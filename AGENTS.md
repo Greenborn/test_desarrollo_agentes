@@ -4,8 +4,11 @@
 
 - `docs/ESPECIFICACION_TECNICA.md` — especificación general del backend/frontend
 - `docs/PLAYWRIGHT_API.md` — documentación del servicio Playwright (API, comandos, instalación)
+- `docs/COMANDOS.md` — documentación de todos los comandos del chat
+- `docs/ENDPOINTS.md` — documentación de todos los endpoints HTTP
+- `docs/DB_SCHEMA.md` — esquema completo de la base de datos
 
-Ambos deben mantenerse actualizados con cada cambio significativo.
+Todos deben mantenerse actualizados con cada cambio significativo.
 
 ## Stack
 
@@ -58,7 +61,10 @@ Ambos deben mantenerse actualizados con cada cambio significativo.
 │       └── services/      # browserManager.js
 ├── docs/
 │   ├── ESPECIFICACION_TECNICA.md
-│   └── PLAYWRIGHT_API.md
+│   ├── PLAYWRIGHT_API.md
+│   ├── COMANDOS.md
+│   ├── ENDPOINTS.md
+│   └── DB_SCHEMA.md
 └── AGENTS.md
 ```
 
