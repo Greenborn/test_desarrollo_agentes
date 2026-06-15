@@ -2,7 +2,10 @@
 
 ## Fuente de verdad del proyecto
 
-Ver `docs/ESPECIFICACION_TECNICA.md` — debe mantenerse actualizada con cada cambio significativo.
+- `docs/ESPECIFICACION_TECNICA.md` — especificación general del backend/frontend
+- `docs/PLAYWRIGHT_API.md` — documentación del servicio Playwright (API, comandos, instalación)
+
+Ambos deben mantenerse actualizados con cada cambio significativo.
 
 ## Stack
 
@@ -48,8 +51,14 @@ Ver `docs/ESPECIFICACION_TECNICA.md` — debe mantenerse actualizada con cada ca
 │       ├── stores/         # Pinia (auth, chat, settings)
 │       ├── views/          # Login, Dashboard, Settings
 │       └── components/     # Topbar, SidebarChat, ChatWindow, ChatMessage
+├── playwright/            # Servicio Playwright (Express wrapper)
+│   └── src/
+│       ├── index.js       # Entrypoint (Express)
+│       ├── routes/        # command.routes.js
+│       └── services/      # browserManager.js
 ├── docs/
-│   └── ESPECIFICACION_TECNICA.md
+│   ├── ESPECIFICACION_TECNICA.md
+│   └── PLAYWRIGHT_API.md
 └── AGENTS.md
 ```
 
@@ -73,6 +82,14 @@ Orden inicial obligatorio: `sudo setup-db → migrate → seed → dev`
 ```bash
 npm run dev               # Servidor de desarrollo Vite (puerto 5173)
 npm run build             # Build producción
+```
+
+### Playwright (`playwright/`)
+
+```bash
+npm run setup             # npm install + instalar navegadores chromium y firefox
+npm run dev               # Iniciar servidor con --watch (puerto 4098)
+npm start                 # Iniciar servidor en producción
 ```
 
 ## Testing

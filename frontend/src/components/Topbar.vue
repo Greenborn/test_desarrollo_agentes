@@ -22,6 +22,7 @@ import { useAuthStore } from '../stores/auth.js'
 import { useRouter } from 'vue-router'
 import { useCommandStore } from '../stores/command.js'
 import { useModalStore } from '../stores/modal.js'
+import { useOpencodeStore } from '../stores/opencode.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useChatStore } from '../stores/chat.js'
 import CommandInput from './CommandInput.vue'
@@ -34,6 +35,7 @@ export default {
     const cmdStore = useCommandStore()
     const chatStore = useChatStore()
     const modal = useModalStore()
+    const ocStore = useOpencodeStore()
     const { user } = storeToRefs(auth)
     const { register } = useCommandRegistry()
     const router = useRouter()
@@ -55,7 +57,7 @@ export default {
       usage: '/cd &lt;ruta&gt;',
       autocomplete(args, cmdStore) {
         const last = args.length > 0 ? args[args.length - 1] : ''
-        const prefix = last.startsWith('/') || last.startsWith('~') ? last : '/'
+        const prefix = last ? last : '/'
         cmdStore.fetchAutocomplete(prefix, cmdStore.currentDir)
       },
       async execute(args, { cmdStore, chatStore }) {
@@ -92,9 +94,11 @@ export default {
       usage: '/ls [ruta]',
       autocomplete(args, cmdStore) {
         const last = args.length > 0 ? args[args.length - 1] : ''
-        const prefix = last.startsWith('/') || last.startsWith('~') ? last : ''
-        if (!prefix && !cmdStore.currentDir) return
-        cmdStore.fetchAutocomplete(prefix || cmdStore.currentDir, cmdStore.currentDir)
+        if (last) {
+          cmdStore.fetchAutocomplete(last, cmdStore.currentDir)
+        } else if (cmdStore.currentDir) {
+          cmdStore.fetchAutocomplete(cmdStore.currentDir, cmdStore.currentDir)
+        }
       },
       async execute(args, { cmdStore, chatStore }) {
         const dir = args.join(' ')
@@ -140,6 +144,66 @@ export default {
           chatStore.loadMessages(sessionId)
         } catch (err) {
           console.error('Error en /history:', err)
+        }
+      },
+    })
+
+    register({
+      name: '/opencode',
+      category: 'OpenCode',
+      description: 'Inicia una sesión con OpenCode: seleccionar proveedor, modelo, modo y enviar prompt.',
+      usage: '/opencode',
+      async execute(args, { cmdStore, chatStore }) {
+        const sessionId = chatStore.activeSessionId
+        if (!sessionId) {
+          console.error('Error en /opencode: no hay sesión de chat activa')
+          return
+        }
+
+        const data = await ocStore.start()
+        if (!data) return
+
+        const providerList = ocStore.getAvailableProviders()
+        if (providerList.length === 0) {
+          console.error('Error en /opencode: no se encontraron proveedores')
+          return
+        }
+
+        const preselectProvider = ocStore.savedProvider || providerList[0].value
+
+        chatStore.messages.push({
+          role: 'opencode_control',
+          controlData: {
+            controlId: 'provider-' + Date.now(),
+            controlType: 'select',
+            stepType: 'opencode_setup',
+            subStepType: 'provider',
+            options: providerList,
+            placeholder: 'Selecciona proveedor...',
+            preselect: preselectProvider,
+          },
+          _key: 'control-' + Date.now(),
+        })
+      },
+    })
+
+    register({
+      name: '/opencode_fin',
+      category: 'OpenCode',
+      description: 'Finaliza la sesión OpenCode activa.',
+      usage: '/opencode_fin',
+      async execute(args, { cmdStore, chatStore }) {
+        try {
+          await fetch('/api/opencode/finish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ ocSessionId: ocStore.ocSessionId }),
+          })
+        } catch {}
+        ocStore.finish()
+        if (chatStore.activeSessionId) {
+          chatStore.loadMessages(chatStore.activeSessionId)
         }
       },
     })

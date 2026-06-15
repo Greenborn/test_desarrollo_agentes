@@ -1,5 +1,5 @@
 <template>
-  <div class="position-relative flex-grow-1 mx-3" style="max-width: 480px;">
+  <div class="position-relative flex-grow-1 mx-3">
     <div class="input-group input-group-sm">
       <span class="input-group-text bg-dark text-success border-secondary font-monospace text-truncate" style="max-width: 180px;" :title="currentDir || '/'">
         {{ (currentDir || '/') }} $

@@ -180,7 +180,9 @@ router.post('/execute', async (req, res) => {
     }
 
     if (sessionId) {
-      await db('chat_messages').insert({ session_id: sessionId, role: 'command', content: command });
+      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+      const cwd = session && session.cwd ? session.cwd : process.cwd();
+      await db('chat_messages').insert({ session_id: sessionId, role: 'command', content: `[${cwd}] ${command}` });
       await db('chat_messages').insert({ session_id: sessionId, role: 'result', content: result });
       await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
     }
@@ -194,7 +196,9 @@ router.post('/execute', async (req, res) => {
     const errorResult = `Error: ${err.message}`;
     if (sessionId) {
       try {
-        await db('chat_messages').insert({ session_id: sessionId, role: 'command', content: command });
+        const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+        const cwd = session && session.cwd ? session.cwd : process.cwd();
+        await db('chat_messages').insert({ session_id: sessionId, role: 'command', content: `[${cwd}] ${command}` });
         await db('chat_messages').insert({ session_id: sessionId, role: 'result', content: errorResult });
       } catch (innerErr) {
         console.log('Error al guardar resultado de error en chat_messages:', innerErr.message);
