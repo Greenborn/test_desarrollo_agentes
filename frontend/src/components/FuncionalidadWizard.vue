@@ -41,6 +41,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 export default {
   props: {
     sessionId: { type: Number, required: true },
+    proyectoId: { type: String, default: null },
   },
   emits: ['close'],
   setup(props, { emit }) {
@@ -90,6 +91,7 @@ export default {
           credentials: 'include',
           body: JSON.stringify({
             sessionId: props.sessionId,
+            proyectoId: props.proyectoId,
             etapa: activeTab.value.toUpperCase(),
             parametros: { ...formData },
           }),

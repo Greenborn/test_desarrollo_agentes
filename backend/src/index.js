@@ -12,7 +12,9 @@ import commandRoutes from './routes/command.routes.js';
 import opencodeRoutes from './routes/opencode.routes.js';
 import navegadorRoutes from './routes/navegador.routes.js';
 import funcionalidadRoutes from './routes/funcionalidad.routes.js';
+import proyectoRoutes from './routes/proyecto.routes.js';
 import opencode from './services/opencode.js';
+import db from './config/db.js';
 
 const PORT = process.env.PORT;
 if (!PORT) {
@@ -31,6 +33,7 @@ app.use('/api/command', commandRoutes);
 app.use('/api/opencode', opencodeRoutes);
 app.use('/api/navegador', navegadorRoutes);
 app.use('/api', funcionalidadRoutes);
+app.use('/api', proyectoRoutes);
 
 let pwProcess = null;
 
@@ -64,15 +67,28 @@ function startPlaywrightService() {
   });
 }
 
-const server = http.createServer(app);
-server.listen(PORT, (err) => {
-  if (err) {
-    console.log('Error al iniciar servidor:', err.message);
+async function start() {
+  try {
+    console.log('[migrate] Ejecutando migraciones pendientes...');
+    await db.migrate.latest();
+    console.log('[migrate] Migraciones ejecutadas correctamente.');
+  } catch (err) {
+    console.log('[migrate] Error al ejecutar migraciones:', err.message);
     process.exit(1);
   }
-  console.log(`Server listening on port ${PORT}`);
-  startPlaywrightService();
-});
+
+  const server = http.createServer(app);
+  server.listen(PORT, (err) => {
+    if (err) {
+      console.log('Error al iniciar servidor:', err.message);
+      process.exit(1);
+    }
+    console.log(`Server listening on port ${PORT}`);
+    startPlaywrightService();
+  });
+}
+
+start();
 
 process.on('exit', () => {
   opencode.stopAllServers();

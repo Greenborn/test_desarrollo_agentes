@@ -31,10 +31,17 @@ router.get('/funcionalidad/:sessionId', async (req, res) => {
 
 router.post('/funcionalidad', async (req, res) => {
   if (!authGuard(req, res)) return;
-  const { sessionId, etapa, parametros } = req.body;
+  const { sessionId, etapa, parametros, proyectoId } = req.body;
 
   if (!sessionId) {
     return res.status(400).json({ error: 'sessionId es requerido' });
+  }
+
+  if (proyectoId) {
+    const proy = await db('proyectos').where({ id: proyectoId }).first();
+    if (!proy) {
+      return res.status(400).json({ error: `El proyecto '${proyectoId}' no existe` });
+    }
   }
 
   try {
@@ -44,6 +51,7 @@ router.post('/funcionalidad', async (req, res) => {
       session_id: sessionId,
       etapa: etapa || 'RELEVAMIENTO',
       parametros: parametros ? JSON.stringify(parametros) : null,
+      proyecto_id: proyectoId || null,
       fecha_hora: db.fn.now(),
     };
 

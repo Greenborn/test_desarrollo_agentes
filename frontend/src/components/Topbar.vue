@@ -32,6 +32,7 @@ import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useChatStore } from '../stores/chat.js'
 import CommandInput from './CommandInput.vue'
 import HelpContent from './HelpModal.vue'
+import CrearProyectoModal from './CrearProyectoModal.vue'
 
 export default {
   components: { CommandInput },
@@ -386,6 +387,95 @@ export default {
         ocStore.finish()
         if (chatStore.activeSessionId) {
           chatStore.loadMessages(chatStore.activeSessionId)
+        }
+      },
+    })
+
+    register({
+      name: '/proyecto_set',
+      category: 'Proyecto',
+      description: 'Asigna un proyecto a la sesión actual, o crea uno nuevo si se invoca sin parámetros.',
+      usage: '/proyecto_set [id_proyecto]',
+      async autocomplete(args, cmdStore) {
+        try {
+          const res = await fetch('/api/proyecto', { credentials: 'include' })
+          const data = await res.json()
+          if (data.proyectos) {
+            cmdStore.showAutocomplete(data.proyectos.map((p) => p.id))
+          }
+        } catch (err) {
+          console.error('Error en autocomplete de /proyecto_set:', err)
+        }
+      },
+      async execute(args, { cmdStore, chatStore }) {
+        const sessionId = chatStore.activeSessionId
+        if (!sessionId) {
+          console.error('Error en /proyecto_set: no hay sesión de chat activa')
+          return
+        }
+        const proyectoId = args[0]
+        if (!proyectoId) {
+          modal.open(CrearProyectoModal, {}, { title: 'Nuevo Proyecto' })
+          return
+        }
+        try {
+          const res = await fetch('/api/proyecto/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ sessionId, proyectoId }),
+          })
+          const data = await res.json()
+          chatStore.messages.push({
+            role: 'command',
+            content: `/proyecto_set ${proyectoId}`,
+            _key: 'cmd-' + Date.now(),
+          })
+          if (data.success) {
+            chatStore.messages.push({
+              role: 'result',
+              content: `Proyecto "${proyectoId}" seleccionado.`,
+              _key: 'res-' + Date.now(),
+            })
+          } else {
+            chatStore.messages.push({
+              role: 'result',
+              content: `Error: ${data.error}`,
+              _key: 'err-' + Date.now(),
+            })
+          }
+        } catch (err) {
+          console.error('Error en /proyecto_set:', err)
+        }
+      },
+    })
+
+    register({
+      name: '/proyecto_info',
+      category: 'Proyecto',
+      description: 'Muestra el ID del proyecto asignado a la sesión actual.',
+      usage: '/proyecto_info',
+      async execute(args, { cmdStore, chatStore }) {
+        const sessionId = chatStore.activeSessionId
+        if (!sessionId) {
+          console.error('Error en /proyecto_info: no hay sesión de chat activa')
+          return
+        }
+        try {
+          const res = await fetch(`/api/proyecto/session/${sessionId}`, { credentials: 'include' })
+          const data = await res.json()
+          chatStore.messages.push({
+            role: 'command',
+            content: '/proyecto_info',
+            _key: 'cmd-' + Date.now(),
+          })
+          chatStore.messages.push({
+            role: 'result',
+            content: data.proyectoId ? `Proyecto actual: ${data.proyectoId}` : 'No hay proyecto asignado a esta sesión.',
+            _key: 'res-' + Date.now(),
+          })
+        } catch (err) {
+          console.error('Error en /proyecto_info:', err)
         }
       },
     })

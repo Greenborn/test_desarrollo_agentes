@@ -5,9 +5,8 @@
       :key="modal.id"
       class="app-modal-overlay"
       :style="{ zIndex: 1050 + i }"
-      @click.self="close(modal.id)"
     >
-      <div class="app-modal-backdrop" @click="close(modal.id)"></div>
+      <div class="app-modal-backdrop"></div>
       <div class="app-modal-wrapper" :class="{ wide: modal.wide }">
         <div class="app-modal-dialog">
           <div class="app-modal-header">
@@ -26,7 +25,7 @@
 </template>
 
 <script>
-import { onMounted, onUnmounted, watch } from 'vue'
+import { watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useModalStore } from '../stores/modal.js'
 
@@ -42,15 +41,6 @@ export default {
     function close(id) {
       modal.close(id)
     }
-
-    function onKeydown(e) {
-      if (e.key === 'Escape' && stack.value.length > 0) {
-        close(stack.value[stack.value.length - 1].id)
-      }
-    }
-
-    onMounted(() => window.addEventListener('keydown', onKeydown))
-    onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
     return { stack, close }
   },
@@ -77,9 +67,9 @@ export default {
   max-height: 85vh;
 }
 .app-modal-wrapper.wide {
-  max-width: 1400px;
-  width: 98%;
-  height: 94vh;
+  max-width: 98%;
+  width: 100%;
+  height: 96vh;
 }
 .app-modal-wrapper.wide .app-modal-dialog {
   height: 100%;
