@@ -8,7 +8,7 @@ Ver `docs/ESPECIFICACION_TECNICA.md` — debe mantenerse actualizada con cada ca
 
 - **Backend:** Node.js + Express + Knex + mysql2 + MariaDB — JavaScript puro (NO TypeScript)
 - **Frontend:** Vue 3 + Vite + Bootstrap 5 — JavaScript puro (NO TypeScript)
-- **Comunicación:** Socket.IO (100%, sin HTTP REST entre front/back)
+- **Comunicación:** HTTP REST + SSE streaming (no WebSockets)
 - **Autenticación:** Sesiones con cookies (express-session)
 - **Agente chat:** DeepSeek API con streaming (thinking + respuesta en vivo)
 - **Encriptación:** AES-256-CBC con clave desde `.env`
@@ -20,30 +20,30 @@ Ver `docs/ESPECIFICACION_TECNICA.md` — debe mantenerse actualizada con cada ca
 - Variables de entorno desde `backend/.env`
 - Script `backend/scripts/setup-db.js` para crear DB y usuario en MariaDB
 - API keys encriptadas antes de guardar en tabla `settings`
-- Todas las comunicaciones frontend ↔ backend vía Socket.IO
+- Comunicaciones frontend ↔ backend vía HTTP REST con `credentials: 'include'`
+- Streaming de chat vía Server-Sent Events sobre HTTP POST
 
 ## Estructura
 
 ```
 /
-├── backend/               # Express + Socket.IO + Knex
+├── backend/               # Express + Knex
 │   ├── migrations/        # Migraciones Knex
 │   ├── seeds/             # Seeds Knex (admin/admin)
 │   ├── scripts/           # setup-db.js
 │   └── src/
-│       ├── index.js       # Entrypoint (Express + Socket.IO)
+│       ├── index.js       # Entrypoint (Express)
 │       ├── config/db.js   # Conexión Knex
-│       ├── socketHandlers/ # auth, chat, settings
-│       ├── services/       # crypto.js, deepseek.js
-│       └── middlewares/    # sessionAuth.js
+│       ├── routes/        # auth.routes.js, chat.routes.js, settings.routes.js
+│       ├── services/      # crypto.js, deepseek.js
+│       └── middlewares/   # sessionAuth.js
 ├── frontend/              # Vue 3 + Vite + Bootstrap
 │   └── src/
 │       ├── main.js
 │       ├── router/         # Vue Router con guard de sesión
 │       ├── stores/         # Pinia (auth, chat, settings)
 │       ├── views/          # Login, Dashboard, Settings
-│       ├── components/     # Topbar, SidebarChat, ChatWindow, ChatMessage
-│       └── composables/    # useSocket.js
+│       └── components/     # Topbar, SidebarChat, ChatWindow, ChatMessage
 ├── docs/
 │   └── ESPECIFICACION_TECNICA.md
 └── AGENTS.md

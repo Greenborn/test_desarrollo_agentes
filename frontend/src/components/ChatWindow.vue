@@ -38,6 +38,7 @@
 
 <script>
 import { ref, watch, nextTick } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import ChatMessage from './ChatMessage.vue'
 
@@ -45,6 +46,7 @@ export default {
   components: { ChatMessage },
   setup() {
     const chat = useChatStore()
+    const { activeSessionId, messages, streaming, currentChunk, currentThinking } = storeToRefs(chat)
     const input = ref('')
     const messagesContainer = ref(null)
 
@@ -55,7 +57,7 @@ export default {
     }
 
     watch(
-      () => [chat.messages.length, chat.currentChunk.value],
+      () => [chat.messages.length, chat.currentChunk],
       async () => {
         await nextTick()
         if (messagesContainer.value) {
@@ -66,11 +68,11 @@ export default {
     )
 
     return {
-      activeSessionId: chat.activeSessionId,
-      messages: chat.messages,
-      streaming: chat.streaming,
-      currentChunk: chat.currentChunk,
-      currentThinking: chat.currentThinking,
+      activeSessionId,
+      messages,
+      streaming,
+      currentChunk,
+      currentThinking,
       input,
       send,
       messagesContainer,

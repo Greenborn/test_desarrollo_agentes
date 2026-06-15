@@ -15,12 +15,14 @@
 </template>
 
 <script>
+import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/auth.js'
 import { useRouter } from 'vue-router'
 
 export default {
   setup() {
     const auth = useAuthStore()
+    const { user } = storeToRefs(auth)
     const router = useRouter()
 
     function logout() {
@@ -28,7 +30,7 @@ export default {
       router.push('/')
     }
 
-    return { user: auth.user, logout }
+    return { user, logout }
   },
 }
 </script>

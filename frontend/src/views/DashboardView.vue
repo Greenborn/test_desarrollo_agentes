@@ -9,17 +9,25 @@
 </template>
 
 <script>
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import Topbar from '../components/Topbar.vue'
 import SidebarChat from '../components/SidebarChat.vue'
 import ChatWindow from '../components/ChatWindow.vue'
+import { useAuthStore } from '../stores/auth.js'
 import { useChatStore } from '../stores/chat.js'
 
 export default {
   components: { Topbar, SidebarChat, ChatWindow },
   setup() {
+    const auth = useAuthStore()
     const chat = useChatStore()
-    onMounted(() => chat.loadSessions())
+
+    function load() {
+      if (auth.user) chat.loadSessions()
+    }
+
+    watch(() => auth.user, load)
+    onMounted(load)
   },
 }
 </script>

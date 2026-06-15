@@ -7,10 +7,10 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [vue()],
     server: {
+      host: '0.0.0.0',
       proxy: {
-        '/socket.io': {
+        '/api': {
           target: env.VITE_BACKEND_URL || 'http://localhost:4000',
-          ws: true,
         },
       },
     },

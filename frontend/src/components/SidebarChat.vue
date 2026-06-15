@@ -1,7 +1,7 @@
 <template>
   <div class="d-flex flex-column h-100 bg-light border-end p-2" style="width: 220px; min-width: 220px;">
-    <button class="btn btn-primary btn-sm mb-2" @click="createSession">
-      ＋ Nuevo chat
+    <button class="btn btn-primary btn-sm mb-2" @click="createSession" :disabled="creating">
+      {{ creating ? 'Creando...' : '＋ Nuevo chat' }}
     </button>
     <div class="list-group list-group-flush overflow-auto flex-grow-1">
       <button
@@ -18,11 +18,13 @@
 </template>
 
 <script>
+import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 
 export default {
   setup() {
     const chat = useChatStore()
+    const { sessions, activeSessionId, creating } = storeToRefs(chat)
 
     function createSession() {
       chat.createSession()
@@ -33,8 +35,9 @@ export default {
     }
 
     return {
-      sessions: chat.sessions,
-      activeSessionId: chat.activeSessionId,
+      sessions,
+      activeSessionId,
+      creating,
       createSession,
       selectSession,
     }

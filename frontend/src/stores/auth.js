@@ -1,45 +1,60 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { useSocket } from '../composables/useSocket.js'
+
+const API = '/api'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
   const loading = ref(true)
   const error = ref('')
-  const socket = useSocket()
 
-  socket.on('auth:me', (data) => {
-    user.value = data
-    loading.value = false
-  })
-
-  socket.on('auth:session', ({ token }) => {
-    if (token) {
-      localStorage.setItem('session_token', token)
-    } else {
-      localStorage.removeItem('session_token')
+  async function checkSession() {
+    try {
+      const res = await fetch(`${API}/auth/me`, { credentials: 'include' })
+      const data = await res.json()
+      user.value = data
+    } catch {
+      user.value = null
+    } finally {
+      loading.value = false
     }
-  })
+  }
 
-  socket.on('auth:login_res', (data) => {
-    if (data.success) {
-      user.value = data.user
-      error.value = ''
-    } else {
-      error.value = data.error
-    }
-  })
-
-  function login(username, password) {
+  async function login(username, password) {
     error.value = ''
-    socket.emit('auth:login', { username, password })
+    loading.value = true
+    try {
+      const res = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username, password }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        user.value = data.user
+      } else {
+        error.value = data.error
+      }
+    } catch {
+      error.value = 'Error de conexión'
+    } finally {
+      loading.value = false
+    }
   }
 
-  function logout() {
-    localStorage.removeItem('session_token')
-    socket.emit('auth:logout')
+  async function logout() {
+    try {
+      await fetch(`${API}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+    } catch {
+      // ignore
+    }
     user.value = null
+    loading.value = false
   }
 
-  return { user, loading, error, login, logout }
+  return { user, loading, error, login, logout, checkSession }
 })

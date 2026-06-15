@@ -17,18 +17,11 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
-  if (to.meta.requiresAuth) {
-    if (auth.loading) {
-      await new Promise((resolve) => {
-        const stop = auth.$subscribe((mutation, state) => {
-          if (!state.loading) {
-            stop()
-            resolve()
-          }
-        })
-      })
-    }
-    if (!auth.user) return next('/')
+  if (auth.loading) {
+    await auth.checkSession()
+  }
+  if (to.meta.requiresAuth && !auth.user) {
+    return next('/')
   }
   next()
 })

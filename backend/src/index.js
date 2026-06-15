@@ -1,35 +1,20 @@
 import 'dotenv/config';
 import http from 'http';
 import express from 'express';
-import { Server } from 'socket.io';
 import sessionMiddleware from './middlewares/sessionAuth.js';
-import { wrapSessionForSocket } from './middlewares/sessionAuth.js';
-import registerAuthHandlers from './socketHandlers/auth.js';
-import registerChatHandlers from './socketHandlers/chat.js';
-import registerSettingsHandlers from './socketHandlers/settings.js';
+import authRoutes from './routes/auth.routes.js';
+import chatRoutes from './routes/chat.routes.js';
+import settingsRoutes from './routes/settings.routes.js';
 
 const app = express();
 app.use(sessionMiddleware);
+app.use(express.json());
+
+app.use('/api/auth', authRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/settings', settingsRoutes);
 
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: '*', credentials: true },
-});
-
-wrapSessionForSocket(io);
-
-io.on('connection', (socket) => {
-  try {
-    const userId = socket.request.session?.userId;
-    const username = socket.request.session?.username;
-
-    registerAuthHandlers(io, socket, userId, username);
-    registerChatHandlers(io, socket, userId);
-    registerSettingsHandlers(io, socket, userId, username);
-  } catch (err) {
-    console.log('Error en connection handler:', err.message);
-  }
-});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, (err) => {
