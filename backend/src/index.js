@@ -13,6 +13,7 @@ import opencodeRoutes from './routes/opencode.routes.js';
 import navegadorRoutes from './routes/navegador.routes.js';
 import funcionalidadRoutes from './routes/funcionalidad.routes.js';
 import proyectoRoutes from './routes/proyecto.routes.js';
+import documentacionRoutes from './routes/documentacion.routes.js';
 import opencode from './services/opencode.js';
 import db from './config/db.js';
 
@@ -34,8 +35,10 @@ app.use('/api/opencode', opencodeRoutes);
 app.use('/api/navegador', navegadorRoutes);
 app.use('/api', funcionalidadRoutes);
 app.use('/api', proyectoRoutes);
+app.use('/api/documentacion', documentacionRoutes);
 
 let pwProcess = null;
+let docProcess = null;
 
 function startPlaywrightService() {
   const pwPort = process.env.SERVICIO_PLAYWRIGHT_PORT || 4098;
@@ -67,6 +70,36 @@ function startPlaywrightService() {
   });
 }
 
+function startDocumentalService() {
+  const docPort = process.env.SERVICIO_DOCUMENTAL_PORT || 4099;
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const docPath = path.resolve(__dirname, '../../api_documental/src/index.js');
+  docProcess = spawn('node', [docPath], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env },
+  });
+
+  docProcess.stdout.on('data', (data) => {
+    const text = data.toString().trim();
+    if (text) console.log('[documental]', text);
+  });
+
+  docProcess.stderr.on('data', (data) => {
+    const text = data.toString().trim();
+    if (text) console.log('[documental]', text);
+  });
+
+  docProcess.on('exit', (code) => {
+    console.log('[documental] proceso terminado, código:', code);
+    docProcess = null;
+  });
+
+  docProcess.on('error', (err) => {
+    console.log('[documental] error al iniciar:', err.message);
+    docProcess = null;
+  });
+}
+
 async function start() {
   try {
     console.log('[migrate] Ejecutando migraciones pendientes...');
@@ -85,6 +118,7 @@ async function start() {
     }
     console.log(`Server listening on port ${PORT}`);
     startPlaywrightService();
+    startDocumentalService();
   });
 }
 
@@ -93,14 +127,17 @@ start();
 process.on('exit', () => {
   opencode.stopAllServers();
   if (pwProcess) pwProcess.kill();
+  if (docProcess) docProcess.kill();
 });
 process.on('SIGTERM', () => {
   opencode.stopAllServers();
   if (pwProcess) pwProcess.kill();
+  if (docProcess) docProcess.kill();
   process.exit(0);
 });
 process.on('SIGINT', () => {
   opencode.stopAllServers();
   if (pwProcess) pwProcess.kill();
+  if (docProcess) docProcess.kill();
   process.exit(0);
 });
