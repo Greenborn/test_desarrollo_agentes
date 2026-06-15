@@ -9,11 +9,11 @@
         <div class="input-group">
           <input
             :type="showKey ? 'text' : 'password'"
-            class="form-control"
+            class="form-control bg-dark text-light border-secondary"
             v-model="keyInput"
             placeholder="sk-..."
           />
-          <button class="btn btn-outline-secondary" @click="showKey = !showKey">
+          <button class="btn btn-outline-light" @click="showKey = !showKey">
             {{ showKey ? 'Ocultar' : 'Mostrar' }}
           </button>
         </div>
@@ -25,7 +25,7 @@
       <div class="mb-4">
         <label class="form-label">System Prompt del agente</label>
         <textarea
-          class="form-control font-monospace"
+          class="form-control font-monospace bg-dark text-light border-secondary"
           rows="8"
           v-model="promptInput"
         ></textarea>

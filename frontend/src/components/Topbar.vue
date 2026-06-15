@@ -6,7 +6,7 @@
       <button class="btn btn-dark dropdown-toggle" data-bs-toggle="dropdown">
         {{ user.username }}
       </button>
-      <ul class="dropdown-menu dropdown-menu-end">
+      <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
         <li><router-link class="dropdown-item" to="/settings">Configuración</router-link></li>
         <li><hr class="dropdown-divider" /></li>
         <li><a class="dropdown-item" href="#" @click.prevent="logout">Cerrar sesión</a></li>
@@ -16,7 +16,7 @@
 </template>
 
 <script>
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/auth.js'
 import { useRouter } from 'vue-router'
@@ -39,6 +39,7 @@ export default {
     const { user } = storeToRefs(auth)
     const { register } = useCommandRegistry()
     const router = useRouter()
+    const navegadorSessionId = ref(null)
 
     register({
       name: '/help',
@@ -235,6 +236,118 @@ export default {
             streamMsg.streaming = false
           },
         })
+      },
+    })
+
+    register({
+      name: '/iniciar_navegador',
+      category: 'Navegador',
+      description: 'Inicia una sesión de navegador web (chrome o firefox). Opcional: URL a navegar.',
+      usage: '/iniciar_navegador [chrome|firefox] [url]',
+      async execute(args, { cmdStore, chatStore }) {
+        const navegador = args[0] || 'chrome'
+        const url = args[1] || ''
+        const sessionId = chatStore.activeSessionId
+        try {
+          const body = { comando: 'start', parametros: { navegador } }
+          if (url) body.parametros.url = url
+          const res = await fetch('/api/navegador/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+          })
+          const data = await res.json()
+          if (data.error) {
+            console.error('Error en /iniciar_navegador:', data.error)
+            if (sessionId) {
+              chatStore.messages.push({ role: 'opencode_info', content: JSON.stringify({ type: 'error', message: data.error }), _key: 'err-' + Date.now() })
+            }
+          } else {
+            navegadorSessionId.value = data.id_session
+            if (sessionId) {
+              const msg = `Navegador "${navegador}" iniciado. Sesión: ${data.id_session}\nHeadless: ${data.headless ? 'Sí' : 'No'}`
+              chatStore.messages.push({ role: 'opencode_result', content: msg + (data.url ? `\nURL: ${data.url}` : ''), _key: 'nav-' + Date.now() })
+            }
+          }
+        } catch (err) {
+          console.error('Error en /iniciar_navegador:', err)
+        }
+      },
+    })
+
+    register({
+      name: '/navegador_go_to',
+      category: 'Navegador',
+      description: 'Navega a una URL en la sesión de navegador activa.',
+      usage: '/navegador_go_to &lt;url&gt;',
+      async execute(args, { cmdStore, chatStore }) {
+        const url = args.join('')
+        if (!url) {
+          console.error('Error en /navegador_go_to: debe especificar una URL')
+          return
+        }
+        const sessionId = chatStore.activeSessionId
+        try {
+          const res = await fetch('/api/navegador/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ comando: 'go_to_url', parametros: { id_session: navegadorSessionId.value, url } }),
+          })
+          const data = await res.json()
+          if (data.error) {
+            console.error('Error en /navegador_go_to:', data.error)
+            if (sessionId) {
+              chatStore.messages.push({ role: 'opencode_info', content: JSON.stringify({ type: 'error', message: data.error }), _key: 'err-' + Date.now() })
+            }
+          } else {
+            if (data.id_session) navegadorSessionId.value = data.id_session
+            if (sessionId) {
+              chatStore.messages.push({ role: 'opencode_result', content: `Navegó a: ${url}`, _key: 'nav-' + Date.now() })
+            }
+          }
+        } catch (err) {
+          console.error('Error en /navegador_go_to:', err)
+        }
+      },
+    })
+
+    register({
+      name: '/navegador_set_headless',
+      category: 'Navegador',
+      description: 'Cambia el modo headless del navegador (0 = visible, 1 = headless). Si hay sesión activa, la reinicia.',
+      usage: '/navegador_set_headless &lt;0|1&gt;',
+      async execute(args, { cmdStore, chatStore }) {
+        const val = args[0]
+        if (val !== '0' && val !== '1') {
+          console.error('Error en /navegador_set_headless: use 0 (visible) o 1 (headless)')
+          return
+        }
+        const headless = val === '1'
+        const sessionId = chatStore.activeSessionId
+        try {
+          const res = await fetch('/api/navegador/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ comando: 'set_headless', parametros: { headless: val } }),
+          })
+          const data = await res.json()
+          if (data.error) {
+            console.error('Error en /navegador_set_headless:', data.error)
+          } else {
+            if (data.id_session) navegadorSessionId.value = data.id_session
+            if (sessionId) {
+              const msg = data.reiniciado
+                ? `Modo headless cambiado a ${headless ? '1' : '0'}. Navegador reiniciado. Nueva sesión: ${data.id_session}`
+                : `Modo headless por defecto: ${headless ? '1 (headless)' : '0 (visible)'}`
+              chatStore.messages.push({ role: 'opencode_result', content: msg, _key: 'nav-' + Date.now() })
+            }
+          }
+        } catch (err) {
+          console.error('Error en /navegador_set_headless:', err)
+        }
       },
     })
 

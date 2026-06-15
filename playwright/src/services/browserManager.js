@@ -2,6 +2,7 @@ import { chromium, firefox } from 'playwright';
 import crypto from 'crypto';
 
 const sessions = new Map();
+let defaultHeadless = false;
 
 function generateId() {
   return crypto.randomUUID();
@@ -13,7 +14,15 @@ function getBrowserType(navegador) {
   return null;
 }
 
-async function startSession(navegador) {
+function setDefaultHeadless(value) {
+  defaultHeadless = !!value;
+}
+
+function getDefaultHeadless() {
+  return defaultHeadless;
+}
+
+async function startSession(navegador, headless) {
   if (!navegador) {
     throw new Error('Parámetro "navegador" es requerido');
   }
@@ -23,9 +32,11 @@ async function startSession(navegador) {
     throw new Error(`Navegador no soportado: "${navegador}". Soporta: chrome, firefox`);
   }
 
+  const headlessMode = headless !== undefined ? !!headless : defaultHeadless;
+
   let browser;
   try {
-    browser = await browserType.launch();
+    browser = await browserType.launch({ headless: headlessMode });
   } catch (err) {
     console.log('Error al lanzar navegador:', err.message);
     throw new Error(`No se pudo iniciar ${navegador}: ${err.message}`);
@@ -35,9 +46,9 @@ async function startSession(navegador) {
   const page = await context.newPage();
 
   const id = generateId();
-  sessions.set(id, { browser, context, page, navegador });
+  sessions.set(id, { browser, context, page, navegador, headless: headlessMode });
 
-  console.log(`Sesión ${id} iniciada con ${navegador}`);
+  console.log(`Sesión ${id} iniciada con ${navegador} (headless: ${headlessMode})`);
   return id;
 }
 
@@ -67,6 +78,13 @@ function getSession(idSession) {
   return sessions.get(idSession) || null;
 }
 
+function getActiveSession() {
+  for (const [id, session] of sessions) {
+    return { id, ...session };
+  }
+  return null;
+}
+
 function closeSession(idSession) {
   const session = sessions.get(idSession);
   if (!session) return false;
@@ -75,9 +93,19 @@ function closeSession(idSession) {
   return true;
 }
 
+function closeAllSessions() {
+  for (const [id] of sessions) {
+    closeSession(id);
+  }
+}
+
 export default {
   startSession,
   goToUrl,
   getSession,
+  getActiveSession,
   closeSession,
+  closeAllSessions,
+  setDefaultHeadless,
+  getDefaultHeadless,
 };

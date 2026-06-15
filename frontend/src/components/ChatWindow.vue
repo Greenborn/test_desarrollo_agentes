@@ -2,12 +2,12 @@
   <div class="d-flex flex-column h-100">
     <div class="flex-grow-1 overflow-auto p-3" ref="messagesContainer">
       <div v-if="!activeSessionId" class="text-center text-muted mt-5">
-        <h5>Selecciona o crea un nuevo chat</h5>
+        <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
       </div>
       <template v-else>
         <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" @control-confirm="onControlConfirm" />
         <div v-if="streaming" class="text-start mb-3">
-          <div class="d-inline-block bg-light border rounded-3 p-3 text-start" style="max-width: 80%;">
+          <div class="d-inline-block bg-dark text-light border-secondary rounded-3 p-3 text-start" style="max-width: 80%;">
             <div v-if="currentThinking" class="mb-2">
               <button class="btn btn-sm btn-outline-secondary w-100 text-start" data-bs-toggle="collapse" data-bs-target="#think-stream">
                 🧠 Razonando...
@@ -34,11 +34,11 @@
         </div>
       </template>
     </div>
-    <div class="border-top p-2" v-if="activeSessionId">
+    <div class="border-top border-secondary p-2" v-if="activeSessionId">
       <form @submit.prevent="send" class="d-flex gap-2">
         <input
           v-model="input"
-          class="form-control"
+          class="form-control bg-dark text-light border-secondary"
           placeholder="Escribe tu mensaje..."
           :disabled="streaming"
         />

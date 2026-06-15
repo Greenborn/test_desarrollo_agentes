@@ -1,17 +1,17 @@
 <template>
-  <div class="d-flex flex-column h-100 bg-light border-end p-2" style="width: 220px; min-width: 220px;">
+  <div class="d-flex flex-column h-100 bg-dark border-secondary border-end p-2" style="width: 220px; min-width: 220px;">
     <button class="btn btn-primary btn-sm mb-2" @click="createSession" :disabled="creating">
       {{ creating ? 'Creando...' : '＋ Nuevo chat' }}
     </button>
-    <div class="list-group list-group-flush overflow-auto flex-grow-1">
+    <div class="list-group list-group-flush overflow-auto flex-grow-1 bg-dark">
       <button
         v-for="s in sessions"
         :key="s.id"
-        class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
+        class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center bg-dark text-light border-secondary"
         :class="{ active: s.id === activeSessionId }"
         @click="selectSession(s.id)"
       >
-        <span class="text-truncate">{{ s.title }}</span>
+        <span class="text-truncate text-light">{{ s.title }}</span>
         <span
           class="delete-btn"
           @click.stop="chat.deleteSession(s.id)"
@@ -61,7 +61,7 @@ export default {
   cursor: pointer;
   font-size: 1.2rem;
   line-height: 1;
-  color: #dc3545;
+  color: #e05a6b;
   padding: 0 4px;
   margin-left: 4px;
 }

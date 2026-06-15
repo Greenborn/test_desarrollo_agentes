@@ -236,14 +236,19 @@ playwright/
 
 ```
 COMANDOS DISPONIBLES:
-- start      → inicia navegador chrome/firefox, devuelve id_session
-- go_to_url  → navega a una URL en una sesión existente
+- start         → inicia navegador chrome/firefox, devuelve id_session
+- go_to_url     → navega a una URL en una sesión existente
+- set_headless  → cambia modo headless (0=visible, 1=headless)
+- close         → cierra una sesión de navegador
 
 USO:
-  { "comando": "start",     "parametros": { "navegador": "chrome"|"firefox" } }
-  { "comando": "go_to_url", "parametros": { "id_session": "uuid", "url": "https://..." } }
+  { "comando": "start",        "parametros": { "navegador": "chrome"|"firefox", "headless": true|false } }
+  { "comando": "go_to_url",    "parametros": { "id_session": "uuid", "url": "https://..." } }
+  { "comando": "set_headless", "parametros": { "headless": "0"|"1" } }
+  { "comando": "close",        "parametros": { "id_session": "uuid" } }
 
 ERRORES:
   - 400: parámetros faltantes o comando desconocido
   - 500: error interno (navegador no disponible, navegación fallida)
+  - 502: error de conexión con el servicio Playwright
 ```

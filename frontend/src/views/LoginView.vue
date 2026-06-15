@@ -1,16 +1,16 @@
 <template>
   <div class="d-flex align-items-center justify-content-center vh-100 bg-dark">
-    <div class="card shadow" style="width: 360px;">
+    <div class="card shadow bg-dark text-light" style="width: 360px;">
       <div class="card-body p-4">
-        <h4 class="card-title text-center mb-4">Agent Orchestrator</h4>
+        <h4 class="card-title text-center mb-4 text-light">Agent Orchestrator</h4>
         <form @submit.prevent="handleLogin">
           <div class="mb-3">
-            <label class="form-label">Usuario</label>
-            <input v-model="username" class="form-control" autocomplete="username" required />
+            <label class="form-label text-light">Usuario</label>
+            <input v-model="username" class="form-control bg-dark text-light border-secondary" autocomplete="username" required />
           </div>
           <div class="mb-3">
-            <label class="form-label">Contraseña</label>
-            <input v-model="password" type="password" class="form-control" autocomplete="current-password" required />
+            <label class="form-label text-light">Contraseña</label>
+            <input v-model="password" type="password" class="form-control bg-dark text-light border-secondary" autocomplete="current-password" required />
           </div>
           <div v-if="auth.error" class="alert alert-danger py-2 small">{{ auth.error }}</div>
           <button type="submit" class="btn btn-primary w-100">Iniciar sesión</button>

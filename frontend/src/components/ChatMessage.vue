@@ -41,7 +41,7 @@
     <div
       v-else
       class="d-inline-block rounded-3 p-3 text-start"
-      :class="msg.role === 'user' ? 'bg-primary text-white' : 'bg-light border'"
+      :class="msg.role === 'user' ? 'bg-primary text-white' : 'bg-dark text-light border-secondary'"
       style="max-width: 80%;"
     >
       <div v-if="msg.thinking" class="mb-2">
