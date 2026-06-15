@@ -117,6 +117,19 @@ export default {
             chat.messages[idx].role = 'opencode_result'
             chat.messages[idx].content = json.fullResponse || fullText || '(sin respuesta)'
           }
+          // Add follow-up prompt control
+          chat.messages.push({
+            role: 'opencode_control',
+            controlData: {
+              controlId: 'followup-' + Date.now(),
+              controlType: 'textarea',
+              stepType: 'opencode_runtime',
+              subStepType: 'followup_prompt',
+              placeholder: 'Escribe otro mensaje para OpenCode (Enter para enviar)...',
+              rows: 2,
+            },
+            _key: 'control-' + Date.now(),
+          })
         },
         onError(msg) {
           ocStreaming.value = false
@@ -137,6 +150,18 @@ export default {
 
       if (stepType === 'opencode_setup') {
         await handleOpencodeSetup(controlId, value, controlMsg)
+      } else if (stepType === 'opencode_runtime' && controlMsg?.controlData?.subStepType === 'followup_prompt') {
+        // Follow-up prompt to existing OpenCode session
+        const msg = { role: 'opencode_info', content: JSON.stringify({ type: 'info', message: 'Enviando mensaje a OpenCode...' }), _key: 'info-' + Date.now() }
+        chat.messages.push(msg)
+        await opencodeStreamPrompt(
+          chat.activeSessionId,
+          value,
+          ocStore.selectedProvider,
+          ocStore.selectedModel,
+          ocStore.selectedThinking,
+          ocStore.selectedMode,
+        )
       } else {
         // Runtime OpenCode control
         try {
