@@ -73,6 +73,7 @@ export default {
     const ocStreaming = ref(false)
     const ocChunk = ref('')
     const ocThinking = ref('')
+    const docUpdateProyectoId = ref('')
 
     function send() {
       const raw = input.value.trim()
@@ -144,6 +145,75 @@ export default {
       })
     }
 
+    async function opencodeStreamPromptDocUpdate(sessionId, prompt, provider, model, thinking, mode, proyectoId) {
+      ocStreaming.value = true
+      ocChunk.value = ''
+      ocThinking.value = ''
+
+      const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
+      streamMsg._key = 'stream-' + Date.now()
+
+      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, {
+        onChunk(content) {
+          ocChunk.value += content
+        },
+        onThinking(content) {
+          ocThinking.value += content
+        },
+        onControl(control) {
+          chat.messages.push({
+            role: 'opencode_control',
+            content: JSON.stringify(control),
+            controlData: control,
+            _key: 'control-' + Date.now(),
+          })
+        },
+        async onDone(json, fullText) {
+          ocStreaming.value = false
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
+          if (idx >= 0) {
+            chat.messages[idx].streaming = false
+            chat.messages[idx].role = 'opencode_result'
+            chat.messages[idx].content = fullResponse
+          }
+
+          try {
+            const res = await fetch(`/api/documentacion/subproyectos/${encodeURIComponent(proyectoId)}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ data: fullResponse }),
+            })
+            if (!res.ok) {
+              const errData = await res.json()
+              throw new Error(errData.error || 'Error al guardar documentación')
+            }
+            chat.messages.push({
+              role: 'result',
+              content: `Documentación de subproyectos actualizada correctamente para el proyecto "${proyectoId}".`,
+              _key: 'result-' + Date.now(),
+            })
+          } catch (err) {
+            console.error('Error al guardar documentación de subproyectos:', err.message)
+            chat.messages.push({
+              role: 'result',
+              content: 'Error al guardar documentación de subproyectos: ' + err.message,
+              _key: 'result-' + Date.now(),
+            })
+          }
+        },
+        onError(msg) {
+          ocStreaming.value = false
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) {
+            chat.messages[idx].content = '[Error: ' + msg + ']'
+            chat.messages[idx].streaming = false
+          }
+        },
+      })
+    }
+
     async function onControlConfirm({ controlId, value }) {
       // Find the control message to determine type
       const controlMsg = chat.messages.find((m) => m.controlData && m.controlData.controlId === controlId)
@@ -152,6 +222,8 @@ export default {
 
       if (stepType === 'opencode_setup') {
         await handleOpencodeSetup(controlId, value, controlMsg)
+      } else if (stepType === 'documentacion_update') {
+        await handleDocumentacionUpdate(controlId, value, controlMsg)
       } else if (controlType === 'followup') {
         // Follow-up prompt with model/thinking selectors
         const { model, thinking, prompt } = value
@@ -192,6 +264,89 @@ export default {
     }
 
     let ocSetupData = { provider: '', model: '', thinking: '', mode: '', prompt: '' }
+    let docUpdateData = { provider: '', model: '', thinking: '', mode: '' }
+
+    async function handleDocumentacionUpdate(controlId, value, controlMsg) {
+      const subStepType = controlMsg.controlData.subStepType
+
+      if (subStepType === 'provider') {
+        docUpdateData.provider = value
+        docUpdateProyectoId.value = controlMsg.controlData.proyectoId || ''
+        await ocStore.select('provider', value)
+        ocStore.selectedProvider = value
+        const models = ocStore.getModelsForProvider(value)
+        chat.messages.push({
+          role: 'opencode_control',
+          controlData: {
+            controlId: 'model-' + Date.now(),
+            controlType: 'select',
+            stepType: 'documentacion_update',
+            subStepType: 'model',
+            options: models,
+            placeholder: 'Selecciona modelo...',
+            preselect: ocStore.savedModel || '',
+          },
+          _key: 'control-' + Date.now(),
+        })
+      } else if (subStepType === 'model') {
+        docUpdateData.model = value
+        await ocStore.select('model', value)
+        ocStore.selectedModel = value
+        if (ocStore.modelSupportsReasoning(docUpdateData.provider, value)) {
+          chat.messages.push({
+            role: 'opencode_control',
+            controlData: {
+              controlId: 'thinking-' + Date.now(),
+              controlType: 'select',
+              stepType: 'documentacion_update',
+              subStepType: 'thinking',
+              options: ocStore.thinkingOptions,
+              placeholder: 'Selecciona nivel de pensamiento...',
+              preselect: ocStore.savedThinking || 'medium',
+            },
+            _key: 'control-' + Date.now(),
+          })
+        } else {
+          const fakeMsg = { controlData: { subStepType: 'thinking' } }
+          await handleDocumentacionUpdate(null, null, fakeMsg)
+        }
+      } else if (subStepType === 'thinking') {
+        docUpdateData.thinking = value
+        await ocStore.select('thinking', value)
+        ocStore.selectedThinking = value
+        // Skip mode selection — always use Plan
+        const fakeMsg = { controlData: { subStepType: 'mode' } }
+        await handleDocumentacionUpdate(null, null, fakeMsg)
+      } else if (subStepType === 'mode') {
+        // Always use Plan mode for documentation updates
+        docUpdateData.mode = 'Plan'
+        await ocStore.select('mode', 'Plan')
+        ocStore.selectedMode = 'Plan'
+
+        try {
+          const settingsRes = await fetch('/api/settings', { credentials: 'include' })
+          const settingsKeys = await settingsRes.json()
+          const prompt = settingsKeys.documentacion_prompt_subproyectos || 'Analiza el proyecto actual e identifica todos los subproyectos que lo componen. Para cada subproyecto, proporciona un nombre identificativo y una descripción breve pero suficientemente descriptiva para que otros agentes de IA puedan entender su propósito y alcance. Devuelve la información en formato estructurado.'
+
+          await opencodeStreamPromptDocUpdate(
+            chat.activeSessionId,
+            prompt,
+            docUpdateData.provider,
+            docUpdateData.model,
+            docUpdateData.thinking,
+            docUpdateData.mode,
+            docUpdateProyectoId.value,
+          )
+        } catch (err) {
+          console.error('Error al obtener prompt de documentación:', err.message)
+          chat.messages.push({
+            role: 'result',
+            content: 'Error al obtener prompt de documentación: ' + err.message,
+            _key: 'result-' + Date.now(),
+          })
+        }
+      }
+    }
 
     async function handleOpencodeSetup(controlId, value, controlMsg) {
       const subStepType = controlMsg.controlData.subStepType

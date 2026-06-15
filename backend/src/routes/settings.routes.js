@@ -28,7 +28,12 @@ router.get('/', async (req, res) => {
         }
       } else if (row.setting_key === 'system_prompt') {
         keys.system_prompt = row.setting_value;
+      } else if (row.setting_key === 'documentacion_prompt_subproyectos') {
+        keys.documentacion_prompt_subproyectos = row.setting_value;
       }
+    }
+    if (!keys.documentacion_prompt_subproyectos) {
+      keys.documentacion_prompt_subproyectos = 'Analiza el proyecto actual e identifica todos los subproyectos que lo componen. Para cada subproyecto, proporciona un nombre identificativo y una descripción breve pero suficientemente descriptiva para que otros agentes de IA puedan entender su propósito y alcance. Devuelve la información en formato estructurado.';
     }
     res.json(keys);
   } catch (err) {

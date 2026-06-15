@@ -34,6 +34,18 @@
         </button>
       </div>
 
+      <div class="mb-4">
+        <label class="form-label">Prompt Documentación - Subproyectos</label>
+        <textarea
+          class="form-control font-monospace bg-dark text-light border-secondary"
+          rows="6"
+          v-model="docPromptInput"
+        ></textarea>
+        <button class="btn btn-sm btn-primary mt-2" @click="saveDocPrompt">
+          Guardar Prompt
+        </button>
+      </div>
+
       <div v-if="settings.saveSuccess" class="alert alert-success py-2 small">{{ settings.saveSuccess }}</div>
       <div v-if="settings.saveError" class="alert alert-danger py-2 small">{{ settings.saveError }}</div>
     </div>
@@ -51,6 +63,7 @@ export default {
     const settings = useSettingsStore()
     const keyInput = ref('')
     const promptInput = ref('')
+    const docPromptInput = ref('')
     const showKey = ref(false)
 
     onMounted(() => settings.load())
@@ -63,6 +76,10 @@ export default {
       keyInput.value = val
     }, { immediate: true })
 
+    watch(() => settings.documentacionPromptSubproyectos, (val) => {
+      docPromptInput.value = val
+    }, { immediate: true })
+
     function saveKey() {
       settings.clearFeedback()
       settings.save('deepseek_key', keyInput.value)
@@ -73,10 +90,15 @@ export default {
       settings.save('system_prompt', promptInput.value)
     }
 
+    function saveDocPrompt() {
+      settings.clearFeedback()
+      settings.save('documentacion_prompt_subproyectos', docPromptInput.value)
+    }
+
     return {
-      keyInput, promptInput, showKey,
+      keyInput, promptInput, docPromptInput, showKey,
       settings,
-      saveKey, savePrompt,
+      saveKey, savePrompt, saveDocPrompt,
     }
   },
 }

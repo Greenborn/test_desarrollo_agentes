@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import db from '../config/db.js';
 
 const router = Router();
 
@@ -19,6 +20,29 @@ router.get('/:proyectoId', async (req, res) => {
     res.json(data);
   } catch (err) {
     console.log('Error al obtener documentación:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/subproyectos/:proyectoId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { proyectoId } = req.params;
+    const { data } = req.body;
+
+    if (!data) {
+      return res.status(400).json({ error: 'Campo "data" es requerido' });
+    }
+
+    await db('documentacion_subproyectos').where({ id_proyecto: proyectoId }).del();
+    await db('documentacion_subproyectos').insert({
+      id_proyecto: proyectoId,
+      data: JSON.stringify({ respuesta: data, generado_por: 'opencode' }),
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al actualizar subproyectos:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

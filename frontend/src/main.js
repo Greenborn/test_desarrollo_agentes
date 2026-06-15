@@ -8,6 +8,7 @@ import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 import './composables/commands/iniciarNavegador.js'
 import './composables/commands/nuevaFuncionalidad.js'
 import './composables/commands/documentacionAll.js'
+import './composables/commands/documentacionUpdate.js'
 
 const app = createApp(App)
 app.use(createPinia())

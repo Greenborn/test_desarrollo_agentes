@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 
 const servers = {};
-let nextPort = 4098;
+let nextPort = 4200;
 
 class OpenCodeServer {
   constructor(directory, port) {
