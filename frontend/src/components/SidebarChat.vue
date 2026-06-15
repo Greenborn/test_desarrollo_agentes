@@ -1,6 +1,9 @@
 <template>
-  <div class="d-flex flex-column h-100 bg-dark border-secondary border-end p-2" style="width: 220px; min-width: 220px;">
-    <button class="btn btn-primary btn-sm mb-2" @click="createSession" :disabled="creating">
+  <div
+    class="d-flex flex-column h-100 bg-dark sidebar-chat"
+    :class="{ collapsed: sidebarCollapsed }"
+  >
+    <button class="btn btn-primary btn-sm mb-2 flex-shrink-0" @click="createSession" :disabled="creating">
       {{ creating ? 'Creando...' : '＋ Nuevo chat' }}
     </button>
     <div class="list-group list-group-flush overflow-auto flex-grow-1 bg-dark">
@@ -26,12 +29,15 @@
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
+import { useUiStore } from '../stores/ui.js'
 
 export default {
   setup() {
     const chat = useChatStore()
     const cmd = useCommandStore()
+    const ui = useUiStore()
     const { sessions, activeSessionId, creating } = storeToRefs(chat)
+    const { sidebarCollapsed } = storeToRefs(ui)
 
     function createSession() {
       chat.createSession()
@@ -48,6 +54,7 @@ export default {
       sessions,
       activeSessionId,
       creating,
+      sidebarCollapsed,
       createSession,
       selectSession,
     }
@@ -56,6 +63,23 @@ export default {
 </script>
 
 <style scoped>
+.sidebar-chat {
+  width: 220px;
+  min-width: 220px;
+  padding: 8px;
+  border-right: 1px solid var(--bs-border-secondary, #6c757d);
+  transition: width 0.25s ease, min-width 0.25s ease, padding 0.25s ease, border 0.25s ease;
+  overflow: hidden;
+}
+
+.sidebar-chat.collapsed {
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  overflow: hidden;
+}
+
 .delete-btn {
   display: none;
   cursor: pointer;

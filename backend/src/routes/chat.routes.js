@@ -74,8 +74,6 @@ router.post('/sessions/:id/messages', async (req, res) => {
       .orderBy('created_at', 'asc')
       .select('role', 'content');
 
-    const deepseekMessages = history.map((m) => ({ role: m.role, content: m.content }));
-
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -85,7 +83,7 @@ router.post('/sessions/:id/messages', async (req, res) => {
     let fullThinking = '';
     let fullResponse = '';
 
-    for await (const chunk of streamChat(deepseekMessages)) {
+    for await (const chunk of streamChat(history)) {
       if (chunk.type === 'thinking') {
         fullThinking += chunk.content;
       } else {

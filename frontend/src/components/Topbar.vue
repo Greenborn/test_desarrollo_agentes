@@ -1,6 +1,10 @@
 <template>
   <nav class="navbar navbar-dark bg-dark px-3">
     <span class="navbar-brand mb-0 h1">Agent Orchestrator</span>
+    <button class="btn btn-sm btn-outline-secondary border-0 me-1" @click="toggleSidebar" title="Toggle sidebar">
+      <svg v-if="sidebarCollapsed" width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M6.5 12.5a.5.5 0 0 0 .832.374l4.5-4.5a.5.5 0 0 0 0-.748l-4.5-4.5A.5.5 0 0 0 6.5 3.5v9z"/></svg>
+      <svg v-else width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 3.5a.5.5 0 0 0-.832-.374l-4.5 4.5a.5.5 0 0 0 0 .748l4.5 4.5A.5.5 0 0 0 9.5 12.5v-9z"/></svg>
+    </button>
     <CommandInput v-if="user" />
     <div class="dropdown" v-if="user">
       <button class="btn btn-dark dropdown-toggle" data-bs-toggle="dropdown">
@@ -22,6 +26,7 @@ import { useAuthStore } from '../stores/auth.js'
 import { useRouter } from 'vue-router'
 import { useCommandStore } from '../stores/command.js'
 import { useModalStore } from '../stores/modal.js'
+import { useUiStore } from '../stores/ui.js'
 import { useOpencodeStore } from '../stores/opencode.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useChatStore } from '../stores/chat.js'
@@ -36,6 +41,7 @@ export default {
     const chatStore = useChatStore()
     const modal = useModalStore()
     const ocStore = useOpencodeStore()
+    const ui = useUiStore()
     const { user } = storeToRefs(auth)
     const { register } = useCommandRegistry()
     const router = useRouter()
@@ -393,7 +399,7 @@ export default {
       router.push('/')
     }
 
-    return { user, logout }
+    return { user, logout, sidebarCollapsed: ui.sidebarCollapsed, toggleSidebar: ui.toggleSidebar }
   },
 }
 </script>

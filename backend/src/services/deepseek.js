@@ -22,6 +22,23 @@ export async function getSystemPrompt() {
   }
 }
 
+export function normalizeMessages(messages) {
+  return messages.map((m) => {
+    switch (m.role) {
+      case 'command':
+        return { role: 'user', content: `[COMANDO] ${m.content}` };
+      case 'result':
+        return { role: 'user', content: `[RESULTADO] ${m.content}` };
+      case 'opencode_info':
+        return { role: 'system', content: m.content };
+      case 'opencode_result':
+        return { role: 'user', content: `[OPENCODE] ${m.content}` };
+      default:
+        return { role: m.role, content: m.content };
+    }
+  });
+}
+
 export async function* streamChat(messages) {
   const apiKey = await getDeepSeekKey();
   if (!apiKey) throw new Error('DeepSeek API key no configurada');
@@ -32,7 +49,7 @@ export async function* streamChat(messages) {
     model: 'deepseek-chat',
     messages: [
       { role: 'system', content: systemPrompt },
-      ...messages,
+      ...normalizeMessages(messages),
     ],
     stream: true,
   };
