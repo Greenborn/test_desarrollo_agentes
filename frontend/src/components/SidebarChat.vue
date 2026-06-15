@@ -7,11 +7,16 @@
       <button
         v-for="s in sessions"
         :key="s.id"
-        class="list-group-item list-group-item-action py-2 px-2 small"
+        class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
         :class="{ active: s.id === activeSessionId }"
         @click="selectSession(s.id)"
       >
-        {{ s.title }}
+        <span class="text-truncate">{{ s.title }}</span>
+        <span
+          class="delete-btn"
+          @click.stop="chat.deleteSession(s.id)"
+          title="Eliminar conversación"
+        >&times;</span>
       </button>
     </div>
   </div>
@@ -39,6 +44,7 @@ export default {
     }
 
     return {
+      chat,
       sessions,
       activeSessionId,
       creating,
@@ -48,3 +54,18 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+.delete-btn {
+  display: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #dc3545;
+  padding: 0 4px;
+  margin-left: 4px;
+}
+.list-group-item:hover .delete-btn {
+  display: inline;
+}
+</style>

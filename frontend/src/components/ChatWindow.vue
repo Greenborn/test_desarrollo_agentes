@@ -117,16 +117,18 @@ export default {
             chat.messages[idx].role = 'opencode_result'
             chat.messages[idx].content = json.fullResponse || fullText || '(sin respuesta)'
           }
-          // Add follow-up prompt control
+          // Add follow-up prompt control with model and thinking selectors
           chat.messages.push({
             role: 'opencode_control',
             controlData: {
               controlId: 'followup-' + Date.now(),
-              controlType: 'textarea',
-              stepType: 'opencode_runtime',
-              subStepType: 'followup_prompt',
-              placeholder: 'Escribe otro mensaje para OpenCode (Enter para enviar)...',
-              rows: 2,
+              controlType: 'followup',
+              models: ocStore.getModelsForProvider(ocStore.selectedProvider),
+              modelValue: ocStore.selectedModel || '',
+              thinkingOptions: ocStore.thinkingOptions,
+              thinkingValue: ocStore.selectedThinking || '',
+              placeholder: 'Escribe otro mensaje para OpenCode...',
+              rows: 3,
             },
             _key: 'control-' + Date.now(),
           })
@@ -150,13 +152,15 @@ export default {
 
       if (stepType === 'opencode_setup') {
         await handleOpencodeSetup(controlId, value, controlMsg)
-      } else if (stepType === 'opencode_runtime' && controlMsg?.controlData?.subStepType === 'followup_prompt') {
-        // Follow-up prompt to existing OpenCode session
-        const msg = { role: 'opencode_info', content: JSON.stringify({ type: 'info', message: 'Enviando mensaje a OpenCode...' }), _key: 'info-' + Date.now() }
-        chat.messages.push(msg)
+      } else if (controlType === 'followup') {
+        // Follow-up prompt with model/thinking selectors
+        const { model, thinking, prompt } = value
+        if (!prompt) return
+        ocStore.selectedModel = model || ocStore.selectedModel
+        ocStore.selectedThinking = thinking || ocStore.selectedThinking
         await opencodeStreamPrompt(
           chat.activeSessionId,
-          value,
+          prompt,
           ocStore.selectedProvider,
           ocStore.selectedModel,
           ocStore.selectedThinking,
