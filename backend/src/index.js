@@ -11,6 +11,7 @@ import settingsRoutes from './routes/settings.routes.js';
 import commandRoutes from './routes/command.routes.js';
 import opencodeRoutes from './routes/opencode.routes.js';
 import navegadorRoutes from './routes/navegador.routes.js';
+import funcionalidadRoutes from './routes/funcionalidad.routes.js';
 import opencode from './services/opencode.js';
 
 const PORT = process.env.PORT;
@@ -29,6 +30,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/command', commandRoutes);
 app.use('/api/opencode', opencodeRoutes);
 app.use('/api/navegador', navegadorRoutes);
+app.use('/api', funcionalidadRoutes);
 
 let pwProcess = null;
 

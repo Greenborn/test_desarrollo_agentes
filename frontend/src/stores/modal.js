@@ -4,9 +4,15 @@ import { ref, shallowRef } from 'vue'
 export const useModalStore = defineStore('modal', () => {
   const stack = ref([])
 
-  function open(component, props) {
+  function open(component, props = {}, options = {}) {
     const id = Date.now() + Math.random()
-    stack.value.push({ id, component, props })
+    stack.value.push({
+      id,
+      component,
+      props,
+      title: options.title || 'Modal',
+      wide: options.wide || false,
+    })
     return id
   }
 

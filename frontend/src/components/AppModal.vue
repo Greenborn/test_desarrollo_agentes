@@ -8,11 +8,11 @@
       @click.self="close(modal.id)"
     >
       <div class="app-modal-backdrop" @click="close(modal.id)"></div>
-      <div class="app-modal-wrapper">
+      <div class="app-modal-wrapper" :class="{ wide: modal.wide }">
         <div class="app-modal-dialog">
           <div class="app-modal-header">
             <slot :name="'header-' + modal.id">
-              <h5 class="app-modal-title font-monospace">Modal</h5>
+              <h5 class="app-modal-title font-monospace">{{ modal.title }}</h5>
             </slot>
             <button class="app-modal-close btn-close btn-close-white" @click="close(modal.id)"></button>
           </div>
@@ -75,6 +75,21 @@ export default {
   width: 90%;
   max-width: 720px;
   max-height: 85vh;
+}
+.app-modal-wrapper.wide {
+  max-width: 1400px;
+  width: 98%;
+  height: 94vh;
+}
+.app-modal-wrapper.wide .app-modal-dialog {
+  height: 100%;
+  max-height: none;
+}
+.app-modal-wrapper.wide .app-modal-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .app-modal-dialog {
   background: #212529;
