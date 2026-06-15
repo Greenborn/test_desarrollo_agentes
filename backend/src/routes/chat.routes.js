@@ -97,7 +97,7 @@ router.post('/sessions/:id/messages', async (req, res) => {
       session_id: sessionId,
       role: 'assistant',
       content: fullResponse,
-      thinking: fullThinking || null,
+      thinking: fullThinking ? fullThinking : null,
     });
     await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
 

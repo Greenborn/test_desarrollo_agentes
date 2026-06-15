@@ -13,8 +13,8 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       const res = await fetch(`${API}/settings`, { credentials: 'include' })
       const keys = await res.json()
-      deepseekKey.value = keys.deepseek_key || ''
-      systemPrompt.value = keys.system_prompt || ''
+      deepseekKey.value = keys.deepseek_key ? keys.deepseek_key : ''
+      systemPrompt.value = keys.system_prompt ? keys.system_prompt : ''
     } catch (err) {
       console.error('Error al cargar settings:', err)
     }
@@ -33,7 +33,7 @@ export const useSettingsStore = defineStore('settings', () => {
       if (data.success) {
         saveSuccess.value = 'Guardado correctamente'
       } else {
-        saveError.value = data.error || 'Error al guardar'
+        saveError.value = data.error ? data.error : 'Error al guardar'
       }
       await load()
     } catch (err) {

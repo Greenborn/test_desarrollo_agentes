@@ -68,7 +68,8 @@ export async function* streamChat(messages) {
 
     buffer += decoder.decode(chunk.value, { stream: true });
     const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
+    const last = lines.pop();
+    buffer = last !== undefined ? last : '';
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -77,7 +78,8 @@ export async function* streamChat(messages) {
 
       try {
         const json = JSON.parse(trimmed.slice(6));
-        const delta = json.choices?.[0]?.delta || {};
+        const choice = json.choices ? json.choices[0] : null;
+        const delta = choice && choice.delta ? choice.delta : {};
         if (delta.reasoning_content) {
           yield { type: 'thinking', content: delta.reasoning_content };
         }

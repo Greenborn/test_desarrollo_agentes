@@ -40,20 +40,66 @@
 import { ref, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
+import { useCommandStore } from '../stores/command.js'
+import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import ChatMessage from './ChatMessage.vue'
 
 export default {
   components: { ChatMessage },
   setup() {
     const chat = useChatStore()
+    const cmdStore = useCommandStore()
+    const { find } = useCommandRegistry()
     const { activeSessionId, messages, streaming, currentChunk, currentThinking } = storeToRefs(chat)
     const input = ref('')
     const messagesContainer = ref(null)
 
     function send() {
-      if (!input.value.trim() || !chat.activeSessionId) return
-      chat.sendMessage(chat.activeSessionId, input.value)
+      const raw = input.value.trim()
+      if (!raw || !chat.activeSessionId) return
       input.value = ''
+
+      if (raw.startsWith('/')) {
+        executeCommand(raw)
+      } else {
+        chat.sendMessage(chat.activeSessionId, raw)
+      }
+    }
+
+    async function executeCommand(raw) {
+      const parts = raw.split(/\s+/)
+      const cmdName = parts[0].toLowerCase()
+      const args = parts.slice(1)
+      const sessionId = chat.activeSessionId
+
+      const known = find(cmdName)
+      if (known) {
+        if (cmdName === '/help') {
+          const el = document.getElementById('helpModal')
+          if (el && window.bootstrap?.Modal) {
+            new window.bootstrap.Modal(el).show()
+          }
+          return
+        }
+        known.execute(args, { cmdStore, chatStore: chat })
+      } else {
+        try {
+          const res = await fetch('/api/command/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: raw, sessionId }),
+          })
+          const data = await res.json()
+          if (data.success) {
+            chat.loadMessages(sessionId)
+          } else {
+            console.error('Error al ejecutar comando:', data.result)
+          }
+        } catch (err) {
+          console.error('Error al ejecutar comando:', err)
+        }
+      }
     }
 
     watch(

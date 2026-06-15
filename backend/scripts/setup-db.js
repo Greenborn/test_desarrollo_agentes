@@ -1,11 +1,16 @@
 import 'dotenv/config';
 import { spawnSync } from 'child_process';
 
-const host = process.env.DB_HOST || 'localhost';
-const port = process.env.DB_PORT || '3306';
-const appUser = process.env.DB_USER || 'agent_user';
-const appPass = process.env.DB_PASSWORD || 'agent_pass';
-const dbName = process.env.DB_NAME || 'agent_orchestrator';
+const host = process.env.DB_HOST;
+const port = process.env.DB_PORT;
+const appUser = process.env.DB_USER;
+const appPass = process.env.DB_PASSWORD;
+const dbName = process.env.DB_NAME;
+
+if (!host || !port || !appUser || !dbName) {
+  console.error('Faltan variables de entorno DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME en .env');
+  process.exit(1);
+}
 
 if (process.getuid?.() !== 0) {
   console.error('Este script debe ejecutarse como root. Usá: sudo npm run setup-db');

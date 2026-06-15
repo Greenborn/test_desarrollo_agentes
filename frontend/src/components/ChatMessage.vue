@@ -1,6 +1,13 @@
 <template>
   <div class="mb-3" :class="msg.role === 'user' ? 'text-end' : 'text-start'">
+    <div v-if="msg.role === 'command'" class="d-inline-block bg-dark text-success border border-secondary rounded-3 p-2 text-start font-monospace" style="max-width: 90%;">
+      <span class="text-muted me-2">$</span>{{ msg.content }}
+    </div>
+    <div v-else-if="msg.role === 'result'" class="d-inline-block bg-dark text-light border border-secondary rounded-3 p-2 text-start font-monospace small" style="max-width: 90%;">
+      <pre class="mb-0" style="white-space: pre-wrap;">{{ msg.content }}</pre>
+    </div>
     <div
+      v-else
       class="d-inline-block rounded-3 p-3 text-start"
       :class="msg.role === 'user' ? 'bg-primary text-white' : 'bg-light border'"
       style="max-width: 80%;"

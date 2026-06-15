@@ -22,6 +22,10 @@ Ver `docs/ESPECIFICACION_TECNICA.md` — debe mantenerse actualizada con cada ca
 - API keys encriptadas antes de guardar en tabla `settings`
 - Comunicaciones frontend ↔ backend vía HTTP REST con `credentials: 'include'`
 - Streaming de chat vía Server-Sent Events sobre HTTP POST
+- **Prohibido `||` como fallback de parámetros:** si un argumento es requerido, validarlo explícitamente y devolver error si falta. No usar valores por defecto silenciosos.
+- **Prohibido `catch {}` vacío o `catch { /* silencio */ }`:** todo error debe registrarse con `console.error` (frontend) o `console.log` (backend) como mínimo. El silencio absoluto solo se permite en casos excepcionales documentados con comentario.
+- **Prohibido ocultar errores en consola:** nunca silenciar un error sin registrarlo. Si un error es esperado y manejado, documentar por qué.
+- **Sistema de comandos extensible:** usar `useCommandRegistry.js` para registrar comandos via `register({ name, category, description, usage, execute })`. No agregar nuevos comandos fuera del registry.
 
 ## Estructura
 
