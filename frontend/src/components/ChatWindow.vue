@@ -1,5 +1,5 @@
 <template>
-  <div class="d-flex flex-column h-100">
+  <div class="d-flex flex-column h-100 overflow-x-hidden">
     <div class="flex-grow-1 overflow-auto p-3" ref="messagesContainer">
       <div v-if="!activeSessionId" class="text-center text-muted mt-5">
         <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
@@ -36,12 +36,15 @@
     </div>
     <div class="border-top border-secondary p-2" v-if="activeSessionId">
       <form @submit.prevent="send" class="d-flex gap-2">
-        <input
+        <textarea
           v-model="input"
-          class="form-control bg-dark text-light border-secondary"
+          class="form-control flex-grow-1 bg-dark text-light border-secondary"
           placeholder="Escribe tu mensaje..."
           :disabled="streaming"
-        />
+          rows="1"
+          style="resize: vertical; max-height: 150px;"
+          @keydown.enter.exact.prevent="send"
+        ></textarea>
         <button class="btn btn-primary" :disabled="streaming || !input.trim()">Enviar</button>
       </form>
     </div>

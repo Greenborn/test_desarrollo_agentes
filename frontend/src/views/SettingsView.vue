@@ -3,8 +3,14 @@
     <Topbar />
     <div class="container py-4" style="max-width: 640px;">
       <h5 class="mb-4">Configuración</h5>
+      <input
+        type="text"
+        class="form-control bg-dark text-light border-secondary mb-3"
+        placeholder="Buscar configuración..."
+        v-model="searchTerm"
+      />
 
-      <div class="mb-4">
+      <div class="mb-4" v-if="matches('api key deepseek')">
         <label class="form-label">API Key DeepSeek</label>
         <div class="input-group">
           <input
@@ -22,7 +28,7 @@
         </button>
       </div>
 
-      <div class="mb-4">
+      <div class="mb-4" v-if="matches('system prompt del agente')">
         <label class="form-label">System Prompt del agente</label>
         <textarea
           class="form-control font-monospace bg-dark text-light border-secondary"
@@ -34,7 +40,7 @@
         </button>
       </div>
 
-      <div class="mb-4">
+      <div class="mb-4" v-if="matches('base de datos')">
         <label class="form-label">Prompt Documentación - Base de Datos</label>
         <textarea
           class="form-control font-monospace bg-dark text-light border-secondary"
@@ -46,7 +52,7 @@
         </button>
       </div>
 
-      <div class="mb-4">
+      <div class="mb-4" v-if="matches('subproyectos')">
         <label class="form-label">Prompt Documentación - Subproyectos</label>
         <textarea
           class="form-control font-monospace bg-dark text-light border-secondary"
@@ -58,7 +64,7 @@
         </button>
       </div>
 
-      <div class="mb-4">
+      <div class="mb-4" v-if="matches('endpoints')">
         <label class="form-label">Prompt Documentación - Endpoints</label>
         <textarea
           class="form-control font-monospace bg-dark text-light border-secondary"
@@ -70,7 +76,7 @@
         </button>
       </div>
 
-      <div class="mb-4">
+      <div class="mb-4" v-if="matches('websockets')">
         <label class="form-label">Prompt Documentación - WebSockets</label>
         <textarea
           class="form-control font-monospace bg-dark text-light border-secondary"
@@ -82,7 +88,7 @@
         </button>
       </div>
 
-      <div class="mb-4">
+      <div class="mb-4" v-if="matches('funcionalidades')">
         <label class="form-label">Prompt Documentación - Funcionalidades</label>
         <textarea
           class="form-control font-monospace bg-dark text-light border-secondary"
@@ -117,6 +123,12 @@ export default {
     const docWsInput = ref('')
     const docFuncInput = ref('')
     const showKey = ref(false)
+    const searchTerm = ref('')
+
+    function matches(label) {
+      if (!searchTerm.value) return true
+      return label.toLowerCase().includes(searchTerm.value.toLowerCase())
+    }
 
     const DOC_INPUTS = {
       base_datos: docBdInput,
@@ -166,9 +178,9 @@ export default {
     }
 
     return {
-      keyInput, promptInput, docBdInput, docSubInput, docEndpointsInput, docWsInput, docFuncInput, showKey,
+      keyInput, promptInput, docBdInput, docSubInput, docEndpointsInput, docWsInput, docFuncInput, showKey, searchTerm,
       settings,
-      saveKey, savePrompt, saveDoc,
+      saveKey, savePrompt, saveDoc, matches,
     }
   },
 }

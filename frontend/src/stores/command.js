@@ -7,6 +7,7 @@ export const useCommandStore = defineStore('command', () => {
   const currentDir = ref('')
   const helpVisible = ref(false)
   const sessionHistory = ref([])
+  const dbHistory = ref([])
   const autocompleteOptions = ref([])
   const autocompleteVisible = ref(false)
   const arrowIndex = ref(-1)
@@ -67,6 +68,19 @@ export const useCommandStore = defineStore('command', () => {
     autocompleteOptions.value = []
   }
 
+  async function loadHistory(sessionId) {
+    try {
+      let url = `${API}/command/history?order=asc`
+      if (sessionId) url += `&sessionId=${sessionId}`
+      const res = await fetch(url, { credentials: 'include' })
+      const data = await res.json()
+      dbHistory.value = data.history ? data.history.map((h) => h.command) : []
+    } catch (err) {
+      console.error('Error al cargar historial:', err)
+      dbHistory.value = []
+    }
+  }
+
   function pushHistory(cmd) {
     sessionHistory.value.unshift(cmd)
     if (sessionHistory.value.length > 100) sessionHistory.value.pop()
@@ -77,6 +91,6 @@ export const useCommandStore = defineStore('command', () => {
     autocompleteOptions, autocompleteVisible, arrowIndex,
     loadLastDirectory, setDirectory,
     fetchAutocomplete, showAutocomplete, hideAutocomplete,
-    pushHistory, resetArrowIndex,
+    loadHistory, pushHistory, resetArrowIndex,
   }
 })

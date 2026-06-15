@@ -76,6 +76,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 |---|---|---|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
 | `user_id` | INTEGER UNSIGNED | NOT NULL, FK → `users(id)` ON DELETE CASCADE |
+| `session_id` | INTEGER UNSIGNED | nullable, FK → `chat_sessions(id)` ON DELETE SET NULL |
 | `command` | VARCHAR(500) | NOT NULL |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 
@@ -124,6 +125,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `chat_messages` | `session_id` | `chat_sessions` | `id` | CASCADE |
 | `user_settings` | `user_id` | `users` | `id` | CASCADE |
 | `command_history` | `user_id` | `users` | `id` | CASCADE |
+| `command_history` | `session_id` | `chat_sessions` | `id` | SET NULL |
 | `funcionalidades` | `session_id` | `chat_sessions` | `id` | CASCADE |
 | `gastos_tokens_usados` | `id_chat_session` | `chat_sessions` | `id` | CASCADE |
 | `gastos_tokens_usados` | `id_proyecto` | `proyectos` | `id` | CASCADE |
@@ -146,5 +148,6 @@ proyectos
  └─ gastos_tokens_usados.id_proyecto (FK)
 
 chat_sessions
- └─ gastos_tokens_usados.id_chat_session (FK)
+ ├─ gastos_tokens_usados.id_chat_session (FK)
+ └─ command_history.session_id (FK)
 ```

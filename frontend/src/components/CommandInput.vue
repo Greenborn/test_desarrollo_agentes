@@ -39,7 +39,7 @@
 </template>
 
 <script>
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCommandStore } from '../stores/command.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
@@ -51,6 +51,7 @@ export default {
     const chatStore = useChatStore()
     const { find, suggest } = useCommandRegistry()
     const { autocompleteOptions, autocompleteVisible, arrowIndex, currentDir } = storeToRefs(cmdStore)
+    const { activeSessionId } = storeToRefs(chatStore)
     const buffer = ref('')
     const inputEl = ref(null)
     const autocompleteList = ref(null)
@@ -81,6 +82,7 @@ export default {
       cmdStore.pushHistory(raw)
       cmdStore.hideAutocomplete()
       execute(raw)
+      cmdStore.loadHistory(chatStore.activeSessionId)
     }
 
     async function execute(raw) {
@@ -134,7 +136,7 @@ export default {
     }
 
     function navHistory(dir) {
-      const h = cmdStore.sessionHistory
+      const h = cmdStore.dbHistory
       if (!h.length) return
       historyIdx.value += dir
       if (historyIdx.value < -1) historyIdx.value = -1
@@ -188,6 +190,14 @@ export default {
     function onInput() {
       cmdStore.hideAutocomplete()
     }
+
+    onMounted(() => {
+      cmdStore.loadHistory(chatStore.activeSessionId)
+    })
+
+    watch(activeSessionId, (newId) => {
+      cmdStore.loadHistory(newId)
+    })
 
     return {
       buffer, inputEl, autocompleteList, autocompleteOptions,

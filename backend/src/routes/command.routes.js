@@ -77,11 +77,16 @@ router.post('/setting', async (req, res) => {
 router.get('/history', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const rows = await db('command_history')
-      .where({ user_id: req.session.userId })
-      .orderBy('created_at', 'desc')
+    const query = db('command_history')
+      .where({ user_id: req.session.userId });
+    if (req.query.sessionId) {
+      query.where({ session_id: parseInt(req.query.sessionId) });
+    }
+    const order = req.query.order === 'asc' ? 'asc' : 'desc';
+    const rows = await query
+      .orderBy('created_at', order)
       .limit(50)
-      .select('command', 'created_at');
+      .select('command', 'created_at', 'session_id');
     res.json({ history: rows });
   } catch (err) {
     res.status(500).json({ history: [], error: err.message });
@@ -91,8 +96,10 @@ router.get('/history', async (req, res) => {
 router.post('/history', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { command } = req.body;
-    await db('command_history').insert({ user_id: req.session.userId, command });
+    const { command, sessionId } = req.body;
+    const record = { user_id: req.session.userId, command };
+    if (sessionId) record.session_id = sessionId;
+    await db('command_history').insert(record);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -187,7 +194,9 @@ router.post('/execute', async (req, res) => {
       await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
     }
 
-    await db('command_history').insert({ user_id: req.session.userId, command });
+    const histRecord = { user_id: req.session.userId, command };
+    if (sessionId) histRecord.session_id = sessionId;
+    await db('command_history').insert(histRecord);
 
     const success = !result.startsWith('Error:');
     res.json({ success, result, command });
