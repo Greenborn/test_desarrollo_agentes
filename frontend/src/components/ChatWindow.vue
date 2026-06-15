@@ -74,6 +74,7 @@ export default {
     const ocChunk = ref('')
     const ocThinking = ref('')
     const docUpdateProyectoId = ref('')
+    const docUpdateType = ref('')
 
     function send() {
       const raw = input.value.trim()
@@ -145,6 +146,14 @@ export default {
       })
     }
 
+    const DOC_LABELS = {
+      base_datos: 'Base de Datos',
+      subproyectos: 'Subproyectos',
+      endpoints: 'Endpoints',
+      web_sockets: 'WebSockets',
+      funcionalidades: 'Funcionalidades',
+    }
+
     async function opencodeStreamPromptDocUpdate(sessionId, prompt, provider, model, thinking, mode, proyectoId) {
       ocStreaming.value = true
       ocChunk.value = ''
@@ -179,7 +188,9 @@ export default {
           }
 
           try {
-            const res = await fetch(`/api/documentacion/subproyectos/${encodeURIComponent(proyectoId)}`, {
+            const tipo = docUpdateType.value
+            const label = DOC_LABELS[tipo] || tipo
+            const res = await fetch(`/api/documentacion/${tipo}/${encodeURIComponent(proyectoId)}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
@@ -191,14 +202,14 @@ export default {
             }
             chat.messages.push({
               role: 'result',
-              content: `Documentación de subproyectos actualizada correctamente para el proyecto "${proyectoId}".`,
+              content: `Documentación de ${label} actualizada correctamente para el proyecto "${proyectoId}".`,
               _key: 'result-' + Date.now(),
             })
           } catch (err) {
-            console.error('Error al guardar documentación de subproyectos:', err.message)
+            console.error('Error al guardar documentación:', err.message)
             chat.messages.push({
               role: 'result',
-              content: 'Error al guardar documentación de subproyectos: ' + err.message,
+              content: 'Error al guardar documentación: ' + err.message,
               _key: 'result-' + Date.now(),
             })
           }
@@ -272,6 +283,7 @@ export default {
       if (subStepType === 'provider') {
         docUpdateData.provider = value
         docUpdateProyectoId.value = controlMsg.controlData.proyectoId || ''
+        docUpdateType.value = controlMsg.controlData.docType || ''
         await ocStore.select('provider', value)
         ocStore.selectedProvider = value
         const models = ocStore.getModelsForProvider(value)
@@ -324,11 +336,14 @@ export default {
         ocStore.selectedMode = 'Plan'
 
         try {
+          const tipo = docUpdateType.value
           const settingsRes = await fetch('/api/settings', { credentials: 'include' })
           const settingsKeys = await settingsRes.json()
-          const prompt = settingsKeys.documentacion_prompt_subproyectos || 'Analiza el proyecto actual e identifica todos los subproyectos que lo componen. Para cada subproyecto, proporciona un nombre identificativo y una descripción breve pero suficientemente descriptiva para que otros agentes de IA puedan entender su propósito y alcance. Devuelve la información en formato estructurado.'
+          const promptKey = 'documentacion_prompt_' + tipo
+          const defaultPrompt = 'Analiza el proyecto actual y documenta la información correspondiente a ' + (DOC_LABELS[tipo] || tipo) + '. Proporciona una descripción detallada que permita a otros agentes de IA entender su propósito y alcance.'
+          const prompt = settingsKeys[promptKey] || defaultPrompt
 
-          await opencodeStreamPromptDocUpdate(
+          opencodeStreamPromptDocUpdate(
             chat.activeSessionId,
             prompt,
             docUpdateData.provider,

@@ -6,7 +6,11 @@ const API = '/api'
 export const useSettingsStore = defineStore('settings', () => {
   const deepseekKey = ref('')
   const systemPrompt = ref('')
+  const documentacionPromptBaseDatos = ref('')
   const documentacionPromptSubproyectos = ref('')
+  const documentacionPromptEndpoints = ref('')
+  const documentacionPromptWebSockets = ref('')
+  const documentacionPromptFuncionalidades = ref('')
   const saveError = ref('')
   const saveSuccess = ref('')
 
@@ -16,7 +20,11 @@ export const useSettingsStore = defineStore('settings', () => {
       const keys = await res.json()
       deepseekKey.value = keys.deepseek_key ? keys.deepseek_key : ''
       systemPrompt.value = keys.system_prompt ? keys.system_prompt : ''
+      documentacionPromptBaseDatos.value = keys.documentacion_prompt_base_datos || ''
       documentacionPromptSubproyectos.value = keys.documentacion_prompt_subproyectos || ''
+      documentacionPromptEndpoints.value = keys.documentacion_prompt_endpoints || ''
+      documentacionPromptWebSockets.value = keys.documentacion_prompt_web_sockets || ''
+      documentacionPromptFuncionalidades.value = keys.documentacion_prompt_funcionalidades || ''
     } catch (err) {
       console.error('Error al cargar settings:', err)
     }
@@ -48,5 +56,5 @@ export const useSettingsStore = defineStore('settings', () => {
     saveError.value = ''
   }
 
-  return { deepseekKey, systemPrompt, documentacionPromptSubproyectos, saveError, saveSuccess, clearFeedback, load, save }
+  return { deepseekKey, systemPrompt, documentacionPromptBaseDatos, documentacionPromptSubproyectos, documentacionPromptEndpoints, documentacionPromptWebSockets, documentacionPromptFuncionalidades, saveError, saveSuccess, clearFeedback, load, save }
 })

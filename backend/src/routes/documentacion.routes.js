@@ -24,25 +24,38 @@ router.get('/:proyectoId', async (req, res) => {
   }
 });
 
-router.put('/subproyectos/:proyectoId', async (req, res) => {
+const TABLA_MAP = {
+  base_de_datos: 'documentacion_base_datos',
+  subproyectos: 'documentacion_subproyectos',
+  endpoints: 'documentacion_endpoints',
+  web_sockets: 'documentacion_web_sockets',
+  funcionalidades: 'documentacion_funcionalidades',
+};
+
+router.put('/:tipo/:proyectoId', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { proyectoId } = req.params;
+    const { tipo, proyectoId } = req.params;
     const { data } = req.body;
+
+    const table = TABLA_MAP[tipo];
+    if (!table) {
+      return res.status(400).json({ error: `Tipo de documentación no válido: "${tipo}"` });
+    }
 
     if (!data) {
       return res.status(400).json({ error: 'Campo "data" es requerido' });
     }
 
-    await db('documentacion_subproyectos').where({ id_proyecto: proyectoId }).del();
-    await db('documentacion_subproyectos').insert({
+    await db(table).where({ id_proyecto: proyectoId }).del();
+    await db(table).insert({
       id_proyecto: proyectoId,
       data: JSON.stringify({ respuesta: data, generado_por: 'opencode' }),
     });
 
     res.json({ success: true });
   } catch (err) {
-    console.log('Error al actualizar subproyectos:', err.message);
+    console.log(`Error al actualizar ${req.params.tipo}:`, err.message);
     res.status(500).json({ error: err.message });
   }
 });

@@ -54,6 +54,10 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 │       ├── stores/         # Pinia (auth, chat, settings)
 │       ├── views/          # Login, Dashboard, Settings
 │       └── components/     # Topbar, SidebarChat, ChatWindow, ChatMessage
+├── api_gastos/            # Servicio de registro de gastos de tokens
+│   └── src/
+│       ├── index.js       # Entrypoint (Express)
+│       └── routes/        # gastos.routes.js
 ├── playwright/            # Servicio Playwright (Express wrapper)
 │   └── src/
 │       ├── index.js       # Entrypoint (Express)
@@ -88,6 +92,13 @@ Orden inicial obligatorio: `sudo setup-db → migrate → seed → dev`
 ```bash
 npm run dev               # Servidor de desarrollo Vite (puerto 5173)
 npm run build             # Build producción
+```
+
+### API Gastos (`api_gastos/`)
+
+```bash
+npm run dev               # Iniciar servidor con --watch (puerto 4100)
+npm start                 # Iniciar servidor en producción
 ```
 
 ### Playwright (`playwright/`)

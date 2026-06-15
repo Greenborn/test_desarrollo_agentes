@@ -53,6 +53,15 @@ Los comandos registrados en frontend tienen prioridad sobre los del backend.
 
 ---
 
+## Gastos
+
+| Comando | Descripción | Uso |
+|---|---|---|
+| `/gastos_all` | Muestra todos los registros de gastos de tokens | `/gastos_all` |
+| `/gastos_proyecto` | Muestra gastos del proyecto activo o del especificado | `/gastos_proyecto [id_proyecto]` |
+
+---
+
 ## Desarrollo
 
 | Comando | Descripción | Uso |

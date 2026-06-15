@@ -35,13 +35,61 @@
       </div>
 
       <div class="mb-4">
+        <label class="form-label">Prompt Documentación - Base de Datos</label>
+        <textarea
+          class="form-control font-monospace bg-dark text-light border-secondary"
+          rows="4"
+          v-model="docBdInput"
+        ></textarea>
+        <button class="btn btn-sm btn-primary mt-2" @click="saveDoc('base_datos')">
+          Guardar Prompt
+        </button>
+      </div>
+
+      <div class="mb-4">
         <label class="form-label">Prompt Documentación - Subproyectos</label>
         <textarea
           class="form-control font-monospace bg-dark text-light border-secondary"
-          rows="6"
-          v-model="docPromptInput"
+          rows="4"
+          v-model="docSubInput"
         ></textarea>
-        <button class="btn btn-sm btn-primary mt-2" @click="saveDocPrompt">
+        <button class="btn btn-sm btn-primary mt-2" @click="saveDoc('subproyectos')">
+          Guardar Prompt
+        </button>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Prompt Documentación - Endpoints</label>
+        <textarea
+          class="form-control font-monospace bg-dark text-light border-secondary"
+          rows="4"
+          v-model="docEndpointsInput"
+        ></textarea>
+        <button class="btn btn-sm btn-primary mt-2" @click="saveDoc('endpoints')">
+          Guardar Prompt
+        </button>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Prompt Documentación - WebSockets</label>
+        <textarea
+          class="form-control font-monospace bg-dark text-light border-secondary"
+          rows="4"
+          v-model="docWsInput"
+        ></textarea>
+        <button class="btn btn-sm btn-primary mt-2" @click="saveDoc('web_sockets')">
+          Guardar Prompt
+        </button>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Prompt Documentación - Funcionalidades</label>
+        <textarea
+          class="form-control font-monospace bg-dark text-light border-secondary"
+          rows="4"
+          v-model="docFuncInput"
+        ></textarea>
+        <button class="btn btn-sm btn-primary mt-2" @click="saveDoc('funcionalidades')">
           Guardar Prompt
         </button>
       </div>
@@ -63,8 +111,28 @@ export default {
     const settings = useSettingsStore()
     const keyInput = ref('')
     const promptInput = ref('')
-    const docPromptInput = ref('')
+    const docBdInput = ref('')
+    const docSubInput = ref('')
+    const docEndpointsInput = ref('')
+    const docWsInput = ref('')
+    const docFuncInput = ref('')
     const showKey = ref(false)
+
+    const DOC_INPUTS = {
+      base_datos: docBdInput,
+      subproyectos: docSubInput,
+      endpoints: docEndpointsInput,
+      web_sockets: docWsInput,
+      funcionalidades: docFuncInput,
+    }
+
+    const DOC_STORE_MAP = {
+      base_datos: 'documentacionPromptBaseDatos',
+      subproyectos: 'documentacionPromptSubproyectos',
+      endpoints: 'documentacionPromptEndpoints',
+      web_sockets: 'documentacionPromptWebSockets',
+      funcionalidades: 'documentacionPromptFuncionalidades',
+    }
 
     onMounted(() => settings.load())
 
@@ -76,9 +144,11 @@ export default {
       keyInput.value = val
     }, { immediate: true })
 
-    watch(() => settings.documentacionPromptSubproyectos, (val) => {
-      docPromptInput.value = val
-    }, { immediate: true })
+    for (const [key, refName] of Object.entries(DOC_STORE_MAP)) {
+      watch(() => settings[refName], (val) => {
+        DOC_INPUTS[key].value = val
+      }, { immediate: true })
+    }
 
     function saveKey() {
       settings.clearFeedback()
@@ -90,15 +160,15 @@ export default {
       settings.save('system_prompt', promptInput.value)
     }
 
-    function saveDocPrompt() {
+    function saveDoc(tipo) {
       settings.clearFeedback()
-      settings.save('documentacion_prompt_subproyectos', docPromptInput.value)
+      settings.save('documentacion_prompt_' + tipo, DOC_INPUTS[tipo].value)
     }
 
     return {
-      keyInput, promptInput, docPromptInput, showKey,
+      keyInput, promptInput, docBdInput, docSubInput, docEndpointsInput, docWsInput, docFuncInput, showKey,
       settings,
-      saveKey, savePrompt, saveDocPrompt,
+      saveKey, savePrompt, saveDoc,
     }
   },
 }

@@ -103,6 +103,19 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
+## 9. `gastos_tokens_usados`
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `id_chat_session` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
+| `id_proyecto` | VARCHAR(255) | NOT NULL, FK → `proyectos(id)` ON DELETE CASCADE |
+| `precio` | DECIMAL(10,4) | NOT NULL |
+| `tokens` | INTEGER | NOT NULL |
+| `fecha_hora` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+---
+
 ## Relaciones (Foreign Keys)
 
 | Origen | Columna | Destino | Columna | ON DELETE |
@@ -112,6 +125,8 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `user_settings` | `user_id` | `users` | `id` | CASCADE |
 | `command_history` | `user_id` | `users` | `id` | CASCADE |
 | `funcionalidades` | `session_id` | `chat_sessions` | `id` | CASCADE |
+| `gastos_tokens_usados` | `id_chat_session` | `chat_sessions` | `id` | CASCADE |
+| `gastos_tokens_usados` | `id_proyecto` | `proyectos` | `id` | CASCADE |
 
 ---
 
@@ -126,6 +141,10 @@ users
  └─ command_history (user_id)
 
 proyectos
- └─ chat_sessions.proyecto_id (FK lógica)
- └─ funcionalidades.proyecto_id (FK lógica)
+ ├─ chat_sessions.proyecto_id (FK lógica)
+ ├─ funcionalidades.proyecto_id (FK lógica)
+ └─ gastos_tokens_usados.id_proyecto (FK)
+
+chat_sessions
+ └─ gastos_tokens_usados.id_chat_session (FK)
 ```

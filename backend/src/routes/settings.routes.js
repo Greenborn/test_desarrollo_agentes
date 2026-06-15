@@ -28,12 +28,19 @@ router.get('/', async (req, res) => {
         }
       } else if (row.setting_key === 'system_prompt') {
         keys.system_prompt = row.setting_value;
-      } else if (row.setting_key === 'documentacion_prompt_subproyectos') {
-        keys.documentacion_prompt_subproyectos = row.setting_value;
+      } else if (row.setting_key.startsWith('documentacion_prompt_')) {
+        keys[row.setting_key] = row.setting_value;
       }
     }
-    if (!keys.documentacion_prompt_subproyectos) {
-      keys.documentacion_prompt_subproyectos = 'Analiza el proyecto actual e identifica todos los subproyectos que lo componen. Para cada subproyecto, proporciona un nombre identificativo y una descripción breve pero suficientemente descriptiva para que otros agentes de IA puedan entender su propósito y alcance. Devuelve la información en formato estructurado.';
+    const defaults = {
+      documentacion_prompt_base_datos: 'Analiza el proyecto actual y documenta la estructura de la base de datos, incluyendo tablas, columnas, relaciones, índices y cualquier otra información relevante sobre el esquema de datos. Proporciona una descripción detallada que permita a otros agentes entender la arquitectura de datos del proyecto.',
+      documentacion_prompt_subproyectos: 'Analiza el proyecto actual e identifica todos los subproyectos que lo componen. Para cada subproyecto, proporciona un nombre identificativo y una descripción breve pero suficientemente descriptiva para que otros agentes de IA puedan entender su propósito y alcance. Devuelve la información en formato estructurado.',
+      documentacion_prompt_endpoints: 'Analiza el proyecto actual y documenta todos los endpoints de la API, incluyendo método HTTP, ruta, parámetros, cuerpo de la solicitud, respuesta y cualquier detalle relevante de cada endpoint. Proporciona una descripción detallada que permita a otros agentes entender y consumir la API.',
+      documentacion_prompt_web_sockets: 'Analiza el proyecto actual y documenta todos los eventos y canales de WebSocket, incluyendo el nombre del evento, payload, dirección (cliente-servidor o servidor-cliente) y cualquier detalle relevante. Proporciona una descripción detallada que permita a otros agentes entender la comunicación en tiempo real del proyecto.',
+      documentacion_prompt_funcionalidades: 'Analiza el proyecto actual y documenta todas las funcionalidades implementadas, incluyendo nombre, descripción, módulo al que pertenece, dependencias y cualquier detalle relevante. Proporciona una descripción detallada que permita a otros agentes entender el alcance funcional del proyecto.',
+    };
+    for (const [key, def] of Object.entries(defaults)) {
+      if (!keys[key]) keys[key] = def;
     }
     res.json(keys);
   } catch (err) {

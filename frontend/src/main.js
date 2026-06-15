@@ -9,6 +9,8 @@ import './composables/commands/iniciarNavegador.js'
 import './composables/commands/nuevaFuncionalidad.js'
 import './composables/commands/documentacionAll.js'
 import './composables/commands/documentacionUpdate.js'
+import './composables/commands/gastosAll.js'
+import './composables/commands/gastosProyecto.js'
 
 const app = createApp(App)
 app.use(createPinia())

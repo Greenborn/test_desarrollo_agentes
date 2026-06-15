@@ -215,6 +215,46 @@ router.post('/send', async (req, res) => {
         });
       }
 
+      let realTokens = 0;
+      let realCost = 0;
+      let idProyecto = null;
+      try {
+        const messages = await server.getSessionMessages(ocSessionId);
+        const lastAssistant = messages && messages.findLast
+          ? messages.findLast(m => m.info?.role === 'assistant')
+          : messages && messages.length > 0
+            ? [...messages].reverse().find(m => m.info?.role === 'assistant')
+            : null;
+        if (lastAssistant?.info) {
+          realTokens = lastAssistant.info.tokens?.output || 0;
+          realCost = lastAssistant.info.cost || 0;
+        }
+      } catch (e) {
+        console.log('[gastos] error al leer tokens opencode:', e.message);
+      }
+      if (sessionId) {
+        try {
+          const chatSess = await db('chat_sessions').where({ id: sessionId }).select('proyecto_id').first();
+          idProyecto = chatSess?.proyecto_id || null;
+        } catch (e) {
+          console.log('[gastos] error al obtener proyecto:', e.message);
+        }
+      }
+      if (sessionId && idProyecto && (realTokens > 0 || realCost > 0)) {
+        const gastosPort = process.env.SERVICIO_GASTOS_PORT || 4100;
+        fetch(`http://localhost:${gastosPort}/api/gastos/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id_chat_session: sessionId,
+            id_proyecto: idProyecto,
+            precio: realCost,
+            tokens: realTokens,
+            id_sesion_opencode: ocSessionId,
+          }),
+        }).catch(err => console.log('[gastos] error al registrar:', err.message));
+      }
+
       res.write(`data: ${JSON.stringify({ type: 'done', ocSessionId, hash: ocSessionId, fullResponse, diff: diff || [] })}\n\n`);
       res.end();
 

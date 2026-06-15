@@ -35,15 +35,6 @@ register({
       return;
     }
 
-    if (docType !== 'subproyectos') {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Por ahora solo está implementado "subproyectos". Los demás tipos estarán disponibles próximamente.',
-        _key: 'result-' + Date.now(),
-      });
-      return;
-    }
-
     let proyectoId;
     try {
       const res = await fetch(`/api/proyecto/session/${sessionId}`, { credentials: 'include' });
@@ -96,6 +87,7 @@ register({
         placeholder: 'Selecciona proveedor...',
         preselect: preselectProvider,
         proyectoId,
+        docType,
       },
       _key: 'control-' + Date.now(),
     });

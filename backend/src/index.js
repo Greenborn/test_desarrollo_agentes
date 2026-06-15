@@ -14,6 +14,7 @@ import navegadorRoutes from './routes/navegador.routes.js';
 import funcionalidadRoutes from './routes/funcionalidad.routes.js';
 import proyectoRoutes from './routes/proyecto.routes.js';
 import documentacionRoutes from './routes/documentacion.routes.js';
+import gastosRoutes from './routes/gastos.routes.js';
 import opencode from './services/opencode.js';
 import db from './config/db.js';
 
@@ -36,9 +37,11 @@ app.use('/api/navegador', navegadorRoutes);
 app.use('/api', funcionalidadRoutes);
 app.use('/api', proyectoRoutes);
 app.use('/api/documentacion', documentacionRoutes);
+app.use('/api/gastos', gastosRoutes);
 
 let pwProcess = null;
 let docProcess = null;
+let gastosProcess = null;
 
 function startPlaywrightService() {
   const pwPort = process.env.SERVICIO_PLAYWRIGHT_PORT || 4098;
@@ -100,6 +103,36 @@ function startDocumentalService() {
   });
 }
 
+function startGastosService() {
+  const gastosPort = process.env.SERVICIO_GASTOS_PORT || 4100;
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const gastosPath = path.resolve(__dirname, '../../api_gastos/src/index.js');
+  gastosProcess = spawn('node', [gastosPath], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env },
+  });
+
+  gastosProcess.stdout.on('data', (data) => {
+    const text = data.toString().trim();
+    if (text) console.log('[gastos]', text);
+  });
+
+  gastosProcess.stderr.on('data', (data) => {
+    const text = data.toString().trim();
+    if (text) console.log('[gastos]', text);
+  });
+
+  gastosProcess.on('exit', (code) => {
+    console.log('[gastos] proceso terminado, código:', code);
+    gastosProcess = null;
+  });
+
+  gastosProcess.on('error', (err) => {
+    console.log('[gastos] error al iniciar:', err.message);
+    gastosProcess = null;
+  });
+}
+
 async function start() {
   try {
     console.log('[migrate] Ejecutando migraciones pendientes...');
@@ -119,6 +152,7 @@ async function start() {
     console.log(`Server listening on port ${PORT}`);
     startPlaywrightService();
     startDocumentalService();
+    startGastosService();
   });
 }
 
@@ -128,16 +162,19 @@ process.on('exit', () => {
   opencode.stopAllServers();
   if (pwProcess) pwProcess.kill();
   if (docProcess) docProcess.kill();
+  if (gastosProcess) gastosProcess.kill();
 });
 process.on('SIGTERM', () => {
   opencode.stopAllServers();
   if (pwProcess) pwProcess.kill();
   if (docProcess) docProcess.kill();
+  if (gastosProcess) gastosProcess.kill();
   process.exit(0);
 });
 process.on('SIGINT', () => {
   opencode.stopAllServers();
   if (pwProcess) pwProcess.kill();
   if (docProcess) docProcess.kill();
+  if (gastosProcess) gastosProcess.kill();
   process.exit(0);
 });

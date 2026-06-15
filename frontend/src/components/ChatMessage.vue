@@ -1,5 +1,5 @@
 <template>
-  <div class="mb-3" :class="msg.role === 'user' ? 'text-end' : 'text-start'">
+  <div class="mb-3" :class="msg.role === 'user' || msg.role === 'command' ? 'text-end' : 'text-start'">
     <div v-if="msg.role === 'command'" class="d-inline-block rounded-3 p-2 text-start font-monospace" style="max-width: 90%; background: #1a1a2e; border: 1px solid #00ff88; color: #00ff88;">
       {{ msg.content }}
     </div>
@@ -28,11 +28,8 @@
       </div>
       <ChatFormatter :text="msg.content" /><span v-if="msg.streaming" class="blink">▌</span>
     </div>
-    <div v-else-if="msg.role === 'opencode_result'" class="d-block w-100 rounded-3 p-3 text-start font-monospace small" style="background: #0f0f1e; border: 1px solid #7c3aed; color: #f0f0f0;">
-      <template v-for="(seg, i) in formattedContent" :key="i">
-        <div v-if="seg.type === 'text'" style="white-space: pre-wrap;">{{ seg.content }}</div>
-        <pre v-else-if="seg.type === 'code'" class="mb-2 p-2 rounded" style="white-space: pre-wrap; overflow-x: auto; background: #1a1a2e; border: 1px solid #333; color: #e0e0e0;"><code>{{ seg.content }}</code></pre>
-      </template>
+    <div v-else-if="msg.role === 'opencode_result'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #0f0f1e; border: 1px solid #7c3aed; color: #f0f0f0;">
+      <ChatFormatter :text="msg.content" />
       <div v-if="parsedInfo && parsedInfo.hash" class="mt-2 small" style="color: #87ceeb;">Hash: {{ parsedInfo.hash }}</div>
     </div>
     <div v-else-if="msg.role === 'opencode_info'" class="d-block w-100 rounded-3 p-2 text-start small" style="background: #1a1a2e; border: 1px solid #374151; color: #9ca3af;">
@@ -106,24 +103,7 @@ export default {
       } catch {}
       return this.msg.extra || null
     },
-    formattedContent() {
-      const text = this.msg.content || ''
-      const segments = []
-      const regex = /```(\w*)\n([\s\S]*?)```/g
-      let lastIdx = 0
-      let match
-      while ((match = regex.exec(text)) !== null) {
-        if (match.index > lastIdx) {
-          segments.push({ type: 'text', content: text.slice(lastIdx, match.index) })
-        }
-        segments.push({ type: 'code', content: match[2], language: match[1] || 'text' })
-        lastIdx = match.index + match[0].length
-      }
-      if (lastIdx < text.length) {
-        segments.push({ type: 'text', content: text.slice(lastIdx) })
-      }
-      return segments.length ? segments : [{ type: 'text', content: text }]
-    },
+
   },
 }
 </script>

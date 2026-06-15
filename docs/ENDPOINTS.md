@@ -213,6 +213,23 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 
 ---
 
+## Gastos Tokens (`/api/gastos`)
+
+Hace proxy al servicio de gastos independiente (puerto `4100`).
+
+### `GET /api/gastos`
+- **Auth:** Requerida
+- **Query params:** `id_proyecto` (opcional), `id_chat_session` (opcional)
+- **Respuesta:** `[{ id, id_chat_session, id_proyecto, precio, tokens, fecha_hora }]`
+
+### `POST /api/gastos/register`
+- **Auth:** Requerida
+- **Body:** `{ id_chat_session: number, id_proyecto: string, precio: number, tokens: number }`
+- **Respuesta 200:** `{ success: true, id: number }`
+- **Respuesta 400:** `{ error: "Campo \"...\" es requerido" }`
+
+---
+
 ## Notas
 
 - Todas las rutas protegidas devuelven `401 { error: "Sesión no válida" }` si no hay sesión
