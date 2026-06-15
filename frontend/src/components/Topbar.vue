@@ -249,9 +249,11 @@ export default {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ ocSessionId: ocStore.ocSessionId }),
+            body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, directory: cmdStore.currentDir || undefined }),
           })
-        } catch {}
+        } catch (err) {
+          console.error('Error en /opencode_fin:', err)
+        }
         ocStore.finish()
         if (chatStore.activeSessionId) {
           chatStore.loadMessages(chatStore.activeSessionId)

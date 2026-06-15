@@ -26,20 +26,14 @@ app.use('/api/command', commandRoutes);
 app.use('/api/opencode', opencodeRoutes);
 
 const server = http.createServer(app);
-server.listen(PORT, async (err) => {
+server.listen(PORT, (err) => {
   if (err) {
     console.log('Error al iniciar servidor:', err.message);
     process.exit(1);
   }
   console.log(`Server listening on port ${PORT}`);
-
-  try {
-    console.log('Iniciando opencode serve...');
-    opencode.startProcess();
-    await opencode.waitForReady();
-    console.log(`opencode listo en puerto ${process.env.OPENCODE_PORT || 4097}`);
-  } catch (e) {
-    console.log('Error al iniciar opencode:', e.message);
-    console.log('Podes iniciarlo manualmente con: opencode serve --port 4097');
-  }
 });
+
+process.on('exit', () => opencode.stopAllServers());
+process.on('SIGTERM', () => { opencode.stopAllServers(); process.exit(0); });
+process.on('SIGINT', () => { opencode.stopAllServers(); process.exit(0); });

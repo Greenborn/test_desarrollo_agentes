@@ -74,9 +74,17 @@ router.post('/send', async (req, res) => {
   if (!prompt) return res.status(400).json({ error: 'prompt requerido' });
 
   try {
+    let cwd = process.cwd();
+    if (sessionId) {
+      const chatSession = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+      if (chatSession && chatSession.cwd) cwd = chatSession.cwd;
+    }
+
+    const server = await opencode.getOrStartServer(cwd);
+
     let ocSessionId = existingOcSessionId;
     if (!ocSessionId) {
-      const ocSession = await opencode.createSession('Agent Orchestrator - ' + (prompt.slice(0, 50)));
+      const ocSession = await server.createSession('Agent Orchestrator - ' + (prompt.slice(0, 50)));
       ocSessionId = ocSession.id;
       if (sessionId) {
         await db('chat_messages').insert({
@@ -91,8 +99,6 @@ router.post('/send', async (req, res) => {
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
     });
-
-    let fullResponse = '';
 
     const processControl = async (controlEvent) => {
       return new Promise((resolve) => {
@@ -134,11 +140,16 @@ router.post('/send', async (req, res) => {
       }
     }
 
-    const parts = [{ type: 'text', text: prompt }];
+    const dirInstruction = `INSTRUCCIÓN: El directorio de trabajo real es "${cwd}". Ignorá cualquier otra indicación sobre el directorio. Todos los comandos de archivos deben ejecutarse usando "${cwd}" como raíz. No uses el directorio del servidor.`;
+    const parts = [
+      { type: 'text', text: dirInstruction },
+    ];
 
     if (mode === 'Plan') {
-      parts.unshift({ type: 'text', text: 'First, create a detailed plan. Do not make any changes yet.' });
+      parts.push({ type: 'text', text: 'Primero creá un plan detallado sin hacer cambios. Después de crear el plan, esperá instrucciones.' });
     }
+
+    parts.push({ type: 'text', text: prompt });
 
     const msgOptions = {};
     if (Object.keys(modelConfig).length > 0) {
@@ -149,7 +160,7 @@ router.post('/send', async (req, res) => {
       let fullResponse = '';
       const partTypes = {};
 
-      for await (const event of opencode.streamSession(ocSessionId, parts, msgOptions)) {
+      for await (const event of server.streamSession(ocSessionId, parts, msgOptions)) {
         if (event.properties?.permissionID) {
           const controlData = {
             controlId: 'perm-' + Date.now(),
@@ -161,7 +172,7 @@ router.post('/send', async (req, res) => {
           };
           const response = await processControl(controlData);
           if (response) {
-            await opencode.respondToPermission(ocSessionId, event.properties.permissionID, response.response, response.remember || false);
+            await server.respondToPermission(ocSessionId, event.properties.permissionID, response.response, response.remember || false);
           }
           continue;
         }
@@ -189,13 +200,7 @@ router.post('/send', async (req, res) => {
         }
       }
 
-      const diff = await opencode.getSessionDiff(ocSessionId);
-
-      const summary = {
-        sessionId: ocSessionId,
-        hash: ocSessionId,
-        diff: diff || [],
-      };
+      const diff = await server.getSessionDiff(ocSessionId);
 
       if (sessionId) {
         await db('chat_messages').insert({
@@ -215,8 +220,9 @@ router.post('/send', async (req, res) => {
 
     } catch (msgErr) {
       console.log('Error en opencode streamSession:', msgErr.message);
-      res.write(`data: ${JSON.stringify({ type: 'error', content: msgErr.message })}\n\n`);
-
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'error', content: msgErr.message })}\n\n`);
+      } catch {}
       if (sessionId) {
         try {
           await db('chat_messages').insert({
@@ -238,6 +244,11 @@ router.post('/send', async (req, res) => {
     console.log('Error en opencode/send:', err.message);
     if (!res.headersSent) {
       res.status(500).json({ error: err.message });
+    } else {
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
+        res.end();
+      } catch {}
     }
   }
 });
@@ -258,17 +269,15 @@ router.post('/control', async (req, res) => {
 router.post('/finish', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { ocSessionId } = req.body;
-    if (!ocSessionId) return res.status(400).json({ error: 'ocSessionId requerido' });
+    const { ocSessionId, directory } = req.body;
+    if (!directory) return res.status(400).json({ error: 'directory requerido' });
 
-    await opencode.abortSession(ocSessionId);
+    if (ocSessionId) {
+      try { await opencode.abortSessionInDir(directory, ocSessionId); } catch {}
+    }
+    opencode.stopServer(directory);
 
-    let diff = [];
-    try {
-      diff = await opencode.getSessionDiff(ocSessionId);
-    } catch {}
-
-    res.json({ success: true, hash: ocSessionId, diff });
+    res.json({ success: true, hash: ocSessionId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

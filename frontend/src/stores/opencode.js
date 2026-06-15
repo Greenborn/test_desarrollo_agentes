@@ -103,6 +103,14 @@ export const useOpencodeStore = defineStore('opencode', () => {
         body: JSON.stringify(body),
       })
 
+      if (!res.ok) {
+        let errMsg = 'Error en conexión con OpenCode'
+        try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
+        streaming.value = false
+        if (callbacks?.onError) callbacks.onError(errMsg)
+        return
+      }
+
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buf = ''
