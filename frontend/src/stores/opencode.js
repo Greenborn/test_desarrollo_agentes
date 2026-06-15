@@ -87,6 +87,70 @@ export const useOpencodeStore = defineStore('opencode', () => {
     }
   }
 
+  async function streamPrompt(sessionId, prompt, provider, model, thinking, mode, callbacks) {
+    const body = { prompt, provider, model, thinking, mode, sessionId }
+    if (ocSessionId.value) body.ocSessionId = ocSessionId.value
+
+    streaming.value = true
+    streamText.value = ''
+    streamThinking.value = ''
+
+    try {
+      const res = await fetch(`${API}/opencode/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      })
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() || ''
+
+        for (const line of lines) {
+          const t = line.trim()
+          if (!t || !t.startsWith('data: ')) continue
+
+          try {
+            const j = JSON.parse(t.slice(6))
+            if (j.type === 'response') {
+              streamText.value += j.content
+              if (callbacks?.onChunk) callbacks.onChunk(j.content, streamText.value)
+            } else if (j.type === 'thinking') {
+              streamThinking.value += j.content
+              if (callbacks?.onThinking) callbacks.onThinking(j.content, streamThinking.value)
+            } else if (j.type === 'control_request') {
+              if (callbacks?.onControl) callbacks.onControl(j.control)
+            } else if (j.type === 'done') {
+              ocSessionId.value = j.ocSessionId || j.hash || null
+              streaming.value = false
+              if (callbacks?.onDone) callbacks.onDone(j, streamText.value)
+            } else if (j.type === 'error') {
+              streaming.value = false
+              if (callbacks?.onError) callbacks.onError(j.content)
+            }
+          } catch {}
+        }
+      }
+
+      if (streaming.value) {
+        streaming.value = false
+      }
+    } catch (err) {
+      console.error('Error en streamPrompt:', err)
+      streaming.value = false
+      if (callbacks?.onError) callbacks.onError(err.message)
+    }
+  }
+
   function finish() {
     step.value = 'idle'
     ocSessionId.value = null
@@ -106,6 +170,6 @@ export const useOpencodeStore = defineStore('opencode', () => {
     streaming, streamText, streamThinking,
     thinkingOptions,
     getAvailableProviders, getModelsForProvider, modelSupportsReasoning,
-    start, select, finish,
+    start, select, streamPrompt, finish,
   }
 })

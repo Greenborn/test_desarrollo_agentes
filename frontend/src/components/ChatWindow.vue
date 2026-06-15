@@ -94,81 +94,39 @@ export default {
       const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
       streamMsg._key = 'stream-' + Date.now()
 
-      try {
-        const res = await fetch('/api/opencode/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ prompt, provider, model, thinking, mode, sessionId }),
-        })
-
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-
-          for (const line of lines) {
-            const trimmed = line.trim()
-            if (!trimmed || !trimmed.startsWith('data: ')) continue
-
-            try {
-              const json = JSON.parse(trimmed.slice(6))
-              if (json.type === 'response') {
-                ocChunk.value += json.content
-                streamMsg.content = ocChunk.value
-              } else if (json.type === 'thinking') {
-                ocThinking.value += json.content
-                streamMsg.thinking = ocThinking.value
-              } else if (json.type === 'tool_use') {
-                const toolText = `\n[${json.tool}]\n`
-                ocChunk.value += toolText
-                streamMsg.content = ocChunk.value
-              } else if (json.type === 'control_request') {
-                // Add control message to chat
-                const controlMsg = {
-                  role: 'opencode_control',
-                  content: JSON.stringify(json.control),
-                  controlData: json.control,
-                  _key: 'control-' + Date.now(),
-                }
-                chat.messages.push(controlMsg)
-              } else if (json.type === 'done') {
-                ocStreaming.value = false
-                delete streamMsg.streaming
-                // Add result message
-                const resultContent = json.diff ? json.diff.map((d) => `${d.path || d.file}: ${d.status || 'modificado'}`).join('\n') : ocChunk.value
-                chat.messages.push({
-                  role: 'opencode_result',
-                  content: JSON.stringify({ summary: resultContent, hash: json.hash || json.sessionId }),
-                  _key: 'result-' + Date.now(),
-                })
-                await chat.loadMessages(sessionId)
-              } else if (json.type === 'error') {
-                ocChunk.value += `\n\n[Error: ${json.content}]`
-                streamMsg.content = ocChunk.value
-                ocStreaming.value = false
-                delete streamMsg.streaming
-              }
-            } catch {}
-          }
-        }
-
-        if (ocStreaming.value) {
+      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, {
+        onChunk(content) {
+          ocChunk.value += content
+        },
+        onThinking(content) {
+          ocThinking.value += content
+        },
+        onControl(control) {
+          chat.messages.push({
+            role: 'opencode_control',
+            content: JSON.stringify(control),
+            controlData: control,
+            _key: 'control-' + Date.now(),
+          })
+        },
+        onDone(json, fullText) {
           ocStreaming.value = false
-          delete streamMsg.streaming
-        }
-      } catch (err) {
-        console.error('Error en opencode stream:', err)
-        ocStreaming.value = false
-        delete streamMsg.streaming
-      }
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) {
+            chat.messages[idx].streaming = false
+            chat.messages[idx].role = 'opencode_result'
+            chat.messages[idx].content = json.fullResponse || fullText || '(sin respuesta)'
+          }
+        },
+        onError(msg) {
+          ocStreaming.value = false
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) {
+            chat.messages[idx].content = `[Error: ${msg}]`
+            chat.messages[idx].streaming = false
+          }
+        },
+      })
     }
 
     async function onControlConfirm({ controlId, value }) {

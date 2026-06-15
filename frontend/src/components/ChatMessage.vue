@@ -13,10 +13,10 @@
         <pre class="mb-0 small" style="white-space: pre-wrap;">{{ msg.content }}</pre>
       </div>
     </div>
-    <div v-else-if="msg.role === 'opencode_confirmed'" class="d-inline-block rounded-3 p-2 text-start font-monospace small" style="max-width: 90%; background: #1a1a2e; border: 1px solid #7c3aed; color: #a78bfa;">
+    <div v-else-if="msg.role === 'opencode_confirmed'" class="d-inline-block rounded-3 p-2 text-start font-monospace small" style="max-width: 90%; background: #1a1a2e; border: 1px solid #7c3aed; color: #c4b5fd;">
       {{ msg.content }}
     </div>
-    <div v-else-if="msg.role === 'opencode_stream'" class="d-inline-block rounded-3 p-3 text-start" style="max-width: 90%; background: #0f0f1e; border: 1px solid #7c3aed; color: #e0e0e0;">
+    <div v-else-if="msg.role === 'opencode_stream'" class="d-inline-block rounded-3 p-3 text-start" style="max-width: 90%; background: #0f0f1e; border: 1px solid #7c3aed; color: #f0f0f0;">
       <div v-if="msg.thinking" class="mb-2">
         <button class="btn btn-sm btn-outline-secondary w-100 text-start" data-bs-toggle="collapse" :data-bs-target="'#think-' + uid">
           🧠 Razonando...
@@ -27,12 +27,11 @@
       </div>
       <div style="white-space: pre-wrap;">{{ msg.content }}<span v-if="msg.streaming" class="blink">▌</span></div>
     </div>
-    <div v-else-if="msg.role === 'opencode_result'" class="d-inline-block rounded-3 p-3 text-start font-monospace small" style="max-width: 90%; background: #0f0f1e; border: 1px solid #7c3aed; color: #c084fc;">
-      <pre v-if="parsedResult" class="mb-0" style="white-space: pre-wrap;">{{ parsedResult.summary || parsedResult.content || msg.content }}</pre>
-      <pre v-else class="mb-0" style="white-space: pre-wrap;">{{ msg.content }}</pre>
-      <div v-if="parsedResult && parsedResult.hash" class="mt-2 text-info small">Hash: {{ parsedResult.hash }}</div>
+    <div v-else-if="msg.role === 'opencode_result'" class="d-inline-block rounded-3 p-3 text-start font-monospace small" style="max-width: 90%; background: #0f0f1e; border: 1px solid #7c3aed; color: #f0f0f0;">
+      <div style="white-space: pre-wrap;">{{ msg.content }}</div>
+      <div v-if="msg.extra && msg.extra.hash" class="mt-2 small" style="color: #87ceeb;">Hash: {{ msg.extra.hash }}</div>
     </div>
-    <div v-else-if="msg.role === 'opencode_info'" class="d-inline-block rounded-3 p-2 text-start small" style="max-width: 90%; background: #1a1a2e; border: 1px solid #374151; color: #6b7280;">
+    <div v-else-if="msg.role === 'opencode_info'" class="d-inline-block rounded-3 p-2 text-start small" style="max-width: 90%; background: #1a1a2e; border: 1px solid #374151; color: #9ca3af;">
       <pre class="mb-0" style="white-space: pre-wrap;">{{ msg.content }}</pre>
     </div>
     <div

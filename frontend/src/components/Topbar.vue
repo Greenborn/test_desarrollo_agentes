@@ -188,6 +188,57 @@ export default {
     })
 
     register({
+      name: '/oc',
+      category: 'OpenCode',
+      description: 'Envía un prompt a la sesión OpenCode activa. Si no hay sesión, inicia una nueva.',
+      usage: '/oc &lt;prompt&gt;',
+      async execute(args, { cmdStore, chatStore }) {
+        const prompt = args.join(' ')
+        if (!prompt) {
+          console.error('Error en /oc: debe especificar un prompt')
+          return
+        }
+        const sessionId = chatStore.activeSessionId
+        if (!sessionId) {
+          console.error('Error en /oc: no hay sesión de chat activa')
+          return
+        }
+        if (!ocStore.ocSessionId) {
+          // No existing opencode session, start setup flow
+          chatStore.messages.push({
+            role: 'opencode_info',
+            content: JSON.stringify({ type: 'info', message: 'No hay sesión OpenCode activa. Ejecutá /opencode primero.' }),
+            _key: 'info-' + Date.now(),
+          })
+          return
+        }
+        // Send prompt to existing OpenCode session
+        const streamMsg = {
+          role: 'opencode_stream',
+          content: '',
+          streaming: true,
+          _key: 'ocstream-' + Date.now(),
+        }
+        chatStore.messages.push(streamMsg)
+
+        await ocStore.streamPrompt(sessionId, prompt, ocStore.selectedProvider, ocStore.selectedModel, ocStore.selectedThinking, ocStore.selectedMode, {
+          onChunk(content, total) {
+            streamMsg.content = total
+          },
+          onDone(json, fullText) {
+            streamMsg.streaming = false
+            streamMsg.role = 'opencode_result'
+            streamMsg.content = json.fullResponse || fullText || '(sin respuesta)'
+          },
+          onError(msg) {
+            streamMsg.content = `[Error: ${msg}]`
+            streamMsg.streaming = false
+          },
+        })
+      },
+    })
+
+    register({
       name: '/opencode_fin',
       category: 'OpenCode',
       description: 'Finaliza la sesión OpenCode activa.',

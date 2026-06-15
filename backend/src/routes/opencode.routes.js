@@ -70,18 +70,20 @@ router.post('/select', async (req, res) => {
 
 router.post('/send', async (req, res) => {
   if (!authGuard(req, res)) return;
-  const { prompt, provider, model, thinking, mode, sessionId } = req.body;
+  const { prompt, provider, model, thinking, mode, sessionId, ocSessionId: existingOcSessionId } = req.body;
   if (!prompt) return res.status(400).json({ error: 'prompt requerido' });
 
   try {
-    const ocSession = await opencode.createSession('Agent Orchestrator - ' + (prompt.slice(0, 50)));
-    const ocSessionId = ocSession.id;
-
-    if (sessionId) {
-      await db('chat_messages').insert({
-        session_id: sessionId, role: 'opencode_info',
-        content: JSON.stringify({ type: 'session_created', ocSessionId }),
-      });
+    let ocSessionId = existingOcSessionId;
+    if (!ocSessionId) {
+      const ocSession = await opencode.createSession('Agent Orchestrator - ' + (prompt.slice(0, 50)));
+      ocSessionId = ocSession.id;
+      if (sessionId) {
+        await db('chat_messages').insert({
+          session_id: sessionId, role: 'opencode_info',
+          content: JSON.stringify({ type: 'session_created', ocSessionId }),
+        });
+      }
     }
 
     res.writeHead(200, {
@@ -199,16 +201,16 @@ router.post('/send', async (req, res) => {
         await db('chat_messages').insert({
           session_id: sessionId,
           role: 'opencode_result',
-          content: JSON.stringify(summary),
+          content: fullResponse || '(sin respuesta)',
         });
         await db('chat_messages').insert({
           session_id: sessionId,
           role: 'opencode_info',
-          content: JSON.stringify({ type: 'finished', ocSessionId }),
+          content: JSON.stringify({ type: 'finished', hash: ocSessionId, diff: diff || [] }),
         });
       }
 
-      res.write(`data: ${JSON.stringify({ type: 'done', ...summary })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'done', ocSessionId, hash: ocSessionId, fullResponse, diff: diff || [] })}\n\n`);
       res.end();
 
     } catch (msgErr) {
