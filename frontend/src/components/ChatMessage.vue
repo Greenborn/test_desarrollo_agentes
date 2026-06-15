@@ -26,7 +26,7 @@
           <pre class="mb-0 small text-muted" style="white-space: pre-wrap;">{{ msg.thinking }}</pre>
         </div>
       </div>
-      <div style="white-space: pre-wrap;">{{ msg.content }}<span v-if="msg.streaming" class="blink">▌</span></div>
+      <ChatFormatter :text="msg.content" /><span v-if="msg.streaming" class="blink">▌</span>
     </div>
     <div v-else-if="msg.role === 'opencode_result'" class="d-block w-100 rounded-3 p-3 text-start font-monospace small" style="background: #0f0f1e; border: 1px solid #7c3aed; color: #f0f0f0;">
       <template v-for="(seg, i) in formattedContent" :key="i">
@@ -56,7 +56,7 @@
           <pre class="mb-0 small text-muted" style="white-space: pre-wrap;">{{ msg.thinking }}</pre>
         </div>
       </div>
-      <div style="white-space: pre-wrap;">{{ msg.content }}</div>
+      <ChatFormatter :text="msg.content" />
     </div>
   </div>
 </template>
@@ -65,11 +65,12 @@
 import ControlSelect from './ChatControlSelect.vue'
 import ControlTextarea from './ChatControlTextarea.vue'
 import ChatControlFollowup from './ChatControlFollowup.vue'
+import ChatFormatter from './ChatFormatter.vue'
 
 let counter = 0
 
 export default {
-  components: { ControlSelect, ControlTextarea, ChatControlFollowup },
+  components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatFormatter },
   props: {
     msg: { type: Object, required: true },
   },
