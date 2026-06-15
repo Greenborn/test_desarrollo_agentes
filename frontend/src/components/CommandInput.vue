@@ -19,6 +19,7 @@
       />
     </div>
     <div
+      ref="autocompleteList"
       v-if="autocompleteVisible"
       class="position-absolute top-100 start-0 end-0 bg-dark border border-secondary rounded-bottom"
       style="z-index: 1050; max-height: 200px; overflow-y: auto;"
@@ -38,7 +39,7 @@
 </template>
 
 <script>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCommandStore } from '../stores/command.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
@@ -52,7 +53,17 @@ export default {
     const { autocompleteOptions, autocompleteVisible, arrowIndex, currentDir } = storeToRefs(cmdStore)
     const buffer = ref('')
     const inputEl = ref(null)
+    const autocompleteList = ref(null)
     const historyIdx = ref(-1)
+
+    watch(arrowIndex, (newIdx) => {
+      if (newIdx >= 0 && autocompleteList.value) {
+        nextTick(() => {
+          const el = autocompleteList.value?.children[newIdx]
+          if (el) el.scrollIntoView({ block: 'nearest' })
+        })
+      }
+    })
 
     function handleEnter() {
       if (autocompleteVisible.value && arrowIndex.value >= 0 && arrowIndex.value < autocompleteOptions.value.length) {
@@ -179,7 +190,7 @@ export default {
     }
 
     return {
-      buffer, inputEl, autocompleteOptions,
+      buffer, inputEl, autocompleteList, autocompleteOptions,
       autocompleteVisible, arrowIndex, currentDir,
       handleEnter, handleTab, handleUp, handleDown,
       hideAutocomplete, pickAutocomplete, onInput,

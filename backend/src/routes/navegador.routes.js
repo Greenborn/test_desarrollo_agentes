@@ -76,34 +76,19 @@ router.post('/finish', async (req, res) => {
 
   const { id_session, sessionId } = req.body;
 
+  if (!id_session) {
+    const errorMsg = 'No hay sesión de navegador activa. Usá /iniciar_navegador primero.';
+    await saveToChat(sessionId, 'result', errorMsg);
+    return res.status(400).json({ error: errorMsg });
+  }
+
   try {
-    let targetId = id_session;
-
-    if (!targetId) {
-      // Try to get active session from Playwright service
-      try {
-        const statusRes = await fetch(`${PW_URL}/api/command`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ comando: 'status', parametros: {} }),
-        });
-        const statusData = await statusRes.json();
-        if (statusData.active) targetId = statusData.id;
-      } catch {}
-    }
-
-    if (!targetId) {
-      const errorMsg = 'No hay sesión de navegador activa. Usá /iniciar_navegador primero.';
-      await saveToChat(sessionId, 'result', errorMsg);
-      return res.status(400).json({ error: errorMsg });
-    }
-
     await saveToChat(sessionId, 'command', '[navegador] finish');
 
     const pwRes = await fetch(`${PW_URL}/api/command`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comando: 'close', parametros: { id_session: targetId } }),
+      body: JSON.stringify({ comando: 'close', parametros: { id_session } }),
     });
     const data = await pwRes.json();
 

@@ -12,7 +12,7 @@
         @keydown.down.prevent="onArrow(1)"
         @keydown.up.prevent="onArrow(-1)"
       />
-      <div v-if="filteredOptions.length > 0" class="position-absolute top-100 start-0 end-0 bg-dark border border-secondary rounded-bottom" style="z-index: 1050; max-height: 160px; overflow-y: auto;">
+      <div ref="dropdownList" v-if="filteredOptions.length > 0" class="position-absolute top-100 start-0 end-0 bg-dark border border-secondary rounded-bottom" style="z-index: 1050; max-height: 160px; overflow-y: auto;">
         <button
           v-for="(opt, i) in filteredOptions"
           :key="opt.value"
@@ -31,7 +31,7 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 
 export default {
   props: {
@@ -43,6 +43,7 @@ export default {
   emits: ['confirm', 'update:modelValue'],
   setup(props, { emit }) {
     const inputEl = ref(null)
+    const dropdownList = ref(null)
     const filterText = ref('')
     const selected = ref(props.preselect || '')
 
@@ -58,6 +59,10 @@ export default {
       const idx = opts.findIndex((o) => o.value === selected.value)
       let newIdx = idx < 0 ? 0 : (idx + dir + opts.length) % opts.length
       selected.value = opts[newIdx].value
+      nextTick(() => {
+        const el = dropdownList.value?.querySelector('.bg-primary')
+        if (el) el.scrollIntoView({ block: 'nearest' })
+      })
     }
 
     function onFilter() {
@@ -73,7 +78,7 @@ export default {
       emit('confirm', v)
     }
 
-    return { inputEl, filterText, selected, filteredOptions, onFilter, onArrow, confirm }
+    return { inputEl, dropdownList, filterText, selected, filteredOptions, onFilter, onArrow, confirm }
   },
 }
 </script>

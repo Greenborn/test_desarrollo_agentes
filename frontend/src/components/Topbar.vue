@@ -335,17 +335,25 @@ export default {
       usage: '/navegador_fin',
       async execute(args, { cmdStore, chatStore }) {
         const sessionId = chatStore.activeSessionId
+        if (!navegadorSessionId.value) {
+          console.error('Error en /navegador_fin: no hay sesión de navegador activa')
+          if (sessionId) {
+            chatStore.messages.push({ role: 'result', content: 'Error: No hay sesión de navegador activa. Usá /iniciar_navegador primero.', _key: 'err-' + Date.now() })
+          }
+          return
+        }
         try {
           const res = await fetch('/api/navegador/finish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ sessionId }),
+            body: JSON.stringify({ id_session: navegadorSessionId.value, sessionId }),
           })
           const data = await res.json()
           if (data.error) {
             console.error('Error en /navegador_fin:', data.error)
           }
+          navegadorSessionId.value = null
           if (sessionId) chatStore.loadMessages(sessionId)
         } catch (err) {
           console.error('Error en /navegador_fin:', err)
