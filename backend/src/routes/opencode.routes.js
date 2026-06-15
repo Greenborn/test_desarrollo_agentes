@@ -138,29 +138,53 @@ router.post('/send', async (req, res) => {
       parts.unshift({ type: 'text', text: 'First, create a detailed plan. Do not make any changes yet.' });
     }
 
-    const msgOptions = { ...modelConfig };
+    const msgOptions = {};
     if (Object.keys(modelConfig).length > 0) {
       msgOptions.model = modelConfig;
     }
 
     try {
-      const result = await opencode.sendMessage(ocSessionId, parts, msgOptions);
+      let fullResponse = '';
+      const partTypes = {};
 
-      if (result && result.info && result.parts) {
-        for (const part of result.parts) {
-          if (part.type === 'text') {
-            fullResponse += part.text || '';
-            res.write(`data: ${JSON.stringify({ type: 'response', content: part.text || '' })}\n\n`);
-          } else if (part.type === 'tool_use') {
-            res.write(`data: ${JSON.stringify({ type: 'tool_use', tool: part.name, input: part.input })}\n\n`);
+      for await (const event of opencode.streamSession(ocSessionId, parts, msgOptions)) {
+        if (event.properties?.permissionID) {
+          const controlData = {
+            controlId: 'perm-' + Date.now(),
+            controlType: 'select',
+            type: 'permission',
+            permissionID: event.properties.permissionID,
+            question: event.properties.type || 'Permiso requerido',
+            options: [{ label: 'Aceptar', value: 'yes' }, { label: 'Rechazar', value: 'no' }],
+          };
+          const response = await processControl(controlData);
+          if (response) {
+            await opencode.respondToPermission(ocSessionId, event.properties.permissionID, response.response, response.remember || false);
+          }
+          continue;
+        }
+
+        if (event.type === 'message.part.updated' && event.properties?.part?.type) {
+          const partId = event.properties.part.id || event.properties.partID;
+          if (partId) partTypes[partId] = event.properties.part.type;
+        }
+
+        if (event.type === 'message.part.delta' && event.properties?.field === 'text') {
+          const partId = event.properties.partID;
+          const partType = partTypes[partId] || '';
+          const delta = event.properties.delta || '';
+
+          if (partType === 'reasoning') {
+            res.write(`data: ${JSON.stringify({ type: 'thinking', content: delta })}\n\n`);
+          } else {
+            fullResponse += delta;
+            res.write(`data: ${JSON.stringify({ type: 'response', content: delta })}\n\n`);
           }
         }
-      } else if (result && result.info && result.info.content) {
-        fullResponse = result.info.content;
-        res.write(`data: ${JSON.stringify({ type: 'response', content: result.info.content })}\n\n`);
-      } else {
-        fullResponse = JSON.stringify(result);
-        res.write(`data: ${JSON.stringify({ type: 'response', content: JSON.stringify(result) })}\n\n`);
+
+        if (event.type === 'session.status' && event.properties?.status?.type === 'idle') {
+          break;
+        }
       }
 
       const diff = await opencode.getSessionDiff(ocSessionId);
@@ -186,8 +210,9 @@ router.post('/send', async (req, res) => {
 
       res.write(`data: ${JSON.stringify({ type: 'done', ...summary })}\n\n`);
       res.end();
+
     } catch (msgErr) {
-      console.log('Error en opencode sendMessage:', msgErr.message);
+      console.log('Error en opencode streamSession:', msgErr.message);
       res.write(`data: ${JSON.stringify({ type: 'error', content: msgErr.message })}\n\n`);
 
       if (sessionId) {
@@ -206,6 +231,7 @@ router.post('/send', async (req, res) => {
       }
       res.end();
     }
+
   } catch (err) {
     console.log('Error en opencode/send:', err.message);
     if (!res.headersSent) {

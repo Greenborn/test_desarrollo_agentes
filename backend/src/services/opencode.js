@@ -153,6 +153,43 @@ async function getEvents(sessionId) {
   return res;
 }
 
+async function* streamSession(sessionId, parts, options = {}) {
+  const eventRes = await fetch(`${BASE_URL}/event`);
+  if (!eventRes.ok || !eventRes.body) {
+    throw new Error('No se pudo conectar al stream de eventos de OpenCode');
+  }
+
+  await sendPromptAsync(sessionId, parts, options);
+
+  const reader = eventRes.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let done = false;
+
+  while (!done) {
+    const { done: readerDone, value } = await reader.read();
+    if (readerDone) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      try {
+        const event = JSON.parse(trimmed.slice(6));
+        yield event;
+
+        if (event.type === 'session.status' && event.properties?.status?.type === 'idle') {
+          done = true;
+        }
+      } catch {}
+    }
+  }
+  reader.cancel();
+}
+
 async function getSessionStatus(sessionId) {
   try {
     const data = await api(`/session/${sessionId}`);
@@ -174,6 +211,7 @@ export default {
   createSession,
   sendMessage,
   sendPromptAsync,
+  streamSession,
   respondToPermission,
   abortSession,
   getSessionDiff,
