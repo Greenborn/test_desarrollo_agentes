@@ -28,12 +28,15 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function createSession() {
+  async function createSession(cwd) {
     creating.value = true
     try {
+      const body = cwd ? JSON.stringify({ cwd }) : undefined
       const res = await fetch(`${API}/chat/sessions`, {
         method: 'POST',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
         credentials: 'include',
+        body,
       })
       const data = await res.json()
       if (data.error) {
@@ -50,6 +53,13 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function createSessionIfNeeded(cwd) {
+    if (!activeSessionId.value) {
+      await createSession(cwd)
+    }
+    return activeSessionId.value
+  }
+
   async function loadMessages(sessionId) {
     activeSessionId.value = sessionId
     messages.value = []
@@ -62,7 +72,7 @@ export const useChatStore = defineStore('chat', () => {
         console.error('Error al cargar mensajes:', data.error)
         return
       }
-      if (data.sessionId === activeSessionId.value) {
+      if (Number(data.sessionId) === Number(activeSessionId.value)) {
         messages.value = data.messages
       }
     } catch (err) {
@@ -174,7 +184,7 @@ export const useChatStore = defineStore('chat', () => {
   return {
     sessions, activeSessionId, messages,
     streaming, creating, currentChunk, currentThinking,
-    loadSessions, createSession, loadMessages,
+    loadSessions, createSession, createSessionIfNeeded, loadMessages,
     sendMessage, deleteSession,
   }
 })

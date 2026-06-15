@@ -15,15 +15,23 @@ import SidebarChat from '../components/SidebarChat.vue'
 import ChatWindow from '../components/ChatWindow.vue'
 import { useAuthStore } from '../stores/auth.js'
 import { useChatStore } from '../stores/chat.js'
+import { useCommandStore } from '../stores/command.js'
 
 export default {
   components: { Topbar, SidebarChat, ChatWindow },
   setup() {
     const auth = useAuthStore()
     const chat = useChatStore()
+    const cmd = useCommandStore()
 
     function load() {
-      if (auth.user) chat.loadSessions()
+      if (auth.user) {
+        chat.loadSessions()
+        if (chat.activeSessionId) {
+          const s = chat.sessions.find((s) => s.id === chat.activeSessionId)
+          if (s && s.cwd) cmd.currentDir = s.cwd
+        }
+      }
     }
 
     watch(() => auth.user, load)

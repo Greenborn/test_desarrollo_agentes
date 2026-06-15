@@ -13,30 +13,30 @@
       </ul>
     </div>
   </nav>
-  <HelpModal ref="helpModalRef" />
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/auth.js'
 import { useRouter } from 'vue-router'
 import { useCommandStore } from '../stores/command.js'
+import { useModalStore } from '../stores/modal.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useChatStore } from '../stores/chat.js'
 import CommandInput from './CommandInput.vue'
-import HelpModal from './HelpModal.vue'
+import HelpContent from './HelpModal.vue'
 
 export default {
-  components: { CommandInput, HelpModal },
+  components: { CommandInput },
   setup() {
     const auth = useAuthStore()
     const cmdStore = useCommandStore()
     const chatStore = useChatStore()
+    const modal = useModalStore()
     const { user } = storeToRefs(auth)
     const { register } = useCommandRegistry()
     const router = useRouter()
-    const helpModalRef = ref(null)
 
     register({
       name: '/help',
@@ -44,17 +44,7 @@ export default {
       description: 'Muestra esta ayuda general de comandos, organizada por categoría.',
       usage: '/help',
       async execute(args, { cmdStore }) {
-        const el = document.getElementById('helpModal')
-        if (!el) {
-          console.error('Error en /help: elemento #helpModal no encontrado')
-          return
-        }
-        if (!window.bootstrap?.Modal) {
-          console.error('Error en /help: Bootstrap Modal no disponible')
-          return
-        }
-        const bsModal = window.bootstrap.Modal.getInstance(el) || new window.bootstrap.Modal(el)
-        bsModal.show()
+        modal.open(HelpContent, {})
       },
     })
 
@@ -66,7 +56,7 @@ export default {
       autocomplete(args, cmdStore) {
         const last = args.length > 0 ? args[args.length - 1] : ''
         const prefix = last.startsWith('/') || last.startsWith('~') ? last : '/'
-        cmdStore.fetchAutocomplete(prefix)
+        cmdStore.fetchAutocomplete(prefix, cmdStore.currentDir)
       },
       async execute(args, { cmdStore, chatStore }) {
         const dir = args.join(' ')
@@ -84,13 +74,43 @@ export default {
           })
           const data = await res.json()
           if (data.success) {
-            cmdStore.setDirectory(data.result)
+            cmdStore.currentDir = data.result
           } else {
             console.error('Error en /cd:', data.result)
           }
           if (sessionId) chatStore.loadMessages(sessionId)
         } catch (err) {
           console.error('Error en /cd:', err)
+        }
+      },
+    })
+
+    register({
+      name: '/ls',
+      category: 'Navegación',
+      description: 'Lista el contenido del directorio actual o del especificado.',
+      usage: '/ls [ruta]',
+      autocomplete(args, cmdStore) {
+        const last = args.length > 0 ? args[args.length - 1] : ''
+        const prefix = last.startsWith('/') || last.startsWith('~') ? last : ''
+        if (!prefix && !cmdStore.currentDir) return
+        cmdStore.fetchAutocomplete(prefix || cmdStore.currentDir, cmdStore.currentDir)
+      },
+      async execute(args, { cmdStore, chatStore }) {
+        const dir = args.join(' ')
+        const sessionId = chatStore.activeSessionId
+        try {
+          const res = await fetch('/api/command/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: `/ls ${dir}`, sessionId }),
+          })
+          const data = await res.json()
+          if (!data.success) console.error('Error en /ls:', data.result)
+          if (sessionId) chatStore.loadMessages(sessionId)
+        } catch (err) {
+          console.error('Error en /ls:', err)
         }
       },
     })
@@ -133,7 +153,7 @@ export default {
       router.push('/')
     }
 
-    return { user, logout, helpModalRef }
+    return { user, logout }
   },
 }
 </script>

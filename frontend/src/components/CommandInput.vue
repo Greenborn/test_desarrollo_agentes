@@ -1,17 +1,19 @@
 <template>
   <div class="position-relative flex-grow-1 mx-3" style="max-width: 480px;">
     <div class="input-group input-group-sm">
-      <span class="input-group-text bg-dark text-success border-secondary font-monospace">$</span>
+      <span class="input-group-text bg-dark text-success border-secondary font-monospace text-truncate" style="max-width: 180px;" :title="currentDir || '/'">
+        {{ (currentDir || '/') }} $
+      </span>
       <input
         ref="inputEl"
         v-model="buffer"
         type="text"
         class="form-control form-control-sm bg-dark text-light border-secondary font-monospace"
         placeholder="Escribe /help para ayuda"
-        @keydown.enter="submit"
+        @keydown.enter="handleEnter"
         @keydown.tab.prevent="handleTab"
-        @keydown.up.prevent="navHistory(-1)"
-        @keydown.down.prevent="navHistory(1)"
+        @keydown.up.prevent="handleUp"
+        @keydown.down.prevent="handleDown"
         @keydown.escape="hideAutocomplete"
         @input="onInput"
       />
@@ -22,11 +24,12 @@
       style="z-index: 1050; max-height: 200px; overflow-y: auto;"
     >
       <button
-        v-for="opt in autocompleteOptions"
+        v-for="(opt, i) in autocompleteOptions"
         :key="opt"
         class="d-block w-100 text-start px-2 py-1 btn btn-sm text-light font-monospace"
-        :class="{ 'bg-primary': opt === highlightIndex }"
+        :class="{ 'bg-primary': i === arrowIndex }"
         @mousedown.prevent="pickAutocomplete(opt)"
+        @mouseenter="arrowIndex = i"
       >
         {{ opt }}
       </button>
@@ -46,11 +49,18 @@ export default {
     const cmdStore = useCommandStore()
     const chatStore = useChatStore()
     const { find, suggest } = useCommandRegistry()
-    const { autocompleteOptions, autocompleteVisible } = storeToRefs(cmdStore)
+    const { autocompleteOptions, autocompleteVisible, arrowIndex, currentDir } = storeToRefs(cmdStore)
     const buffer = ref('')
     const inputEl = ref(null)
     const historyIdx = ref(-1)
-    const highlightIndex = ref(null)
+
+    function handleEnter() {
+      if (autocompleteVisible.value && arrowIndex.value >= 0 && arrowIndex.value < autocompleteOptions.value.length) {
+        pickAutocomplete(autocompleteOptions.value[arrowIndex.value])
+        return
+      }
+      submit()
+    }
 
     function submit() {
       const raw = buffer.value.trim()
@@ -63,6 +73,12 @@ export default {
     }
 
     async function execute(raw) {
+      let sessionId = chatStore.activeSessionId
+      if (!sessionId) {
+        sessionId = await chatStore.createSessionIfNeeded(cmdStore.currentDir)
+        if (!sessionId) return
+      }
+
       const parts = raw.split(/\s+/)
       const cmdName = parts[0].toLowerCase()
       const args = parts.slice(1)
@@ -71,25 +87,38 @@ export default {
       if (known) {
         known.execute(args, { cmdStore, chatStore })
       } else if (cmdName.startsWith('/')) {
-        const sessionId = chatStore.activeSessionId
-        if (sessionId) {
-          try {
-            const res = await fetch('/api/command/execute', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ command: raw, sessionId }),
-            })
-            const data = await res.json()
-            if (data.success) {
-              chatStore.loadMessages(sessionId)
-            } else {
-              console.error('Error al ejecutar comando:', data.result)
-            }
-          } catch (err) {
-            console.error('Error al ejecutar comando:', err)
+        try {
+          const res = await fetch('/api/command/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: raw, sessionId }),
+          })
+          const data = await res.json()
+          if (data.success) {
+            chatStore.loadMessages(sessionId)
+          } else {
+            console.error('Error al ejecutar comando:', data.result)
           }
+        } catch (err) {
+          console.error('Error al ejecutar comando:', err)
         }
+      }
+    }
+
+    function handleUp() {
+      if (autocompleteVisible.value && autocompleteOptions.value.length > 0) {
+        arrowIndex.value = arrowIndex.value <= 0 ? autocompleteOptions.value.length - 1 : arrowIndex.value - 1
+      } else {
+        navHistory(-1)
+      }
+    }
+
+    function handleDown() {
+      if (autocompleteVisible.value && autocompleteOptions.value.length > 0) {
+        arrowIndex.value = (arrowIndex.value + 1) % autocompleteOptions.value.length
+      } else {
+        navHistory(1)
       }
     }
 
@@ -105,7 +134,6 @@ export default {
     async function handleTab() {
       const trimmed = buffer.value.trim()
       const parts = buffer.value.split(/\s+/)
-      const lastWord = parts[parts.length - 1] || ''
 
       if (!trimmed) {
         cmdStore.showAutocomplete(suggest(''))
@@ -131,8 +159,13 @@ export default {
 
     function pickAutocomplete(dir) {
       const parts = buffer.value.split(/\s+/)
-      parts[parts.length - 1] = dir
-      buffer.value = parts.join(' ') + ' '
+      const isCommand = dir.startsWith('/') && parts.length === 1
+      if (isCommand) {
+        buffer.value = dir + ' '
+      } else {
+        parts[parts.length - 1] = dir
+        buffer.value = parts.join(' ') + ' '
+      }
       cmdStore.hideAutocomplete()
       nextTick(() => inputEl.value?.focus())
     }
@@ -147,9 +180,9 @@ export default {
 
     return {
       buffer, inputEl, autocompleteOptions,
-      autocompleteVisible,
-      highlightIndex, submit, handleTab, navHistory, hideAutocomplete,
-      pickAutocomplete, onInput,
+      autocompleteVisible, arrowIndex, currentDir,
+      handleEnter, handleTab, handleUp, handleDown,
+      hideAutocomplete, pickAutocomplete, onInput,
     }
   },
 }

@@ -24,7 +24,7 @@ router.get('/sessions', async (req, res) => {
     const sessions = await db('chat_sessions')
       .where({ user_id: req.session.userId })
       .orderBy('updated_at', 'desc')
-      .select('id', 'title', 'updated_at');
+      .select('id', 'title', 'updated_at', 'cwd');
     res.json({ sessions });
   } catch (err) {
     console.log('Error al cargar sesiones:', err.message);
@@ -36,7 +36,8 @@ router.post('/sessions', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
     const title = generateTitle();
-    const [id] = await db('chat_sessions').insert({ user_id: req.session.userId, title });
+    const cwd = req.body.cwd ? req.body.cwd : process.cwd();
+    const [id] = await db('chat_sessions').insert({ user_id: req.session.userId, title, cwd });
     const session = await db('chat_sessions').where({ id }).first();
     res.status(201).json({ session });
   } catch (err) {
@@ -52,10 +53,10 @@ router.get('/sessions/:id/messages', async (req, res) => {
       .where({ session_id: req.params.id })
       .orderBy('created_at', 'asc')
       .select('id', 'role', 'content', 'thinking', 'created_at');
-    res.json({ sessionId: req.params.id, messages });
+    res.json({ sessionId: Number(req.params.id), messages });
   } catch (err) {
     console.log('Error al cargar mensajes:', err.message);
-    res.status(500).json({ sessionId: req.params.id, messages: [], error: err.message });
+    res.status(500).json({ sessionId: Number(req.params.id), messages: [], error: err.message });
   }
 });
 

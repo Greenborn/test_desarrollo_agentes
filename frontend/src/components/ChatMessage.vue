@@ -1,9 +1,9 @@
 <template>
   <div class="mb-3" :class="msg.role === 'user' ? 'text-end' : 'text-start'">
-    <div v-if="msg.role === 'command'" class="d-inline-block bg-dark text-success border border-secondary rounded-3 p-2 text-start font-monospace" style="max-width: 90%;">
-      <span class="text-muted me-2">$</span>{{ msg.content }}
+    <div v-if="msg.role === 'command'" class="d-inline-block rounded-3 p-2 text-start font-monospace" style="max-width: 90%; background: #1a1a2e; border: 1px solid #00ff88; color: #00ff88;">
+      <span class="me-2" style="color: #666;">$</span>{{ msg.content }}
     </div>
-    <div v-else-if="msg.role === 'result'" class="d-inline-block bg-dark text-light border border-secondary rounded-3 p-2 text-start font-monospace small" style="max-width: 90%;">
+    <div v-else-if="msg.role === 'result'" class="d-inline-block rounded-3 p-2 text-start font-monospace small" style="max-width: 90%; background: #16213e; border: 1px solid #0f3460; color: #e0e0e0;">
       <pre class="mb-0" style="white-space: pre-wrap;">{{ msg.content }}</pre>
     </div>
     <div

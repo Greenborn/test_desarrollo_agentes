@@ -41,14 +41,17 @@ import { ref, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
+import { useModalStore } from '../stores/modal.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import ChatMessage from './ChatMessage.vue'
+import HelpContent from './HelpModal.vue'
 
 export default {
   components: { ChatMessage },
   setup() {
     const chat = useChatStore()
     const cmdStore = useCommandStore()
+    const modal = useModalStore()
     const { find } = useCommandRegistry()
     const { activeSessionId, messages, streaming, currentChunk, currentThinking } = storeToRefs(chat)
     const input = ref('')
@@ -75,10 +78,7 @@ export default {
       const known = find(cmdName)
       if (known) {
         if (cmdName === '/help') {
-          const el = document.getElementById('helpModal')
-          if (el && window.bootstrap?.Modal) {
-            new window.bootstrap.Modal(el).show()
-          }
+          modal.open(HelpContent, {})
           return
         }
         known.execute(args, { cmdStore, chatStore: chat })

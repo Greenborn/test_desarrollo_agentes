@@ -9,6 +9,7 @@ export const useCommandStore = defineStore('command', () => {
   const sessionHistory = ref([])
   const autocompleteOptions = ref([])
   const autocompleteVisible = ref(false)
+  const arrowIndex = ref(-1)
 
   async function loadLastDirectory() {
     try {
@@ -34,22 +35,31 @@ export const useCommandStore = defineStore('command', () => {
     }
   }
 
-  async function fetchAutocomplete(prefix) {
+  async function fetchAutocomplete(prefix, cwd) {
     try {
-      const res = await fetch(`${API}/command/list-directories?prefix=${encodeURIComponent(prefix)}`, { credentials: 'include' })
+      let url = `${API}/command/list-directories?prefix=${encodeURIComponent(prefix)}`
+      if (cwd) url += `&cwd=${encodeURIComponent(cwd)}`
+      const res = await fetch(url, { credentials: 'include' })
       const data = await res.json()
       autocompleteOptions.value = data.directories ? data.directories : []
       autocompleteVisible.value = autocompleteOptions.value.length > 0
+      arrowIndex.value = -1
     } catch (err) {
       console.error('Error al obtener autocomplete:', err)
       autocompleteOptions.value = []
       autocompleteVisible.value = false
+      arrowIndex.value = -1
     }
   }
 
   function showAutocomplete(options) {
     autocompleteOptions.value = options
     autocompleteVisible.value = options.length > 0
+    arrowIndex.value = -1
+  }
+
+  function resetArrowIndex() {
+    arrowIndex.value = -1
   }
 
   function hideAutocomplete() {
@@ -64,9 +74,9 @@ export const useCommandStore = defineStore('command', () => {
 
   return {
     currentDir, helpVisible, sessionHistory,
-    autocompleteOptions, autocompleteVisible,
+    autocompleteOptions, autocompleteVisible, arrowIndex,
     loadLastDirectory, setDirectory,
     fetchAutocomplete, showAutocomplete, hideAutocomplete,
-    pushHistory,
+    pushHistory, resetArrowIndex,
   }
 })

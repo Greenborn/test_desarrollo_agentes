@@ -20,10 +20,12 @@
 <script>
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
+import { useCommandStore } from '../stores/command.js'
 
 export default {
   setup() {
     const chat = useChatStore()
+    const cmd = useCommandStore()
     const { sessions, activeSessionId, creating } = storeToRefs(chat)
 
     function createSession() {
@@ -31,6 +33,8 @@ export default {
     }
 
     function selectSession(id) {
+      const s = chat.sessions.find((s) => s.id === id)
+      if (s && s.cwd) cmd.currentDir = s.cwd
       chat.loadMessages(id)
     }
 

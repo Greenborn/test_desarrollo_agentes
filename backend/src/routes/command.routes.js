@@ -16,14 +16,30 @@ function authGuard(req, res) {
 router.get('/list-directories', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const prefix = req.query.prefix !== undefined && req.query.prefix !== '' ? req.query.prefix : '/';
-    const dir = path.dirname(prefix);
+    let rawPrefix = req.query.prefix !== undefined && req.query.prefix !== '' ? req.query.prefix : '/';
+    const cwd = req.query.cwd ? req.query.cwd : process.cwd();
+
+    if (rawPrefix.startsWith('~')) {
+      const home = process.env.HOME ? process.env.HOME : '/root';
+      rawPrefix = rawPrefix.replace(/^~/, home);
+    } else if (!rawPrefix.startsWith('/')) {
+      rawPrefix = path.resolve(cwd, rawPrefix);
+    }
+
+    let dir;
+    if (rawPrefix === '' || rawPrefix === '/') {
+      dir = '/';
+    } else if (fs.existsSync(rawPrefix) && fs.statSync(rawPrefix).isDirectory()) {
+      dir = rawPrefix;
+    } else {
+      dir = path.dirname(rawPrefix);
+    }
 
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     const dirs = entries
       .filter((e) => e.isDirectory())
       .map((e) => path.join(dir, e.name))
-      .filter((p) => p.startsWith(prefix));
+      .filter((p) => p.startsWith(rawPrefix));
 
     res.json({ directories: dirs });
   } catch (err) {
@@ -100,23 +116,54 @@ router.post('/execute', async (req, res) => {
       if (!dir) {
         result = 'Error: debe especificar un directorio';
       } else {
+        let baseDir = process.cwd();
+        if (sessionId) {
+          const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+          if (session && session.cwd) baseDir = session.cwd;
+        }
         let resolved;
         if (dir.startsWith('~')) {
           resolved = process.env.HOME ? dir.replace(/^~/, process.env.HOME) : dir;
         } else {
-          resolved = path.resolve(dir);
+          resolved = path.resolve(baseDir, dir);
         }
         if (!fs.existsSync(resolved)) {
           result = `Error: el directorio '${resolved}' no existe`;
         } else if (!fs.statSync(resolved).isDirectory()) {
           result = `Error: '${resolved}' no es un directorio`;
         } else {
-          await db('user_settings')
-            .insert({ user_id: req.session.userId, key: 'last_directory', value: resolved })
-            .onConflict(['user_id', 'key'])
-            .merge();
+          if (sessionId) {
+            await db('chat_sessions').where({ id: sessionId }).update({ cwd: resolved });
+          }
           result = resolved;
         }
+      }
+    } else if (cmd === '/ls') {
+      const dirArg = args.join(' ');
+      let baseDir = process.cwd();
+      if (sessionId) {
+        const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+        if (session && session.cwd) baseDir = session.cwd;
+      }
+      let targetDir;
+      if (!dirArg) {
+        targetDir = baseDir;
+      } else if (dirArg.startsWith('~')) {
+        targetDir = process.env.HOME ? dirArg.replace(/^~/, process.env.HOME) : dirArg;
+      } else {
+        targetDir = path.resolve(baseDir, dirArg);
+      }
+      if (!fs.existsSync(targetDir)) {
+        result = `Error: el directorio '${targetDir}' no existe`;
+      } else if (!fs.statSync(targetDir).isDirectory()) {
+        result = `Error: '${targetDir}' no es un directorio`;
+      } else {
+        const entries = fs.readdirSync(targetDir, { withFileTypes: true });
+        const lines = entries.map((e) => {
+          const type = e.isDirectory() ? 'd' : '-';
+          return `${type}  ${e.name}`;
+        });
+        result = lines.join('\n');
       }
     } else if (cmd === '/help') {
       result = 'Comando recibido — el modal de ayuda se muestra en cliente';
