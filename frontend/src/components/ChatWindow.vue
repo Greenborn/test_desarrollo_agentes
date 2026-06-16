@@ -1,6 +1,6 @@
 <template>
   <div class="d-flex flex-column h-100 overflow-x-hidden" @click="closeCtxMenu">
-    <div class="flex-grow-1 overflow-auto p-3" ref="messagesContainer">
+    <div class="flex-grow-1 overflow-y-auto p-3" ref="messagesContainer">
       <div v-if="!activeSessionId" class="text-center text-muted mt-5">
         <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
       </div>
@@ -576,6 +576,9 @@ export default {
 </script>
 
 <style>
+html, body {
+  overflow-x: hidden;
+}
 .blink {
   animation: blink 1s step-end infinite;
 }

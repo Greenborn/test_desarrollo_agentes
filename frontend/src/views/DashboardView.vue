@@ -5,6 +5,7 @@
       <SidebarChat />
       <ChatWindow class="flex-grow-1" />
     </div>
+    <AppModal />
   </div>
 </template>
 
@@ -13,12 +14,13 @@ import { onMounted, watch } from 'vue'
 import Topbar from '../components/Topbar.vue'
 import SidebarChat from '../components/SidebarChat.vue'
 import ChatWindow from '../components/ChatWindow.vue'
+import AppModal from '../components/AppModal.vue'
 import { useAuthStore } from '../stores/auth.js'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 
 export default {
-  components: { Topbar, SidebarChat, ChatWindow },
+  components: { Topbar, SidebarChat, ChatWindow, AppModal },
   setup() {
     const auth = useAuthStore()
     const chat = useChatStore()

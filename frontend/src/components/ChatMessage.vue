@@ -11,7 +11,7 @@
       <ControlSelect v-else-if="parsedControl && parsedControl.controlType === 'select'" :options="parsedControl.options || []" :preselect="parsedControl.preselect || ''" :placeholder="parsedControl.placeholder || 'Selecciona...'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <ControlTextarea v-else-if="parsedControl && parsedControl.controlType === 'textarea'" :placeholder="parsedControl.placeholder || 'Escribe...'" :rows="parsedControl.rows || 3" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <div v-else class="d-flex flex-column gap-2">
-        <pre class="mb-0 small" style="white-space: pre-wrap;">{{ msg.content }}</pre>
+        <pre class="mb-0 small" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
       </div>
     </div>
     <div v-else-if="msg.role === 'opencode_confirmed'" class="d-inline-block rounded-3 p-2 text-start font-monospace small" style="max-width: 90%; background: #1a1a2e; border: 1px solid #75AADB; color: #75AADB;">
@@ -33,7 +33,7 @@
       <div v-if="parsedInfo && parsedInfo.hash" class="mt-2 small" style="color: #75AADB;">Hash: {{ parsedInfo.hash }}</div>
     </div>
     <div v-else-if="msg.role === 'opencode_info'" class="d-block w-100 rounded-3 p-2 text-start small" style="background: #1a1a2e; border: 1px solid #374151; color: #9ca3af;">
-      <pre class="mb-0" style="white-space: pre-wrap;">{{ msg.content }}</pre>
+      <pre class="mb-0" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
     </div>
     <div
       v-else
@@ -114,6 +114,10 @@ export default {
 }
 @keyframes blink {
   50% { opacity: 0; }
+}
+.mb-3 > div {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .user-bubble {
   background-color: #75AADB;

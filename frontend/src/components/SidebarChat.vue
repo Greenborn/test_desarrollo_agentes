@@ -13,7 +13,7 @@
     >
       ▼ Chats
     </button>
-    <div id="sidebar-chats-collapse" class="collapse show flex-grow-1 overflow-auto">
+    <div id="sidebar-chats-collapse" class="collapse show flex-grow-1 overflow-y-auto">
       <div class="list-group list-group-flush" style="min-height: 0;">
         <button
           v-for="s in sessions"

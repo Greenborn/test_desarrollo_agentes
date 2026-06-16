@@ -11,7 +11,7 @@
         {{ user.username }}
       </button>
       <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
-        <li><router-link class="dropdown-item" to="/settings">Configuración</router-link></li>
+        <li><a class="dropdown-item" href="#" @click.prevent="openSettings">Configuración</a></li>
         <li><hr class="dropdown-divider" /></li>
         <li><a class="dropdown-item" href="#" @click.prevent="logout">Cerrar sesión</a></li>
       </ul>
@@ -33,6 +33,7 @@ import { useChatStore } from '../stores/chat.js'
 import CommandInput from './CommandInput.vue'
 import HelpContent from './HelpModal.vue'
 import CrearProyectoModal from './CrearProyectoModal.vue'
+import SettingsView from '../views/SettingsView.vue'
 
 export default {
   components: { CommandInput },
@@ -480,6 +481,10 @@ export default {
       },
     })
 
+    function openSettings() {
+      modal.open(SettingsView, {}, { title: 'Configuración' })
+    }
+
     onMounted(() => {
       cmdStore.loadLastDirectory()
     })
@@ -489,7 +494,7 @@ export default {
       router.push('/')
     }
 
-    return { user, logout, sidebarCollapsed: ui.sidebarCollapsed, toggleSidebar: ui.toggleSidebar }
+    return { user, logout, openSettings, sidebarCollapsed: ui.sidebarCollapsed, toggleSidebar: ui.toggleSidebar }
   },
 }
 </script>

@@ -1,7 +1,7 @@
 <template>
   <JsonTreeView v-if="parsedJson" :data="parsedJson" />
-  <div v-else-if="parsedHtml" v-html="parsedHtml" style="white-space: pre-wrap;"></div>
-  <div v-else style="white-space: pre-wrap;">{{ text }}</div>
+  <div v-else-if="parsedHtml" style="overflow-x: auto; max-width: 100%;"><div v-html="parsedHtml" style="white-space: pre-wrap;"></div></div>
+  <div v-else style="white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word;">{{ text }}</div>
 </template>
 
 <script>

@@ -1,118 +1,112 @@
 <template>
-  <div class="d-flex flex-column vh-100">
-    <Topbar />
-    <div class="container py-4 text-light" style="max-width: 640px;">
-      <h5 class="mb-4">Configuración</h5>
-      <input
-        type="text"
-        class="form-control bg-dark text-light border-secondary mb-3"
-        placeholder="Buscar configuración..."
-        v-model="searchTerm"
-      />
+  <div class="container py-4 text-light" style="max-width: 640px;">
+    <input
+      type="text"
+      class="form-control bg-dark text-light border-secondary mb-3"
+      placeholder="Buscar configuración..."
+      v-model="searchTerm"
+    />
 
-      <div class="mb-4" v-if="matches('api key deepseek')">
-        <label class="form-label">API Key DeepSeek</label>
-        <div class="input-group">
-          <input
-            :type="showKey ? 'text' : 'password'"
-            class="form-control bg-dark text-light border-secondary"
-            v-model="keyInput"
-            placeholder="sk-..."
-          />
-          <button class="btn btn-outline-argentina" @click="showKey = !showKey">
-            {{ showKey ? 'Ocultar' : 'Mostrar' }}
-          </button>
-        </div>
-        <button class="btn btn-sm mt-2 btn-argentina" @click="saveKey">
-          Guardar Key
+    <div class="mb-4" v-if="matches('api key deepseek')">
+      <label class="form-label">API Key DeepSeek</label>
+      <div class="input-group">
+        <input
+          :type="showKey ? 'text' : 'password'"
+          class="form-control bg-dark text-light border-secondary"
+          v-model="keyInput"
+          placeholder="sk-..."
+        />
+        <button class="btn btn-outline-argentina" @click="showKey = !showKey">
+          {{ showKey ? 'Ocultar' : 'Mostrar' }}
         </button>
       </div>
-
-      <div class="mb-4" v-if="matches('system prompt del agente')">
-        <label class="form-label">System Prompt del agente</label>
-        <textarea
-          class="form-control font-monospace bg-dark text-light border-secondary"
-          rows="8"
-          v-model="promptInput"
-        ></textarea>
-        <button class="btn btn-sm mt-2 btn-argentina" @click="savePrompt">
-          Guardar Prompt
-        </button>
-      </div>
-
-      <div class="mb-4" v-if="matches('base de datos')">
-        <label class="form-label">Prompt Documentación - Base de Datos</label>
-        <textarea
-          class="form-control font-monospace bg-dark text-light border-secondary"
-          rows="4"
-          v-model="docBdInput"
-        ></textarea>
-        <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('base_datos')">
-          Guardar Prompt
-        </button>
-      </div>
-
-      <div class="mb-4" v-if="matches('subproyectos')">
-        <label class="form-label">Prompt Documentación - Subproyectos</label>
-        <textarea
-          class="form-control font-monospace bg-dark text-light border-secondary"
-          rows="4"
-          v-model="docSubInput"
-        ></textarea>
-        <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('subproyectos')">
-          Guardar Prompt
-        </button>
-      </div>
-
-      <div class="mb-4" v-if="matches('endpoints')">
-        <label class="form-label">Prompt Documentación - Endpoints</label>
-        <textarea
-          class="form-control font-monospace bg-dark text-light border-secondary"
-          rows="4"
-          v-model="docEndpointsInput"
-        ></textarea>
-        <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('endpoints')">
-          Guardar Prompt
-        </button>
-      </div>
-
-      <div class="mb-4" v-if="matches('websockets')">
-        <label class="form-label">Prompt Documentación - WebSockets</label>
-        <textarea
-          class="form-control font-monospace bg-dark text-light border-secondary"
-          rows="4"
-          v-model="docWsInput"
-        ></textarea>
-        <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('web_sockets')">
-          Guardar Prompt
-        </button>
-      </div>
-
-      <div class="mb-4" v-if="matches('funcionalidades')">
-        <label class="form-label">Prompt Documentación - Funcionalidades</label>
-        <textarea
-          class="form-control font-monospace bg-dark text-light border-secondary"
-          rows="4"
-          v-model="docFuncInput"
-        ></textarea>
-        <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('funcionalidades')">
-          Guardar Prompt
-        </button>
-      </div>
-
-      <div v-if="settings.saveSuccess" class="alert alert-success py-2 small">{{ settings.saveSuccess }}</div>
-      <div v-if="settings.saveError" class="alert alert-danger py-2 small">{{ settings.saveError }}</div>
+      <button class="btn btn-sm mt-2 btn-argentina" @click="saveKey">
+        Guardar Key
+      </button>
     </div>
+
+    <div class="mb-4" v-if="matches('system prompt del agente')">
+      <label class="form-label">System Prompt del agente</label>
+      <textarea
+        class="form-control font-monospace bg-dark text-light border-secondary"
+        rows="8"
+        v-model="promptInput"
+      ></textarea>
+      <button class="btn btn-sm mt-2 btn-argentina" @click="savePrompt">
+        Guardar Prompt
+      </button>
+    </div>
+
+    <div class="mb-4" v-if="matches('base de datos')">
+      <label class="form-label">Prompt Documentación - Base de Datos</label>
+      <textarea
+        class="form-control font-monospace bg-dark text-light border-secondary"
+        rows="4"
+        v-model="docBdInput"
+      ></textarea>
+      <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('base_datos')">
+        Guardar Prompt
+      </button>
+    </div>
+
+    <div class="mb-4" v-if="matches('subproyectos')">
+      <label class="form-label">Prompt Documentación - Subproyectos</label>
+      <textarea
+        class="form-control font-monospace bg-dark text-light border-secondary"
+        rows="4"
+        v-model="docSubInput"
+      ></textarea>
+      <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('subproyectos')">
+        Guardar Prompt
+      </button>
+    </div>
+
+    <div class="mb-4" v-if="matches('endpoints')">
+      <label class="form-label">Prompt Documentación - Endpoints</label>
+      <textarea
+        class="form-control font-monospace bg-dark text-light border-secondary"
+        rows="4"
+        v-model="docEndpointsInput"
+      ></textarea>
+      <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('endpoints')">
+        Guardar Prompt
+      </button>
+    </div>
+
+    <div class="mb-4" v-if="matches('websockets')">
+      <label class="form-label">Prompt Documentación - WebSockets</label>
+      <textarea
+        class="form-control font-monospace bg-dark text-light border-secondary"
+        rows="4"
+        v-model="docWsInput"
+      ></textarea>
+      <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('web_sockets')">
+        Guardar Prompt
+      </button>
+    </div>
+
+    <div class="mb-4" v-if="matches('funcionalidades')">
+      <label class="form-label">Prompt Documentación - Funcionalidades</label>
+      <textarea
+        class="form-control font-monospace bg-dark text-light border-secondary"
+        rows="4"
+        v-model="docFuncInput"
+      ></textarea>
+      <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('funcionalidades')">
+        Guardar Prompt
+      </button>
+    </div>
+
+    <div v-if="settings.saveSuccess" class="alert alert-success py-2 small">{{ settings.saveSuccess }}</div>
+    <div v-if="settings.saveError" class="alert alert-danger py-2 small">{{ settings.saveError }}</div>
   </div>
 </template>
 
 <script>
 import { ref, onMounted, watch } from 'vue'
-import Topbar from '../components/Topbar.vue'
 import { useSettingsStore } from '../stores/settings.js'
 
 export default {
-  components: { Topbar },
   setup() {
     const settings = useSettingsStore()
     const keyInput = ref('')

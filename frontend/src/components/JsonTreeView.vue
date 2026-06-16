@@ -91,9 +91,11 @@ export default {
   line-height: 1.6;
   color: #e0e0e0;
   text-align: left;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .json-entry {
-  white-space: nowrap;
+  white-space: normal;
 }
 .json-toggle {
   cursor: pointer;
