@@ -87,7 +87,7 @@ router.get('/funcionalidades/:proyectoId', async (req, res) => {
     const rows = await db('funcionalidades')
       .where({ proyecto_id: req.params.proyectoId })
       .orderBy('fecha_hora', 'desc')
-      .select('id', 'nombre', 'etapa', 'url_redmine', 'fecha_hora');
+      .select('id', 'nombre', 'etapa', 'url_redmine', 'session_id', 'fecha_hora');
     res.json({ funcionalidades: rows });
   } catch (err) {
     console.log('Error al listar funcionalidades:', err.message);

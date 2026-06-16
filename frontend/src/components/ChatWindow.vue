@@ -65,6 +65,7 @@ import { useOpencodeStore } from '../stores/opencode.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import ChatMessage from './ChatMessage.vue'
 import HelpContent from './HelpModal.vue'
+import FuncionalidadWizard from './FuncionalidadWizard.vue'
 
 export default {
   components: { ChatMessage },
@@ -262,6 +263,12 @@ export default {
         await handleOpencodeSetup(controlId, value, controlMsg)
       } else if (stepType === 'documentacion_update') {
         await handleDocumentacionUpdate(controlId, value, controlMsg)
+      } else if (controlType === 'funcionalidad_list') {
+        modal.open(FuncionalidadWizard, {
+          sessionId: value.sessionId,
+          proyectoId: value.proyectoId,
+        }, { title: 'Editar funcionalidad', wide: true })
+        return
       } else if (controlType === 'followup') {
         // Follow-up prompt with model/thinking selectors
         const { model, thinking, prompt } = value

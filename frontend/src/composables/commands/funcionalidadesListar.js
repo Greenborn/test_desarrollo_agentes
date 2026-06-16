@@ -66,11 +66,21 @@ register({
         })
         return
       }
-      const lista = data.funcionalidades.map(f => `- ${f.nombre}`).join('\n')
+      const listData = {
+        controlType: 'funcionalidad_list',
+        controlId: 'funcionalidad-list-' + Date.now(),
+        items: data.funcionalidades.map(f => ({
+          nombre: f.nombre,
+          etapa: f.etapa,
+          sessionId: f.session_id,
+          proyectoId: proyectoId,
+        })),
+      }
       chatStore.messages.push({
-        role: 'result',
-        content: `**Funcionalidades de "${proyectoId}":**\n\n${lista}`,
-        _key: 'res-' + Date.now(),
+        role: 'opencode_control',
+        content: JSON.stringify(listData),
+        controlData: listData,
+        _key: 'ctrl-' + Date.now(),
       })
     } catch (err) {
       console.error('Error en /funcionalidades_listar:', err)
