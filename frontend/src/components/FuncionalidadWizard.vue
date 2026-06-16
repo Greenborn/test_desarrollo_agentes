@@ -14,7 +14,17 @@
     </ul>
 
     <div class="flex-fill d-flex flex-column" style="min-height: 0;">
-      <div class="d-flex flex-column flex-fill">
+      <template v-if="activeTab === 'relevamiento'">
+        <div class="mb-2 flex-shrink-0">
+          <label class="form-label small text-light-emphasis mb-1">Nombre de la funcionalidad</label>
+          <input v-model="nombre" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" placeholder="Ej: Login con Google" />
+        </div>
+        <div class="mb-2 flex-shrink-0">
+          <label class="form-label small text-light-emphasis mb-1">URL Redmine (opcional)</label>
+          <input v-model="urlRedmine" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" placeholder="https://redmine..." />
+        </div>
+      </template>
+      <div class="d-flex flex-column flex-fill" style="min-height: 0;">
         <label class="form-label small text-light-emphasis mb-1 flex-shrink-0">{{ activeTabData.label }}</label>
         <textarea
           class="form-control font-monospace small flex-fill"
@@ -56,6 +66,8 @@ export default {
     const activeTab = ref('relevamiento');
     const activeTabData = computed(() => tabs.find(t => t.key === activeTab.value));
     const saving = ref(false);
+    const nombre = ref('');
+    const urlRedmine = ref('');
     const formData = reactive({
       relevamiento: '',
       diseno: '',
@@ -68,14 +80,18 @@ export default {
       try {
         const res = await fetch(`/api/funcionalidad/${props.sessionId}`, { credentials: 'include' });
         const data = await res.json();
-        if (data.funcionalidad && data.funcionalidad.parametros) {
-          const p = data.funcionalidad.parametros;
-          if (p.relevamiento) formData.relevamiento = p.relevamiento;
-          if (p.diseno) formData.diseno = p.diseno;
-          if (p.implementacion) formData.implementacion = p.implementacion;
-          if (p.testing) formData.testing = p.testing;
-          if (p.documentacion) formData.documentacion = p.documentacion;
-          if (data.funcionalidad.etapa) activeTab.value = data.funcionalidad.etapa.toLowerCase();
+        if (data.funcionalidad) {
+          nombre.value = data.funcionalidad.nombre || '';
+          urlRedmine.value = data.funcionalidad.url_redmine || '';
+          if (data.funcionalidad.parametros) {
+            const p = data.funcionalidad.parametros;
+            if (p.relevamiento) formData.relevamiento = p.relevamiento;
+            if (p.diseno) formData.diseno = p.diseno;
+            if (p.implementacion) formData.implementacion = p.implementacion;
+            if (p.testing) formData.testing = p.testing;
+            if (p.documentacion) formData.documentacion = p.documentacion;
+            if (data.funcionalidad.etapa) activeTab.value = data.funcionalidad.etapa.toLowerCase();
+          }
         }
       } catch (err) {
         console.error('Error al cargar funcionalidad:', err.message);
@@ -94,6 +110,8 @@ export default {
             proyectoId: props.proyectoId,
             etapa: activeTab.value.toUpperCase(),
             parametros: { ...formData },
+            nombre: nombre.value,
+            url_redmine: urlRedmine.value || null,
           }),
         });
         const data = await res.json();
@@ -111,7 +129,7 @@ export default {
 
     onMounted(load);
 
-    return { tabs, activeTab, activeTabData, formData, saving, save };
+    return { tabs, activeTab, activeTabData, formData, nombre, urlRedmine, saving, save };
   },
 };
 </script>

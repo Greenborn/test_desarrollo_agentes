@@ -31,7 +31,7 @@ router.get('/funcionalidad/:sessionId', async (req, res) => {
 
 router.post('/funcionalidad', async (req, res) => {
   if (!authGuard(req, res)) return;
-  const { sessionId, etapa, parametros, proyectoId } = req.body;
+  const { sessionId, etapa, parametros, proyectoId, nombre, url_redmine } = req.body;
 
   if (!sessionId) {
     return res.status(400).json({ error: 'sessionId es requerido' });
@@ -52,6 +52,8 @@ router.post('/funcionalidad', async (req, res) => {
       etapa: etapa || 'RELEVAMIENTO',
       parametros: parametros ? JSON.stringify(parametros) : null,
       proyecto_id: proyectoId || null,
+      nombre: nombre || 'Sin nombre',
+      url_redmine: url_redmine || null,
       fecha_hora: db.fn.now(),
     };
 
@@ -76,6 +78,20 @@ router.post('/funcionalidad', async (req, res) => {
   } catch (err) {
     console.log('Error al guardar funcionalidad:', err.message);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/funcionalidades/:proyectoId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const rows = await db('funcionalidades')
+      .where({ proyecto_id: req.params.proyectoId })
+      .orderBy('fecha_hora', 'desc')
+      .select('id', 'nombre', 'etapa', 'url_redmine', 'fecha_hora');
+    res.json({ funcionalidades: rows });
+  } catch (err) {
+    console.log('Error al listar funcionalidades:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

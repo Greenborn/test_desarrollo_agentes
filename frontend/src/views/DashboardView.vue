@@ -3,7 +3,8 @@
     <Topbar />
     <div class="d-flex flex-grow-1 overflow-hidden">
       <SidebarChat />
-      <ChatWindow class="flex-grow-1" />
+      <ChatWindow v-if="!selectedProject" class="flex-grow-1" />
+      <ProjectDetail v-else class="flex-grow-1" />
     </div>
     <AppModal />
   </div>
@@ -11,20 +12,25 @@
 
 <script>
 import { onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import Topbar from '../components/Topbar.vue'
 import SidebarChat from '../components/SidebarChat.vue'
 import ChatWindow from '../components/ChatWindow.vue'
+import ProjectDetail from '../components/ProjectDetail.vue'
 import AppModal from '../components/AppModal.vue'
 import { useAuthStore } from '../stores/auth.js'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
+import { useProjectStore } from '../stores/project.js'
 
 export default {
-  components: { Topbar, SidebarChat, ChatWindow, AppModal },
+  components: { Topbar, SidebarChat, ChatWindow, ProjectDetail, AppModal },
   setup() {
     const auth = useAuthStore()
     const chat = useChatStore()
     const cmd = useCommandStore()
+    const projectStore = useProjectStore()
+    const { selectedProject } = storeToRefs(projectStore)
 
     function load() {
       if (auth.user) {
@@ -38,6 +44,8 @@ export default {
 
     watch(() => auth.user, load)
     onMounted(load)
+
+    return { selectedProject }
   },
 }
 </script>

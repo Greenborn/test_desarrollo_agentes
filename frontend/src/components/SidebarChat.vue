@@ -13,7 +13,7 @@
     >
       ▼ Chats
     </button>
-    <div id="sidebar-chats-collapse" class="collapse show flex-grow-1 overflow-y-auto">
+    <div id="sidebar-chats-collapse" class="collapse show overflow-y-auto" style="max-height: 40%;">
       <div class="list-group list-group-flush" style="min-height: 0;">
         <button
           v-for="s in sessions"
@@ -32,22 +32,46 @@
         </button>
       </div>
     </div>
+    <button
+      class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
+      data-bs-toggle="collapse"
+      data-bs-target="#sidebar-projects-collapse"
+    >
+      ▼ Proyectos
+    </button>
+    <div id="sidebar-projects-collapse" class="collapse show overflow-y-auto flex-grow-1">
+      <div class="list-group list-group-flush" style="min-height: 0;">
+        <button
+          v-for="p in projects"
+          :key="p.id"
+          class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
+          :class="{ active: selectedProject && selectedProject.id === p.id }"
+          @click="selectProject(p)"
+        >
+          <span class="text-truncate">{{ p.id }} — {{ p.descripcion }}</span>
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 import { useUiStore } from '../stores/ui.js'
+import { useProjectStore } from '../stores/project.js'
 
 export default {
   setup() {
     const chat = useChatStore()
     const cmd = useCommandStore()
     const ui = useUiStore()
+    const projectStore = useProjectStore()
     const { sessions, activeSessionId, creating } = storeToRefs(chat)
     const { sidebarCollapsed } = storeToRefs(ui)
+    const { projects, selectedProject } = storeToRefs(projectStore)
 
     function sessionTooltip(s) {
       const lines = []
@@ -67,10 +91,19 @@ export default {
     }
 
     function selectSession(id) {
+      projectStore.clearSelection()
       const s = chat.sessions.find((s) => s.id === id)
       if (s && s.cwd) cmd.currentDir = s.cwd
       chat.loadMessages(id)
     }
+
+    function selectProject(p) {
+      projectStore.selectProject(p)
+    }
+
+    onMounted(() => {
+      projectStore.loadProjects()
+    })
 
     return {
       chat,
@@ -78,9 +111,12 @@ export default {
       activeSessionId,
       creating,
       sidebarCollapsed,
+      projects,
+      selectedProject,
       sessionTooltip,
       createSession,
       selectSession,
+      selectProject,
     }
   },
 }

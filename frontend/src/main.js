@@ -14,6 +14,7 @@ import './composables/commands/documentacionUpdate.js'
 import './composables/commands/gastosAll.js'
 import './composables/commands/gastosProyecto.js'
 import './composables/commands/arbolDirectorios.js'
+import './composables/commands/funcionalidadesListar.js'
 
 const app = createApp(App)
 const pinia = createPinia()

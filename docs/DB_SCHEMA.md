@@ -87,11 +87,13 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | Columna | Tipo | Restricciones |
 |---|---|---|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
-| `session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE, UNIQUE |
+| `session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
 | `fecha_hora` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `etapa` | ENUM(`'RELEVAMIENTO'`, `'DISENIO'`, `'IMPLEMENTACION'`, `'TESTING'`) | DEFAULT `'RELEVAMIENTO'` |
 | `parametros` | TEXT | nullable — JSON con contenido de las pestañas del wizard |
 | `proyecto_id` | VARCHAR(255) | nullable — FK lógica → `proyectos(id)` |
+| `nombre` | VARCHAR(255) | NOT NULL, DEFAULT `'Sin nombre'` — agregado en migración 015 |
+| `url_redmine` | VARCHAR(255) | nullable — agregado en migración 015 |
 
 ---
 
@@ -138,7 +140,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 users
  ├─ chat_sessions (user_id)
  │   ├─ chat_messages (session_id)
- │   └─ funcionalidades (session_id, 1:1)
+  │   └─ funcionalidades (session_id)
  ├─ user_settings (user_id)
  └─ command_history (user_id)
 
