@@ -5,6 +5,8 @@ import router from './router/index.js'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 
+import { useAuthStore } from './stores/auth.js'
+
 import './composables/commands/iniciarNavegador.js'
 import './composables/commands/nuevaFuncionalidad.js'
 import './composables/commands/documentacionAll.js'
@@ -14,6 +16,24 @@ import './composables/commands/gastosProyecto.js'
 import './composables/commands/arbolDirectorios.js'
 
 const app = createApp(App)
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
 app.use(router)
+
+const originalFetch = window.fetch.bind(window)
+window.fetch = async function (url, options = {}) {
+  const res = await originalFetch(url, options)
+  if (res.status === 401) {
+    const urlStr = (typeof url === 'string' ? url : url.url) || ''
+    if (!urlStr.includes('/api/auth/')) {
+      const auth = useAuthStore()
+      if (auth.user) {
+        auth.user = null
+        router.push('/')
+      }
+    }
+  }
+  return res
+}
+
 app.mount('#app')

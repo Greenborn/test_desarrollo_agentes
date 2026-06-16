@@ -182,7 +182,7 @@ export default {
       funcionalidades: 'Funcionalidades',
     }
 
-    async function opencodeStreamPromptDocUpdate(sessionId, prompt, provider, model, thinking, mode, proyectoId) {
+    async function opencodeStreamPromptDocUpdate(sessionId, prompt, provider, model, thinking, mode, proyectoId, tipo) {
       ocStreaming.value = true
       ocChunk.value = ''
       ocThinking.value = ''
@@ -216,7 +216,6 @@ export default {
           }
 
           try {
-            const tipo = docUpdateType.value
             const label = DOC_LABELS[tipo] || tipo
             const res = await fetch(`/api/documentacion/${tipo}/${encodeURIComponent(proyectoId)}`, {
               method: 'PUT',
@@ -364,28 +363,42 @@ export default {
         ocStore.selectedMode = 'Plan'
 
         try {
-          const tipo = docUpdateType.value
+          const tipos = docUpdateType.value === 'all'
+            ? ['base_datos', 'subproyectos', 'endpoints', 'web_sockets', 'funcionalidades']
+            : [docUpdateType.value]
           const settingsRes = await fetch('/api/settings', { credentials: 'include' })
           const settingsKeys = await settingsRes.json()
-          const promptKey = 'documentacion_prompt_' + tipo
-          const defaultPrompt = 'Analiza el proyecto actual y documenta la información correspondiente a ' + (DOC_LABELS[tipo] || tipo) + '. Proporciona una descripción detallada que permita a otros agentes de IA entender su propósito y alcance.'
-          const prompt = settingsKeys[promptKey] || defaultPrompt
 
-          chat.messages.push({
-            role: 'opencode_info',
-            content: '📋 Prompt a enviar a OpenCode:\n\n```\n' + prompt + '\n```',
-            _key: 'preview-' + Date.now(),
-          })
+          for (const tipo of tipos) {
+            const promptKey = 'documentacion_prompt_' + tipo
+            const defaultPrompt = 'Analiza el proyecto actual y documenta la información correspondiente a ' + (DOC_LABELS[tipo] || tipo) + '. Proporciona una descripción detallada que permita a otros agentes de IA entender su propósito y alcance.'
+            const prompt = settingsKeys[promptKey] || defaultPrompt
 
-          opencodeStreamPromptDocUpdate(
-            chat.activeSessionId,
-            prompt,
-            docUpdateData.provider,
-            docUpdateData.model,
-            docUpdateData.thinking,
-            docUpdateData.mode,
-            docUpdateProyectoId.value,
-          )
+            chat.messages.push({
+              role: 'opencode_info',
+              content: '📋 Prompt a enviar a OpenCode:\n\n```\n' + prompt + '\n```',
+              _key: 'preview-' + Date.now(),
+            })
+
+            await opencodeStreamPromptDocUpdate(
+              chat.activeSessionId,
+              prompt,
+              docUpdateData.provider,
+              docUpdateData.model,
+              docUpdateData.thinking,
+              docUpdateData.mode,
+              docUpdateProyectoId.value,
+              tipo,
+            )
+          }
+
+          if (docUpdateType.value === 'all') {
+            chat.messages.push({
+              role: 'result',
+              content: 'Documentación completada para todos los tipos.',
+              _key: 'result-' + Date.now(),
+            })
+          }
         } catch (err) {
           console.error('Error al obtener prompt de documentación:', err.message)
           chat.messages.push({
