@@ -48,6 +48,68 @@ router.get('/list-directories', async (req, res) => {
   }
 });
 
+function buildTree(dirPath) {
+  const name = path.basename(dirPath) || dirPath;
+  const stat = fs.statSync(dirPath);
+  const node = { name, type: stat.isDirectory() ? 'directory' : 'file', path: dirPath };
+  if (stat.isDirectory()) {
+    try {
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      node.children = entries
+        .filter((e) => e.name !== '.' && e.name !== '..')
+        .map((e) => {
+          const fullPath = path.join(dirPath, e.name);
+          try {
+            return buildTree(fullPath);
+          } catch (err) {
+            console.log(`Error al procesar ${fullPath}: ${err.message}`);
+            return { name: e.name, type: 'error', error: err.message, path: fullPath };
+          }
+        });
+    } catch (err) {
+      console.log(`Error al leer directorio ${dirPath}: ${err.message}`);
+      node.children = [];
+      node.error = err.message;
+    }
+  }
+  if (!stat.isDirectory()) {
+    node.size = stat.size;
+  }
+  return node;
+}
+
+router.get('/arbol-directorios', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const dirArg = req.query.dir || '';
+    const sessionId = req.query.sessionId ? parseInt(req.query.sessionId) : null;
+    let baseDir = process.cwd();
+    if (sessionId) {
+      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+      if (session && session.cwd) baseDir = session.cwd;
+    }
+    let targetDir;
+    if (!dirArg) {
+      targetDir = baseDir;
+    } else if (dirArg.startsWith('~')) {
+      targetDir = process.env.HOME ? dirArg.replace(/^~/, process.env.HOME) : dirArg;
+    } else {
+      targetDir = path.resolve(baseDir, dirArg);
+    }
+    if (!fs.existsSync(targetDir)) {
+      return res.status(400).json({ success: false, error: `El directorio '${targetDir}' no existe` });
+    }
+    if (!fs.statSync(targetDir).isDirectory()) {
+      return res.status(400).json({ success: false, error: `'${targetDir}' no es un directorio` });
+    }
+    const tree = buildTree(targetDir);
+    res.json({ success: true, tree });
+  } catch (err) {
+    console.log('Error en arbol-directorios:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/setting/:key', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
