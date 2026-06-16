@@ -1,9 +1,12 @@
 <template>
-  <div v-if="parsedHtml" v-html="parsedHtml" style="white-space: pre-wrap;"></div>
+  <JsonTreeView v-if="parsedJson" :data="parsedJson" />
+  <div v-else-if="parsedHtml" v-html="parsedHtml" style="white-space: pre-wrap;"></div>
   <div v-else style="white-space: pre-wrap;">{{ text }}</div>
 </template>
 
 <script>
+import JsonTreeView from './JsonTreeView.vue'
+
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
@@ -163,11 +166,24 @@ function parseMarkdown(text) {
 }
 
 export default {
+  components: { JsonTreeView },
   props: {
     text: { type: String, default: '' },
   },
   computed: {
+    parsedJson() {
+      try {
+        const trimmed = this.text.trim()
+        if (!trimmed) return null
+        const parsed = JSON.parse(trimmed)
+        if (parsed !== null && typeof parsed === 'object') return parsed
+        return null
+      } catch {
+        return null
+      }
+    },
     parsedHtml() {
+      if (this.parsedJson) return ''
       return parseMarkdown(this.text)
     },
   },

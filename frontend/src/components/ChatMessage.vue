@@ -4,7 +4,7 @@
       {{ msg.content }}
     </div>
     <div v-else-if="msg.role === 'result'" class="d-inline-block rounded-3 p-2 text-start font-monospace small" style="max-width: 90%; background: #16213e; border: 1px solid #0f3460; color: #e0e0e0;">
-      <pre class="mb-0" style="white-space: pre-wrap;">{{ msg.content }}</pre>
+      <ChatFormatter :text="msg.content" />
     </div>
     <div v-else-if="msg.role === 'opencode_control'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #1a1a2e; border: 1px solid #7c3aed; color: #e0e0e0;">
       <ChatControlFollowup v-if="parsedControl && parsedControl.controlType === 'followup'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :placeholder="parsedControl.placeholder || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
