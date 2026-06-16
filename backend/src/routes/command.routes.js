@@ -48,34 +48,133 @@ router.get('/list-directories', async (req, res) => {
   }
 });
 
-function buildTree(dirPath) {
-  const name = path.basename(dirPath) || dirPath;
-  const stat = fs.statSync(dirPath);
-  const node = { name, type: stat.isDirectory() ? 'directory' : 'file', path: dirPath };
+function parseGitignore(content, baseDir) {
+  const patterns = []
+  const lines = content.split('\n')
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    let pattern = line
+    let negate = false
+    let dirOnly = false
+    if (pattern.startsWith('\\!')) {
+      pattern = pattern.slice(1)
+    } else if (pattern.startsWith('!')) {
+      negate = true
+      pattern = pattern.slice(1)
+    }
+    if (pattern.endsWith('/')) {
+      dirOnly = true
+      pattern = pattern.slice(0, -1)
+    }
+    if (!pattern) continue
+    const anchored = pattern.includes('/')
+    patterns.push({ pattern, negate, dirOnly, anchored, baseDir, regex: gitignoreToRegex(pattern) })
+  }
+  return patterns
+}
+
+function gitignoreToRegex(pattern) {
+  let regex = ''
+  let i = 0
+  while (i < pattern.length) {
+    const ch = pattern[i]
+    if (ch === '*' && i + 1 < pattern.length && pattern[i + 1] === '*') {
+      regex += '.*'
+      i += 2
+      if (i < pattern.length && pattern[i] === '/') i++
+    } else if (ch === '*') {
+      regex += '[^/]*'
+      i++
+    } else if (ch === '?') {
+      regex += '[^/]'
+      i++
+    } else if (ch === '.') {
+      regex += '\\.'
+      i++
+    } else {
+      regex += ch
+      i++
+    }
+  }
+  return regex
+}
+
+function matchesGitignore(entry, dirPath, patterns) {
+  if (!patterns || patterns.length === 0) return false
+  const entryPath = path.join(dirPath, entry.name)
+  let ignored = false
+  for (const p of patterns) {
+    let target
+    if (p.anchored) {
+      target = path.relative(p.baseDir, entryPath)
+    } else {
+      target = entry.name
+    }
+    const re = new RegExp('^' + p.regex + '$')
+    if (re.test(target)) {
+      if (p.dirOnly && !entry.isDirectory()) continue
+      ignored = !p.negate
+    }
+  }
+  return ignored
+}
+
+function loadGitignore(dirPath) {
+  const gitignorePath = path.join(dirPath, '.gitignore')
+  if (fs.existsSync(gitignorePath)) {
+    const content = fs.readFileSync(gitignorePath, 'utf-8')
+    return parseGitignore(content, dirPath)
+  }
+  return []
+}
+
+function buildTree(dirPath, parentPatterns, useGitignore) {
+  const name = path.basename(dirPath) || dirPath
+  const stat = fs.statSync(dirPath)
+  const node = { name, type: stat.isDirectory() ? 'directory' : 'file', path: dirPath }
   if (stat.isDirectory()) {
+    let patterns = parentPatterns
+    if (useGitignore) {
+      patterns = parentPatterns.concat(loadGitignore(dirPath))
+    }
     try {
-      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-      node.children = entries
-        .filter((e) => e.name !== '.' && e.name !== '..')
-        .map((e) => {
-          const fullPath = path.join(dirPath, e.name);
-          try {
-            return buildTree(fullPath);
-          } catch (err) {
-            console.log(`Error al procesar ${fullPath}: ${err.message}`);
-            return { name: e.name, type: 'error', error: err.message, path: fullPath };
-          }
-        });
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+      let filtered = entries.filter((e) => e.name !== '.' && e.name !== '..')
+      if (useGitignore) {
+        filtered = filtered.filter((e) => e.name !== '.git' && !matchesGitignore(e, dirPath, patterns))
+      }
+      node.children = filtered.map((e) => {
+        const fullPath = path.join(dirPath, e.name)
+        try {
+          return buildTree(fullPath, patterns, useGitignore)
+        } catch (err) {
+          console.log(`Error al procesar ${fullPath}: ${err.message}`)
+          return { name: e.name, type: 'error', error: err.message, path: fullPath }
+        }
+      })
     } catch (err) {
-      console.log(`Error al leer directorio ${dirPath}: ${err.message}`);
-      node.children = [];
-      node.error = err.message;
+      console.log(`Error al leer directorio ${dirPath}: ${err.message}`)
+      node.children = []
+      node.error = err.message
     }
   }
   if (!stat.isDirectory()) {
-    node.size = stat.size;
+    node.size = stat.size
   }
-  return node;
+  return node
+}
+
+function pruneTree(node, extensions) {
+  if (node.type === 'file') {
+    const ext = path.extname(node.name).slice(1)
+    return extensions.includes(ext)
+  }
+  if (node.type === 'directory' && node.children) {
+    node.children = node.children.filter((child) => pruneTree(child, extensions))
+    return node.children.length > 0
+  }
+  return false
 }
 
 router.get('/arbol-directorios', async (req, res) => {
@@ -83,6 +182,8 @@ router.get('/arbol-directorios', async (req, res) => {
   try {
     const dirArg = req.query.dir || '';
     const sessionId = req.query.sessionId ? parseInt(req.query.sessionId) : null;
+    const useGitignore = req.query.useGitignore !== 'false';
+    const filterExtension = (req.query.filterExtension || '').replace(/^["']|["']$/g, '');
     let baseDir = process.cwd();
     if (sessionId) {
       const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
@@ -102,8 +203,12 @@ router.get('/arbol-directorios', async (req, res) => {
     if (!fs.statSync(targetDir).isDirectory()) {
       return res.status(400).json({ success: false, error: `'${targetDir}' no es un directorio` });
     }
-    const tree = buildTree(targetDir);
-    res.json({ success: true, tree });
+    const tree = buildTree(targetDir, [], useGitignore);
+    if (filterExtension) {
+      const extensions = filterExtension.split(',').map((s) => s.trim()).filter(Boolean)
+      pruneTree(tree, extensions)
+    }
+    res.json({ success: true, tree, gitignore: useGitignore });
   } catch (err) {
     console.log('Error en arbol-directorios:', err.message);
     res.status(500).json({ success: false, error: err.message });

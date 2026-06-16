@@ -39,7 +39,7 @@
 </template>
 
 <script>
-import { ref, nextTick, watch, onMounted } from 'vue'
+import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCommandStore } from '../stores/command.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
@@ -56,6 +56,20 @@ export default {
     const inputEl = ref(null)
     const autocompleteList = ref(null)
     const historyIdx = ref(-1)
+
+    const fullHistory = computed(() => {
+      const db = cmdStore.dbHistory || []
+      const session = cmdStore.sessionHistory || []
+      const seen = new Set()
+      const result = []
+      for (const cmd of session) {
+        if (!seen.has(cmd)) { result.push(cmd); seen.add(cmd) }
+      }
+      for (let i = db.length - 1; i >= 0; i--) {
+        if (!seen.has(db[i])) { result.push(db[i]); seen.add(db[i]) }
+      }
+      return result
+    })
 
     watch(arrowIndex, (newIdx) => {
       if (newIdx >= 0 && autocompleteList.value) {
@@ -136,9 +150,9 @@ export default {
     }
 
     function navHistory(dir) {
-      const h = cmdStore.dbHistory
+      const h = fullHistory.value
       if (!h.length) return
-      historyIdx.value += dir
+      historyIdx.value -= dir
       if (historyIdx.value < -1) historyIdx.value = -1
       if (historyIdx.value >= h.length) historyIdx.value = h.length - 1
       buffer.value = historyIdx.value >= 0 ? h[historyIdx.value] : ''

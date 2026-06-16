@@ -16,7 +16,20 @@ register({
     }
   },
   async execute(args, { cmdStore, chatStore }) {
-    const dir = args.join(' ')
+    let useGitignore = true
+    let filterExtension = ''
+    const dirArgs = []
+    for (const arg of args) {
+      if (arg.startsWith('--')) {
+        const [key, val] = arg.slice(2).split('=')
+        const cleanVal = val ? val.replace(/^["']|["']$/g, '') : ''
+        if (key === 'gitignore') useGitignore = cleanVal !== 'false'
+        if (key === 'filter-extension') filterExtension = cleanVal
+      } else {
+        dirArgs.push(arg)
+      }
+    }
+    const dir = dirArgs.join(' ')
     const sessionId = chatStore.activeSessionId
     if (!sessionId) {
       chatStore.messages.push({
@@ -29,7 +42,7 @@ register({
 
     chatStore.messages.push({
       role: 'command',
-      content: `/arbol_directorios ${dir}`,
+      content: `/arbol_directorios ${args.join(' ')}`,
       _key: 'cmd-' + Date.now(),
     })
 
@@ -44,6 +57,8 @@ register({
       const params = new URLSearchParams()
       if (dir) params.set('dir', dir)
       params.set('sessionId', sessionId)
+      params.set('useGitignore', String(useGitignore))
+      if (filterExtension) params.set('filterExtension', filterExtension)
       const res = await fetch(`/api/command/arbol-directorios?${params.toString()}`, { credentials: 'include' })
       const data = await res.json()
 

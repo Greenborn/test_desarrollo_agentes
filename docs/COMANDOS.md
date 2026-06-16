@@ -20,7 +20,7 @@ Los comandos registrados en frontend tienen prioridad sobre los del backend.
 |---|---|---|
 | `/cd` | Cambia el directorio de trabajo de la sesión. Soporta rutas absolutas, relativas, `.`, `..`, `~` y autocompletado con Tab | `/cd <ruta>` |
 | `/ls` | Lista el contenido del directorio actual o del especificado | `/ls [ruta]` |
-| `/arbol_directorios` | Muestra el árbol de directorios en formato JSON. Si no se especifica ruta, usa el directorio base de la sesión | `/arbol_directorios [ruta]` |
+| `/arbol_directorios` | Muestra el árbol de directorios en formato JSON respetando `.gitignore`. Usar `--gitignore=false` para mostrar todo el listado completo. Usar `--filter-extension="sql,md,js"` para mostrar solo directorios que contengan archivos con esas extensiones | `/arbol_directorios [ruta] [--gitignore=false] [--filter-extension="ext1,ext2"]` |
 
 ---
 
