@@ -423,7 +423,7 @@ export default {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ sessionId, proyectoId }),
+            body: JSON.stringify({ sessionId, proyectoId, cwd: cmdStore.currentDir || undefined }),
           })
           const data = await res.json()
           chatStore.messages.push({

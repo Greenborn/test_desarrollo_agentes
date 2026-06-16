@@ -53,14 +53,16 @@ router.get('/proyecto/session/:sessionId', async (req, res) => {
 
 router.post('/proyecto/session', async (req, res) => {
   if (!authGuard(req, res)) return;
-  const { sessionId, proyectoId } = req.body;
+  const { sessionId, proyectoId, cwd } = req.body;
   if (!sessionId) {
     return res.status(400).json({ error: 'sessionId es requerido' });
   }
   try {
+    const updateData = { proyecto_id: proyectoId || null, updated_at: db.fn.now() };
+    if (cwd) updateData.cwd = cwd;
     await db('chat_sessions')
       .where({ id: sessionId, user_id: req.session.userId })
-      .update({ proyecto_id: proyectoId || null, updated_at: db.fn.now() });
+      .update(updateData);
     res.json({ success: true });
   } catch (err) {
     console.log('Error al asignar proyecto a sesión:', err.message);

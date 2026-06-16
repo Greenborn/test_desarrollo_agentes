@@ -2,7 +2,7 @@ import { useCommandRegistry } from '../useCommandRegistry.js';
 import { useOpencodeStore } from '../../stores/opencode.js';
 
 const { register } = useCommandRegistry();
-const DOC_TYPES = ['base_de_datos', 'subproyectos', 'endpoints', 'web_sockets', 'funcionalidades'];
+const DOC_TYPES = ['base_datos', 'subproyectos', 'endpoints', 'web_sockets', 'funcionalidades'];
 
 register({
   name: '/documentacion_update',

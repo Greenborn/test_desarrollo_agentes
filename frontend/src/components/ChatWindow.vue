@@ -346,6 +346,12 @@ export default {
           const defaultPrompt = 'Analiza el proyecto actual y documenta la información correspondiente a ' + (DOC_LABELS[tipo] || tipo) + '. Proporciona una descripción detallada que permita a otros agentes de IA entender su propósito y alcance.'
           const prompt = settingsKeys[promptKey] || defaultPrompt
 
+          chat.messages.push({
+            role: 'opencode_info',
+            content: '📋 Prompt a enviar a OpenCode:\n\n```\n' + prompt + '\n```',
+            _key: 'preview-' + Date.now(),
+          })
+
           opencodeStreamPromptDocUpdate(
             chat.activeSessionId,
             prompt,

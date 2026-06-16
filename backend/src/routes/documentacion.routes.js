@@ -25,7 +25,7 @@ router.get('/:proyectoId', async (req, res) => {
 });
 
 const TABLA_MAP = {
-  base_de_datos: 'documentacion_base_datos',
+  base_datos: 'documentacion_base_datos',
   subproyectos: 'documentacion_subproyectos',
   endpoints: 'documentacion_endpoints',
   web_sockets: 'documentacion_web_sockets',

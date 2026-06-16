@@ -18,11 +18,13 @@
 <script>
 import { ref } from 'vue'
 import { useChatStore } from '../stores/chat.js'
+import { useCommandStore } from '../stores/command.js'
 
 export default {
   emits: ['close'],
   setup(props, { emit }) {
     const chatStore = useChatStore()
+    const cmdStore = useCommandStore()
     const proyectoId = ref('')
     const descripcion = ref('')
 
@@ -46,7 +48,7 @@ export default {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ sessionId, proyectoId: proyectoId.value }),
+            body: JSON.stringify({ sessionId, proyectoId: proyectoId.value, cwd: cmdStore.currentDir || undefined }),
           })
         }
         chatStore.messages.push({
