@@ -98,14 +98,14 @@ export default {
 .json-toggle {
   cursor: pointer;
   user-select: none;
-  color: #7c3aed;
+  color: #75AADB;
   margin-right: 0.25em;
   font-size: 0.7rem;
   display: inline-block;
   width: 0.8em;
 }
 .json-toggle:hover {
-  color: #a78bfa;
+  color: #9ac8f0;
 }
 .json-key {
   color: #67e8f9;

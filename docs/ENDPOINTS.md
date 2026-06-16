@@ -27,7 +27,7 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 
 ### `GET /api/chat/sessions`
 - **Auth:** Requerida
-- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd }] }`
+- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion }] }`
 
 ### `POST /api/chat/sessions`
 - **Auth:** Requerida

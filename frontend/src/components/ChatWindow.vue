@@ -7,9 +7,9 @@
       <template v-else>
         <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
         <div v-if="streaming" class="text-start mb-3">
-          <div class="d-inline-block bg-dark text-light border-secondary rounded-3 p-3 text-start" style="max-width: 80%;">
+          <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 80%; background: #1a1a2e; border: 1px solid #374151; color: #e0e0e0;">
             <div v-if="currentThinking" class="mb-2">
-              <button class="btn btn-sm btn-outline-secondary w-100 text-start" data-bs-toggle="collapse" data-bs-target="#think-stream">
+              <button class="btn btn-sm w-100 text-start btn-outline-argentina" data-bs-toggle="collapse" data-bs-target="#think-stream">
                 🧠 Razonando...
               </button>
               <div class="collapse show mt-1" id="think-stream">
@@ -20,9 +20,9 @@
           </div>
         </div>
         <div v-if="ocStreaming" class="text-start mb-3">
-          <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 90%; background: #0f0f1e; border: 1px solid #7c3aed; color: #e0e0e0;">
+          <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 90%; background: #0f0f1e; border: 1px solid #75AADB; color: #f0f0f0;">
             <div v-if="ocThinking" class="mb-2">
-              <button class="btn btn-sm btn-outline-secondary w-100 text-start" data-bs-toggle="collapse" data-bs-target="#oc-think-stream">
+              <button class="btn btn-sm w-100 text-start btn-outline-argentina" data-bs-toggle="collapse" data-bs-target="#oc-think-stream">
                 🧠 OpenCode razonando...
               </button>
               <div class="collapse show mt-1" id="oc-think-stream">
@@ -34,7 +34,7 @@
         </div>
       </template>
     </div>
-    <div class="border-top border-secondary p-2" v-if="activeSessionId">
+    <div class="border-top p-2" style="border-color: #374151;" v-if="activeSessionId">
       <form @submit.prevent="send" class="d-flex gap-2">
         <textarea
           v-model="input"
@@ -45,7 +45,7 @@
           style="resize: vertical; max-height: 150px;"
           @keydown.enter.exact.prevent="send"
         ></textarea>
-        <button class="btn btn-primary" :disabled="streaming || !input.trim()">Enviar</button>
+        <button class="btn btn-argentina" :disabled="streaming || !input.trim()">Enviar</button>
       </form>
     </div>
     <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu"></div>
@@ -591,7 +591,7 @@ export default {
   position: fixed;
   z-index: 1050;
   background: #1a1a2e;
-  border: 1px solid #374151;
+  border: 1px solid #75AADB;
   border-radius: 6px;
   padding: 4px 0;
   min-width: 180px;
@@ -604,12 +604,34 @@ export default {
   color: #e0e0e0;
 }
 .context-menu-item:hover {
-  background: #2a2a3e;
+  background: #1a2a4e;
 }
 .context-menu-item.text-danger {
   color: #f87171 !important;
 }
 .context-menu-item.text-danger:hover {
   background: #3a1a1a;
+}
+
+.btn-argentina {
+  background-color: #75AADB;
+  color: #fff;
+  border: 1px solid #75AADB;
+}
+.btn-argentina:hover {
+  background-color: #5a8fc0;
+  color: #fff;
+}
+.btn-argentina:disabled {
+  opacity: 0.6;
+}
+.btn-outline-argentina {
+  background-color: transparent;
+  color: #75AADB;
+  border: 1px solid #75AADB;
+}
+.btn-outline-argentina:hover {
+  background-color: #1a2744;
+  color: #75AADB;
 }
 </style>

@@ -1,7 +1,7 @@
 <template>
   <div class="d-flex flex-column vh-100">
     <Topbar />
-    <div class="container py-4" style="max-width: 640px;">
+    <div class="container py-4 text-light" style="max-width: 640px;">
       <h5 class="mb-4">Configuración</h5>
       <input
         type="text"
@@ -19,11 +19,11 @@
             v-model="keyInput"
             placeholder="sk-..."
           />
-          <button class="btn btn-outline-light" @click="showKey = !showKey">
+          <button class="btn btn-outline-argentina" @click="showKey = !showKey">
             {{ showKey ? 'Ocultar' : 'Mostrar' }}
           </button>
         </div>
-        <button class="btn btn-sm btn-primary mt-2" @click="saveKey">
+        <button class="btn btn-sm mt-2 btn-argentina" @click="saveKey">
           Guardar Key
         </button>
       </div>
@@ -35,7 +35,7 @@
           rows="8"
           v-model="promptInput"
         ></textarea>
-        <button class="btn btn-sm btn-primary mt-2" @click="savePrompt">
+        <button class="btn btn-sm mt-2 btn-argentina" @click="savePrompt">
           Guardar Prompt
         </button>
       </div>
@@ -47,7 +47,7 @@
           rows="4"
           v-model="docBdInput"
         ></textarea>
-        <button class="btn btn-sm btn-primary mt-2" @click="saveDoc('base_datos')">
+        <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('base_datos')">
           Guardar Prompt
         </button>
       </div>
@@ -59,7 +59,7 @@
           rows="4"
           v-model="docSubInput"
         ></textarea>
-        <button class="btn btn-sm btn-primary mt-2" @click="saveDoc('subproyectos')">
+        <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('subproyectos')">
           Guardar Prompt
         </button>
       </div>
@@ -71,7 +71,7 @@
           rows="4"
           v-model="docEndpointsInput"
         ></textarea>
-        <button class="btn btn-sm btn-primary mt-2" @click="saveDoc('endpoints')">
+        <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('endpoints')">
           Guardar Prompt
         </button>
       </div>
@@ -83,7 +83,7 @@
           rows="4"
           v-model="docWsInput"
         ></textarea>
-        <button class="btn btn-sm btn-primary mt-2" @click="saveDoc('web_sockets')">
+        <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('web_sockets')">
           Guardar Prompt
         </button>
       </div>
@@ -95,7 +95,7 @@
           rows="4"
           v-model="docFuncInput"
         ></textarea>
-        <button class="btn btn-sm btn-primary mt-2" @click="saveDoc('funcionalidades')">
+        <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('funcionalidades')">
           Guardar Prompt
         </button>
       </div>
@@ -185,3 +185,24 @@ export default {
   },
 }
 </script>
+
+<style>
+.btn-argentina {
+  background-color: #75AADB;
+  color: #fff;
+  border: 1px solid #75AADB;
+}
+.btn-argentina:hover {
+  background-color: #5a8fc0;
+  color: #fff;
+}
+.btn-outline-argentina {
+  background-color: transparent;
+  color: #75AADB;
+  border: 1px solid #75AADB;
+}
+.btn-outline-argentina:hover {
+  background-color: #1a2744;
+  color: #75AADB;
+}
+</style>

@@ -24,7 +24,15 @@ router.get('/sessions', async (req, res) => {
     const sessions = await db('chat_sessions')
       .where({ user_id: req.session.userId })
       .orderBy('updated_at', 'desc')
-      .select('id', 'title', 'updated_at', 'cwd');
+      .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
+      .select(
+        'chat_sessions.id',
+        'title',
+        'updated_at',
+        'cwd',
+        'proyecto_id',
+        'proyectos.descripcion as proyecto_descripcion'
+      );
     res.json({ sessions });
   } catch (err) {
     console.log('Error al cargar sesiones:', err.message);
