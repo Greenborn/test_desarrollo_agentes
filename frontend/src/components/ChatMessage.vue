@@ -1,5 +1,5 @@
 <template>
-  <div class="mb-3" :class="msg.role === 'user' || msg.role === 'command' ? 'text-end' : 'text-start'">
+  <div class="mb-3" :class="msg.role === 'user' || msg.role === 'command' ? 'text-end' : 'text-start'" @contextmenu.prevent="$emit('contextmenu', $event, msg)">
     <div v-if="msg.role === 'command'" class="d-inline-block rounded-3 p-2 text-start font-monospace" style="max-width: 90%; background: #1a1a2e; border: 1px solid #00ff88; color: #00ff88;">
       {{ msg.content }}
     </div>
@@ -71,7 +71,7 @@ export default {
   props: {
     msg: { type: Object, required: true },
   },
-  emits: ['control-confirm'],
+  emits: ['control-confirm', 'contextmenu'],
   computed: {
     uid() {
       counter++

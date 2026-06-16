@@ -1,11 +1,11 @@
 <template>
-  <div class="d-flex flex-column h-100 overflow-x-hidden">
+  <div class="d-flex flex-column h-100 overflow-x-hidden" @click="closeCtxMenu">
     <div class="flex-grow-1 overflow-auto p-3" ref="messagesContainer">
       <div v-if="!activeSessionId" class="text-center text-muted mt-5">
         <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
       </div>
       <template v-else>
-        <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" @control-confirm="onControlConfirm" />
+        <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
         <div v-if="streaming" class="text-start mb-3">
           <div class="d-inline-block bg-dark text-light border-secondary rounded-3 p-3 text-start" style="max-width: 80%;">
             <div v-if="currentThinking" class="mb-2">
@@ -48,11 +48,15 @@
         <button class="btn btn-primary" :disabled="streaming || !input.trim()">Enviar</button>
       </form>
     </div>
+    <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu"></div>
+    <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
+      <div class="context-menu-item text-danger" @click="deleteMessage(ctxMenu.msg)">🗑️ Eliminar mensaje</div>
+    </div>
   </div>
 </template>
 
 <script>
-import { ref, watch, nextTick } from 'vue'
+import { ref, reactive, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
@@ -78,6 +82,7 @@ export default {
     const ocThinking = ref('')
     const docUpdateProyectoId = ref('')
     const docUpdateType = ref('')
+    const ctxMenu = reactive({ show: false, x: 0, y: 0, msg: null })
 
     function send() {
       const raw = input.value.trim()
@@ -89,6 +94,26 @@ export default {
       } else {
         chat.sendMessage(chat.activeSessionId, raw)
       }
+    }
+
+    function onContextMenu(e, msg) {
+      ctxMenu.show = true
+      ctxMenu.x = e.clientX
+      ctxMenu.y = e.clientY
+      ctxMenu.msg = msg
+    }
+
+    function closeCtxMenu() {
+      ctxMenu.show = false
+    }
+
+    async function deleteMessage(msg) {
+      try {
+        await chat.deleteMessage(chat.activeSessionId, msg)
+      } catch (err) {
+        console.error('Error al eliminar mensaje:', err)
+      }
+      closeCtxMenu()
     }
 
     async function opencodeStreamPrompt(sessionId, prompt, provider, model, thinking, mode) {
@@ -527,6 +552,10 @@ export default {
       input,
       send,
       onControlConfirm,
+      onContextMenu,
+      closeCtxMenu,
+      deleteMessage,
+      ctxMenu,
       messagesContainer,
     }
   },
@@ -539,5 +568,35 @@ export default {
 }
 @keyframes blink {
   50% { opacity: 0; }
+}
+.context-menu-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1040;
+}
+.context-menu {
+  position: fixed;
+  z-index: 1050;
+  background: #1a1a2e;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.context-menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #e0e0e0;
+}
+.context-menu-item:hover {
+  background: #2a2a3e;
+}
+.context-menu-item.text-danger {
+  color: #f87171 !important;
+}
+.context-menu-item.text-danger:hover {
+  background: #3a1a1a;
 }
 </style>

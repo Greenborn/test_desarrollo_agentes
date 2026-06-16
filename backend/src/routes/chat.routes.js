@@ -113,6 +113,20 @@ router.post('/sessions/:id/messages', async (req, res) => {
   }
 });
 
+router.delete('/sessions/:sessionId/messages/:messageId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const session = await db('chat_sessions').where({ id: req.params.sessionId, user_id: req.session.userId }).first();
+    if (!session) return res.status(404).json({ error: 'Sesión no encontrada' });
+    const deleted = await db('chat_messages').where({ id: req.params.messageId, session_id: req.params.sessionId }).del();
+    if (!deleted) return res.status(404).json({ error: 'Mensaje no encontrado' });
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al eliminar mensaje:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.delete('/sessions/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {

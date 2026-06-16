@@ -162,6 +162,25 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function deleteMessage(sessionId, msg) {
+    const key = msg.id || msg._key
+    try {
+      if (msg.id) {
+        const res = await fetch(`${API}/chat/sessions/${sessionId}/messages/${msg.id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+        if (!res.ok) {
+          const errData = await res.json()
+          throw new Error(errData.error || 'Error al eliminar mensaje')
+        }
+      }
+      messages.value = messages.value.filter(m => (m.id || m._key) !== key)
+    } catch (err) {
+      console.error('Error al eliminar mensaje:', err)
+    }
+  }
+
   async function deleteSession(sessionId) {
     try {
       const res = await fetch(`${API}/chat/sessions/${sessionId}`, {
@@ -185,6 +204,6 @@ export const useChatStore = defineStore('chat', () => {
     sessions, activeSessionId, messages,
     streaming, creating, currentChunk, currentThinking,
     loadSessions, createSession, createSessionIfNeeded, loadMessages,
-    sendMessage, deleteSession,
+    sendMessage, deleteMessage, deleteSession,
   }
 })
