@@ -2,26 +2,6 @@ import { useCommandRegistry } from '../useCommandRegistry.js'
 
 const { register } = useCommandRegistry()
 
-function formatDate(dateStr) {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return dateStr
-  return d.toLocaleString('es-ES', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function formatStatus(status) {
-  if (status === 1) return 'activo'
-  if (status === 5) return 'archivado'
-  if (status === 9) return 'cerrado'
-  return `desconocido (${status})`
-}
-
 register({
   name: '/redmine_proyectos',
   category: 'Utilidades',
@@ -76,29 +56,13 @@ register({
         return
       }
 
-      let md = '# Proyectos Redmine\n\n'
-
-      data.proyectos.forEach((p, i) => {
-        md += `## ${i + 1}. ${p.name}\n`
-        md += `- **ID:** ${p.id}\n`
-        md += `- **Identificador:** \`${p.identifier}\`\n`
-        md += `- **Estado:** ${formatStatus(p.status)}\n`
-        md += `- **Creado:** ${formatDate(p.created_on)}\n`
-        md += `- **Actualizado:** ${formatDate(p.updated_on)}\n`
-        if (p.parent) {
-          md += `- **Proyecto padre:** ${p.parent.name} (ID: ${p.parent.id})\n`
-        } else {
-          md += `- **Proyecto padre:** —\n`
-        }
-        if (p.description) {
-          md += `\n**Descripción:**\n\`\`\`\n${p.description}\n\`\`\`\n`
-        }
-        md += '\n'
-      })
-
       chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: md,
+        role: 'opencode_control',
+        content: '',
+        controlData: {
+          controlType: 'redmine_projects',
+          projects: data.proyectos,
+        },
         _key: 'result-' + Date.now(),
       }
     } catch (err) {

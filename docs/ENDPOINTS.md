@@ -242,7 +242,14 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Auth:** Requerida
 - **Body:** ninguno
 - **Descripción:** Obtiene el listado de proyectos Redmine desde `${redmine_url}/projects.json` con autenticación Bearer. Incluye `time_entry_activities`, `issue_categories` y `enabled_modules`.
-- **Respuesta 200:** `{ success: true, proyectos: [{ id, name, identifier, description, status, created_on, updated_on, parent }] }`
+- **Respuesta 200:** `{ success: true, proyectos: [{ id, name, identifier, description, status, created_on, updated_on, parent, slug }] }`
+- **Respuesta 200 (error):** `{ success: false, message: "..." }`
+
+### `POST /api/redmine/proyectos/import`
+- **Auth:** Requerida
+- **Body:** `{ id, name, description?, status?, created_on?, updated_on?, parent?: { id, name } }`
+- **Descripción:** Importa un proyecto Redmine a la tabla `proyectos` local. Genera un slug (minúsculas, solo letras/números, espacios → `_`, sin acentos/símbolos) como `id` del proyecto. Verifica que no exista duplicado.
+- **Respuesta 200:** `{ success: true, proyectoId: "slug_del_proyecto" }`
 - **Respuesta 200 (error):** `{ success: false, message: "..." }`
 
 ---

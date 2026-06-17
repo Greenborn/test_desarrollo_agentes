@@ -1,7 +1,24 @@
 import { Router } from 'express';
 import { getRedmineToken, getRedmineUrl } from '../services/redmine.js';
+import db from '../config/db.js';
 
 const router = Router();
+
+function slugify(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, '')
+    .replace(/ /g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+function toDateTime(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toISOString().replace('T', ' ').replace('Z', '').split('.')[0];
+}
 
 function authGuard(req, res) {
   if (!req.session?.userId) {
@@ -93,12 +110,54 @@ router.get('/proyectos', async (req, res) => {
       created_on: p.created_on,
       updated_on: p.updated_on,
       parent: p.parent ? { id: p.parent.id, name: p.parent.name } : null,
+      slug: slugify(p.name),
     }));
 
     res.json({ success: true, proyectos });
   } catch (err) {
     console.log('Error al obtener proyectos Redmine:', err.message);
     res.json({ success: false, message: 'Error al obtener proyectos Redmine: ' + err.message });
+  }
+});
+
+router.post('/proyectos/import', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { id, name, description, status, created_on, updated_on, parent } = req.body;
+
+  if (!id || !name) {
+    res.json({ success: false, message: 'id y name del proyecto son requeridos.' });
+    return;
+  }
+
+  const proyectoId = slugify(name);
+  if (!proyectoId) {
+    res.json({ success: false, message: 'No se pudo generar un slug válido desde el nombre del proyecto.' });
+    return;
+  }
+
+  try {
+    const existing = await db('proyectos').where({ id: proyectoId }).first();
+    if (existing) {
+      res.json({ success: false, message: `El proyecto "${name}" ya existe en la base de local.` });
+      return;
+    }
+
+    await db('proyectos').insert({
+      id: proyectoId,
+      descripcion: description || '',
+      redmine_id: id,
+      redmine_status: status || null,
+      redmine_created_on: toDateTime(created_on),
+      redmine_updated_on: toDateTime(updated_on),
+      redmine_parent_id: parent?.id ? String(parent.id) : null,
+      redmine_parent_name: parent?.name || null,
+    });
+
+    res.json({ success: true, proyectoId });
+  } catch (err) {
+    console.log('Error al importar proyecto Redmine:', err.message);
+    res.json({ success: false, message: 'Error al importar proyecto: ' + err.message });
   }
 });
 
