@@ -33,7 +33,7 @@
         @mousedown.prevent="pickAutocomplete(opt)"
         @mouseenter="arrowIndex = i"
       >
-        {{ opt }}
+        {{ opt.display || opt }}
       </button>
     </div>
   </div>
@@ -209,13 +209,14 @@ export default {
       }
     }
 
-    function pickAutocomplete(dir) {
+    function pickAutocomplete(opt) {
+      const value = typeof opt === 'object' ? opt.value : opt
       const parts = buffer.value.split(/\s+/)
-      const isCommand = dir.startsWith('/') && parts.length === 1
+      const isCommand = value.startsWith('/') && parts.length === 1
       if (isCommand) {
-        buffer.value = dir + ' '
+        buffer.value = value + ' '
       } else {
-        parts[parts.length - 1] = dir
+        parts[parts.length - 1] = value
         buffer.value = parts.join(' ') + ' '
       }
       cmdStore.hideAutocomplete()

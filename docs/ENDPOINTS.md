@@ -297,6 +297,46 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Obtiene todos los tickets almacenados en la base de datos local (tabla `tickets`), ordenados por `redmine_updated_on` descendente.
 - **Respuesta 200:** `{ success: true, tickets: [{ id, proyecto_id, redmine_id, subject, description, status_name, tracker_name, priority_name, assigned_to_name, author_name, start_date, due_date, estimated_hours, done_ratio, fixed_version_name, redmine_created_on, redmine_updated_on, redmine_closed_on }] }`
 
+### `GET /api/tickets/options`
+- **Auth:** Requerida
+- **Descripción:** Obtiene las opciones disponibles desde la API de Redmine para los campos del ticket: estados, prioridades y usuarios activos. Consulta tres endpoints en paralelo: `/issue_statuses.json`, `/enumerations/issue_priorities.json` y `/users.json?limit=100&status=1`. Si Redmine no está configurado o falla la conexión, retorna arreglos vacíos.
+- **Respuesta 200:** `{ statuses: [{ id: 1, name: "New" }, ...], priorities: [{ id: 3, name: "High" }, ...], users: [{ id: 5, name: "John Doe", login: "jdoe" }, ...] }`
+
+### `GET /api/tickets/ticket-options/:ticketId`
+- **Auth:** Requerida
+- **Params:** `ticketId` — ID numérico del ticket en Redmine (`redmine_id`)
+- **Descripción:** Obtiene las opciones contextuales para un ticket específico desde la API de Redmine. Consulta `GET /issues/{ticketId}.json?include=allowed_statuses` para obtener los estados permitidos y el ID del proyecto. Luego obtiene las prioridades desde `/enumerations/issue_priorities.json` y los miembros del proyecto desde `/projects/{projectId}/memberships.json` (si se obtuvo el proyecto; si no, cae a `/users.json`). Si Redmine no está configurado o falla la conexión, retorna arreglos vacíos.
+- **Respuesta 200:** `{ statuses: [{ id, name }], priorities: [{ id, name }], users: [{ id, name }] }`
+
+### `GET /api/tickets/statuses/:ticketId`
+- **Auth:** Requerida
+- **Params:** `ticketId` — ID numérico del ticket en Redmine (`redmine_id`)
+- **Descripción:** Obtiene los estados permitidos (transiciones válidas) para un ticket específico desde la API de Redmine. Consulta `GET /issues/{ticketId}.json?include=allowed_statuses`. Si Redmine no está configurado o falla la conexión, retorna arreglo vacío.
+- **Respuesta 200:** `{ statuses: [{ id: 1, name: "New" }, { id: 2, name: "In Progress" }, ...] }`
+
+### `GET /api/tickets/session/:sessionId`
+- **Auth:** Requerida
+- **Params:** `sessionId` — ID de la sesión de chat
+- **Query:** `?comments=true` — opcional, incluye los comentarios desde la API de Redmine
+- **Descripción:** Obtiene el `id_ticket_redmine` asignado a la sesión y, si existe, los datos completos del ticket desde la tabla `tickets` (JOIN por `redmine_id`). Si `?comments=true`, también consulta la API de Redmine (`/issues/:id.json?include=journals`) para obtener los comentarios.
+- **Respuesta 200 (con ticket):** `{ idTicketRedmine: 143, ticket: { id, proyecto_id, redmine_id, subject, description, status_name, priority_name, assigned_to_name, ... }, comments: [{ user, notes, created_on }] | null }`
+- **Respuesta 200 (sin ticket):** `{ idTicketRedmine: null, ticket: null, comments: null }`
+
+### `POST /api/tickets/session`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number, idTicketRedmine: number }`
+- **Descripción:** Asigna un ticket de Redmine a la sesión de chat. Si `idTicketRedmine` es `null` o se omite, limpia la asignación.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 400:** `{ error: "sessionId es requerido" }`
+
+### `PUT /api/tickets/session/:sessionId`
+- **Auth:** Requerida
+- **Params:** `sessionId` — ID de la sesión de chat
+- **Body:** `{ subject?, description?, status_name?, priority_name?, assigned_to_name?, status_id?, priority_id?, assigned_to_id?, notes? }`
+- **Descripción:** Actualiza los datos del ticket asignado a la sesión. Los campos `_name` se guardan en la base local. Los campos `_id` (status_id, priority_id, assigned_to_id) y `notes` se envían a Redmine vía `PUT /issues/:id.json`. Valida que `subject` no esté vacío si se envía.
+- **Respuesta 200:** `{ success: true, ticket: { ...datos actualizados... } }`
+- **Respuesta 400:** `{ error: "El asunto no puede estar vacío." }` o `{ error: "No hay ticket asignado a esta sesión." }`
+
 ---
 
 ## Notas

@@ -20,6 +20,9 @@ import './composables/commands/redmineProyectos.js'
 import './composables/commands/redmineTickets.js'
 import './composables/commands/redmineImportarTickets.js'
 import './composables/commands/git.js'
+import './composables/commands/chatSetTicket.js'
+import './composables/commands/chatGetTicket.js'
+import './composables/commands/chatTicketEdit.js'
 
 const app = createApp(App)
 const pinia = createPinia()

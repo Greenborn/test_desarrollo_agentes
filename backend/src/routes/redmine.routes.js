@@ -358,6 +358,7 @@ async function importarIssuesDeRedmine(proyecto, token, url) {
         description: issue.description || null,
         status_name: issue.status?.name || null,
         tracker_name: issue.tracker?.name || null,
+        priority_id: issue.priority?.id || null,
         priority_name: issue.priority?.name || null,
         assigned_to_name: issue.assigned_to?.name || null,
         author_name: issue.author?.name || null,

@@ -30,7 +30,7 @@
           class="form-control font-monospace small flex-fill"
           :value="formData[activeTab]"
           @input="formData[activeTab] = $event.target.value"
-          :style="{ background: '#1a1a2e', color: '#e0e0e0', border: '1px solid #495057', resize: 'none', minHeight: '120px' }"
+          :style="{ background: '#1a2744', color: '#e0e0e0', border: '1px solid #495057', resize: 'none', minHeight: '120px' }"
           :placeholder="activeTabData.placeholder"
         ></textarea>
       </div>

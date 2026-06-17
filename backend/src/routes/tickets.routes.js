@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import db from '../config/db.js';
+import { getRedmineToken, getRedmineUrl } from '../services/redmine.js';
 
 const router = Router();
 
@@ -22,6 +23,310 @@ router.get('/', async (req, res) => {
     res.json({ success: true, tickets });
   } catch (err) {
     console.log('Error al listar tickets:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/options', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const token = await getRedmineToken();
+    const url = await getRedmineUrl();
+
+    if (!token || !url) {
+      return res.json({ statuses: [], priorities: [], users: [] });
+    }
+
+    const baseUrl = url.replace(/\/+$/, '');
+
+    const [statusesRes, prioritiesRes, usersRes] = await Promise.all([
+      fetch(baseUrl + '/issue_statuses.json', {
+        headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+      }),
+      fetch(baseUrl + '/enumerations/issue_priorities.json', {
+        headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+      }),
+      fetch(baseUrl + '/users.json?limit=100&status=1', {
+        headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+      }),
+    ]);
+
+    const [statusesData, prioritiesData, usersData] = await Promise.all([
+      statusesRes.json(),
+      prioritiesRes.json(),
+      usersRes.json(),
+    ]);
+
+    res.json({
+      statuses: (statusesData.issue_statuses || []).map(s => ({ id: s.id, name: s.name })),
+      priorities: (prioritiesData.issue_priorities || []).map(p => ({ id: p.id, name: p.name })),
+      users: (usersData.users || []).map(u => ({
+        id: u.id,
+        name: [u.firstname, u.lastname].filter(Boolean).join(' '),
+        login: u.login,
+      })),
+    });
+  } catch (err) {
+    console.log('Error al obtener opciones de Redmine:', err.message);
+    res.json({ statuses: [], priorities: [], users: [] });
+  }
+});
+
+router.get('/session/:sessionId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const session = await db('chat_sessions')
+      .select('id_ticket_redmine')
+      .where({ id: req.params.sessionId, user_id: req.session.userId })
+      .first();
+
+    const idTicketRedmine = session?.id_ticket_redmine || null;
+    let ticket = null;
+    let comments = null;
+
+    if (idTicketRedmine) {
+      ticket = await db('tickets')
+        .where({ redmine_id: idTicketRedmine })
+        .first();
+    }
+
+    if (idTicketRedmine && req.query.comments === 'true') {
+      try {
+        const token = await getRedmineToken();
+        const url = await getRedmineUrl();
+        if (token && url) {
+          const apiUrl = url.replace(/\/+$/, '') + `/issues/${idTicketRedmine}.json?include=journals`;
+          const response = await fetch(apiUrl, {
+            headers: {
+              'X-Redmine-API-Key': token,
+              'Content-Type': 'application/json',
+            },
+          });
+          const data = await response.json();
+          if (data.issue?.journals) {
+            comments = data.issue.journals
+              .filter(j => j.notes && j.notes.trim())
+              .map(j => ({
+                user: j.user?.name || '—',
+                notes: j.notes,
+                created_on: j.created_on,
+              }));
+          }
+        }
+      } catch (e) {
+        console.log('Error al obtener comentarios de Redmine:', e.message);
+        comments = [];
+      }
+    }
+
+    res.json({ idTicketRedmine, ticket, comments });
+  } catch (err) {
+    console.log('Error al obtener ticket de sesión:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/session', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { sessionId, idTicketRedmine } = req.body;
+
+  if (!sessionId) {
+    return res.status(400).json({ error: 'sessionId es requerido' });
+  }
+
+  try {
+    const updateData = { id_ticket_redmine: idTicketRedmine || null, updated_at: db.fn.now() };
+    await db('chat_sessions')
+      .where({ id: sessionId, user_id: req.session.userId })
+      .update(updateData);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al asignar ticket a sesión:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/ticket-options/:ticketId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const token = await getRedmineToken();
+    const url = await getRedmineUrl();
+
+    if (!token || !url) {
+      return res.json({ statuses: [], priorities: [], users: [] });
+    }
+
+    const baseUrl = url.replace(/\/+$/, '');
+
+    const issueRes = await fetch(`${baseUrl}/issues/${req.params.ticketId}.json?include=allowed_statuses`, {
+      headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+    });
+
+    let allowedStatuses = [];
+    let projectId = null;
+    if (issueRes.ok) {
+      const issueData = await issueRes.json();
+      allowedStatuses = issueData.issue?.allowed_statuses || [];
+      projectId = issueData.issue?.project?.id;
+    } else {
+      console.log(`Error HTTP ${issueRes.status} al obtener datos del ticket ${req.params.ticketId}`);
+    }
+
+    const [prioritiesRes, usersRes] = await Promise.all([
+      fetch(baseUrl + '/enumerations/issue_priorities.json', {
+        headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+      }),
+      projectId
+        ? fetch(`${baseUrl}/projects/${projectId}/memberships.json`, {
+            headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+          })
+        : fetch(baseUrl + '/users.json?limit=100&status=1', {
+            headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+          }),
+    ]);
+
+    const prioritiesData = prioritiesRes.ok ? await prioritiesRes.json() : { issue_priorities: [] };
+    const usersData = usersRes.ok ? await usersRes.json() : {};
+
+    const memberships = usersData.memberships || [];
+    const allUsers = usersData.users || [];
+
+    let users;
+    if (memberships.length > 0) {
+      users = memberships
+        .filter(m => m.user)
+        .map(m => ({
+          id: m.user.id,
+          name: m.user.name,
+        }));
+    } else {
+      users = allUsers.map(u => ({
+        id: u.id,
+        name: [u.firstname, u.lastname].filter(Boolean).join(' '),
+        login: u.login,
+      }));
+    }
+
+    res.json({
+      statuses: (allowedStatuses || []).map(s => ({ id: s.id, name: s.name })),
+      priorities: (prioritiesData.issue_priorities || []).map(p => ({ id: p.id, name: p.name })),
+      users,
+    });
+  } catch (err) {
+    console.log('Error al obtener opciones del ticket en Redmine:', err.message);
+    res.json({ statuses: [], priorities: [], users: [] });
+  }
+});
+
+router.get('/statuses/:ticketId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const token = await getRedmineToken();
+    const url = await getRedmineUrl();
+
+    if (!token || !url) {
+      return res.json({ statuses: [] });
+    }
+
+    const baseUrl = url.replace(/\/+$/, '');
+    const response = await fetch(`${baseUrl}/issues/${req.params.ticketId}.json?include=allowed_statuses`, {
+      headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      console.log(`Error HTTP ${response.status} al obtener estados permitidos del ticket ${req.params.ticketId}`);
+      return res.json({ statuses: [] });
+    }
+
+    const data = await response.json();
+    const allowedStatuses = data.issue?.allowed_statuses || [];
+
+    res.json({
+      statuses: allowedStatuses.map(s => ({ id: s.id, name: s.name })),
+    });
+  } catch (err) {
+    console.log('Error al obtener estados permitidos de Redmine:', err.message);
+    res.json({ statuses: [] });
+  }
+});
+
+router.put('/session/:sessionId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { subject, description, status_name, priority_name, assigned_to_name, status_id, priority_id, assigned_to_id, notes } = req.body;
+
+  if (subject !== undefined && subject.trim().length === 0) {
+    return res.status(400).json({ error: 'El asunto no puede estar vacío.' });
+  }
+
+  try {
+    const session = await db('chat_sessions')
+      .select('id_ticket_redmine')
+      .where({ id: req.params.sessionId, user_id: req.session.userId })
+      .first();
+
+    const idTicketRedmine = session?.id_ticket_redmine;
+    if (!idTicketRedmine) {
+      return res.status(400).json({ error: 'No hay ticket asignado a esta sesión.' });
+    }
+
+    const localUpdate = {};
+    const redmineUpdate = {};
+
+    if (subject !== undefined) { localUpdate.subject = subject.trim(); redmineUpdate.subject = subject.trim(); }
+    if (description !== undefined) { localUpdate.description = description; redmineUpdate.description = description; }
+    if (status_name !== undefined) { localUpdate.status_name = status_name.trim(); }
+    if (priority_name !== undefined) { localUpdate.priority_name = priority_name.trim(); }
+    if (priority_id !== undefined) { localUpdate.priority_id = priority_id; }
+    if (assigned_to_name !== undefined) { localUpdate.assigned_to_name = assigned_to_name.trim(); }
+    if (status_id !== undefined) { redmineUpdate.status_id = status_id; }
+    if (priority_id !== undefined) { redmineUpdate.priority_id = priority_id; }
+    if (assigned_to_id !== undefined) { redmineUpdate.assigned_to_id = assigned_to_id; }
+    if (notes !== undefined && notes.trim()) { redmineUpdate.notes = notes.trim(); }
+
+    if (Object.keys(localUpdate).length > 0) {
+      await db('tickets')
+        .where({ redmine_id: idTicketRedmine })
+        .update(localUpdate);
+    }
+
+    if (Object.keys(redmineUpdate).length > 0) {
+      try {
+        const token = await getRedmineToken();
+        const url = await getRedmineUrl();
+        if (token && url) {
+          const apiUrl = url.replace(/\/+$/, '') + `/issues/${idTicketRedmine}.json`;
+          const response = await fetch(apiUrl, {
+            method: 'PUT',
+            headers: {
+              'X-Redmine-API-Key': token,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ issue: redmineUpdate }),
+          });
+          if (!response.ok) {
+            const errText = await response.text();
+            console.log('Error al actualizar en Redmine:', errText);
+          }
+        }
+      } catch (e) {
+        console.log('Error al conectar con Redmine para actualizar:', e.message);
+      }
+    }
+
+    const updated = await db('tickets')
+      .where({ redmine_id: idTicketRedmine })
+      .first();
+
+    res.json({ success: true, ticket: updated });
+  } catch (err) {
+    console.log('Error al actualizar ticket:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

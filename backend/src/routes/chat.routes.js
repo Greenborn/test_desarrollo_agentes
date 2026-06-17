@@ -31,6 +31,7 @@ router.get('/sessions', async (req, res) => {
         'updated_at',
         'cwd',
         'proyecto_id',
+        'id_ticket_redmine',
         'proyectos.descripcion as proyecto_descripcion'
       );
     res.json({ sessions });

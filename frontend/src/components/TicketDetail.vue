@@ -1,5 +1,5 @@
 <template>
-  <div class="d-flex flex-column h-100 text-light p-4 overflow-y-auto" style="background: #1a1a2e;">
+  <div class="d-flex flex-column h-100 text-light p-4 overflow-y-auto" style="background: #1a2744;">
     <div class="d-flex align-items-center mb-3">
       <button class="btn btn-sm btn-outline-argentina me-3" @click="goBack">
         ← Volver al chat

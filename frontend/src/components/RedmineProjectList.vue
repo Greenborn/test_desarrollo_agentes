@@ -4,7 +4,7 @@
       v-for="project in projects"
       :key="project.id"
       class="rounded-3 p-3"
-      style="background: #0f0f1e; border: 1px solid #374151;"
+      style="background: #1a2744; border: 1px solid #374151;"
     >
       <div class="d-flex justify-content-between align-items-start mb-2">
         <h6 class="mb-0" style="color: #75AADB;">{{ project.name }}</h6>
@@ -20,7 +20,7 @@
       </div>
 
       <div v-if="project.description" class="mb-2">
-        <pre class="small mb-0 p-2 rounded" style="background: #1a1a2e; border: 1px solid #2a2a3e; white-space: pre-wrap; word-break: break-word; max-height: 120px; overflow-y: auto; color: #e0e0e0;">{{ project.description }}</pre>
+        <pre class="small mb-0 p-2 rounded" style="background: #1a2744; border: 1px solid #2a2a3e; white-space: pre-wrap; word-break: break-word; max-height: 120px; overflow-y: auto; color: #e0e0e0;">{{ project.description }}</pre>
       </div>
 
       <div class="d-flex justify-content-end">

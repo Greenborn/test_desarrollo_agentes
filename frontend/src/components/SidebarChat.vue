@@ -124,6 +124,9 @@ export default {
       } else if (s.proyecto_id) {
         lines.push(`Proyecto: ${s.proyecto_id}`)
       }
+      if (s.id_ticket_redmine) {
+        lines.push(`Ticket: #${s.id_ticket_redmine}`)
+      }
       if (s.cwd) {
         lines.push(`Directorio: ${s.cwd}`)
       }

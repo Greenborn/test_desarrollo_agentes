@@ -64,6 +64,9 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 |---|---|---|
 | `/proyecto_set` | Asigna un proyecto a la sesión actual. Sin argumentos abre modal para crear uno nuevo | `/proyecto_set [id_proyecto]` |
 | `/proyecto_info` | Muestra el ID del proyecto asignado a la sesión actual | `/proyecto_info` |
+| `/chat_set_ticket` | Asigna un ticket de Redmine a la sesión actual. Autocompletado filtrado por el proyecto de la sesión | `/chat_set_ticket <id_ticket_redmine>` |
+| `/chat_get_ticket` | Muestra el ticket de Redmine asignado a la sesión actual, incluyendo su descripción. Con `--comments=true` muestra también los comentarios del ticket | `/chat_get_ticket [--comments=true]` |
+| `/chat_ticket_edit` | Abre un editor inline para modificar los datos del ticket de Redmine asignado a la sesión actual (asunto, descripción, estado, prioridad, asignado, + nuevo comentario) | `/chat_ticket_edit` |
 
 ---
 

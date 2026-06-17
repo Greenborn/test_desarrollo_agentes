@@ -1,25 +1,26 @@
 <template>
   <div class="mb-3" :class="msg.role === 'user' || msg.role === 'command' ? 'text-end' : 'text-start'" @contextmenu.prevent="$emit('contextmenu', $event, msg)">
-    <div v-if="msg.role === 'command'" class="d-inline-block rounded-3 p-2 text-start font-monospace" style="max-width: 90%; background: #1a1a2e; border: 1px solid #E8B800; color: #E8B800;">
+    <div v-if="msg.role === 'command'" class="d-inline-block rounded-3 p-2 text-start font-monospace" style="max-width: 90%; background: #1a2744; border: 1px solid #E8B800; color: #E8B800;">
       {{ msg.content }}
     </div>
     <div v-else-if="msg.role === 'result'" class="d-inline-block rounded-3 p-2 text-start font-monospace small" style="max-width: 90%; background: #16213e; border: 1px solid #75AADB; color: #e0e0e0;">
       <ChatFormatter :text="msg.content" />
     </div>
-    <div v-else-if="msg.role === 'opencode_control'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #1a1a2e; border: 1px solid #75AADB; color: #e0e0e0;">
+    <div v-else-if="msg.role === 'opencode_control'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #1a2744; border: 1px solid #75AADB; color: #e0e0e0;">
       <ChatControlFollowup v-if="parsedControl && parsedControl.controlType === 'followup'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :placeholder="parsedControl.placeholder || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <ControlSelect v-else-if="parsedControl && parsedControl.controlType === 'select'" :options="parsedControl.options || []" :preselect="parsedControl.preselect || ''" :placeholder="parsedControl.placeholder || 'Selecciona...'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <ControlTextarea v-else-if="parsedControl && parsedControl.controlType === 'textarea'" :placeholder="parsedControl.placeholder || 'Escribe...'" :rows="parsedControl.rows || 3" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <FuncionalidadListControl v-else-if="parsedControl && parsedControl.controlType === 'funcionalidad_list'" :items="parsedControl.items || []" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <RedmineProjectList v-else-if="parsedControl && parsedControl.controlType === 'redmine_projects'" :projects="parsedControl.projects || []" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <TicketEditControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_edit'" :ticket="parsedControl.ticket" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <div v-else class="d-flex flex-column gap-2">
         <pre class="mb-0 small" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
       </div>
     </div>
-    <div v-else-if="msg.role === 'opencode_confirmed'" class="d-inline-block rounded-3 p-2 text-start font-monospace small" style="max-width: 90%; background: #1a1a2e; border: 1px solid #75AADB; color: #75AADB;">
+    <div v-else-if="msg.role === 'opencode_confirmed'" class="d-inline-block rounded-3 p-2 text-start font-monospace small" style="max-width: 90%; background: #1a2744; border: 1px solid #75AADB; color: #75AADB;">
       {{ msg.content }}
     </div>
-    <div v-else-if="msg.role === 'opencode_stream'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #0f0f1e; border: 1px solid #75AADB; color: #f0f0f0;">
+    <div v-else-if="msg.role === 'opencode_stream'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #1a2744; border: 1px solid #75AADB; color: #f0f0f0;">
       <div v-if="msg.thinking" class="mb-2">
         <button class="btn btn-sm w-100 text-start btn-outline-argentina" data-bs-toggle="collapse" :data-bs-target="'#think-' + uid">
           🧠 Razonando...
@@ -30,11 +31,11 @@
       </div>
       <ChatFormatter :text="msg.content" /><span v-if="msg.streaming" class="blink">▌</span>
     </div>
-    <div v-else-if="msg.role === 'opencode_result'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #0f0f1e; border: 1px solid #75AADB; color: #f0f0f0;">
+    <div v-else-if="msg.role === 'opencode_result'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #1a2744; border: 1px solid #75AADB; color: #f0f0f0;">
       <ChatFormatter :text="msg.content" />
       <div v-if="parsedInfo && parsedInfo.hash" class="mt-2 small" style="color: #75AADB;">Hash: {{ parsedInfo.hash }}</div>
     </div>
-    <div v-else-if="msg.role === 'opencode_info'" class="d-block w-100 rounded-3 p-2 text-start small" style="background: #1a1a2e; border: 1px solid #374151; color: #9ca3af;">
+    <div v-else-if="msg.role === 'opencode_info'" class="d-block w-100 rounded-3 p-2 text-start small" style="background: #1a2744; border: 1px solid #374151; color: #9ca3af;">
       <pre class="mb-0" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
     </div>
     <div
@@ -67,11 +68,12 @@ import ChatControlFollowup from './ChatControlFollowup.vue'
 import ChatFormatter from './ChatFormatter.vue'
 import FuncionalidadListControl from './FuncionalidadListControl.vue'
 import RedmineProjectList from './RedmineProjectList.vue'
+import TicketEditControl from './TicketEditControl.vue'
 
 let counter = 0
 
 export default {
-  components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatFormatter, FuncionalidadListControl, RedmineProjectList },
+  components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl },
   props: {
     msg: { type: Object, required: true },
   },
@@ -129,7 +131,7 @@ export default {
   border: 1px solid #75AADB;
 }
 .assistant-bubble {
-  background-color: #1a1a2e;
+  background-color: #1a2744;
   color: #e0e0e0;
   border: 1px solid #374151;
 }

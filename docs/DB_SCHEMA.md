@@ -25,6 +25,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `title` | VARCHAR(255) | nullable |
 | `cwd` | VARCHAR(500) | nullable — directorio de trabajo de la sesión |
 | `proyecto_id` | VARCHAR(255) | nullable — FK lógica → `proyectos(id)` |
+| `id_ticket_redmine` | INTEGER | nullable — ID del issue en Redmine (FK lógica → `tickets(redmine_id)`) |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 
@@ -136,6 +137,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `description` | LONGTEXT | nullable |
 | `status_name` | VARCHAR(100) | nullable |
 | `tracker_name` | VARCHAR(100) | nullable |
+| `priority_id` | INTEGER | nullable — ID de prioridad de Redmine (1=baja, 2=normal, 3=alta, 4=urgente, 5=inmediata) |
 | `priority_name` | VARCHAR(100) | nullable |
 | `assigned_to_name` | VARCHAR(255) | nullable |
 | `author_name` | VARCHAR(255) | nullable |
@@ -181,6 +183,9 @@ proyectos
  ├─ funcionalidades.proyecto_id (FK lógica)
  ├─ gastos_tokens_usados.id_proyecto (FK)
  └─ tickets.proyecto_id (FK)
+
+tickets
+ └─ chat_sessions.id_ticket_redmine (FK lógica)
 
 chat_sessions
  ├─ gastos_tokens_usados.id_chat_session (FK)

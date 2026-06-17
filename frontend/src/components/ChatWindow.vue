@@ -1,5 +1,11 @@
 <template>
   <div class="d-flex flex-column h-100 overflow-x-hidden" @click="closeCtxMenu">
+    <div v-if="activeSessionId && ticketInfo" class="ticket-info-bar px-3 d-flex align-items-center gap-2" :class="priorityClass(ticketInfo.priority_id)">
+      <span class="priority-dot" :class="priorityClass(ticketInfo.priority_id)"></span>
+      <span class="ticket-id">#{{ ticketInfo.redmine_id }}</span>
+      <span class="ticket-sep text-muted">—</span>
+      <span class="ticket-subject text-truncate">{{ ticketInfo.subject }}</span>
+    </div>
     <div class="flex-grow-1 overflow-y-auto p-3" ref="messagesContainer">
       <div v-if="!activeSessionId" class="text-center text-muted mt-5">
         <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
@@ -7,7 +13,7 @@
       <template v-else>
         <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
         <div v-if="streaming" class="text-start mb-3">
-          <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 80%; background: #1a1a2e; border: 1px solid #374151; color: #e0e0e0;">
+          <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 80%; background: #1a2744; border: 1px solid #374151; color: #e0e0e0;">
             <div v-if="currentThinking" class="mb-2">
               <button class="btn btn-sm w-100 text-start btn-outline-argentina" data-bs-toggle="collapse" data-bs-target="#think-stream">
                 🧠 Razonando...
@@ -20,7 +26,7 @@
           </div>
         </div>
         <div v-if="ocStreaming" class="text-start mb-3">
-          <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 90%; background: #0f0f1e; border: 1px solid #75AADB; color: #f0f0f0;">
+          <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 90%; background: #1a2744; border: 1px solid #75AADB; color: #f0f0f0;">
             <div v-if="ocThinking" class="mb-2">
               <button class="btn btn-sm w-100 text-start btn-outline-argentina" data-bs-toggle="collapse" data-bs-target="#oc-think-stream">
                 🧠 OpenCode razonando...
@@ -75,12 +81,40 @@ export default {
     const modal = useModalStore()
     const ocStore = useOpencodeStore()
     const { find } = useCommandRegistry()
-    const { activeSessionId, messages, streaming, executing, currentChunk, currentThinking } = storeToRefs(chat)
+    const { activeSessionId, messages, streaming, executing, currentChunk, currentThinking, sessions } = storeToRefs(chat)
     const input = ref('')
     const messagesContainer = ref(null)
     const ocStreaming = ref(false)
     const ocChunk = ref('')
     const ocThinking = ref('')
+    const ticketInfo = ref(null)
+
+    async function loadTicketInfo() {
+      ticketInfo.value = null
+      if (!activeSessionId.value) return
+      const session = sessions.value.find(s => Number(s.id) === Number(activeSessionId.value))
+      if (!session?.id_ticket_redmine) return
+      try {
+        const res = await fetch(`/api/tickets/session/${activeSessionId.value}`, { credentials: 'include' })
+        const data = await res.json()
+        if (data.ticket) {
+          ticketInfo.value = data.ticket
+        }
+      } catch (err) {
+        console.error('Error al cargar info del ticket:', err)
+      }
+    }
+
+    function priorityClass(priorityId) {
+      if (!priorityId) return 'priority-none'
+      if (priorityId <= 1) return 'priority-low'
+      if (priorityId === 2) return 'priority-normal'
+      if (priorityId === 3) return 'priority-high'
+      if (priorityId >= 5) return 'priority-immediate'
+      if (priorityId >= 4) return 'priority-urgent'
+      return 'priority-none'
+    }
+
     const docUpdateProyectoId = ref('')
     const docUpdateType = ref('')
     const ctxMenu = reactive({ show: false, x: 0, y: 0, msg: null })
@@ -268,6 +302,58 @@ export default {
           sessionId: value.sessionId,
           proyectoId: value.proyectoId,
         }, { title: 'Editar funcionalidad', wide: true })
+        return
+      } else if (controlType === 'ticket_edit') {
+        if (value === null) {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Edición cancelada.',
+              _key: 'result-' + Date.now(),
+            }
+          }
+          return
+        }
+        try {
+          const res = await fetch(`/api/tickets/session/${chat.activeSessionId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(value),
+          })
+          const data = await res.json()
+          if (data.success) {
+            ticketInfo.value = data.ticket
+            const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: `✓ Ticket #${data.ticket.redmine_id} actualizado correctamente.`,
+                _key: 'result-' + Date.now(),
+              }
+            }
+          } else {
+            const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: `Error: ${data.error || 'Error al actualizar ticket'}`,
+                _key: 'err-' + Date.now(),
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error al actualizar ticket:', err)
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Error de conexión al actualizar el ticket.',
+              _key: 'err-' + Date.now(),
+            }
+          }
+        }
         return
       } else if (controlType === 'followup') {
         // Follow-up prompt with model/thinking selectors
@@ -559,6 +645,10 @@ export default {
     watch(() => chat.messages.length, scrollToBottom)
     watch([currentChunk, ocChunk], scrollToBottom)
 
+    watch(activeSessionId, () => {
+      loadTicketInfo()
+    })
+
     onMounted(() => {
       if (messagesContainer.value) {
         resizeObserver = new ResizeObserver(() => {
@@ -568,6 +658,7 @@ export default {
         })
         resizeObserver.observe(messagesContainer.value)
       }
+      loadTicketInfo()
     })
 
     onUnmounted(() => {
@@ -591,6 +682,8 @@ export default {
       deleteMessage,
       ctxMenu,
       messagesContainer,
+      ticketInfo,
+      priorityClass,
     }
   },
 }
@@ -614,7 +707,7 @@ html, body {
 .context-menu {
   position: fixed;
   z-index: 1050;
-  background: #1a1a2e;
+  background: #1a2744;
   border: 1px solid #75AADB;
   border-radius: 6px;
   padding: 4px 0;
@@ -657,5 +750,70 @@ html, body {
 .btn-outline-argentina:hover {
   background-color: #1a2744;
   color: #75AADB;
+}
+.ticket-info-bar {
+  background: #0f1a2e;
+  border-bottom: 1px solid #374151;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  min-height: 32px;
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+.ticket-info-bar.priority-low {
+  background: #374151;
+  border-bottom-color: #4b5563;
+}
+.ticket-info-bar.priority-normal {
+  background: #1a2744;
+  border-bottom: 2px solid #3b82f6;
+}
+.ticket-info-bar.priority-high {
+  background: #2a2400;
+  border-bottom: 2px solid #eab308;
+}
+.ticket-info-bar.priority-urgent {
+  background: #2a0808;
+  border-bottom: 2px solid #ef4444;
+}
+.ticket-info-bar.priority-immediate {
+  background: #3a0505;
+  border-bottom: 2px solid #ef4444;
+  border-bottom-width: 3px;
+}
+.ticket-id {
+  color: #fbbf24;
+  font-weight: 600;
+}
+.ticket-subject {
+  color: #e0e0e0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ticket-sep {
+  color: #4b5563;
+}
+.priority-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #6b7280;
+}
+.priority-dot.priority-low {
+  background: #9ca3af;
+}
+.priority-dot.priority-normal {
+  background: #3b82f6;
+}
+.priority-dot.priority-high {
+  background: #eab308;
+}
+.priority-dot.priority-urgent {
+  background: #ef4444;
+}
+.priority-dot.priority-immediate {
+  background: #ef4444;
+  box-shadow: 0 0 4px #ef4444;
 }
 </style>

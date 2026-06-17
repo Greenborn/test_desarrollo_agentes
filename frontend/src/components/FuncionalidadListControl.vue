@@ -4,7 +4,7 @@
       v-for="item in items"
       :key="item.sessionId"
       class="d-flex align-items-center justify-content-between p-2 rounded"
-      style="background: #0f0f1e; border: 1px solid #374151; cursor: pointer;"
+      style="background: #1a2744; border: 1px solid #374151; cursor: pointer;"
       @click="select(item)"
     >
       <span>{{ item.nombre }}</span>
