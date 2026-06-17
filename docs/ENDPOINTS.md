@@ -27,10 +27,12 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 
 ### `GET /api/chat/sessions`
 - **Auth:** Requerida
+- **Workspace:** Filtra por `workspace_id` de la sesión
 - **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion }] }`
 
 ### `POST /api/chat/sessions`
 - **Auth:** Requerida
+- **Workspace:** Asigna `workspace_id` de la sesión
 - **Body (opcional):** `{ cwd: string }`
 - **Respuesta 201:** `{ session: { id, title, cwd, ... } }`
 
@@ -58,13 +60,15 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 
 ### `GET /api/settings`
 - **Auth:** Requerida
+- **Workspace:** Filtra por `workspace_id` de la sesión
 - **Respuesta:** `{ deepseek_key: string (mascarado), system_prompt: string|null, omnifilter_debounce_ms: string|null }`
 
 ### `POST /api/settings`
 - **Auth:** Requerida
+- **Workspace:** Guarda con `workspace_id` de la sesión
 - **Body:** `{ key: string, value: string }`
 - Si `key === "deepseek_key"` se encripta con AES-256-CBC antes de almacenar
-- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `omnifilter_debounce_ms`
+- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `omnifilter_debounce_ms`
 - **Respuesta:** `{ success: true }`
 
 ---
@@ -339,8 +343,48 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ---
 
+## Espacios de Trabajo (`/api/workspaces`)
+
+### `GET /api/workspaces`
+- **Auth:** Requerida
+- **Respuesta:** `{ workspaces: [{ id, name, is_default, created_at }] }`
+
+### `POST /api/workspaces`
+- **Auth:** Requerida
+- **Body:** `{ name: string }`
+- **Descripción:** Crea un workspace y copia las settings del workspace por defecto (id=1)
+- **Respuesta 201:** `{ success: true, workspace: { id, name, is_default, created_at } }`
+- **Respuesta 400:** `{ error: "El nombre es requerido" }`
+
+### `PUT /api/workspaces/:id`
+- **Auth:** Requerida
+- **Body:** `{ name: string }`
+- **Respuesta:** `{ success: true }`
+- **Respuesta 404:** `{ error: "Workspace no encontrado" }`
+
+### `DELETE /api/workspaces/:id`
+- **Auth:** Requerida
+- **Descripción:** Elimina el workspace y sus datos asociados en cascada (chat_sessions, proyectos, tickets, settings). Rechaza si es el workspace por defecto.
+- **Respuesta:** `{ success: true }`
+- **Respuesta 400:** `{ error: "No se puede eliminar el workspace por defecto" }`
+
+### `POST /api/workspaces/stop-all`
+- **Auth:** Requerida
+- **Descripción:** Detiene servidores OpenCode y sesiones de navegador activas (sin cambiar de workspace)
+- **Respuesta:** `{ success: true }`
+
+### `POST /api/workspaces/switch`
+- **Auth:** Requerida
+- **Body:** `{ workspaceId: number }`
+- **Descripción:** Detiene procesos activos, cambia `workspaceId` en la sesión HTTP
+- **Respuesta:** `{ success: true, workspaceId }`
+- **Respuesta 400:** `{ error: "workspaceId es requerido" }` o `{ error: "Workspace no encontrado" }`
+
+---
+
 ## Notas
 
 - Todas las rutas protegidas devuelven `401 { error: "Sesión no válida" }` si no hay sesión
 - Los endpoints con `sessionId` opcional solo persisten en `chat_messages` cuando se provee
 - El streaming SSE se usa para respuestas de DeepSeek (chat) y OpenCode
+- Los espacios de trabajo (workspaces) agrupan configuraciones, sesiones de chat, proyectos y tickets. El workspace_id se almacena en la sesión del usuario y se usa para filtrar datos en todos los endpoints relevantes.

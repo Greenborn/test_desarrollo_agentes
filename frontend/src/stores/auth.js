@@ -8,6 +8,10 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(true)
   const error = ref('')
 
+  function getWorkspaceId() {
+    return user.value?.workspaceId || 1
+  }
+
   async function checkSession() {
     try {
       const res = await fetch(`${API}/auth/me`, { credentials: 'include' })
@@ -56,5 +60,5 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = false
   }
 
-  return { user, loading, error, login, logout, checkSession }
+  return { user, loading, error, getWorkspaceId, login, logout, checkSession }
 })

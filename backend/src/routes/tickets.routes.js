@@ -16,7 +16,9 @@ router.get('/', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
+    const wsId = req.session.workspaceId || 1;
     const tickets = await db('tickets')
+      .where({ workspace_id: wsId })
       .select('*')
       .orderBy('redmine_updated_on', 'desc');
 
@@ -31,8 +33,9 @@ router.get('/options', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const token = await getRedmineToken();
-    const url = await getRedmineUrl();
+    const wsId = req.session.workspaceId || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
 
     if (!token || !url) {
       return res.json({ statuses: [], priorities: [], users: [] });
@@ -94,8 +97,9 @@ router.get('/session/:sessionId', async (req, res) => {
 
     if (idTicketRedmine && req.query.comments === 'true') {
       try {
-        const token = await getRedmineToken();
-        const url = await getRedmineUrl();
+        const wsId = req.session.workspaceId || 1;
+        const token = await getRedmineToken(wsId);
+        const url = await getRedmineUrl(wsId);
         if (token && url) {
           const apiUrl = url.replace(/\/+$/, '') + `/issues/${idTicketRedmine}.json?include=journals`;
           const response = await fetch(apiUrl, {
@@ -154,8 +158,9 @@ router.get('/ticket-options/:ticketId', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const token = await getRedmineToken();
-    const url = await getRedmineUrl();
+    const wsId = req.session.workspaceId || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
 
     if (!token || !url) {
       return res.json({ statuses: [], priorities: [], users: [] });
@@ -227,8 +232,9 @@ router.get('/statuses/:ticketId', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const token = await getRedmineToken();
-    const url = await getRedmineUrl();
+    const wsId = req.session.workspaceId || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
 
     if (!token || !url) {
       return res.json({ statuses: [] });
@@ -298,8 +304,9 @@ router.put('/session/:sessionId', async (req, res) => {
 
     if (Object.keys(redmineUpdate).length > 0) {
       try {
-        const token = await getRedmineToken();
-        const url = await getRedmineUrl();
+        const wsId = req.session.workspaceId || 1;
+        const token = await getRedmineToken(wsId);
+        const url = await getRedmineUrl(wsId);
         if (token && url) {
           const apiUrl = url.replace(/\/+$/, '') + `/issues/${idTicketRedmine}.json`;
           const response = await fetch(apiUrl, {

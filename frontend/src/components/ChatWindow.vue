@@ -25,7 +25,7 @@
             <div style="white-space: pre-wrap;">{{ currentChunk }}<span class="blink">▌</span></div>
           </div>
         </div>
-        <div v-if="ocStreaming" class="text-start mb-3">
+        <div v-if="ocStreaming && _isActiveSession(_streamSessionId)" class="text-start mb-3">
           <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 90%; background: #1a2744; border: 1px solid #75AADB; color: #f0f0f0;">
             <div v-if="ocThinking" class="mb-2">
               <button class="btn btn-sm w-100 text-start btn-outline-argentina" data-bs-toggle="collapse" data-bs-target="#oc-think-stream">
@@ -87,7 +87,12 @@ export default {
     const ocStreaming = ref(false)
     const ocChunk = ref('')
     const ocThinking = ref('')
+    const _streamSessionId = ref(null)
     const ticketInfo = ref(null)
+
+    function _isActiveSession(sid) {
+      return sid && Number(chat.activeSessionId) === Number(sid)
+    }
 
     async function loadTicketInfo() {
       ticketInfo.value = null
@@ -155,55 +160,66 @@ export default {
       ocStreaming.value = true
       ocChunk.value = ''
       ocThinking.value = ''
+      _streamSessionId.value = sessionId
+      if (sessionId) chat.sessionStatus[sessionId] = 'executing'
 
       const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
       streamMsg._key = 'stream-' + Date.now()
 
       await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, {
         onChunk(content) {
-          ocChunk.value += content
+          if (_isActiveSession(sessionId)) ocChunk.value += content
         },
         onThinking(content) {
-          ocThinking.value += content
+          if (_isActiveSession(sessionId)) ocThinking.value += content
         },
         onControl(control) {
-          chat.messages.push({
-            role: 'opencode_control',
-            content: JSON.stringify(control),
-            controlData: control,
-            _key: 'control-' + Date.now(),
-          })
+          if (_isActiveSession(sessionId)) {
+            chat.messages.push({
+              role: 'opencode_control',
+              content: JSON.stringify(control),
+              controlData: control,
+              _key: 'control-' + Date.now(),
+            })
+          }
         },
         onDone(json, fullText) {
           ocStreaming.value = false
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) {
-            chat.messages[idx].streaming = false
-            chat.messages[idx].role = 'opencode_result'
-            chat.messages[idx].content = json.fullResponse || fullText || '(sin respuesta)'
+          if (sessionId) chat.sessionStatus[sessionId] = 'idle'
+          if (_isActiveSession(sessionId)) {
+            const streamKey = streamMsg._key
+            const idx = chat.messages.findIndex((m) => m._key === streamKey)
+            if (idx >= 0) {
+              chat.messages[idx].streaming = false
+              chat.messages[idx].role = 'opencode_result'
+              chat.messages[idx].content = json.fullResponse || fullText || '(sin respuesta)'
+            }
+            chat.messages.push({
+              role: 'opencode_control',
+              controlData: {
+                controlId: 'followup-' + Date.now(),
+                controlType: 'followup',
+                models: ocStore.getModelsForProvider(ocStore.selectedProvider),
+                modelValue: ocStore.selectedModel || '',
+                thinkingOptions: ocStore.thinkingOptions,
+                thinkingValue: ocStore.selectedThinking || '',
+                placeholder: 'Escribe otro mensaje para OpenCode...',
+                rows: 3,
+              },
+              _key: 'control-' + Date.now(),
+            })
           }
-          // Add follow-up prompt control with model and thinking selectors
-          chat.messages.push({
-            role: 'opencode_control',
-            controlData: {
-              controlId: 'followup-' + Date.now(),
-              controlType: 'followup',
-              models: ocStore.getModelsForProvider(ocStore.selectedProvider),
-              modelValue: ocStore.selectedModel || '',
-              thinkingOptions: ocStore.thinkingOptions,
-              thinkingValue: ocStore.selectedThinking || '',
-              placeholder: 'Escribe otro mensaje para OpenCode...',
-              rows: 3,
-            },
-            _key: 'control-' + Date.now(),
-          })
         },
         onError(msg) {
           ocStreaming.value = false
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) {
-            chat.messages[idx].content = `[Error: ${msg}]`
-            chat.messages[idx].streaming = false
+          if (sessionId) chat.sessionStatus[sessionId] = 'error'
+          if (_isActiveSession(sessionId)) {
+            const streamKey = streamMsg._key
+            const idx = chat.messages.findIndex((m) => m._key === streamKey)
+            if (idx >= 0) {
+              chat.messages[idx].content = `[Error: ${msg}]`
+              chat.messages[idx].streaming = false
+            }
           }
         },
       })
@@ -221,67 +237,77 @@ export default {
       ocStreaming.value = true
       ocChunk.value = ''
       ocThinking.value = ''
+      _streamSessionId.value = sessionId
+      if (sessionId) chat.sessionStatus[sessionId] = 'executing'
 
       const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
       streamMsg._key = 'stream-' + Date.now()
 
       await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, {
         onChunk(content) {
-          ocChunk.value += content
+          if (_isActiveSession(sessionId)) ocChunk.value += content
         },
         onThinking(content) {
-          ocThinking.value += content
+          if (_isActiveSession(sessionId)) ocThinking.value += content
         },
         onControl(control) {
-          chat.messages.push({
-            role: 'opencode_control',
-            content: JSON.stringify(control),
-            controlData: control,
-            _key: 'control-' + Date.now(),
-          })
+          if (_isActiveSession(sessionId)) {
+            chat.messages.push({
+              role: 'opencode_control',
+              content: JSON.stringify(control),
+              controlData: control,
+              _key: 'control-' + Date.now(),
+            })
+          }
         },
         async onDone(json, fullText) {
           ocStreaming.value = false
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
-          if (idx >= 0) {
-            chat.messages[idx].streaming = false
-            chat.messages[idx].role = 'opencode_result'
-            chat.messages[idx].content = fullResponse
-          }
-
-          try {
-            const label = DOC_LABELS[tipo] || tipo
-            const res = await fetch(`/api/documentacion/${tipo}/${encodeURIComponent(proyectoId)}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ data: fullResponse }),
-            })
-            if (!res.ok) {
-              const errData = await res.json()
-              throw new Error(errData.error || 'Error al guardar documentación')
+          if (sessionId) chat.sessionStatus[sessionId] = 'idle'
+          if (_isActiveSession(sessionId)) {
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
+            if (idx >= 0) {
+              chat.messages[idx].streaming = false
+              chat.messages[idx].role = 'opencode_result'
+              chat.messages[idx].content = fullResponse
             }
-            chat.messages.push({
-              role: 'result',
-              content: `Documentación de ${label} actualizada correctamente para el proyecto "${proyectoId}".`,
-              _key: 'result-' + Date.now(),
-            })
-          } catch (err) {
-            console.error('Error al guardar documentación:', err.message)
-            chat.messages.push({
-              role: 'result',
-              content: 'Error al guardar documentación: ' + err.message,
-              _key: 'result-' + Date.now(),
-            })
+
+            try {
+              const label = DOC_LABELS[tipo] || tipo
+              const res = await fetch(`/api/documentacion/${tipo}/${encodeURIComponent(proyectoId)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ data: fullResponse }),
+              })
+              if (!res.ok) {
+                const errData = await res.json()
+                throw new Error(errData.error || 'Error al guardar documentación')
+              }
+              chat.messages.push({
+                role: 'result',
+                content: `Documentación de ${label} actualizada correctamente para el proyecto "${proyectoId}".`,
+                _key: 'result-' + Date.now(),
+              })
+            } catch (err) {
+              console.error('Error al guardar documentación:', err.message)
+              chat.messages.push({
+                role: 'result',
+                content: 'Error al guardar documentación: ' + err.message,
+                _key: 'result-' + Date.now(),
+              })
+            }
           }
         },
         onError(msg) {
           ocStreaming.value = false
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) {
-            chat.messages[idx].content = '[Error: ' + msg + ']'
-            chat.messages[idx].streaming = false
+          if (sessionId) chat.sessionStatus[sessionId] = 'error'
+          if (_isActiveSession(sessionId)) {
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) {
+              chat.messages[idx].content = '[Error: ' + msg + ']'
+              chat.messages[idx].streaming = false
+            }
           }
         },
       })
@@ -297,6 +323,69 @@ export default {
         await handleOpencodeSetup(controlId, value, controlMsg)
       } else if (stepType === 'documentacion_update') {
         await handleDocumentacionUpdate(controlId, value, controlMsg)
+      } else if (stepType === 'ticket_descripcion') {
+        if (controlType === 'followup') {
+          const { model, thinking, prompt } = value
+          if (!prompt) return
+          ocStore.selectedModel = model || ocStore.selectedModel
+          ocStore.selectedThinking = thinking || ocStore.selectedThinking
+          await opencodeStreamDescripcionFollowup(chat.activeSessionId, prompt, controlMsg.controlData.ticket)
+        } else if (value === null) {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = { role: 'result', content: 'Edición de descripción cancelada.', _key: 'result-' + Date.now() }
+          }
+          return
+        } else {
+          await handleTicketDescripcion(controlId, value, controlMsg)
+        }
+        // Let generic replacement run below
+      } else if (controlType === 'descripcion_result') {
+        if (value === null) {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = { role: 'result', content: 'Edición de descripción cancelada.', _key: 'result-' + Date.now() }
+          }
+        } else if (value.action === 'accept') {
+          try {
+            const res = await fetch(`/api/tickets/session/${chat.activeSessionId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ description: value.description }),
+            })
+            const data = await res.json()
+            const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+            if (idx >= 0) {
+              if (data.success) {
+                chat.messages[idx] = {
+                  role: 'result',
+                  content: `✓ Descripción del ticket #${data.ticket.redmine_id} actualizada correctamente.`,
+                  _key: 'result-' + Date.now(),
+                }
+              } else {
+                chat.messages[idx] = {
+                  role: 'result',
+                  content: `Error: ${data.error || 'Error al actualizar la descripción'}`,
+                  _key: 'err-' + Date.now(),
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error al actualizar descripción:', err)
+            const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: 'Error de conexión al actualizar la descripción.',
+                _key: 'err-' + Date.now(),
+              }
+            }
+          }
+        } else if (value.action === 'retry') {
+          await regenerateDescripcion(controlId, controlMsg)
+        }
+        return
       } else if (controlType === 'funcionalidad_list') {
         modal.open(FuncionalidadWizard, {
           sessionId: value.sessionId,
@@ -356,7 +445,6 @@ export default {
         }
         return
       } else if (controlType === 'followup') {
-        // Follow-up prompt with model/thinking selectors
         const { model, thinking, prompt } = value
         if (!prompt) return
         ocStore.selectedModel = model || ocStore.selectedModel
@@ -396,6 +484,8 @@ export default {
 
     let ocSetupData = { provider: '', model: '', thinking: '', mode: '', prompt: '' }
     let docUpdateData = { provider: '', model: '', thinking: '', mode: '' }
+    let descripcionData = { provider: '', model: '', thinking: '', mode: 'Plan' }
+    const descripcionUserInput = ref('')
 
     async function handleDocumentacionUpdate(controlId, value, controlMsg) {
       const subStepType = controlMsg.controlData.subStepType
@@ -499,6 +589,402 @@ export default {
             content: 'Error al obtener prompt de documentación: ' + err.message,
             _key: 'result-' + Date.now(),
           })
+        }
+      }
+    }
+
+    async function handleTicketDescripcion(controlId, value, controlMsg) {
+      const subStepType = controlMsg.controlData.subStepType
+
+      if (subStepType === 'provider') {
+        descripcionData.provider = value
+        await ocStore.select('provider', value)
+        ocStore.selectedProvider = value
+        const models = ocStore.getModelsForProvider(value)
+        chat.messages.push({
+          role: 'opencode_control',
+          controlData: {
+            controlId: 'model-' + Date.now(),
+            controlType: 'select',
+            stepType: 'ticket_descripcion',
+            subStepType: 'model',
+            options: models,
+            placeholder: 'Selecciona modelo...',
+            preselect: ocStore.savedModel || '',
+            ticket: controlMsg.controlData.ticket,
+            sessionId: controlMsg.controlData.sessionId,
+          },
+          _key: 'control-' + Date.now(),
+        })
+      } else if (subStepType === 'model') {
+        descripcionData.model = value
+        await ocStore.select('model', value)
+        ocStore.selectedModel = value
+        if (ocStore.modelSupportsReasoning(descripcionData.provider, value)) {
+          chat.messages.push({
+            role: 'opencode_control',
+            controlData: {
+              controlId: 'thinking-' + Date.now(),
+              controlType: 'select',
+              stepType: 'ticket_descripcion',
+              subStepType: 'thinking',
+              options: ocStore.thinkingOptions,
+              placeholder: 'Selecciona nivel de pensamiento...',
+              preselect: ocStore.savedThinking || 'medium',
+              ticket: controlMsg.controlData.ticket,
+              sessionId: controlMsg.controlData.sessionId,
+            },
+            _key: 'control-' + Date.now(),
+          })
+        } else {
+          const fakeMsg = { controlData: { subStepType: 'thinking', ticket: controlMsg.controlData.ticket, sessionId: controlMsg.controlData.sessionId } }
+          await handleTicketDescripcion(null, null, fakeMsg)
+        }
+      } else if (subStepType === 'thinking') {
+        descripcionData.thinking = value
+        await ocStore.select('thinking', value)
+        ocStore.selectedThinking = value
+        chat.messages.push({
+          role: 'opencode_control',
+          controlData: {
+            controlId: 'descripcion-input-' + Date.now(),
+            controlType: 'descripcion_input',
+            stepType: 'ticket_descripcion',
+            subStepType: 'descripcion_input',
+            placeholder: 'Ej: Describe el error y los pasos para reproducirlo...',
+            ticket: controlMsg.controlData.ticket,
+            sessionId: controlMsg.controlData.sessionId,
+          },
+          _key: 'control-' + Date.now(),
+        })
+      } else if (subStepType === 'descripcion_input') {
+        descripcionUserInput.value = value.text
+        const ticket = controlMsg.controlData.ticket
+
+        try {
+          const settingsRes = await fetch('/api/settings', { credentials: 'include' })
+          const settingsKeys = await settingsRes.json()
+          const defaultPrompt = 'Eres un asistente experto en redactar descripciones técnicas para tickets de Redmine. Tu objetivo principal es generar una descripción ÓPTIMA y detallada para el siguiente ticket:\n\nContexto del ticket:\n- Título: {subject}\n- Estado actual: {status}\n- Prioridad: {priority}\n- Asignado a: {assigned_to}\n\nInstrucciones:\n1. Genera una descripción clara, precisa y bien estructurada que explique el problema o requerimiento del ticket.\n2. Utiliza la siguiente solicitud del usuario como guía para el contenido:\n{user_input}\n3. La descripción debe ser profesional, técnica y útil para desarrolladores.\n4. Incluye solo información relevante al ticket, sin divagaciones.'
+          const promptTemplate = settingsKeys.ticket_descripcion_prompt || defaultPrompt
+          const prompt = promptTemplate
+            .replace(/{subject}/g, ticket.subject || '')
+            .replace(/{status}/g, ticket.status_name || '')
+            .replace(/{priority}/g, ticket.priority_name || '')
+            .replace(/{assigned_to}/g, ticket.assigned_to_name || '')
+            .replace(/{user_input}/g, descripcionUserInput.value)
+
+          chat.messages.push({
+            role: 'opencode_info',
+            content: '📤 Prompt enviado a OpenCode:\n\n' + prompt,
+            _key: 'prompt-' + Date.now(),
+          })
+
+          await opencodeStreamDescripcion(
+            chat.activeSessionId,
+            prompt,
+            descripcionData.provider,
+            descripcionData.model,
+            descripcionData.thinking,
+            descripcionData.mode,
+            ticket,
+          )
+        } catch (err) {
+          console.error('Error al obtener prompt de descripción:', err.message)
+          chat.messages.push({
+            role: 'result',
+            content: 'Error al obtener prompt de descripción: ' + err.message,
+            _key: 'err-' + Date.now(),
+          })
+        }
+      }
+    }
+
+    async function opencodeStreamDescripcion(sessionId, prompt, provider, model, thinking, mode, ticket) {
+      ocStreaming.value = true
+      ocChunk.value = ''
+      ocThinking.value = ''
+      _streamSessionId.value = sessionId
+      if (sessionId) chat.sessionStatus[sessionId] = 'executing'
+
+      const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
+      streamMsg._key = 'stream-' + Date.now()
+
+      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, {
+        onChunk(content) {
+          if (_isActiveSession(sessionId)) ocChunk.value += content
+        },
+        onThinking(content) {
+          if (_isActiveSession(sessionId)) ocThinking.value += content
+        },
+        onControl(control) {
+          if (_isActiveSession(sessionId)) {
+            chat.messages.push({
+              role: 'opencode_control',
+              content: JSON.stringify(control),
+              controlData: control,
+              _key: 'control-' + Date.now(),
+            })
+          }
+        },
+        onDone(json, fullText) {
+          ocStreaming.value = false
+          if (sessionId) chat.sessionStatus[sessionId] = 'idle'
+          if (_isActiveSession(sessionId)) {
+            const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) {
+              chat.messages[idx].streaming = false
+              chat.messages[idx].role = 'opencode_result'
+              chat.messages[idx].content = fullResponse
+            }
+            chat.messages.push({
+              role: 'opencode_control',
+              controlData: {
+                controlId: 'descripcion-result-' + Date.now(),
+                controlType: 'descripcion_result',
+                description: fullResponse,
+                loading: false,
+                ticket,
+              },
+              _key: 'control-' + Date.now(),
+            })
+            chat.messages.push({
+              role: 'opencode_control',
+              controlData: {
+                controlId: 'followup-' + Date.now(),
+                controlType: 'followup',
+                stepType: 'ticket_descripcion',
+                ticket,
+                models: ocStore.getModelsForProvider(ocStore.selectedProvider),
+                modelValue: ocStore.selectedModel || '',
+                thinkingOptions: ocStore.thinkingOptions,
+                thinkingValue: ocStore.selectedThinking || '',
+                placeholder: 'Escribe otro mensaje para OpenCode...',
+                rows: 3,
+              },
+              _key: 'control-' + Date.now(),
+            })
+          }
+        },
+        onError(msg) {
+          ocStreaming.value = false
+          if (sessionId) chat.sessionStatus[sessionId] = 'error'
+          if (_isActiveSession(sessionId)) {
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) {
+              chat.messages[idx].content = '[Error: ' + msg + ']'
+              chat.messages[idx].streaming = false
+            }
+          }
+        },
+      })
+    }
+
+    async function opencodeStreamDescripcionFollowup(sessionId, userPrompt, ticket) {
+      ocStreaming.value = true
+      ocChunk.value = ''
+      ocThinking.value = ''
+      _streamSessionId.value = sessionId
+      if (sessionId) chat.sessionStatus[sessionId] = 'executing'
+
+      if (_isActiveSession(sessionId)) {
+        chat.messages.push({
+          role: 'user',
+          content: userPrompt,
+          _key: 'user-' + Date.now(),
+        })
+
+        chat.messages.push({
+          role: 'opencode_info',
+          content: '📤 Mensaje enviado a OpenCode:\n\n' + userPrompt,
+          _key: 'prompt-' + Date.now(),
+        })
+      }
+
+      const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
+      streamMsg._key = 'stream-' + Date.now()
+
+      await ocStore.streamPrompt(sessionId, userPrompt, descripcionData.provider, descripcionData.model, descripcionData.thinking, descripcionData.mode, {
+        onChunk(content) {
+          if (_isActiveSession(sessionId)) ocChunk.value += content
+        },
+        onThinking(content) {
+          if (_isActiveSession(sessionId)) ocThinking.value += content
+        },
+        onControl(control) {
+          if (_isActiveSession(sessionId)) {
+            chat.messages.push({
+              role: 'opencode_control',
+              content: JSON.stringify(control),
+              controlData: control,
+              _key: 'control-' + Date.now(),
+            })
+          }
+        },
+        onDone(json, fullText) {
+          ocStreaming.value = false
+          if (sessionId) chat.sessionStatus[sessionId] = 'idle'
+          if (_isActiveSession(sessionId)) {
+            const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
+            const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (streamIdx >= 0) {
+              chat.messages[streamIdx].streaming = false
+              chat.messages[streamIdx].role = 'opencode_result'
+              chat.messages[streamIdx].content = fullResponse
+            }
+            // Update the LAST descripcion_result control with the new response
+            for (let i = chat.messages.length - 1; i >= 0; i--) {
+              const m = chat.messages[i]
+              if (m.controlData && m.controlData.controlType === 'descripcion_result') {
+                m.controlData.description = fullResponse
+                m.controlData.loading = false
+                break
+              }
+            }
+            // Add new followup control to continue the conversation
+            chat.messages.push({
+              role: 'opencode_control',
+              controlData: {
+                controlId: 'followup-' + Date.now(),
+                controlType: 'followup',
+                stepType: 'ticket_descripcion',
+                ticket,
+                models: ocStore.getModelsForProvider(ocStore.selectedProvider),
+                modelValue: ocStore.selectedModel || '',
+                thinkingOptions: ocStore.thinkingOptions,
+                thinkingValue: ocStore.selectedThinking || '',
+                placeholder: 'Escribe otro mensaje para OpenCode...',
+                rows: 3,
+              },
+              _key: 'control-' + Date.now(),
+            })
+          }
+        },
+        onError(msg) {
+          ocStreaming.value = false
+          if (sessionId) chat.sessionStatus[sessionId] = 'error'
+          if (_isActiveSession(sessionId)) {
+            const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (streamIdx >= 0) {
+              chat.messages[streamIdx].content = '[Error: ' + msg + ']'
+              chat.messages[streamIdx].streaming = false
+            }
+          }
+        },
+      })
+    }
+
+    async function regenerateDescripcion(controlId, controlMsg) {
+      const oldIdx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+      if (oldIdx >= 0 && _isActiveSession(chat.activeSessionId)) {
+        chat.messages[oldIdx].controlData.loading = true
+      }
+
+      const newStreamKey = 'stream-' + Date.now()
+      const sid = chat.activeSessionId
+      _streamSessionId.value = sid
+
+      if (_isActiveSession(sid)) {
+        chat.messages.push({
+          role: 'opencode_stream',
+          content: '',
+          streaming: true,
+          _key: newStreamKey,
+        })
+      }
+
+      const ticket = controlMsg?.controlData?.ticket || {}
+      ocStore.selectedModel = ocStore.selectedModel || descripcionData.model
+      ocStore.selectedThinking = ocStore.selectedThinking || descripcionData.thinking
+
+      try {
+        const settingsRes = await fetch('/api/settings', { credentials: 'include' })
+        const settingsKeys = await settingsRes.json()
+        const defaultPrompt = 'Eres un asistente experto en redactar descripciones técnicas para tickets de Redmine. Tu objetivo principal es generar una descripción ÓPTIMA y detallada para el siguiente ticket:\n\nContexto del ticket:\n- Título: {subject}\n- Estado actual: {status}\n- Prioridad: {priority}\n- Asignado a: {assigned_to}\n\nInstrucciones:\n1. Genera una descripción clara, precisa y bien estructurada que explique el problema o requerimiento del ticket.\n2. Utiliza la siguiente solicitud del usuario como guía para el contenido:\n{user_input}\n3. La descripción debe ser profesional, técnica y útil para desarrolladores.\n4. Incluye solo información relevante al ticket, sin divagaciones.'
+        const promptTemplate = settingsKeys.ticket_descripcion_prompt || defaultPrompt
+        const prompt = promptTemplate
+          .replace(/{subject}/g, ticket.subject || '')
+          .replace(/{status}/g, ticket.status_name || '')
+          .replace(/{priority}/g, ticket.priority_name || '')
+          .replace(/{assigned_to}/g, ticket.assigned_to_name || '')
+          .replace(/{user_input}/g, descripcionUserInput.value)
+
+        if (_isActiveSession(sid)) {
+          chat.messages.push({
+            role: 'opencode_info',
+            content: '📤 Prompt enviado a OpenCode:\n\n' + prompt,
+            _key: 'prompt-' + Date.now(),
+          })
+        }
+
+        ocStreaming.value = true
+        ocChunk.value = ''
+        ocThinking.value = ''
+        if (sid) chat.sessionStatus[sid] = 'executing'
+
+        await ocStore.streamPrompt(sid, prompt, descripcionData.provider, descripcionData.model, descripcionData.thinking, descripcionData.mode, {
+          onChunk(content) {
+            if (_isActiveSession(sid)) ocChunk.value += content
+          },
+          onThinking(content) {
+            if (_isActiveSession(sid)) ocThinking.value += content
+          },
+          onControl(control) {
+            if (_isActiveSession(sid)) {
+              chat.messages.push({
+                role: 'opencode_control',
+                content: JSON.stringify(control),
+                controlData: control,
+                _key: 'control-' + Date.now(),
+              })
+            }
+          },
+          onDone(json, fullText) {
+            ocStreaming.value = false
+            if (sid) chat.sessionStatus[sid] = 'idle'
+            if (_isActiveSession(sid)) {
+              const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
+              const idx = chat.messages.findIndex((m) => m._key === newStreamKey)
+              if (idx >= 0) {
+                chat.messages[idx].role = 'opencode_result'
+                chat.messages[idx].content = fullResponse
+                chat.messages[idx].streaming = false
+              }
+              if (oldIdx >= 0) {
+                chat.messages[oldIdx] = {
+                  role: 'opencode_control',
+                  controlData: {
+                    controlId: 'descripcion-result-' + Date.now(),
+                    controlType: 'descripcion_result',
+                    description: fullResponse,
+                    loading: false,
+                    ticket,
+                  },
+                  _key: 'control-' + Date.now(),
+                }
+              }
+            }
+          },
+          onError(msg) {
+            ocStreaming.value = false
+            if (sid) chat.sessionStatus[sid] = 'error'
+            if (_isActiveSession(sid)) {
+              const idx = chat.messages.findIndex((m) => m._key === newStreamKey)
+              if (idx >= 0) {
+                chat.messages[idx].content = '[Error: ' + msg + ']'
+                chat.messages[idx].streaming = false
+              }
+              if (oldIdx >= 0) {
+                chat.messages[oldIdx].controlData.loading = false
+              }
+            }
+          },
+        })
+      } catch (err) {
+        console.error('Error al reintentar:', err.message)
+        if (sid) chat.sessionStatus[sid] = 'error'
+        if (oldIdx >= 0 && _isActiveSession(sid)) {
+          chat.messages[oldIdx].controlData.loading = false
         }
       }
     }
@@ -674,6 +1160,8 @@ export default {
       ocStreaming,
       ocChunk,
       ocThinking,
+      _streamSessionId,
+      _isActiveSession,
       input,
       send,
       onControlConfirm,

@@ -7,7 +7,7 @@ const router = Router();
 function getUser(req) {
   const userId = req.session?.userId;
   if (!userId) return null;
-  return { id: userId, username: req.session.username, role: req.session.role };
+  return { id: userId, username: req.session.username, role: req.session.role, workspaceId: req.session.workspaceId || 1 };
 }
 
 router.get('/me', (req, res) => {
@@ -29,6 +29,7 @@ router.post('/login', async (req, res) => {
     req.session.userId = user.id;
     req.session.username = user.username;
     req.session.role = user.role;
+    req.session.workspaceId = 1;
     await new Promise((resolve) => req.session.save(resolve));
     res.json({
       success: true,

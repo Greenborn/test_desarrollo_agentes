@@ -40,12 +40,17 @@ export default {
     function load() {
       if (auth.user) {
         chat.loadSessions()
-        if (chat.activeSessionId) {
-          const s = chat.sessions.find((s) => s.id === chat.activeSessionId)
-          if (s && s.cwd) cmd.currentDir = s.cwd
-        }
+        projectStore.loadProjects()
+        ticketStore.loadTickets()
       }
     }
+
+    watch(() => auth.user?.workspaceId, (newId, oldId) => {
+      if (newId && newId !== oldId) {
+        chat.stopAllExecutions()
+        load()
+      }
+    })
 
     watch(() => auth.user, load)
     onMounted(load)

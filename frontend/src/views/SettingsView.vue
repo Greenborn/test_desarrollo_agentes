@@ -1,11 +1,26 @@
 <template>
   <div class="container py-4 text-light" style="max-width: 640px;">
-    <input
-      type="text"
-      class="form-control bg-dark text-light border-secondary mb-3"
-      placeholder="Buscar configuración..."
-      v-model="searchTerm"
-    />
+    <div class="d-flex gap-2 mb-3 align-items-center">
+      <input
+        type="text"
+        class="form-control bg-dark text-light border-secondary"
+        placeholder="Buscar configuración..."
+        v-model="searchTerm"
+      />
+    </div>
+
+    <div class="d-flex gap-2 mb-3 align-items-center">
+      <select
+        class="form-select bg-dark text-light border-secondary flex-grow-1"
+        v-model="selectedWId"
+        @change="onWorkspaceChange"
+      >
+        <option v-for="w in workspaces" :key="w.id" :value="w.id">{{ w.name }}</option>
+      </select>
+      <button class="btn btn-sm btn-outline-argentina" style="white-space: nowrap;" @click="promptCreate">+ Nuevo</button>
+      <button class="btn btn-sm btn-outline-argentina" style="white-space: nowrap;" @click="promptRename" v-if="selectedWId !== 1">Editar</button>
+      <button class="btn btn-sm btn-outline-danger" style="white-space: nowrap;" @click="confirmDelete" v-if="selectedWId !== 1">Eliminar</button>
+    </div>
 
     <div class="mb-4" v-if="matches('api key deepseek')">
       <label class="form-label">API Key DeepSeek</label>
@@ -157,16 +172,28 @@
 
     <div v-if="settings.saveSuccess" class="alert alert-success py-2 small">{{ settings.saveSuccess }}</div>
     <div v-if="settings.saveError" class="alert alert-danger py-2 small">{{ settings.saveError }}</div>
+    <div v-if="wsMessage" class="alert alert-info py-2 small">{{ wsMessage }}</div>
   </div>
 </template>
 
 <script>
 import { ref, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '../stores/settings.js'
+import { useWorkspaceStore } from '../stores/workspace.js'
+import { useChatStore } from '../stores/chat.js'
+import { useAuthStore } from '../stores/auth.js'
+import { useModalStore } from '../stores/modal.js'
 
 export default {
   setup() {
     const settings = useSettingsStore()
+    const wsStore = useWorkspaceStore()
+    const chatStore = useChatStore()
+    const auth = useAuthStore()
+    const modal = useModalStore()
+    const { workspaces } = storeToRefs(wsStore)
+
     const keyInput = ref('')
     const redmineTokenInput = ref('')
     const redmineUrlInput = ref('')
@@ -181,6 +208,8 @@ export default {
     const searchTerm = ref('')
     const descripcionPromptInput = ref('')
     const omnifilterDebounceInput = ref(2000)
+    const selectedWId = ref(1)
+    const wsMessage = ref('')
 
     function matches(label) {
       if (!searchTerm.value) return true
@@ -203,7 +232,14 @@ export default {
       funcionalidades: 'documentacionPromptFuncionalidades',
     }
 
-    onMounted(() => settings.load())
+    onMounted(async () => {
+      await wsStore.loadWorkspaces()
+      selectedWId.value = auth.getWorkspaceId()
+      if (!selectedWId.value || !workspaces.value.find(w => w.id === selectedWId.value)) {
+        selectedWId.value = 1
+      }
+      await settings.load()
+    })
 
     watch(() => settings.systemPrompt, (val) => {
       promptInput.value = val
@@ -233,6 +269,90 @@ export default {
       watch(() => settings[refName], (val) => {
         DOC_INPUTS[key].value = val
       }, { immediate: true })
+    }
+
+    async function reloadSettings() {
+      settings.clearFeedback()
+      await settings.load()
+    }
+
+    async function onWorkspaceChange() {
+      const newId = selectedWId.value
+      const oldId = auth.getWorkspaceId()
+      if (newId === oldId) return
+
+      const hasProcesses = chatStore.executing || chatStore.streaming
+      if (hasProcesses) {
+        const confirmed = confirm('Se detendrán todos los procesos en ejecución. ¿Desea cambiar de espacio de trabajo?')
+        if (!confirmed) {
+          selectedWId.value = oldId
+          return
+        }
+      }
+
+      wsMessage.value = 'Deteniendo procesos y cambiando espacio de trabajo...'
+      const result = await wsStore.selectWorkspace(newId)
+      if (result.success) {
+        auth.user.value = { ...auth.user.value, workspaceId: newId }
+        chatStore.stopAllExecutions()
+        await wsStore.loadWorkspaces()
+        await reloadSettings()
+        wsMessage.value = 'Espacio de trabajo cambiado correctamente.'
+        setTimeout(() => { wsMessage.value = '' }, 3000)
+      } else {
+        wsMessage.value = 'Error al cambiar de espacio de trabajo.'
+        selectedWId.value = oldId
+      }
+    }
+
+    async function promptCreate() {
+      const name = prompt('Nombre del nuevo espacio de trabajo:')
+      if (!name || !name.trim()) return
+      wsMessage.value = 'Creando espacio de trabajo...'
+      const result = await wsStore.createWorkspace(name.trim())
+      if (result.success) {
+        wsMessage.value = 'Espacio de trabajo creado.'
+        wsStore.loadWorkspaces()
+        setTimeout(() => { wsMessage.value = '' }, 3000)
+      } else {
+        wsMessage.value = result.error || 'Error al crear espacio de trabajo.'
+      }
+    }
+
+    async function promptRename() {
+      const ws = workspaces.value.find(w => w.id === selectedWId.value)
+      if (!ws) return
+      const name = prompt('Nuevo nombre:', ws.name)
+      if (!name || !name.trim() || name.trim() === ws.name) return
+      const result = await wsStore.updateWorkspace(ws.id, name.trim())
+      if (result.success) {
+        wsMessage.value = 'Espacio de trabajo renombrado.'
+        setTimeout(() => { wsMessage.value = '' }, 3000)
+      } else {
+        wsMessage.value = result.error || 'Error al renombrar.'
+      }
+    }
+
+    async function confirmDelete() {
+      const ws = workspaces.value.find(w => w.id === selectedWId.value)
+      if (!ws) return
+      const confirmed = confirm(`¿Está seguro de eliminar el espacio de trabajo "${ws.name}"?\n\nSe eliminarán todas las sesiones de chat, proyectos y tickets asociados.`)
+      if (!confirmed) return
+      wsMessage.value = 'Eliminando espacio de trabajo...'
+      const result = await wsStore.deleteWorkspace(ws.id)
+      if (result.success) {
+        workspaces.value = workspaces.value.filter(w => w.id !== ws.id)
+        selectedWId.value = 1
+        auth.user.value = { ...auth.user.value, workspaceId: 1 }
+        await wsStore.selectWorkspace(1)
+        chatStore.stopAllExecutions()
+        await wsStore.loadWorkspaces()
+        await reloadSettings()
+        wsMessage.value = 'Espacio de trabajo eliminado. Cambiado a "Por Defecto".'
+        setTimeout(() => { wsMessage.value = '' }, 3000)
+      } else {
+        wsMessage.value = result.error || 'Error al eliminar.'
+      }
     }
 
     function saveKey() {
@@ -271,9 +391,13 @@ export default {
     }
 
     return {
-      keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput, docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput, showKey, showRedmineToken, searchTerm, omnifilterDebounceInput,
-      settings,
-      saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc, saveOmnifilterDebounce, saveDescripcionPrompt, matches,
+      keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput,
+      docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput,
+      showKey, showRedmineToken, searchTerm, omnifilterDebounceInput,
+      settings, workspaces, selectedWId, wsMessage,
+      saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
+      saveOmnifilterDebounce, saveDescripcionPrompt, matches,
+      onWorkspaceChange, promptCreate, promptRename, confirmDelete,
     }
   },
 }

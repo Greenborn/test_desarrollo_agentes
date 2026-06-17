@@ -21,8 +21,9 @@ function generateTitle() {
 router.get('/sessions', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
+    const wsId = req.session.workspaceId || 1;
     const sessions = await db('chat_sessions')
-      .where({ user_id: req.session.userId })
+      .where({ 'chat_sessions.user_id': req.session.userId, 'chat_sessions.workspace_id': wsId })
       .orderBy('updated_at', 'desc')
       .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
       .select(
@@ -44,9 +45,10 @@ router.get('/sessions', async (req, res) => {
 router.post('/sessions', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
+    const wsId = req.session.workspaceId || 1;
     const title = generateTitle();
     const cwd = req.body.cwd ? req.body.cwd : process.cwd();
-    const [id] = await db('chat_sessions').insert({ user_id: req.session.userId, title, cwd });
+    const [id] = await db('chat_sessions').insert({ user_id: req.session.userId, workspace_id: wsId, title, cwd });
     const session = await db('chat_sessions').where({ id }).first();
     res.status(201).json({ session });
   } catch (err) {
@@ -93,7 +95,8 @@ router.post('/sessions/:id/messages', async (req, res) => {
     let fullResponse = '';
     let usageData = null;
 
-    for await (const chunk of streamChat(history)) {
+    const wsId = req.session.workspaceId || 1;
+    for await (const chunk of streamChat(history, wsId)) {
       if (chunk.type === 'usage') {
         usageData = chunk;
         continue;
@@ -103,7 +106,7 @@ router.post('/sessions/:id/messages', async (req, res) => {
       } else {
         fullResponse += chunk.content;
       }
-      res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+      res.write(`data: ${JSON.stringify({ ...chunk, sessionId })}\n\n`);
     }
 
     await db('chat_messages').insert({

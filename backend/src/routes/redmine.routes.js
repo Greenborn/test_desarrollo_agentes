@@ -32,8 +32,9 @@ router.post('/test', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const token = await getRedmineToken();
-    const url = await getRedmineUrl();
+    const wsId = req.session.workspaceId || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
 
     if (!token || !url) {
       res.json({
@@ -71,8 +72,9 @@ router.get('/proyectos', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const token = await getRedmineToken();
-    const url = await getRedmineUrl();
+    const wsId = req.session.workspaceId || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
 
     if (!token || !url) {
       res.json({
@@ -124,8 +126,9 @@ router.post('/proyectos/import-all', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const token = await getRedmineToken();
-    const url = await getRedmineUrl();
+    const wsId = req.session.workspaceId || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
 
     if (!token || !url) {
       res.json({
@@ -184,6 +187,7 @@ router.post('/proyectos/import-all', async (req, res) => {
           continue;
         }
 
+        const wsId = req.session.workspaceId || 1;
         await db('proyectos').insert({
           id: proyectoId,
           descripcion: p.description || '',
@@ -193,6 +197,7 @@ router.post('/proyectos/import-all', async (req, res) => {
           redmine_updated_on: toDateTime(p.updated_on),
           redmine_parent_id: p.parent?.id ? String(p.parent.id) : null,
           redmine_parent_name: p.parent?.name || null,
+          workspace_id: wsId,
         });
 
         importados.push({ id: p.id, name: p.name, identifier: p.identifier });
@@ -238,6 +243,7 @@ router.post('/proyectos/import', async (req, res) => {
       return;
     }
 
+    const wsId = req.session.workspaceId || 1;
     await db('proyectos').insert({
       id: proyectoId,
       descripcion: description || '',
@@ -247,6 +253,7 @@ router.post('/proyectos/import', async (req, res) => {
       redmine_updated_on: toDateTime(updated_on),
       redmine_parent_id: parent?.id ? String(parent.id) : null,
       redmine_parent_name: parent?.name || null,
+      workspace_id: wsId,
     });
 
     res.json({ success: true, proyectoId });
@@ -272,8 +279,9 @@ router.get('/proyectos/:proyectoId/tickets', async (req, res) => {
       return;
     }
 
-    const token = await getRedmineToken();
-    const url = await getRedmineUrl();
+    const wsId = req.session.workspaceId || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
 
     if (!token || !url) {
       res.json({ success: false, message: 'Token o URL de Redmine no configurados. Configure ambos en Configuración.' });
@@ -318,7 +326,7 @@ router.get('/proyectos/:proyectoId/tickets', async (req, res) => {
   }
 });
 
-async function importarIssuesDeRedmine(proyecto, token, url) {
+async function importarIssuesDeRedmine(proyecto, token, url, workspaceId) {
   const baseUrl = url.replace(/\/+$/, '') + '/issues.json';
   let allIssues = [];
   let offset = 0;
@@ -353,6 +361,7 @@ async function importarIssuesDeRedmine(proyecto, token, url) {
     try {
       const ticketData = {
         proyecto_id: proyecto.id,
+        workspace_id: workspaceId || 1,
         redmine_id: issue.id,
         subject: issue.subject || '(sin asunto)',
         description: issue.description || null,
@@ -404,15 +413,16 @@ router.post('/proyectos/:proyectoId/importar-tickets', async (req, res) => {
       return;
     }
 
-    const token = await getRedmineToken();
-    const url = await getRedmineUrl();
+    const wsId = req.session.workspaceId || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
 
     if (!token || !url) {
       res.json({ success: false, message: 'Token o URL de Redmine no configurados. Configure ambos en Configuración.' });
       return;
     }
 
-    const resultado = await importarIssuesDeRedmine(proyecto, token, url);
+    const resultado = await importarIssuesDeRedmine(proyecto, token, url, wsId);
 
     res.json({ success: true, ...resultado });
   } catch (err) {
@@ -425,8 +435,9 @@ router.post('/proyectos/importar-tickets-all', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const token = await getRedmineToken();
-    const url = await getRedmineUrl();
+    const wsId = req.session.workspaceId || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
 
     if (!token || !url) {
       res.json({ success: false, message: 'Token o URL de Redmine no configurados. Configure ambos en Configuración.' });
@@ -446,7 +457,7 @@ router.post('/proyectos/importar-tickets-all', async (req, res) => {
 
     for (const proyecto of proyectos) {
       try {
-        const r = await importarIssuesDeRedmine(proyecto, token, url);
+        const r = await importarIssuesDeRedmine(proyecto, token, url, wsId);
         resultados.push({
           proyecto_id: proyecto.id,
           importados: r.importados,

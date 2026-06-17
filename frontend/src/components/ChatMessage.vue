@@ -13,6 +13,8 @@
       <FuncionalidadListControl v-else-if="parsedControl && parsedControl.controlType === 'funcionalidad_list'" :items="parsedControl.items || []" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <RedmineProjectList v-else-if="parsedControl && parsedControl.controlType === 'redmine_projects'" :projects="parsedControl.projects || []" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <TicketEditControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_edit'" :ticket="parsedControl.ticket" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <DescripcionInputControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_input'" :placeholder="parsedControl.placeholder || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <DescripcionResultControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_result'" :description="parsedControl.description || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <div v-else class="d-flex flex-column gap-2">
         <pre class="mb-0 small" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
       </div>
@@ -69,11 +71,13 @@ import ChatFormatter from './ChatFormatter.vue'
 import FuncionalidadListControl from './FuncionalidadListControl.vue'
 import RedmineProjectList from './RedmineProjectList.vue'
 import TicketEditControl from './TicketEditControl.vue'
+import DescripcionInputControl from './DescripcionInputControl.vue'
+import DescripcionResultControl from './DescripcionResultControl.vue'
 
 let counter = 0
 
 export default {
-  components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl },
+  components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, DescripcionInputControl, DescripcionResultControl },
   props: {
     msg: { type: Object, required: true },
   },

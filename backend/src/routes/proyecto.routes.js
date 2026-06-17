@@ -14,7 +14,8 @@ function authGuard(req, res) {
 router.get('/proyecto', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const proyectos = await db('proyectos').select('*').orderBy('id');
+    const wsId = req.session.workspaceId || 1;
+    const proyectos = await db('proyectos').where({ workspace_id: wsId }).select('*').orderBy('id');
     const pinnedRow = await db('user_settings')
       .select('value')
       .where({ user_id: req.session.userId, key: 'pinned_project' })
@@ -41,7 +42,8 @@ router.post('/proyecto', async (req, res) => {
     return res.status(400).json({ error: 'id y descripcion son requeridos' });
   }
   try {
-    await db('proyectos').insert({ id, descripcion });
+    const wsId = req.session.workspaceId || 1;
+    await db('proyectos').insert({ id, descripcion, workspace_id: wsId });
     res.json({ success: true });
   } catch (err) {
     console.log('Error al crear proyecto:', err.message);

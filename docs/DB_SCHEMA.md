@@ -22,6 +22,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 |---|---|---|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
 | `user_id` | INTEGER UNSIGNED | NOT NULL, FK → `users(id)` ON DELETE CASCADE |
+| `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` — FK lógica → `workspaces(id)` |
 | `title` | VARCHAR(255) | nullable |
 | `cwd` | VARCHAR(500) | nullable — directorio de trabajo de la sesión |
 | `proyecto_id` | VARCHAR(255) | nullable — FK lógica → `proyectos(id)` |
@@ -44,15 +45,31 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
-## 4. `settings`
+## 4. `workspaces`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
-| `setting_key` | VARCHAR(100) | NOT NULL, UNIQUE |
+| `name` | VARCHAR(255) | NOT NULL |
+| `is_default` | BOOLEAN | DEFAULT `false` |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+**Seed:** `id=1, name='Por Defecto', is_default=true`
+
+---
+
+## 5. `settings`
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` — FK lógica → `workspaces(id)` |
+| `setting_key` | VARCHAR(100) | NOT NULL |
 | `setting_value` | TEXT | NOT NULL |
 | `encrypted` | BOOLEAN | DEFAULT `false` |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+**UNIQUE compuesto:** `(workspace_id, setting_key)` — cada workspace tiene su propio juego de settings.
 
 ---
 
@@ -103,6 +120,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | Columna | Tipo | Restricciones |
 |---|---|---|
 | `id` | VARCHAR(255) | PK (string, no auto-increment) — slug del nombre Redmine |
+| `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` — FK lógica → `workspaces(id)` |
 | `descripcion` | TEXT | NOT NULL — descripción completa desde Redmine |
 | `redmine_id` | INTEGER | NOT NULL — ID numérico del proyecto en Redmine |
 | `redmine_status` | INTEGER | nullable — 1=activo, 5=archivado, 9=cerrado |
@@ -131,6 +149,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | Columna | Tipo | Restricciones |
 |---|---|---|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
+| `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` — FK lógica → `workspaces(id)` |
 | `proyecto_id` | VARCHAR(255) | NOT NULL, FK → `proyectos(id)` ON DELETE CASCADE |
 | `redmine_id` | INTEGER | NOT NULL, UNIQUE — ID del issue en Redmine |
 | `subject` | VARCHAR(500) | NOT NULL |
@@ -171,6 +190,12 @@ Motor: **MariaDB** vía **Knex** (query builder).
 ## Diagrama de relaciones
 
 ```
+workspaces
+ ├─ settings.workspace_id (FK lógica)
+ ├─ chat_sessions.workspace_id (FK lógica)
+ ├─ proyectos.workspace_id (FK lógica)
+ └─ tickets.workspace_id (FK lógica)
+
 users
  ├─ chat_sessions (user_id)
  │   ├─ chat_messages (session_id)

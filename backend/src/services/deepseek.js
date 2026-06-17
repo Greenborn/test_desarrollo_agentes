@@ -1,9 +1,9 @@
 import db from '../config/db.js';
 import { decrypt } from './crypto.js';
 
-export async function getDeepSeekKey() {
+export async function getDeepSeekKey(workspaceId) {
   try {
-    const row = await db('settings').where({ setting_key: 'deepseek_key' }).first();
+    const row = await db('settings').where({ workspace_id: workspaceId || 1, setting_key: 'deepseek_key' }).first();
     if (!row || !row.setting_value) return null;
     return decrypt(row.setting_value);
   } catch (err) {
@@ -12,9 +12,9 @@ export async function getDeepSeekKey() {
   }
 }
 
-export async function getSystemPrompt() {
+export async function getSystemPrompt(workspaceId) {
   try {
-    const row = await db('settings').where({ setting_key: 'system_prompt' }).first();
+    const row = await db('settings').where({ workspace_id: workspaceId || 1, setting_key: 'system_prompt' }).first();
     return row ? row.setting_value : 'Eres un agente experto en programación. Responde consultas técnicas con claridad y precisión.';
   } catch (err) {
     console.log('Error al obtener system_prompt:', err.message);
@@ -39,11 +39,11 @@ export function normalizeMessages(messages) {
   });
 }
 
-export async function* streamChat(messages) {
-  const apiKey = await getDeepSeekKey();
+export async function* streamChat(messages, workspaceId) {
+  const apiKey = await getDeepSeekKey(workspaceId);
   if (!apiKey) throw new Error('DeepSeek API key no configurada');
 
-  const systemPrompt = await getSystemPrompt();
+  const systemPrompt = await getSystemPrompt(workspaceId);
 
   const body = {
     model: 'deepseek-chat',

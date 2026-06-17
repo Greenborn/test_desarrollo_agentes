@@ -32,6 +32,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 - **Prohibido `catch {}` vacío o `catch { /* silencio */ }`:** todo error debe registrarse con `console.error` (frontend) o `console.log` (backend) como mínimo. El silencio absoluto solo se permite en casos excepcionales documentados con comentario.
 - **Prohibido ocultar errores en consola:** nunca silenciar un error sin registrarlo. Si un error es esperado y manejado, documentar por qué.
 - **Sistema de comandos extensible:** usar `useCommandRegistry.js` para registrar comandos via `register({ name, category, description, usage, execute })`. No agregar nuevos comandos fuera del registry.
+- **Espacios de trabajo (workspaces):** tabla `workspaces` con id y name. El workspace por defecto (id=1, "Por Defecto") es inmutable. El `workspace_id` seleccionado se guarda en la sesión (`req.session.workspaceId`). Settings, chat_sessions, proyectos y tickets se filtran por workspace. Al cambiar de workspace se detienen procesos OpenCode y navegador.
 
 ## Estructura
 
@@ -44,14 +45,14 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 │   └── src/
 │       ├── index.js       # Entrypoint (Express)
 │       ├── config/db.js   # Conexión Knex
-│       ├── routes/        # auth.routes.js, chat.routes.js, settings.routes.js
-│       ├── services/      # crypto.js, deepseek.js
+│       ├── routes/        # auth.routes.js, chat.routes.js, settings.routes.js, workspaces.routes.js
+│       ├── services/      # crypto.js, deepseek.js, redmine.js
 │       └── middlewares/   # sessionAuth.js
 ├── frontend/              # Vue 3 + Vite + Bootstrap
 │   └── src/
 │       ├── main.js
 │       ├── router/         # Vue Router con guard de sesión
-│       ├── stores/         # Pinia (auth, chat, settings)
+│       ├── stores/         # Pinia (auth, chat, settings, workspace)
 │       ├── views/          # Login, Dashboard, Settings
 │       └── components/     # Topbar, SidebarChat, ChatWindow, ChatMessage
 ├── api_gastos/            # Servicio de registro de gastos de tokens

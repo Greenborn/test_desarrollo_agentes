@@ -232,10 +232,10 @@ router.post('/send', async (req, res) => {
           const delta = event.properties.delta || '';
 
           if (partType === 'reasoning') {
-            res.write(`data: ${JSON.stringify({ type: 'thinking', content: delta })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'thinking', content: delta, sessionId })}\n\n`);
           } else {
             fullResponse += delta;
-            res.write(`data: ${JSON.stringify({ type: 'response', content: delta })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'response', content: delta, sessionId })}\n\n`);
           }
         }
 

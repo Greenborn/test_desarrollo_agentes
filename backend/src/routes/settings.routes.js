@@ -15,7 +15,8 @@ function authGuard(req, res) {
 router.get('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const rows = await db('settings').select('setting_key', 'setting_value', 'encrypted');
+    const wsId = req.session.workspaceId || 1;
+    const rows = await db('settings').where({ workspace_id: wsId }).select('setting_key', 'setting_value', 'encrypted');
     const keys = {};
     for (const row of rows) {
       if (row.setting_key === 'deepseek_key' && row.setting_value) {
@@ -68,6 +69,7 @@ router.post('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
     const { key, value } = req.body;
+    const wsId = req.session.workspaceId || 1;
     let toStore = value;
     let encrypted = false;
 
@@ -77,8 +79,8 @@ router.post('/', async (req, res) => {
     }
 
     await db('settings')
-      .insert({ setting_key: key, setting_value: toStore, encrypted })
-      .onConflict('setting_key')
+      .insert({ workspace_id: wsId, setting_key: key, setting_value: toStore, encrypted })
+      .onConflict(['workspace_id', 'setting_key'])
       .merge();
 
     res.json({ success: true });

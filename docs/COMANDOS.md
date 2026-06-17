@@ -66,7 +66,7 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/proyecto_info` | Muestra el ID del proyecto asignado a la sesión actual | `/proyecto_info` |
 | `/chat_set_ticket` | Asigna un ticket de Redmine a la sesión actual. Autocompletado filtrado por el proyecto de la sesión | `/chat_set_ticket <id_ticket_redmine>` |
 | `/chat_get_ticket` | Muestra el ticket de Redmine asignado a la sesión actual, incluyendo su descripción. Con `--comments=true` muestra también los comentarios del ticket | `/chat_get_ticket [--comments=true]` |
-| `/chat_ticket_edit` | Abre un editor inline para modificar los datos del ticket de Redmine asignado a la sesión actual (asunto, descripción, estado, prioridad, asignado, + nuevo comentario) | `/chat_ticket_edit` |
+| `/chat_ticket_edit` | Abre un editor inline para modificar los datos del ticket de Redmine asignado a la sesión actual (asunto, descripción, estado, prioridad, asignado, + nuevo comentario). Con el argumento `descripcion` abre un asistente con OpenCode para redactar una descripción del ticket usando IA. | `/chat_ticket_edit [descripcion]` |
 
 ---
 
@@ -94,6 +94,15 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/git` | Ejecuta un comando de Git en el directorio de la sesión activa | `/git <comando>` |
 
 ---
+
+## Espacios de Trabajo (Workspaces)
+
+La gestión de espacios de trabajo se realiza desde el modal de Configuración:
+- El selector de workspace se encuentra debajo del buscador
+- Los workspaces agrupan settings, sesiones de chat, proyectos y tickets
+- El workspace "Por Defecto" (id=1) no se puede eliminar
+- Al crear un workspace nuevo se copian las settings del default
+- Al cambiar de workspace se detienen procesos activos (OpenCode, navegador)
 
 ## Notas
 
