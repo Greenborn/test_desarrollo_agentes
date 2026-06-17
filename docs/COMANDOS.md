@@ -39,7 +39,7 @@ Los comandos registrados en frontend tienen prioridad sobre los del backend.
 | Comando | Descripción | Uso |
 |---|---|---|
 | `/redmine_test` | Prueba la conexión a la instancia de Redmine configurada | `/redmine_test` |
-| `/redmine_proyectos` | Lista detallada de proyectos Redmine a los que se tiene acceso | `/redmine_proyectos` |
+| `/redmine_proyectos` | Lista proyectos Redmine. Con `import_all` importa todos a la base de datos local | `/redmine_proyectos [import_all]` |
 
 ---
 

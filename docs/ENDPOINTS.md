@@ -245,6 +245,12 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Respuesta 200:** `{ success: true, proyectos: [{ id, name, identifier, description, status, created_on, updated_on, parent, slug }] }`
 - **Respuesta 200 (error):** `{ success: false, message: "..." }`
 
+### `POST /api/redmine/proyectos/import-all`
+- **Auth:** Requerida
+- **Body:** ninguno
+- **Descripción:** Obtiene todos los proyectos desde Redmine API (con paginación automática, límite 100 por página) y los importa a la tabla `proyectos` local. Verifica existencia por `redmine_id` (columna UNIQUE). Los errores individuales no detienen el proceso.
+- **Respuesta 200:** `{ success: true, importados: [{ id, name, identifier }], yaExistentes: [{ id, name, identifier }], errores: [{ id, name, error }], total: number }`
+
 ### `POST /api/redmine/proyectos/import`
 - **Auth:** Requerida
 - **Body:** `{ id, name, description?, status?, created_on?, updated_on?, parent?: { id, name } }`

@@ -120,6 +120,101 @@ router.get('/proyectos', async (req, res) => {
   }
 });
 
+router.post('/proyectos/import-all', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const token = await getRedmineToken();
+    const url = await getRedmineUrl();
+
+    if (!token || !url) {
+      res.json({
+        success: false,
+        message: 'Token o URL de Redmine no configurados. Configure ambos en Configuración.',
+      });
+      return;
+    }
+
+    const baseUrl = url.replace(/\/+$/, '') + '/projects.json';
+    let allProjects = [];
+    let offset = 0;
+    const limit = 100;
+
+    while (true) {
+      const apiUrl = `${baseUrl}?limit=${limit}&offset=${offset}&include=time_entry_activities,issue_categories,enabled_modules`;
+      const response = await fetch(apiUrl, {
+        headers: {
+          'X-Redmine-API-Key': token,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        res.json({
+          success: false,
+          message: `Error al obtener proyectos: HTTP ${response.status}${text ? ' — ' + text.slice(0, 200) : ''}`,
+        });
+        return;
+      }
+
+      const data = await response.json();
+      allProjects = allProjects.concat(data.projects || []);
+
+      const total = data.total_count || allProjects.length;
+      if (allProjects.length >= total) break;
+      offset += limit;
+    }
+
+    const importados = [];
+    const yaExistentes = [];
+    const errores = [];
+
+    for (const p of allProjects) {
+      try {
+        const proyectoId = slugify(p.name);
+        if (!proyectoId) {
+          errores.push({ id: p.id, name: p.name, error: 'No se pudo generar slug desde el nombre.' });
+          continue;
+        }
+
+        const existing = await db('proyectos').where({ redmine_id: p.id }).first();
+        if (existing) {
+          yaExistentes.push({ id: p.id, name: p.name, identifier: p.identifier });
+          continue;
+        }
+
+        await db('proyectos').insert({
+          id: proyectoId,
+          descripcion: p.description || '',
+          redmine_id: p.id,
+          redmine_status: p.status || null,
+          redmine_created_on: toDateTime(p.created_on),
+          redmine_updated_on: toDateTime(p.updated_on),
+          redmine_parent_id: p.parent?.id ? String(p.parent.id) : null,
+          redmine_parent_name: p.parent?.name || null,
+        });
+
+        importados.push({ id: p.id, name: p.name, identifier: p.identifier });
+      } catch (err) {
+        console.log('Error al importar proyecto Redmine:', p.id, p.name, err.message);
+        errores.push({ id: p.id, name: p.name, error: err.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      importados,
+      yaExistentes,
+      errores,
+      total: allProjects.length,
+    });
+  } catch (err) {
+    console.log('Error en import-all Redmine:', err.message);
+    res.json({ success: false, message: 'Error al importar proyectos: ' + err.message });
+  }
+});
+
 router.post('/proyectos/import', async (req, res) => {
   if (!authGuard(req, res)) return;
 
