@@ -57,11 +57,13 @@
 </template>
 
 <script>
+import { storeToRefs } from 'pinia'
 import { useProjectStore } from '../stores/project.js'
 
 export default {
   setup() {
     const projectStore = useProjectStore()
+    const { selectedProject } = storeToRefs(projectStore)
 
     function goBack() {
       projectStore.clearSelection()
@@ -92,7 +94,7 @@ export default {
     }
 
     return {
-      project: projectStore.selectedProject,
+      project: selectedProject,
       goBack,
       formatDate,
       statusLabel,
