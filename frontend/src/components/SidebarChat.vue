@@ -8,13 +8,12 @@
     </button>
     <button
       class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
-      data-bs-toggle="collapse"
-      data-bs-target="#sidebar-chats-collapse"
+      @click="toggleSection('chats')"
     >
-      ▼ Chats
+      {{ expandedSections.chats ? '▼' : '▶' }} Chats
     </button>
     <div class="d-flex flex-column flex-grow-1" style="min-height: 0;">
-      <div id="sidebar-chats-collapse" class="collapse show overflow-y-auto flex-grow-1" style="min-height: 0;">
+      <div v-show="expandedSections.chats" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
         <div class="list-group list-group-flush" style="min-height: 0;">
           <button
             v-for="s in filteredSessions"
@@ -35,12 +34,11 @@
       </div>
       <button
         class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
-        data-bs-toggle="collapse"
-        data-bs-target="#sidebar-projects-collapse"
+        @click="toggleSection('projects')"
       >
-        ▼ Proyectos
+        {{ expandedSections.projects ? '▼' : '▶' }} Proyectos
       </button>
-      <div id="sidebar-projects-collapse" class="collapse show overflow-y-auto flex-grow-1" style="min-height: 0;">
+      <div v-show="expandedSections.projects" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
         <div class="list-group list-group-flush" style="min-height: 0;">
           <button
             v-for="p in filteredProjects"
@@ -65,12 +63,11 @@
     </div>
     <button
       class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
-      data-bs-toggle="collapse"
-      data-bs-target="#sidebar-tickets-collapse"
+      @click="toggleSection('tickets')"
     >
-      ▼ Tickets
+      {{ expandedSections.tickets ? '▼' : '▶' }} Tickets
     </button>
-      <div id="sidebar-tickets-collapse" class="collapse overflow-y-auto flex-grow-1" style="min-height: 0;">
+      <div v-show="expandedSections.tickets" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
         <div class="list-group list-group-flush" style="min-height: 0;">
         <button
           v-for="t in filteredTickets"
@@ -90,8 +87,7 @@
 </template>
 
 <script>
-import { computed, onMounted, watch, nextTick } from 'vue'
-import { Collapse } from 'bootstrap'
+import { computed, onMounted, watch, reactive } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
@@ -110,6 +106,16 @@ export default {
     const { sidebarCollapsed, omnifilter } = storeToRefs(ui)
     const { projects, selectedProject, pinnedProjectId } = storeToRefs(projectStore)
     const { tickets, selectedTicket } = storeToRefs(ticketStore)
+
+    const expandedSections = reactive({
+      chats: true,
+      projects: true,
+      tickets: false,
+    })
+
+    function toggleSection(name) {
+      expandedSections[name] = !expandedSections[name]
+    }
 
     function sessionTooltip(s) {
       const lines = []
@@ -187,13 +193,12 @@ export default {
       ticketStore.loadTickets()
     })
 
-    watch(omnifilter, async (val) => {
-      if (!val) return
-      await nextTick()
-      ;['sidebar-chats-collapse', 'sidebar-projects-collapse', 'sidebar-tickets-collapse'].forEach((id) => {
-        const el = document.getElementById(id)
-        if (el) Collapse.getOrCreateInstance(el).show()
-      })
+    watch(omnifilter, (val) => {
+      if (val) {
+        expandedSections.chats = true
+        expandedSections.projects = true
+        expandedSections.tickets = true
+      }
     })
 
     return {
@@ -209,7 +214,9 @@ export default {
       filteredTickets,
       selectedTicket,
       ticketStore,
+      expandedSections,
       sessionTooltip,
+      toggleSection,
       createSession,
       selectSession,
       selectProject,

@@ -84,6 +84,14 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 
 ---
 
+## Git
+
+| Comando | Descripción | Uso |
+|---|---|---|
+| `/git` | Ejecuta un comando de Git en el directorio de la sesión activa | `/git <comando>` |
+
+---
+
 ## Notas
 
 - Los comandos se definen mediante `register({ name, category, description, usage, execute })` desde `useCommandRegistry.js`

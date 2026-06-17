@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import db from '../config/db.js';
 
 const router = Router();
@@ -269,6 +270,46 @@ router.post('/history', async (req, res) => {
     await db('command_history').insert(record);
     res.json({ success: true });
   } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/git', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { command, sessionId } = req.body;
+    if (!command) {
+      return res.status(400).json({ success: false, error: 'Comando git requerido' });
+    }
+
+    let cwd = process.cwd();
+    if (sessionId) {
+      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+      if (session && session.cwd) cwd = session.cwd;
+    }
+
+    let stdout = '';
+    let stderr = '';
+    let success = false;
+
+    try {
+      stdout = execSync(`git ${command}`, { cwd, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
+      success = true;
+    } catch (err) {
+      stdout = err.stdout || '';
+      stderr = err.stderr || err.message || 'Error desconocido';
+      success = false;
+    }
+
+    if (sessionId) {
+      await db('chat_messages').insert({ session_id: sessionId, role: 'command', content: `[${cwd}] /git ${command}` });
+      await db('chat_messages').insert({ session_id: sessionId, role: 'result', content: success ? (stdout || '(sin salida)') : stderr });
+      await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
+    }
+
+    res.json({ success, stdout, stderr });
+  } catch (err) {
+    console.log('Error en /git:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
