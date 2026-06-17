@@ -3,6 +3,8 @@
 Todos los comandos se escriben con prefijo `/` en el input del chat.
 Los comandos registrados en frontend tienen prioridad sobre los del backend.
 
+Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtra en vivo (con debounce configurable) las pestañas de chats y los proyectos del sidebar por los campos tooltip e ID respectivamente.
+
 ---
 
 ## Sistema
@@ -41,6 +43,7 @@ Los comandos registrados en frontend tienen prioridad sobre los del backend.
 | `/redmine_test` | Prueba la conexión a la instancia de Redmine configurada | `/redmine_test` |
 | `/redmine_proyectos` | Lista proyectos Redmine. Con `import_all` importa todos a la base de datos local | `/redmine_proyectos [import_all]` |
 | `/redmine_tickets` | Obtiene la lista de tickets de Redmine para un proyecto importado. Usa Tab para autocompletar con los proyectos disponibles | `/redmine_tickets <id_proyecto>` |
+| `/redmine_importar_tickets` | Importa todos los tickets de Redmine de un proyecto o de todos los proyectos a la base de datos local. Usa Tab para autocompletar | `/redmine_importar_tickets [id_proyecto\|--all]` |
 
 ---
 

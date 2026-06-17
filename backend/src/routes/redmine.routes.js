@@ -318,4 +318,161 @@ router.get('/proyectos/:proyectoId/tickets', async (req, res) => {
   }
 });
 
+async function importarIssuesDeRedmine(proyecto, token, url) {
+  const baseUrl = url.replace(/\/+$/, '') + '/issues.json';
+  let allIssues = [];
+  let offset = 0;
+  const limit = 100;
+
+  while (true) {
+    const apiUrl = `${baseUrl}?project_id=${proyecto.redmine_id}&limit=${limit}&offset=${offset}&sort=id`;
+    const response = await fetch(apiUrl, {
+      headers: {
+        'X-Redmine-API-Key': token,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`HTTP ${response.status}${text ? ' — ' + text.slice(0, 200) : ''}`);
+    }
+
+    const data = await response.json();
+    allIssues = allIssues.concat(data.issues || []);
+
+    const total = data.total_count || allIssues.length;
+    if (allIssues.length >= total) break;
+    offset += limit;
+  }
+
+  let importados = 0;
+  let actualizados = 0;
+
+  for (const issue of allIssues) {
+    try {
+      const ticketData = {
+        proyecto_id: proyecto.id,
+        redmine_id: issue.id,
+        subject: issue.subject || '(sin asunto)',
+        description: issue.description || null,
+        status_name: issue.status?.name || null,
+        tracker_name: issue.tracker?.name || null,
+        priority_name: issue.priority?.name || null,
+        assigned_to_name: issue.assigned_to?.name || null,
+        author_name: issue.author?.name || null,
+        start_date: issue.start_date || null,
+        due_date: issue.due_date || null,
+        estimated_hours: issue.estimated_hours || null,
+        done_ratio: issue.done_ratio || null,
+        fixed_version_name: issue.fixed_version?.name || null,
+        redmine_created_on: toDateTime(issue.created_on),
+        redmine_updated_on: toDateTime(issue.updated_on),
+        redmine_closed_on: toDateTime(issue.closed_on),
+      };
+
+      const existing = await db('tickets').where({ redmine_id: issue.id }).first();
+      if (existing) {
+        await db('tickets').where({ redmine_id: issue.id }).update(ticketData);
+        actualizados++;
+      } else {
+        await db('tickets').insert(ticketData);
+        importados++;
+      }
+    } catch (err) {
+      console.log('Error al guardar ticket Redmine:', issue.id, err.message);
+    }
+  }
+
+  return { importados, actualizados, total_redmine: allIssues.length };
+}
+
+router.post('/proyectos/:proyectoId/importar-tickets', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const proyecto = await db('proyectos').where({ id: req.params.proyectoId }).first();
+
+    if (!proyecto) {
+      res.json({ success: false, message: `Proyecto "${req.params.proyectoId}" no encontrado en la base local.` });
+      return;
+    }
+
+    if (!proyecto.redmine_id) {
+      res.json({ success: false, message: `El proyecto "${req.params.proyectoId}" no tiene ID de Redmine asociado.` });
+      return;
+    }
+
+    const token = await getRedmineToken();
+    const url = await getRedmineUrl();
+
+    if (!token || !url) {
+      res.json({ success: false, message: 'Token o URL de Redmine no configurados. Configure ambos en Configuración.' });
+      return;
+    }
+
+    const resultado = await importarIssuesDeRedmine(proyecto, token, url);
+
+    res.json({ success: true, ...resultado });
+  } catch (err) {
+    console.log('Error al importar tickets Redmine:', err.message);
+    res.json({ success: false, message: 'Error al importar tickets: ' + err.message });
+  }
+});
+
+router.post('/proyectos/importar-tickets-all', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const token = await getRedmineToken();
+    const url = await getRedmineUrl();
+
+    if (!token || !url) {
+      res.json({ success: false, message: 'Token o URL de Redmine no configurados. Configure ambos en Configuración.' });
+      return;
+    }
+
+    const proyectos = await db('proyectos').whereNotNull('redmine_id').orderBy('id');
+
+    if (proyectos.length === 0) {
+      res.json({ success: false, message: 'No hay proyectos con ID de Redmine asociado.' });
+      return;
+    }
+
+    const resultados = [];
+    let totalImportados = 0;
+    let totalActualizados = 0;
+
+    for (const proyecto of proyectos) {
+      try {
+        const r = await importarIssuesDeRedmine(proyecto, token, url);
+        resultados.push({
+          proyecto_id: proyecto.id,
+          importados: r.importados,
+          actualizados: r.actualizados,
+          total_redmine: r.total_redmine,
+        });
+        totalImportados += r.importados;
+        totalActualizados += r.actualizados;
+      } catch (err) {
+        resultados.push({
+          proyecto_id: proyecto.id,
+          error: err.message,
+        });
+        console.log('Error al importar tickets de', proyecto.id, ':', err.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      total_proyectos: proyectos.length,
+      resultados,
+      totales: { importados: totalImportados, actualizados: totalActualizados },
+    });
+  } catch (err) {
+    console.log('Error al importar tickets de todos los proyectos:', err.message);
+    res.json({ success: false, message: 'Error al importar tickets: ' + err.message });
+  }
+});
+
 export default router;

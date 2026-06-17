@@ -18,6 +18,7 @@ import './composables/commands/funcionalidadesListar.js'
 import './composables/commands/redmineTest.js'
 import './composables/commands/redmineProyectos.js'
 import './composables/commands/redmineTickets.js'
+import './composables/commands/redmineImportarTickets.js'
 
 const app = createApp(App)
 const pinia = createPinia()

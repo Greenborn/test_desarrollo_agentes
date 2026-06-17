@@ -58,12 +58,13 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 
 ### `GET /api/settings`
 - **Auth:** Requerida
-- **Respuesta:** `{ deepseek_key: string (mascarado), system_prompt: string|null }`
+- **Respuesta:** `{ deepseek_key: string (mascarado), system_prompt: string|null, omnifilter_debounce_ms: string|null }`
 
 ### `POST /api/settings`
 - **Auth:** Requerida
 - **Body:** `{ key: string, value: string }`
 - Si `key === "deepseek_key"` se encripta con AES-256-CBC antes de almacenar
+- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `omnifilter_debounce_ms`
 - **Respuesta:** `{ success: true }`
 
 ---
@@ -257,6 +258,20 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Busca el proyecto en la base local, obtiene su `redmine_id` y consulta la API de Redmine (`${url}/issues.json?project_id=${redmineId}`) para obtener los tickets del proyecto. Incluye orden por `updated_on` descendente, límite 100.
 - **Respuesta 200:** `{ success: true, tickets: [{ id, subject, status, priority, tracker, assigned_to, created_on, updated_on }], total: number }`
 - **Respuesta 200 (error):** `{ success: false, message: "Proyecto no encontrado..." | "El proyecto no tiene ID de Redmine..." | "Token o URL no configurados..." | "Error al obtener tickets..." }`
+
+### `POST /api/redmine/proyectos/importar-tickets-all`
+- **Auth:** Requerida
+- **Body:** ninguno
+- **Descripción:** Itera sobre todos los proyectos de la base local que tengan `redmine_id` (no nulo) e importa/actualiza sus tickets desde Redmine. Para cada proyecto usa paginación automática (límite 100). Los errores por proyecto no detienen el proceso.
+- **Respuesta 200:** `{ success: true, total_proyectos: number, resultados: [{ proyecto_id, importados, actualizados, total_redmine } | { proyecto_id, error }], totales: { importados, actualizados } }`
+- **Respuesta 200 (error):** `{ success: false, message: "..." }`
+
+### `POST /api/redmine/proyectos/:proyectoId/importar-tickets`
+- **Auth:** Requerida
+- **Params:** `proyectoId` — ID local del proyecto (slug en tabla `proyectos`)
+- **Descripción:** Busca el proyecto en la base local, obtiene su `redmine_id` y consulta la API de Redmine (`${url}/issues.json?project_id=${redmineId}`) con paginación automática (límite 100). Cada issue se guarda en la tabla `tickets` usando `redmine_id` como clave única: si ya existe se actualiza, si no existe se inserta.
+- **Respuesta 200:** `{ success: true, importados: number, actualizados: number, total_redmine: number }`
+- **Respuesta 200 (error):** `{ success: false, message: "..." }`
 
 ### `POST /api/redmine/proyectos/import`
 - **Auth:** Requerida

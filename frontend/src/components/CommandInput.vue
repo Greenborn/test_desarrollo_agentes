@@ -15,6 +15,7 @@
         @keydown.up.prevent="handleUp"
         @keydown.down.prevent="handleDown"
         @keydown.escape="hideAutocomplete"
+        @keyup="onKeyup"
         @input="onInput"
       />
     </div>
@@ -39,16 +40,20 @@
 </template>
 
 <script>
-import { ref, computed, nextTick, watch, onMounted } from 'vue'
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCommandStore } from '../stores/command.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useChatStore } from '../stores/chat.js'
+import { useUiStore } from '../stores/ui.js'
+import { useSettingsStore } from '../stores/settings.js'
 
 export default {
   setup() {
     const cmdStore = useCommandStore()
     const chatStore = useChatStore()
+    const uiStore = useUiStore()
+    const settingsStore = useSettingsStore()
     const { find, suggest } = useCommandRegistry()
     const { autocompleteOptions, autocompleteVisible, arrowIndex, currentDir } = storeToRefs(cmdStore)
     const { activeSessionId } = storeToRefs(chatStore)
@@ -56,6 +61,7 @@ export default {
     const inputEl = ref(null)
     const autocompleteList = ref(null)
     const historyIdx = ref(-1)
+    let debounceTimer = null
 
     const fullHistory = computed(() => {
       const db = cmdStore.dbHistory || []
@@ -88,14 +94,35 @@ export default {
       submit()
     }
 
+    function clearOmnifilterDebounce() {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+        debounceTimer = null
+      }
+    }
+
     function submit() {
       const raw = buffer.value.trim()
-      if (!raw) return
       buffer.value = ''
       historyIdx.value = -1
+      clearOmnifilterDebounce()
+
+      if (!raw) {
+        cmdStore.hideAutocomplete()
+        uiStore.setOmnifilter('')
+        return
+      }
+
       cmdStore.pushHistory(raw)
       cmdStore.hideAutocomplete()
-      execute(raw)
+
+      if (raw.startsWith('/')) {
+        uiStore.setOmnifilter('')
+        execute(raw)
+      } else {
+        uiStore.setOmnifilter(raw)
+      }
+
       cmdStore.loadHistory(chatStore.activeSessionId)
     }
 
@@ -205,8 +232,27 @@ export default {
       cmdStore.hideAutocomplete()
     }
 
+    function onKeyup() {
+      clearOmnifilterDebounce()
+
+      const text = buffer.value.trim()
+      if (text.startsWith('/')) {
+        uiStore.setOmnifilter('')
+        return
+      }
+
+      const delay = settingsStore.omnifilterDebounceMs || 2000
+      debounceTimer = setTimeout(() => {
+        uiStore.setOmnifilter(text)
+      }, delay)
+    }
+
     onMounted(() => {
       cmdStore.loadHistory(chatStore.activeSessionId)
+    })
+
+    onUnmounted(() => {
+      clearOmnifilterDebounce()
     })
 
     watch(activeSessionId, (newId) => {
@@ -217,7 +263,7 @@ export default {
       buffer, inputEl, autocompleteList, autocompleteOptions,
       autocompleteVisible, arrowIndex, currentDir,
       handleEnter, handleTab, handleUp, handleDown,
-      hideAutocomplete, pickAutocomplete, onInput,
+      hideAutocomplete, pickAutocomplete, onInput, onKeyup,
     }
   },
 }

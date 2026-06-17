@@ -125,6 +125,31 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
+## 10. `tickets`
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `proyecto_id` | VARCHAR(255) | NOT NULL, FK → `proyectos(id)` ON DELETE CASCADE |
+| `redmine_id` | INTEGER | NOT NULL, UNIQUE — ID del issue en Redmine |
+| `subject` | VARCHAR(500) | NOT NULL |
+| `description` | LONGTEXT | nullable |
+| `status_name` | VARCHAR(100) | nullable |
+| `tracker_name` | VARCHAR(100) | nullable |
+| `priority_name` | VARCHAR(100) | nullable |
+| `assigned_to_name` | VARCHAR(255) | nullable |
+| `author_name` | VARCHAR(255) | nullable |
+| `start_date` | DATE | nullable |
+| `due_date` | DATE | nullable |
+| `estimated_hours` | DECIMAL(10,2) | nullable |
+| `done_ratio` | INTEGER | nullable |
+| `fixed_version_name` | VARCHAR(255) | nullable |
+| `redmine_created_on` | DATETIME | nullable — fecha creación en Redmine |
+| `redmine_updated_on` | DATETIME | nullable — fecha actualización en Redmine |
+| `redmine_closed_on` | DATETIME | nullable — fecha cierre en Redmine |
+
+---
+
 ## Relaciones (Foreign Keys)
 
 | Origen | Columna | Destino | Columna | ON DELETE |
@@ -137,6 +162,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `funcionalidades` | `session_id` | `chat_sessions` | `id` | CASCADE |
 | `gastos_tokens_usados` | `id_chat_session` | `chat_sessions` | `id` | CASCADE |
 | `gastos_tokens_usados` | `id_proyecto` | `proyectos` | `id` | CASCADE |
+| `tickets` | `proyecto_id` | `proyectos` | `id` | CASCADE |
 
 ---
 
@@ -153,7 +179,8 @@ users
 proyectos
  ├─ chat_sessions.proyecto_id (FK lógica)
  ├─ funcionalidades.proyecto_id (FK lógica)
- └─ gastos_tokens_usados.id_proyecto (FK)
+ ├─ gastos_tokens_usados.id_proyecto (FK)
+ └─ tickets.proyecto_id (FK)
 
 chat_sessions
  ├─ gastos_tokens_usados.id_chat_session (FK)

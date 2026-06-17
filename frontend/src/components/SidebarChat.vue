@@ -16,7 +16,7 @@
     <div id="sidebar-chats-collapse" class="collapse show overflow-y-auto" style="max-height: 40%;">
       <div class="list-group list-group-flush" style="min-height: 0;">
         <button
-          v-for="s in sessions"
+          v-for="s in filteredSessions"
           :key="s.id"
           class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
           :class="{ active: s.id === activeSessionId }"
@@ -42,7 +42,7 @@
     <div id="sidebar-projects-collapse" class="collapse show overflow-y-auto flex-grow-1">
       <div class="list-group list-group-flush" style="min-height: 0;">
         <button
-          v-for="p in projects"
+          v-for="p in filteredProjects"
           :key="p.id"
           class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
           :class="{ active: selectedProject && selectedProject.id === p.id }"
@@ -56,7 +56,7 @@
 </template>
 
 <script>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
@@ -70,7 +70,7 @@ export default {
     const ui = useUiStore()
     const projectStore = useProjectStore()
     const { sessions, activeSessionId, creating } = storeToRefs(chat)
-    const { sidebarCollapsed } = storeToRefs(ui)
+    const { sidebarCollapsed, omnifilter } = storeToRefs(ui)
     const { projects, selectedProject } = storeToRefs(projectStore)
 
     function sessionTooltip(s) {
@@ -101,17 +101,34 @@ export default {
       projectStore.selectProject(p)
     }
 
+    const filteredSessions = computed(() => {
+      const filter = omnifilter.value.toLowerCase()
+      if (!filter) return sessions.value
+      return sessions.value.filter((s) => {
+        const fields = [s.title, s.proyecto_descripcion, s.proyecto_id, s.cwd]
+        return fields.some((f) => f && f.toLowerCase().includes(filter))
+      })
+    })
+
+    const filteredProjects = computed(() => {
+      const filter = omnifilter.value.toLowerCase()
+      if (!filter) return projects.value
+      return projects.value.filter((p) => {
+        return p.id && p.id.toLowerCase().includes(filter)
+      })
+    })
+
     onMounted(() => {
       projectStore.loadProjects()
     })
 
     return {
       chat,
-      sessions,
+      filteredSessions,
       activeSessionId,
       creating,
       sidebarCollapsed,
-      projects,
+      filteredProjects,
       selectedProject,
       sessionTooltip,
       createSession,

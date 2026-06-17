@@ -128,6 +128,21 @@
       </button>
     </div>
 
+    <div class="mb-4" v-if="matches('debounce omnifiltro')">
+      <label class="form-label">Omnifiltro — Tiempo de debounce (ms)</label>
+      <input
+        type="number"
+        class="form-control bg-dark text-light border-secondary"
+        v-model.number="omnifilterDebounceInput"
+        min="0"
+        step="100"
+        placeholder="2000"
+      />
+      <button class="btn btn-sm mt-2 btn-argentina" @click="saveOmnifilterDebounce">
+        Guardar
+      </button>
+    </div>
+
     <div v-if="settings.saveSuccess" class="alert alert-success py-2 small">{{ settings.saveSuccess }}</div>
     <div v-if="settings.saveError" class="alert alert-danger py-2 small">{{ settings.saveError }}</div>
   </div>
@@ -152,6 +167,7 @@ export default {
     const showKey = ref(false)
     const showRedmineToken = ref(false)
     const searchTerm = ref('')
+    const omnifilterDebounceInput = ref(2000)
 
     function matches(label) {
       if (!searchTerm.value) return true
@@ -192,6 +208,10 @@ export default {
       redmineUrlInput.value = val
     }, { immediate: true })
 
+    watch(() => settings.omnifilterDebounceMs, (val) => {
+      omnifilterDebounceInput.value = val
+    }, { immediate: true })
+
     for (const [key, refName] of Object.entries(DOC_STORE_MAP)) {
       watch(() => settings[refName], (val) => {
         DOC_INPUTS[key].value = val
@@ -223,10 +243,15 @@ export default {
       settings.save('documentacion_prompt_' + tipo, DOC_INPUTS[tipo].value)
     }
 
+    function saveOmnifilterDebounce() {
+      settings.clearFeedback()
+      settings.save('omnifilter_debounce_ms', String(omnifilterDebounceInput.value))
+    }
+
     return {
-      keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput, docEndpointsInput, docWsInput, docFuncInput, showKey, showRedmineToken, searchTerm,
+      keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput, docEndpointsInput, docWsInput, docFuncInput, showKey, showRedmineToken, searchTerm, omnifilterDebounceInput,
       settings,
-      saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc, matches,
+      saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc, saveOmnifilterDebounce, matches,
     }
   },
 }

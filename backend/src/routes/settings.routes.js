@@ -40,6 +40,8 @@ router.get('/', async (req, res) => {
         keys.system_prompt = row.setting_value;
       } else if (row.setting_key.startsWith('documentacion_prompt_')) {
         keys[row.setting_key] = row.setting_value;
+      } else if (row.setting_key === 'omnifilter_debounce_ms') {
+        keys.omnifilter_debounce_ms = row.setting_value;
       }
     }
     const defaults = {
