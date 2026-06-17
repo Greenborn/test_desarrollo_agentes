@@ -42,6 +42,8 @@ router.get('/', async (req, res) => {
         keys[row.setting_key] = row.setting_value;
       } else if (row.setting_key === 'omnifilter_debounce_ms') {
         keys.omnifilter_debounce_ms = row.setting_value;
+      } else if (row.setting_key === 'ticket_descripcion_prompt') {
+        keys.ticket_descripcion_prompt = row.setting_value;
       }
     }
     const defaults = {
@@ -50,6 +52,7 @@ router.get('/', async (req, res) => {
       documentacion_prompt_endpoints: 'Analiza el proyecto actual y documenta todos los endpoints de la API, incluyendo método HTTP, ruta, parámetros, cuerpo de la solicitud, respuesta y cualquier detalle relevante de cada endpoint. Proporciona una descripción detallada que permita a otros agentes entender y consumir la API.',
       documentacion_prompt_web_sockets: 'Analiza el proyecto actual y documenta todos los eventos y canales de WebSocket, incluyendo el nombre del evento, payload, dirección (cliente-servidor o servidor-cliente) y cualquier detalle relevante. Proporciona una descripción detallada que permita a otros agentes entender la comunicación en tiempo real del proyecto.',
       documentacion_prompt_funcionalidades: 'Analiza el proyecto actual y documenta todas las funcionalidades implementadas, incluyendo nombre, descripción, módulo al que pertenece, dependencias y cualquier detalle relevante. Proporciona una descripción detallada que permita a otros agentes entender el alcance funcional del proyecto.',
+      ticket_descripcion_prompt: 'Eres un asistente experto en redactar descripciones técnicas para tickets de Redmine. Tu objetivo principal es generar una descripción ÓPTIMA y detallada para el siguiente ticket:\n\nContexto del ticket:\n- Título: {subject}\n- Estado actual: {status}\n- Prioridad: {priority}\n- Asignado a: {assigned_to}\n\nInstrucciones:\n1. Genera una descripción clara, precisa y bien estructurada que explique el problema o requerimiento del ticket.\n2. Utiliza la siguiente solicitud del usuario como guía para el contenido:\n{user_input}\n3. La descripción debe ser profesional, técnica y útil para desarrolladores.\n4. Incluye solo información relevante al ticket, sin divagaciones.',
     };
     for (const [key, def] of Object.entries(defaults)) {
       if (!keys[key]) keys[key] = def;

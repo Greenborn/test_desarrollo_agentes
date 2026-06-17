@@ -13,6 +13,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const documentacionPromptEndpoints = ref('')
   const documentacionPromptWebSockets = ref('')
   const documentacionPromptFuncionalidades = ref('')
+  const ticketDescripcionPrompt = ref('')
   const omnifilterDebounceMs = ref(2000)
   const saveError = ref('')
   const saveSuccess = ref('')
@@ -30,6 +31,7 @@ export const useSettingsStore = defineStore('settings', () => {
       documentacionPromptEndpoints.value = keys.documentacion_prompt_endpoints || ''
       documentacionPromptWebSockets.value = keys.documentacion_prompt_web_sockets || ''
       documentacionPromptFuncionalidades.value = keys.documentacion_prompt_funcionalidades || ''
+      ticketDescripcionPrompt.value = keys.ticket_descripcion_prompt || ''
       omnifilterDebounceMs.value = keys.omnifilter_debounce_ms ? parseInt(keys.omnifilter_debounce_ms, 10) : 2000
     } catch (err) {
       console.error('Error al cargar settings:', err)
@@ -65,6 +67,6 @@ export const useSettingsStore = defineStore('settings', () => {
   return { deepseekKey, redmineToken, redmineUrl, systemPrompt, omnifilterDebounceMs,
            documentacionPromptBaseDatos, documentacionPromptSubproyectos,
            documentacionPromptEndpoints, documentacionPromptWebSockets,
-           documentacionPromptFuncionalidades, saveError, saveSuccess,
+           documentacionPromptFuncionalidades, ticketDescripcionPrompt, saveError, saveSuccess,
            clearFeedback, load, save }
 })

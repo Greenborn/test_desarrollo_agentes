@@ -23,6 +23,7 @@
             :title="sessionTooltip(s)"
             @click="selectSession(s.id)"
           >
+            <span class="status-led" :class="getSessionStatus(s.id)"></span>
             <span class="text-truncate">{{ s.title }}</span>
             <span
               class="delete-btn"
@@ -72,10 +73,13 @@
           v-for="t in filteredTickets"
           :key="t.id"
           class="list-group-item list-group-item-action py-2 px-2 small"
-          :class="{
-            active: selectedTicket && selectedTicket.id === t.id,
-            'pinned-project': t.proyecto_id === pinnedProjectId,
-          }"
+          :class="[
+            ticketPriorityClass(t.priority_id),
+            {
+              active: selectedTicket && selectedTicket.id === t.id,
+              'pinned-project': t.proyecto_id === pinnedProjectId,
+            },
+          ]"
           @click="selectTicket(t)"
         >
           <span class="text-truncate">#{{ t.redmine_id }} — {{ t.subject }}</span>
@@ -102,7 +106,7 @@ export default {
     const ui = useUiStore()
     const projectStore = useProjectStore()
     const ticketStore = useTicketStore()
-    const { sessions, activeSessionId, creating } = storeToRefs(chat)
+    const { sessions, activeSessionId, creating, sessionStatus } = storeToRefs(chat)
     const { sidebarCollapsed, omnifilter } = storeToRefs(ui)
     const { projects, selectedProject, pinnedProjectId } = storeToRefs(projectStore)
     const { tickets, selectedTicket } = storeToRefs(ticketStore)
@@ -153,6 +157,20 @@ export default {
     function selectTicket(t) {
       projectStore.clearSelection()
       ticketStore.selectTicket(t)
+    }
+
+    function ticketPriorityClass(priorityId) {
+      if (!priorityId) return ''
+      if (priorityId <= 1) return 'ticket-priority-low'
+      if (priorityId === 2) return 'ticket-priority-normal'
+      if (priorityId === 3) return 'ticket-priority-high'
+      if (priorityId >= 5) return 'ticket-priority-immediate'
+      if (priorityId >= 4) return 'ticket-priority-urgent'
+      return ''
+    }
+
+    function getSessionStatus(id) {
+      return sessionStatus.value[id] || 'idle'
     }
 
     const filteredSessions = computed(() => {
@@ -219,11 +237,13 @@ export default {
       ticketStore,
       expandedSections,
       sessionTooltip,
+      getSessionStatus,
       toggleSection,
       createSession,
       selectSession,
       selectProject,
       selectTicket,
+      ticketPriorityClass,
     }
   },
 }
@@ -306,8 +326,44 @@ export default {
 .pin-btn:hover {
   opacity: 1;
 }
+.status-led {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 6px;
+  transition: background-color 0.2s ease;
+}
+.status-led.idle {
+  background-color: #6b7280;
+}
+.status-led.executing {
+  background-color: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+}
+.status-led.error {
+  background-color: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
 .pinned-project {
   background-color: #1a3344 !important;
   border-left: 3px solid #75AADB !important;
+}
+.ticket-priority-low {
+  border-left: 3px solid #6b7280 !important;
+}
+.ticket-priority-normal {
+  border-left: 3px solid #3b82f6 !important;
+}
+.ticket-priority-high {
+  border-left: 3px solid #eab308 !important;
+}
+.ticket-priority-urgent {
+  border-left: 3px solid #ef4444 !important;
+}
+.ticket-priority-immediate {
+  border-left: 3px solid #ef4444 !important;
+  border-left-width: 4px !important;
 }
 </style>

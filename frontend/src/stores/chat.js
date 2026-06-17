@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const API = '/api'
 
@@ -9,7 +9,10 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref([])
   const streaming = ref(false)
   const creating = ref(false)
-  const executing = ref(false)
+  const executingCount = ref(0)
+  const executing = computed(() => executingCount.value > 0)
+  const _sessionCmdCount = ref({})
+  const sessionStatus = ref({})
   const currentChunk = ref('')
   const currentThinking = ref('')
 
@@ -61,8 +64,25 @@ export const useChatStore = defineStore('chat', () => {
     return activeSessionId.value
   }
 
+  function _decSessionCount(sid) {
+    if (!sid) return
+    const cnt = _sessionCmdCount.value[sid]
+    if (cnt === undefined || cnt === null) return
+    const next = cnt - 1
+    if (next <= 0) {
+      delete _sessionCmdCount.value[sid]
+    } else {
+      _sessionCmdCount.value[sid] = next
+    }
+  }
+
   async function runCommand(raw, executeFn) {
-    executing.value = true
+    const sid = activeSessionId.value
+    executingCount.value++
+    if (sid) {
+      _sessionCmdCount.value[sid] = (_sessionCmdCount.value[sid] || 0) + 1
+      sessionStatus.value[sid] = 'executing'
+    }
     const loadingKey = 'loading-' + Date.now()
 
     messages.value.push({ role: 'command', content: raw, _key: 'cmd-' + Date.now() })
@@ -82,19 +102,28 @@ export const useChatStore = defineStore('chat', () => {
       } else {
         messages.value.splice(idx, 1)
       }
+      _decSessionCount(sid)
+      if (sid && !_sessionCmdCount.value[sid] && sessionStatus.value[sid] !== 'error') {
+        sessionStatus.value[sid] = 'idle'
+      }
     } catch (err) {
       console.error('Error ejecutando comando:', err)
       const idx = messages.value.findIndex(m => m._key === loadingKey)
       if (idx !== -1) {
         messages.value[idx] = { role: 'result', content: 'Error: ' + (err.message || 'Error desconocido'), _key: 'err-' + Date.now() }
       }
+      _decSessionCount(sid)
+      if (sid) sessionStatus.value[sid] = 'error'
     } finally {
-      executing.value = false
+      executingCount.value--
     }
   }
 
   async function loadMessages(sessionId) {
     activeSessionId.value = sessionId
+    if (!_sessionCmdCount.value[sessionId]) {
+      delete sessionStatus.value[sessionId]
+    }
     messages.value = []
     currentChunk.value = ''
     currentThinking.value = ''
@@ -235,7 +264,7 @@ export const useChatStore = defineStore('chat', () => {
 
   return {
     sessions, activeSessionId, messages,
-    streaming, creating, executing, currentChunk, currentThinking,
+    streaming, creating, executing, sessionStatus, currentChunk, currentThinking,
     loadSessions, createSession, createSessionIfNeeded, runCommand, loadMessages,
     sendMessage, deleteMessage, deleteSession,
   }
