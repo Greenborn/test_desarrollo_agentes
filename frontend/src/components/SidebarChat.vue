@@ -6,13 +6,13 @@
     <button class="btn btn-sm mb-2 flex-shrink-0 btn-argentina" @click="createSession" :disabled="creating">
       {{ creating ? 'Creando...' : '＋ Nuevo chat' }}
     </button>
-    <button
-      class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
-      @click="toggleSection('chats')"
-    >
-      {{ expandedSections.chats ? '▼' : '▶' }} Chats
-    </button>
     <div class="d-flex flex-column flex-grow-1" style="min-height: 0;">
+      <button
+        class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
+        @click="toggleSection('chats')"
+      >
+        {{ expandedSections.chats ? '▼' : '▶' }} Chats
+      </button>
       <div v-show="expandedSections.chats" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
         <div class="list-group list-group-flush" style="min-height: 0;">
           <button
@@ -60,13 +60,12 @@
           </button>
         </div>
       </div>
-    </div>
-    <button
-      class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
-      @click="toggleSection('tickets')"
-    >
-      {{ expandedSections.tickets ? '▼' : '▶' }} Tickets
-    </button>
+      <button
+        class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
+        @click="toggleSection('tickets')"
+      >
+        {{ expandedSections.tickets ? '▼' : '▶' }} Tickets
+      </button>
       <div v-show="expandedSections.tickets" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
         <div class="list-group list-group-flush" style="min-height: 0;">
         <button
@@ -82,6 +81,7 @@
           <span class="text-truncate">#{{ t.redmine_id }} — {{ t.subject }}</span>
         </button>
       </div>
+    </div>
     </div>
   </div>
 </template>

@@ -21,12 +21,7 @@ register({
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId
     if (!sessionId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Primero debe iniciar una sesión de chat.',
-        _key: 'err-' + Date.now(),
-      })
-      return
+      throw new Error('Primero debe iniciar una sesión de chat.')
     }
 
     let proyectoId = args[0]
@@ -40,31 +35,15 @@ register({
         console.error('Error al obtener proyecto de sesión:', err)
       }
       if (!proyectoId) {
-        chatStore.messages.push({
-          role: 'result',
-          content: 'No hay proyecto vinculado a la sesión. Usá /proyecto_set <id> o pasá el ID como argumento.',
-          _key: 'err-' + Date.now(),
-        })
-        return
+        throw new Error('No hay proyecto vinculado a la sesión. Usá /proyecto_set <id> o pasá el ID como argumento.')
       }
     }
-
-    chatStore.messages.push({
-      role: 'command',
-      content: `/funcionalidades_listar ${args.join(' ')}`,
-      _key: 'cmd-' + Date.now(),
-    })
 
     try {
       const res = await fetch(`/api/funcionalidades/${encodeURIComponent(proyectoId)}`, { credentials: 'include' })
       const data = await res.json()
       if (!data.funcionalidades || data.funcionalidades.length === 0) {
-        chatStore.messages.push({
-          role: 'result',
-          content: `No hay funcionalidades registradas para el proyecto "${proyectoId}".`,
-          _key: 'res-' + Date.now(),
-        })
-        return
+        return `No hay funcionalidades registradas para el proyecto "${proyectoId}".`
       }
       const listData = {
         controlType: 'funcionalidad_list',
@@ -76,19 +55,13 @@ register({
           proyectoId: proyectoId,
         })),
       }
-      chatStore.messages.push({
+      return {
         role: 'opencode_control',
-        content: JSON.stringify(listData),
         controlData: listData,
-        _key: 'ctrl-' + Date.now(),
-      })
+      }
     } catch (err) {
       console.error('Error en /funcionalidades_listar:', err)
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Error: ' + err.message,
-        _key: 'err-' + Date.now(),
-      })
+      throw err
     }
   },
 })

@@ -10,26 +10,8 @@ register({
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId
     if (!sessionId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Primero debe iniciar una sesión de chat.',
-        _key: 'result-' + Date.now(),
-      })
-      return
+      throw new Error('Primero debe iniciar una sesión de chat.')
     }
-
-    chatStore.messages.push({
-      role: 'command',
-      content: '/redmine_test',
-      _key: 'cmd-' + Date.now(),
-    })
-
-    const msgIdx = chatStore.messages.length
-    chatStore.messages.push({
-      role: 'result',
-      content: 'Probando conexión a Redmine...',
-      _key: 'result-' + Date.now(),
-    })
 
     try {
       const res = await fetch('/api/redmine/test', {
@@ -38,19 +20,10 @@ register({
         credentials: 'include',
       })
       const data = await res.json()
-
-      chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: data.message,
-        _key: 'result-' + Date.now(),
-      }
+      return data.message
     } catch (err) {
       console.error('Error en /redmine_test:', err.message)
-      chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: 'Error de conexión al intentar probar Redmine.',
-        _key: 'result-' + Date.now(),
-      }
+      throw new Error('Error de conexión al intentar probar Redmine.')
     }
   },
 })

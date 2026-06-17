@@ -135,29 +135,27 @@ export default {
 
       const parts = raw.split(/\s+/)
       const cmdName = parts[0].toLowerCase()
-      const args = parts.slice(1)
 
       const known = find(cmdName)
-      if (known) {
-        known.execute(args, { cmdStore, chatStore })
-      } else if (cmdName.startsWith('/')) {
-        try {
-          const res = await fetch('/api/command/execute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ command: raw, sessionId }),
-          })
-          const data = await res.json()
-          if (data.success) {
-            chatStore.loadMessages(sessionId)
-          } else {
-            console.error('Error al ejecutar comando:', data.result)
-          }
-        } catch (err) {
-          console.error('Error al ejecutar comando:', err)
+
+      await chatStore.runCommand(raw, async (loadingIdx) => {
+        if (known) {
+          return known.execute(parts.slice(1), { cmdStore, chatStore, loadingIdx })
         }
-      }
+        if (!cmdName.startsWith('/')) return null
+        const res = await fetch('/api/command/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ command: raw, sessionId }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          await chatStore.loadMessages(sessionId)
+          return null
+        }
+        throw new Error(data.result || 'Error al ejecutar comando')
+      })
     }
 
     function handleUp() {

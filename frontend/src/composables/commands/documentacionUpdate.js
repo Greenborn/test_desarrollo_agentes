@@ -17,22 +17,12 @@ register({
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId;
     if (!sessionId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Primero debe iniciar una sesión de chat.',
-        _key: 'result-' + Date.now(),
-      });
-      return;
+      throw new Error('Primero debe iniciar una sesión de chat.');
     }
 
     const docType = args[0];
     if (!docType || !DOC_TYPES.includes(docType)) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Debe especificar un tipo: ' + DOC_TYPES.join(', '),
-        _key: 'result-' + Date.now(),
-      });
-      return;
+      throw new Error('Debe especificar un tipo: ' + DOC_TYPES.join(', '));
     }
 
     let proyectoId;
@@ -45,38 +35,23 @@ register({
     }
 
     if (!proyectoId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'No hay proyecto seleccionado. Use /proyecto_set primero.',
-        _key: 'result-' + Date.now(),
-      });
-      return;
+      throw new Error('No hay proyecto seleccionado. Use /proyecto_set primero.');
     }
 
     const ocStore = useOpencodeStore();
     const data = await ocStore.start();
     if (!data) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Error al iniciar OpenCode.',
-        _key: 'result-' + Date.now(),
-      });
-      return;
+      throw new Error('Error al iniciar OpenCode.');
     }
 
     const providerList = ocStore.getAvailableProviders();
     if (providerList.length === 0) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'No se encontraron proveedores de OpenCode.',
-        _key: 'result-' + Date.now(),
-      });
-      return;
+      throw new Error('No se encontraron proveedores de OpenCode.');
     }
 
     const preselectProvider = ocStore.savedProvider || providerList[0].value;
 
-    chatStore.messages.push({
+    return {
       role: 'opencode_control',
       controlData: {
         controlId: 'provider-' + Date.now(),
@@ -89,7 +64,6 @@ register({
         proyectoId,
         docType,
       },
-      _key: 'control-' + Date.now(),
-    });
+    }
   },
 });

@@ -7,42 +7,21 @@ register({
   category: 'Utilidades',
   description: 'Abre un navegador (chrome/firefox) en una URL usando Playwright',
   usage: '/iniciar_navegador <chrome|firefox> <url>',
-  async execute(args, { chatStore }) {
+  async execute(args, { chatStore, loadingIdx }) {
     const navegador = args[0];
     const url = args[1];
 
     if (!navegador || !url) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Uso: /iniciar_navegador <chrome|firefox> <url>',
-        _key: 'result-' + Date.now(),
-      });
-      return;
+      throw new Error('Uso: /iniciar_navegador <chrome|firefox> <url>');
     }
 
     if (navegador !== 'chrome' && navegador !== 'firefox') {
-      chatStore.messages.push({
-        role: 'result',
-        content: `Navegador no soportado: "${navegador}". Usa chrome o firefox.`,
-        _key: 'result-' + Date.now(),
-      });
-      return;
+      throw new Error(`Navegador no soportado: "${navegador}". Usa chrome o firefox.`);
     }
 
-    chatStore.messages.push({
-      role: 'command',
-      content: `/iniciar_navegador ${navegador} ${url}`,
-      _key: 'cmd-' + Date.now(),
-    });
-
-    const msgIdx = chatStore.messages.length;
-    chatStore.messages.push({
-      role: 'result',
-      content: `Iniciando ${navegador}...`,
-      _key: 'result-' + Date.now(),
-    });
-
     try {
+      chatStore.messages[loadingIdx].content = `Iniciando ${navegador}...`;
+
       const startRes = await fetch('/api/playwright/command', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -56,11 +35,7 @@ register({
       }
 
       const idSession = startData.id_session;
-      chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: `Navegando a ${url}...`,
-        _key: 'result-' + Date.now(),
-      };
+      chatStore.messages[loadingIdx].content = `Navegando a ${url}...`;
 
       const navRes = await fetch('/api/playwright/command', {
         method: 'POST',
@@ -81,11 +56,7 @@ register({
       });
     } catch (err) {
       console.error('Error en /iniciar_navegador:', err.message);
-      chatStore.messages.push({
-        role: 'result',
-        content: `Error: ${err.message}`,
-        _key: 'result-' + Date.now(),
-      });
+      throw err;
     }
   },
 });

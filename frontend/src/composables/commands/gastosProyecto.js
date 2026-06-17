@@ -21,12 +21,7 @@ register({
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId;
     if (!sessionId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Primero debe iniciar una sesión de chat.',
-        _key: 'result-' + Date.now(),
-      });
-      return;
+      throw new Error('Primero debe iniciar una sesión de chat.');
     }
 
     let proyectoId = args[0];
@@ -42,26 +37,8 @@ register({
     }
 
     if (!proyectoId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'No hay proyecto seleccionado. Especifique un id de proyecto o use /proyecto_set primero.',
-        _key: 'result-' + Date.now(),
-      });
-      return;
+      throw new Error('No hay proyecto seleccionado. Especifique un id de proyecto o use /proyecto_set primero.');
     }
-
-    chatStore.messages.push({
-      role: 'command',
-      content: `/gastos_proyecto ${proyectoId}`,
-      _key: 'cmd-' + Date.now(),
-    });
-
-    const msgIdx = chatStore.messages.length;
-    chatStore.messages.push({
-      role: 'result',
-      content: 'Obteniendo gastos...',
-      _key: 'result-' + Date.now(),
-    });
 
     try {
       const res = await fetch(`/api/gastos?id_proyecto=${encodeURIComponent(proyectoId)}`, { credentials: 'include' });
@@ -72,18 +49,14 @@ register({
       const data = await res.json();
 
       if (!data || data.length === 0) {
-        chatStore.messages[msgIdx] = {
-          role: 'result',
-          content: `(sin registros de gastos para el proyecto "${proyectoId}")`,
-          _key: 'result-' + Date.now(),
-        };
-        return;
+        return `(sin registros de gastos para el proyecto "${proyectoId}")`;
       }
 
       const lines = data.map((g) => {
         return [
           `ID: ${g.id}`,
           `  Sesión Chat: ${g.id_chat_session}`,
+          `  Proyecto: ${g.id_proyecto}`,
           `  Precio: ${g.precio}`,
           `  Tokens: ${g.tokens}`,
           `  Fecha: ${g.fecha_hora}`,
@@ -91,20 +64,10 @@ register({
         ].filter(Boolean).join('\n');
       });
 
-      const formatted = lines.join('\n\n');
-
-      chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: formatted,
-        _key: 'result-' + Date.now(),
-      };
+      return lines.join('\n\n');
     } catch (err) {
       console.error('Error en /gastos_proyecto:', err.message);
-      chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: 'Error: ' + err.message,
-        _key: 'result-' + Date.now(),
-      };
+      throw err;
     }
   },
 });

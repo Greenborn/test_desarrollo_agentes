@@ -10,36 +10,13 @@ register({
   async execute(args, { cmdStore, chatStore }) {
     const command = args.join(' ');
     if (!command) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Error: debe especificar un comando git. Ej: /git status',
-        _key: 'err-' + Date.now(),
-      });
-      return;
+      throw new Error('Debe especificar un comando git. Ej: /git status');
     }
 
     const sessionId = chatStore.activeSessionId;
     if (!sessionId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Primero debe iniciar una sesión de chat.',
-        _key: 'err-' + Date.now(),
-      });
-      return;
+      throw new Error('Primero debe iniciar una sesión de chat.');
     }
-
-    chatStore.messages.push({
-      role: 'command',
-      content: `/git ${command}`,
-      _key: 'cmd-' + Date.now(),
-    });
-
-    const msgIdx = chatStore.messages.length;
-    chatStore.messages.push({
-      role: 'result',
-      content: '⏳ Ejecutando git...',
-      _key: 'result-' + Date.now(),
-    });
 
     try {
       const res = await fetch('/api/command/git', {
@@ -51,25 +28,12 @@ register({
       const data = await res.json();
 
       if (data.success) {
-        chatStore.messages[msgIdx] = {
-          role: 'result',
-          content: data.stdout || '(sin salida)',
-          _key: 'result-' + Date.now(),
-        };
-      } else {
-        chatStore.messages[msgIdx] = {
-          role: 'result',
-          content: data.stderr || data.error || 'Error desconocido',
-          _key: 'err-' + Date.now(),
-        };
+        return data.stdout || '(sin salida)';
       }
+      throw new Error(data.stderr || data.error || 'Error desconocido');
     } catch (err) {
       console.error('Error en /git:', err);
-      chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: 'Error: ' + err.message,
-        _key: 'err-' + Date.now(),
-      };
+      throw err;
     }
   },
 });

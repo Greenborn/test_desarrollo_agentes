@@ -21,12 +21,7 @@ register({
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId;
     if (!sessionId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Primero debe iniciar una sesión de chat.',
-        _key: 'result-' + Date.now(),
-      });
-      return;
+      throw new Error('Primero debe iniciar una sesión de chat.');
     }
 
     let proyectoId = args[0];
@@ -42,26 +37,8 @@ register({
     }
 
     if (!proyectoId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'No hay proyecto seleccionado. Especifique un id de proyecto o use /proyecto_set primero.',
-        _key: 'result-' + Date.now(),
-      });
-      return;
+      throw new Error('No hay proyecto seleccionado. Especifique un id de proyecto o use /proyecto_set primero.');
     }
-
-    chatStore.messages.push({
-      role: 'command',
-      content: `/documentacion_all ${proyectoId}`,
-      _key: 'cmd-' + Date.now(),
-    });
-
-    const msgIdx = chatStore.messages.length;
-    chatStore.messages.push({
-      role: 'result',
-      content: 'Obteniendo documentación...',
-      _key: 'result-' + Date.now(),
-    });
 
     try {
       const res = await fetch(`/api/documentacion/${encodeURIComponent(proyectoId)}`, { credentials: 'include' });
@@ -86,20 +63,10 @@ register({
         }
       }
 
-      const formatted = lines.join('\n') || '(sin documentación para este proyecto)';
-
-      chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: formatted,
-        _key: 'result-' + Date.now(),
-      };
+      return lines.join('\n') || '(sin documentación para este proyecto)';
     } catch (err) {
       console.error('Error en /documentacion_all:', err.message);
-      chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: 'Error: ' + err.message,
-        _key: 'result-' + Date.now(),
-      };
+      throw err;
     }
   },
 });

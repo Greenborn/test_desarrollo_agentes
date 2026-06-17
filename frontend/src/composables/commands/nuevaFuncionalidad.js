@@ -12,24 +12,14 @@ register({
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId;
     if (!sessionId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Primero debe iniciar una sesión de chat.',
-        _key: 'result-' + Date.now(),
-      });
-      return;
+      throw new Error('Primero debe iniciar una sesión de chat.');
     }
 
     try {
       const res = await fetch(`/api/proyecto/session/${sessionId}`, { credentials: 'include' });
       const data = await res.json();
       if (!data.proyectoId) {
-        chatStore.messages.push({
-          role: 'result',
-          content: 'No hay proyecto seleccionado. Use /proyecto_set primero.',
-          _key: 'result-' + Date.now(),
-        });
-        return;
+        throw new Error('No hay proyecto seleccionado. Use /proyecto_set primero.');
       }
       const modal = useModalStore();
       modal.open(FuncionalidadWizard, { sessionId, proyectoId: data.proyectoId }, {
@@ -38,11 +28,7 @@ register({
       });
     } catch (err) {
       console.error('Error al verificar proyecto:', err.message);
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Error al verificar proyecto: ' + err.message,
-        _key: 'result-' + Date.now(),
-      });
+      throw err;
     }
   },
 });

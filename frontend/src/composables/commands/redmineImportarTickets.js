@@ -25,38 +25,15 @@ register({
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId
     if (!sessionId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Primero debe iniciar una sesión de chat.',
-        _key: 'result-' + Date.now(),
-      })
-      return
+      throw new Error('Primero debe iniciar una sesión de chat.')
     }
 
     const isAll = args.includes('--all')
     const proyectoId = isAll ? null : args[0]
 
     if (!isAll && !proyectoId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Debe especificar el ID del proyecto o usar --all. Use Tab para ver las opciones disponibles.',
-        _key: 'result-' + Date.now(),
-      })
-      return
+      throw new Error('Debe especificar el ID del proyecto o usar --all. Use Tab para ver las opciones disponibles.')
     }
-
-    chatStore.messages.push({
-      role: 'command',
-      content: '/redmine_importar_tickets ' + args.join(' '),
-      _key: 'cmd-' + Date.now(),
-    })
-
-    const msgIdx = chatStore.messages.length
-    chatStore.messages.push({
-      role: 'result',
-      content: 'Importando tickets desde Redmine...',
-      _key: 'result-' + Date.now(),
-    })
 
     try {
       let url
@@ -70,12 +47,7 @@ register({
       const data = await res.json()
 
       if (!data.success) {
-        chatStore.messages[msgIdx] = {
-          role: 'result',
-          content: data.message || 'Error al importar tickets.',
-          _key: 'result-' + Date.now(),
-        }
-        return
+        throw new Error(data.message || 'Error al importar tickets.')
       }
 
       let resultText = ''
@@ -97,18 +69,10 @@ register({
         resultText += `- Total en Redmine: ${data.total_redmine}`
       }
 
-      chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: resultText,
-        _key: 'result-' + Date.now(),
-      }
+      return resultText
     } catch (err) {
       console.error('Error en /redmine_importar_tickets:', err.message)
-      chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: 'Error de conexión al importar tickets de Redmine.',
-        _key: 'result-' + Date.now(),
-      }
+      throw new Error('Error de conexión al importar tickets de Redmine.')
     }
   },
 })

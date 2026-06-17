@@ -32,26 +32,8 @@ register({
     const dir = dirArgs.join(' ')
     const sessionId = chatStore.activeSessionId
     if (!sessionId) {
-      chatStore.messages.push({
-        role: 'result',
-        content: 'Primero debe iniciar una sesión de chat.',
-        _key: 'result-' + Date.now(),
-      })
-      return
+      throw new Error('Primero debe iniciar una sesión de chat.')
     }
-
-    chatStore.messages.push({
-      role: 'command',
-      content: `/arbol_directorios ${args.join(' ')}`,
-      _key: 'cmd-' + Date.now(),
-    })
-
-    const msgIdx = chatStore.messages.length
-    chatStore.messages.push({
-      role: 'result',
-      content: '⏳ Generando árbol de directorios...',
-      _key: 'result-' + Date.now(),
-    })
 
     try {
       const params = new URLSearchParams()
@@ -63,26 +45,13 @@ register({
       const data = await res.json()
 
       if (!data.success) {
-        chatStore.messages[msgIdx] = {
-          role: 'result',
-          content: 'Error: ' + (data.error || 'Error desconocido'),
-          _key: 'err-' + Date.now(),
-        }
-        return
+        throw new Error(data.error || 'Error desconocido')
       }
 
-      chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: JSON.stringify(data.tree, null, 2),
-        _key: 'result-' + Date.now(),
-      }
+      return JSON.stringify(data.tree, null, 2)
     } catch (err) {
       console.error('Error en /arbol_directorios:', err)
-      chatStore.messages[msgIdx] = {
-        role: 'result',
-        content: 'Error: ' + err.message,
-        _key: 'err-' + Date.now(),
-      }
+      throw err
     }
   },
 })

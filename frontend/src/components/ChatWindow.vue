@@ -40,12 +40,12 @@
           v-model="input"
           class="form-control flex-grow-1 bg-dark text-light border-secondary"
           placeholder="Escribe tu mensaje..."
-          :disabled="streaming"
+          :disabled="streaming || executing"
           rows="1"
           style="resize: vertical; max-height: 150px;"
           @keydown.enter.exact.prevent="send"
         ></textarea>
-        <button class="btn btn-argentina" :disabled="streaming || !input.trim()">Enviar</button>
+        <button class="btn btn-argentina" :disabled="streaming || executing || !input.trim()">Enviar</button>
       </form>
     </div>
     <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu"></div>
@@ -56,7 +56,7 @@
 </template>
 
 <script>
-import { ref, reactive, watch, nextTick } from 'vue'
+import { ref, reactive, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
@@ -75,7 +75,7 @@ export default {
     const modal = useModalStore()
     const ocStore = useOpencodeStore()
     const { find } = useCommandRegistry()
-    const { activeSessionId, messages, streaming, currentChunk, currentThinking } = storeToRefs(chat)
+    const { activeSessionId, messages, streaming, executing, currentChunk, currentThinking } = storeToRefs(chat)
     const input = ref('')
     const messagesContainer = ref(null)
     const ocStreaming = ref(false)
@@ -519,46 +519,60 @@ export default {
     async function executeCommand(raw) {
       const parts = raw.split(/\s+/)
       const cmdName = parts[0].toLowerCase()
-      const args = parts.slice(1)
-      const sessionId = chat.activeSessionId
+
+      if (cmdName === '/help') {
+        modal.open(HelpContent, {})
+        return
+      }
 
       const known = find(cmdName)
-      if (known) {
-        if (cmdName === '/help') {
-          modal.open(HelpContent, {})
-          return
+
+      await chat.runCommand(raw, async (loadingIdx) => {
+        if (known) {
+          return known.execute(parts.slice(1), { cmdStore, chatStore: chat, loadingIdx })
         }
-        known.execute(args, { cmdStore, chatStore: chat })
-      } else {
-        try {
-          const res = await fetch('/api/command/execute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ command: raw, sessionId }),
-          })
-          const data = await res.json()
-          if (data.success) {
-            chat.loadMessages(sessionId)
-          } else {
-            console.error('Error al ejecutar comando:', data.result)
-          }
-        } catch (err) {
-          console.error('Error al ejecutar comando:', err)
+        const res = await fetch('/api/command/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ command: raw, sessionId: chat.activeSessionId }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          await chat.loadMessages(chat.activeSessionId)
+          return null
         }
+        throw new Error(data.result || 'Error al ejecutar comando')
+      })
+    }
+
+    let resizeObserver = null
+
+    async function scrollToBottom() {
+      await nextTick()
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+      if (messagesContainer.value) {
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
       }
     }
 
-    watch(
-      () => [chat.messages.length, chat.currentChunk, ocChunk.value],
-      async () => {
-        await nextTick()
-        if (messagesContainer.value) {
-          messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-        }
-      },
-      { deep: true }
-    )
+    watch(() => chat.messages.length, scrollToBottom)
+    watch([currentChunk, ocChunk], scrollToBottom)
+
+    onMounted(() => {
+      if (messagesContainer.value) {
+        resizeObserver = new ResizeObserver(() => {
+          if (messagesContainer.value) {
+            messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+          }
+        })
+        resizeObserver.observe(messagesContainer.value)
+      }
+    })
+
+    onUnmounted(() => {
+      if (resizeObserver) resizeObserver.disconnect()
+    })
 
     return {
       activeSessionId,

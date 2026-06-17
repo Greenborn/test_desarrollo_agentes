@@ -9,6 +9,7 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref([])
   const streaming = ref(false)
   const creating = ref(false)
+  const executing = ref(false)
   const currentChunk = ref('')
   const currentThinking = ref('')
 
@@ -58,6 +59,38 @@ export const useChatStore = defineStore('chat', () => {
       await createSession(cwd)
     }
     return activeSessionId.value
+  }
+
+  async function runCommand(raw, executeFn) {
+    executing.value = true
+    const loadingKey = 'loading-' + Date.now()
+
+    messages.value.push({ role: 'command', content: raw, _key: 'cmd-' + Date.now() })
+    const loadingIdx = messages.value.length
+    messages.value.push({ role: 'result', content: '⏳ Ejecutando comando...', _key: loadingKey })
+
+    try {
+      const result = await executeFn(loadingIdx)
+      const idx = messages.value.findIndex(m => m._key === loadingKey)
+      if (idx === -1) return
+      if (result !== undefined && result !== null) {
+        if (typeof result === 'object' && result.role) {
+          messages.value[idx] = { ...result, _key: 'result-' + Date.now() }
+        } else {
+          messages.value[idx] = { role: 'result', content: String(result), _key: 'result-' + Date.now() }
+        }
+      } else {
+        messages.value.splice(idx, 1)
+      }
+    } catch (err) {
+      console.error('Error ejecutando comando:', err)
+      const idx = messages.value.findIndex(m => m._key === loadingKey)
+      if (idx !== -1) {
+        messages.value[idx] = { role: 'result', content: 'Error: ' + (err.message || 'Error desconocido'), _key: 'err-' + Date.now() }
+      }
+    } finally {
+      executing.value = false
+    }
   }
 
   async function loadMessages(sessionId) {
@@ -202,8 +235,8 @@ export const useChatStore = defineStore('chat', () => {
 
   return {
     sessions, activeSessionId, messages,
-    streaming, creating, currentChunk, currentThinking,
-    loadSessions, createSession, createSessionIfNeeded, loadMessages,
+    streaming, creating, executing, currentChunk, currentThinking,
+    loadSessions, createSession, createSessionIfNeeded, runCommand, loadMessages,
     sendMessage, deleteMessage, deleteSession,
   }
 })
