@@ -238,6 +238,13 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Respuesta 200:** `{ success: true, message: "Conexión exitosa a Redmine." }`
 - **Respuesta 200 (error):** `{ success: false, message: "Error: ..." }`
 
+### `GET /api/redmine/proyectos`
+- **Auth:** Requerida
+- **Body:** ninguno
+- **Descripción:** Obtiene el listado de proyectos Redmine desde `${redmine_url}/projects.json` con autenticación Bearer. Incluye `time_entry_activities`, `issue_categories` y `enabled_modules`.
+- **Respuesta 200:** `{ success: true, proyectos: [{ id, name, identifier, description, status, created_on, updated_on, parent }] }`
+- **Respuesta 200 (error):** `{ success: false, message: "..." }`
+
 ---
 
 ## Notas

@@ -16,6 +16,7 @@ import './composables/commands/gastosProyecto.js'
 import './composables/commands/arbolDirectorios.js'
 import './composables/commands/funcionalidadesListar.js'
 import './composables/commands/redmineTest.js'
+import './composables/commands/redmineProyectos.js'
 
 const app = createApp(App)
 const pinia = createPinia()
