@@ -90,8 +90,13 @@ router.post('/sessions/:id/messages', async (req, res) => {
 
     let fullThinking = '';
     let fullResponse = '';
+    let usageData = null;
 
     for await (const chunk of streamChat(history)) {
+      if (chunk.type === 'usage') {
+        usageData = chunk;
+        continue;
+      }
       if (chunk.type === 'thinking') {
         fullThinking += chunk.content;
       } else {
@@ -107,6 +112,29 @@ router.post('/sessions/:id/messages', async (req, res) => {
       thinking: fullThinking ? fullThinking : null,
     });
     await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
+
+    if (usageData) {
+      try {
+        const chatSess = await db('chat_sessions').where({ id: sessionId }).select('proyecto_id').first();
+        const idProyecto = chatSess?.proyecto_id;
+        if (idProyecto) {
+          const gastosPort = process.env.SERVICIO_GASTOS_PORT || 4100;
+          const precio = (usageData.completion_tokens || 0) * 0.0000011;
+          await fetch(`http://localhost:${gastosPort}/api/gastos/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id_chat_session: parseInt(sessionId),
+              id_proyecto: idProyecto,
+              precio: precio,
+              tokens: usageData.total_tokens || 0,
+            }),
+          });
+        }
+      } catch (e) {
+        console.log('[gastos] error al registrar en chat normal:', e.message);
+      }
+    }
 
     res.write(`data: ${JSON.stringify({ type: 'done', sessionId })}\n\n`);
     res.end();

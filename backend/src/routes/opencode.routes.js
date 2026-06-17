@@ -100,20 +100,31 @@ router.post('/send', async (req, res) => {
       'Connection': 'keep-alive',
     });
 
-    async function registrarGastos(sessionId, ocSessionId, server) {
+    async function registrarGastos(sessionId, ocSessionId, server, fullResponse) {
       if (!sessionId) return;
       try {
+        let realTokens = 0;
+        let realCost = 0;
+
         const messages = await server.getSessionMessages(ocSessionId);
         const lastAssistant = messages && messages.findLast
-          ? messages.findLast(m => m.info?.role === 'assistant')
+          ? messages.findLast(m => m?.info?.role === 'assistant' || m?.role === 'assistant')
           : messages && messages.length > 0
-            ? [...messages].reverse().find(m => m.info?.role === 'assistant')
+            ? [...messages].reverse().find(m => m?.info?.role === 'assistant' || m?.role === 'assistant')
             : null;
-        const realTokens = lastAssistant?.info?.tokens?.output || 0;
-        const realCost = lastAssistant?.info?.cost || 0;
+        if (lastAssistant) {
+          realTokens = lastAssistant?.info?.tokens?.output || lastAssistant?.tokens?.output || lastAssistant?.info?.tokens?.output_tokens || lastAssistant?.tokens?.output_tokens || 0;
+          realCost = lastAssistant?.info?.cost || lastAssistant?.cost || 0;
+        }
+
+        if (!realTokens && !realCost && fullResponse) {
+          realTokens = Math.ceil(fullResponse.length / 4);
+          realCost = 0;
+        }
+
         const chatSess = await db('chat_sessions').where({ id: sessionId }).select('proyecto_id').first();
         const idProyecto = chatSess?.proyecto_id;
-        if (idProyecto && (realTokens > 0 || realCost > 0)) {
+        if (idProyecto) {
           const gastosPort = process.env.SERVICIO_GASTOS_PORT || 4100;
           await fetch(`http://localhost:${gastosPort}/api/gastos/register`, {
             method: 'POST',
@@ -188,8 +199,9 @@ router.post('/send', async (req, res) => {
       msgOptions.model = modelConfig;
     }
 
+    let fullResponse = '';
+
     try {
-      let fullResponse = '';
       const partTypes = {};
 
       for await (const event of server.streamSession(ocSessionId, parts, msgOptions)) {
@@ -247,7 +259,7 @@ router.post('/send', async (req, res) => {
         });
       }
 
-      await registrarGastos(sessionId, ocSessionId, server);
+      await registrarGastos(sessionId, ocSessionId, server, fullResponse);
 
       res.write(`data: ${JSON.stringify({ type: 'done', ocSessionId, hash: ocSessionId, fullResponse, diff: diff || [] })}\n\n`);
       res.end();
@@ -271,7 +283,7 @@ router.post('/send', async (req, res) => {
           });
         } catch {}
       }
-      await registrarGastos(sessionId, ocSessionId, server).catch(() => {});
+      await registrarGastos(sessionId, ocSessionId, server, fullResponse).catch((e) => console.log('[gastos] error en catch post-error:', e.message));
       res.end();
     }
 

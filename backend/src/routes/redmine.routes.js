@@ -256,4 +256,66 @@ router.post('/proyectos/import', async (req, res) => {
   }
 });
 
+router.get('/proyectos/:proyectoId/tickets', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const proyecto = await db('proyectos').where({ id: req.params.proyectoId }).first();
+
+    if (!proyecto) {
+      res.json({ success: false, message: `Proyecto "${req.params.proyectoId}" no encontrado en la base local.` });
+      return;
+    }
+
+    if (!proyecto.redmine_id) {
+      res.json({ success: false, message: `El proyecto "${req.params.proyectoId}" no tiene ID de Redmine asociado.` });
+      return;
+    }
+
+    const token = await getRedmineToken();
+    const url = await getRedmineUrl();
+
+    if (!token || !url) {
+      res.json({ success: false, message: 'Token o URL de Redmine no configurados. Configure ambos en Configuración.' });
+      return;
+    }
+
+    const apiUrl = url.replace(/\/+$/, '') + `/issues.json?project_id=${proyecto.redmine_id}&limit=100&sort=updated_on:desc`;
+
+    const response = await fetch(apiUrl, {
+      headers: {
+        'X-Redmine-API-Key': token,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      res.json({
+        success: false,
+        message: `Error al obtener tickets: HTTP ${response.status}${text ? ' — ' + text.slice(0, 200) : ''}`,
+      });
+      return;
+    }
+
+    const data = await response.json();
+
+    const tickets = (data.issues || []).map((issue) => ({
+      id: issue.id,
+      subject: issue.subject || '(sin asunto)',
+      status: issue.status?.name || '—',
+      priority: issue.priority?.name || '—',
+      tracker: issue.tracker?.name || '—',
+      assigned_to: issue.assigned_to?.name || null,
+      created_on: issue.created_on || null,
+      updated_on: issue.updated_on || null,
+    }));
+
+    res.json({ success: true, tickets, total: data.total_count || tickets.length });
+  } catch (err) {
+    console.log('Error al obtener tickets Redmine:', err.message);
+    res.json({ success: false, message: 'Error al obtener tickets: ' + err.message });
+  }
+});
+
 export default router;

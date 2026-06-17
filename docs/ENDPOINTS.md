@@ -251,6 +251,13 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Obtiene todos los proyectos desde Redmine API (con paginación automática, límite 100 por página) y los importa a la tabla `proyectos` local. Verifica existencia por `redmine_id` (columna UNIQUE). Los errores individuales no detienen el proceso.
 - **Respuesta 200:** `{ success: true, importados: [{ id, name, identifier }], yaExistentes: [{ id, name, identifier }], errores: [{ id, name, error }], total: number }`
 
+### `GET /api/redmine/proyectos/:proyectoId/tickets`
+- **Auth:** Requerida
+- **Params:** `proyectoId` — ID local del proyecto (slug en tabla `proyectos`)
+- **Descripción:** Busca el proyecto en la base local, obtiene su `redmine_id` y consulta la API de Redmine (`${url}/issues.json?project_id=${redmineId}`) para obtener los tickets del proyecto. Incluye orden por `updated_on` descendente, límite 100.
+- **Respuesta 200:** `{ success: true, tickets: [{ id, subject, status, priority, tracker, assigned_to, created_on, updated_on }], total: number }`
+- **Respuesta 200 (error):** `{ success: false, message: "Proyecto no encontrado..." | "El proyecto no tiene ID de Redmine..." | "Token o URL no configurados..." | "Error al obtener tickets..." }`
+
 ### `POST /api/redmine/proyectos/import`
 - **Auth:** Requerida
 - **Body:** `{ id, name, description?, status?, created_on?, updated_on?, parent?: { id, name } }`

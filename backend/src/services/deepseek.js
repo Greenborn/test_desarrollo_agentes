@@ -52,6 +52,7 @@ export async function* streamChat(messages) {
       ...normalizeMessages(messages),
     ],
     stream: true,
+    stream_options: { include_usage: true },
   };
 
   const response = await fetch('https://api.deepseek.com/chat/completions', {
@@ -95,6 +96,10 @@ export async function* streamChat(messages) {
 
       try {
         const json = JSON.parse(trimmed.slice(6));
+        if (json.usage) {
+          yield { type: 'usage', prompt_tokens: json.usage.prompt_tokens || 0, completion_tokens: json.usage.completion_tokens || 0, total_tokens: json.usage.total_tokens || 0 };
+          continue;
+        }
         const choice = json.choices ? json.choices[0] : null;
         const delta = choice && choice.delta ? choice.delta : {};
         if (delta.reasoning_content) {

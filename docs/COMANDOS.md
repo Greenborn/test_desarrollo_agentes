@@ -40,6 +40,7 @@ Los comandos registrados en frontend tienen prioridad sobre los del backend.
 |---|---|---|
 | `/redmine_test` | Prueba la conexión a la instancia de Redmine configurada | `/redmine_test` |
 | `/redmine_proyectos` | Lista proyectos Redmine. Con `import_all` importa todos a la base de datos local | `/redmine_proyectos [import_all]` |
+| `/redmine_tickets` | Obtiene la lista de tickets de Redmine para un proyecto importado. Usa Tab para autocompletar con los proyectos disponibles | `/redmine_tickets <id_proyecto>` |
 
 ---
 

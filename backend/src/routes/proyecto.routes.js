@@ -14,7 +14,7 @@ function authGuard(req, res) {
 router.get('/proyecto', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const proyectos = await db('proyectos').select('id', 'descripcion').orderBy('id');
+    const proyectos = await db('proyectos').select('*').orderBy('id');
     res.json({ proyectos });
   } catch (err) {
     console.log('Error al listar proyectos:', err.message);
