@@ -45,10 +45,42 @@
           v-for="p in filteredProjects"
           :key="p.id"
           class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
-          :class="{ active: selectedProject && selectedProject.id === p.id }"
+          :class="{
+            active: selectedProject && selectedProject.id === p.id,
+            'pinned-project': p.id === pinnedProjectId,
+          }"
           @click="selectProject(p)"
         >
-          <span class="text-truncate">{{ p.id }} — {{ p.descripcion }}</span>
+          <span
+            class="pin-btn"
+            :class="{ pinned: p.id === pinnedProjectId }"
+            @click.stop="projectStore.togglePin(p.id)"
+            title="Fijar proyecto"
+          >📌</span>
+          <span class="text-truncate ms-1">{{ p.id }} — {{ p.descripcion }}</span>
+        </button>
+      </div>
+    </div>
+    <button
+      class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
+      data-bs-toggle="collapse"
+      data-bs-target="#sidebar-tickets-collapse"
+    >
+      ▼ Tickets
+    </button>
+    <div id="sidebar-tickets-collapse" class="collapse overflow-y-auto" style="max-height: 30%;">
+      <div class="list-group list-group-flush" style="min-height: 0;">
+        <button
+          v-for="t in filteredTickets"
+          :key="t.id"
+          class="list-group-item list-group-item-action py-2 px-2 small"
+          :class="{
+            active: selectedTicket && selectedTicket.id === t.id,
+            'pinned-project': t.proyecto_id === pinnedProjectId,
+          }"
+          @click="selectTicket(t)"
+        >
+          <span class="text-truncate">#{{ t.redmine_id }} — {{ t.subject }}</span>
         </button>
       </div>
     </div>
@@ -62,6 +94,7 @@ import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 import { useUiStore } from '../stores/ui.js'
 import { useProjectStore } from '../stores/project.js'
+import { useTicketStore } from '../stores/ticket.js'
 
 export default {
   setup() {
@@ -69,9 +102,11 @@ export default {
     const cmd = useCommandStore()
     const ui = useUiStore()
     const projectStore = useProjectStore()
+    const ticketStore = useTicketStore()
     const { sessions, activeSessionId, creating } = storeToRefs(chat)
     const { sidebarCollapsed, omnifilter } = storeToRefs(ui)
-    const { projects, selectedProject } = storeToRefs(projectStore)
+    const { projects, selectedProject, pinnedProjectId } = storeToRefs(projectStore)
+    const { tickets, selectedTicket } = storeToRefs(ticketStore)
 
     function sessionTooltip(s) {
       const lines = []
@@ -92,13 +127,20 @@ export default {
 
     function selectSession(id) {
       projectStore.clearSelection()
+      ticketStore.clearSelection()
       const s = chat.sessions.find((s) => s.id === id)
       if (s && s.cwd) cmd.currentDir = s.cwd
       chat.loadMessages(id)
     }
 
     function selectProject(p) {
+      ticketStore.clearSelection()
       projectStore.selectProject(p)
+    }
+
+    function selectTicket(t) {
+      projectStore.clearSelection()
+      ticketStore.selectTicket(t)
     }
 
     const filteredSessions = computed(() => {
@@ -118,8 +160,28 @@ export default {
       })
     })
 
+    const filteredTickets = computed(() => {
+      const filter = omnifilter.value.toLowerCase()
+      let list = tickets.value
+      if (filter) {
+        list = list.filter((t) => {
+          const fields = [String(t.redmine_id), t.subject, t.proyecto_id]
+          return fields.some((f) => f && f.toLowerCase().includes(filter))
+        })
+      }
+      if (pinnedProjectId.value) {
+        list = [...list].sort((a, b) => {
+          const aPinned = a.proyecto_id === pinnedProjectId.value ? 0 : 1
+          const bPinned = b.proyecto_id === pinnedProjectId.value ? 0 : 1
+          return aPinned - bPinned
+        })
+      }
+      return list
+    })
+
     onMounted(() => {
       projectStore.loadProjects()
+      ticketStore.loadTickets()
     })
 
     return {
@@ -130,10 +192,16 @@ export default {
       sidebarCollapsed,
       filteredProjects,
       selectedProject,
+      pinnedProjectId,
+      projectStore,
+      filteredTickets,
+      selectedTicket,
+      ticketStore,
       sessionTooltip,
       createSession,
       selectSession,
       selectProject,
+      selectTicket,
     }
   },
 }
@@ -201,5 +269,23 @@ export default {
 .btn-outline-argentina:hover {
   background-color: #1a2744;
   color: #75AADB;
+}
+.pin-btn {
+  cursor: pointer;
+  opacity: 0.3;
+  font-size: 0.75rem;
+  transition: opacity 0.15s ease;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.pin-btn.pinned {
+  opacity: 1;
+}
+.pin-btn:hover {
+  opacity: 1;
+}
+.pinned-project {
+  background-color: #1a3344 !important;
+  border-left: 3px solid #75AADB !important;
 }
 </style>

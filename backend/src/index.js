@@ -16,6 +16,7 @@ import proyectoRoutes from './routes/proyecto.routes.js';
 import documentacionRoutes from './routes/documentacion.routes.js';
 import gastosRoutes from './routes/gastos.routes.js';
 import redmineRoutes from './routes/redmine.routes.js';
+import ticketsRoutes from './routes/tickets.routes.js';
 import opencode from './services/opencode.js';
 import db from './config/db.js';
 
@@ -40,6 +41,7 @@ app.use('/api', proyectoRoutes);
 app.use('/api/documentacion', documentacionRoutes);
 app.use('/api/gastos', gastosRoutes);
 app.use('/api/redmine', redmineRoutes);
+app.use('/api/tickets', ticketsRoutes);
 
 let pwProcess = null;
 let docProcess = null;

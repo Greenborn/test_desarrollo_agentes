@@ -179,7 +179,8 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 
 ### `GET /api/proyecto`
 - **Auth:** Requerida
-- **Respuesta:** `{ proyectos: [{ id, descripcion }] }`
+- **Descripción:** Lista proyectos. El proyecto pineado (si existe) aparece primero.
+- **Respuesta:** `{ proyectos: [{ id, descripcion }], pinnedProjectId: string|null }`
 
 ### `POST /api/proyecto`
 - **Auth:** Requerida
@@ -193,6 +194,13 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 ### `POST /api/proyecto/session`
 - **Auth:** Requerida
 - **Body:** `{ sessionId (req), proyectoId?: string|null }`
+- **Respuesta:** `{ success: true }`
+
+### `POST /api/proyecto/pin`
+- **Auth:** Requerida
+- **Body:** `{ proyectoId: string|null }`
+- **Descripción:** Fija o quita el proyecto pineado para el usuario. Si `proyectoId` es `null` o se omite, quita el pin.
+- **Almacenamiento:** `user_settings` con key `pinned_project`
 - **Respuesta:** `{ success: true }`
 
 ---
@@ -279,6 +287,15 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Importa un proyecto Redmine a la tabla `proyectos` local. Genera un slug (minúsculas, solo letras/números, espacios → `_`, sin acentos/símbolos) como `id` del proyecto. Verifica que no exista duplicado.
 - **Respuesta 200:** `{ success: true, proyectoId: "slug_del_proyecto" }`
 - **Respuesta 200 (error):** `{ success: false, message: "..." }`
+
+---
+
+## Tickets (`/api/tickets`)
+
+### `GET /api/tickets`
+- **Auth:** Requerida
+- **Descripción:** Obtiene todos los tickets almacenados en la base de datos local (tabla `tickets`), ordenados por `redmine_updated_on` descendente.
+- **Respuesta 200:** `{ success: true, tickets: [{ id, proyecto_id, redmine_id, subject, description, status_name, tracker_name, priority_name, assigned_to_name, author_name, start_date, due_date, estimated_hours, done_ratio, fixed_version_name, redmine_created_on, redmine_updated_on, redmine_closed_on }] }`
 
 ---
 

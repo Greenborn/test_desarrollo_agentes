@@ -15,7 +15,19 @@ router.get('/proyecto', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
     const proyectos = await db('proyectos').select('*').orderBy('id');
-    res.json({ proyectos });
+    const pinnedRow = await db('user_settings')
+      .select('value')
+      .where({ user_id: req.session.userId, key: 'pinned_project' })
+      .first();
+    const pinnedProjectId = pinnedRow?.value || null;
+    if (pinnedProjectId) {
+      const idx = proyectos.findIndex(p => p.id === pinnedProjectId);
+      if (idx > 0) {
+        const [pinned] = proyectos.splice(idx, 1);
+        proyectos.unshift(pinned);
+      }
+    }
+    res.json({ proyectos, pinnedProjectId });
   } catch (err) {
     console.log('Error al listar proyectos:', err.message);
     res.status(500).json({ error: err.message });
@@ -66,6 +78,27 @@ router.post('/proyecto/session', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.log('Error al asignar proyecto a sesión:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/proyecto/pin', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const { proyectoId } = req.body;
+  try {
+    if (proyectoId) {
+      await db('user_settings')
+        .insert({ user_id: req.session.userId, key: 'pinned_project', value: proyectoId })
+        .onConflict(['user_id', 'key'])
+        .merge();
+    } else {
+      await db('user_settings')
+        .where({ user_id: req.session.userId, key: 'pinned_project' })
+        .delete();
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al guardar proyecto pineado:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
