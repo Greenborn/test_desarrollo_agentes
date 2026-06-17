@@ -13,52 +13,54 @@
     >
       ▼ Chats
     </button>
-    <div id="sidebar-chats-collapse" class="collapse show overflow-y-auto" style="max-height: 40%;">
-      <div class="list-group list-group-flush" style="min-height: 0;">
-        <button
-          v-for="s in filteredSessions"
-          :key="s.id"
-          class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
-          :class="{ active: s.id === activeSessionId }"
-          :title="sessionTooltip(s)"
-          @click="selectSession(s.id)"
-        >
-          <span class="text-truncate">{{ s.title }}</span>
-          <span
-            class="delete-btn"
-            @click.stop="chat.deleteSession(s.id)"
-            title="Eliminar conversación"
-          >&times;</span>
-        </button>
+    <div class="d-flex flex-column flex-grow-1" style="min-height: 0;">
+      <div id="sidebar-chats-collapse" class="collapse show overflow-y-auto flex-grow-1" style="min-height: 0;">
+        <div class="list-group list-group-flush" style="min-height: 0;">
+          <button
+            v-for="s in filteredSessions"
+            :key="s.id"
+            class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
+            :class="{ active: s.id === activeSessionId }"
+            :title="sessionTooltip(s)"
+            @click="selectSession(s.id)"
+          >
+            <span class="text-truncate">{{ s.title }}</span>
+            <span
+              class="delete-btn"
+              @click.stop="chat.deleteSession(s.id)"
+              title="Eliminar conversación"
+            >&times;</span>
+          </button>
+        </div>
       </div>
-    </div>
-    <button
-      class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
-      data-bs-toggle="collapse"
-      data-bs-target="#sidebar-projects-collapse"
-    >
-      ▼ Proyectos
-    </button>
-    <div id="sidebar-projects-collapse" class="collapse show overflow-y-auto flex-grow-1">
-      <div class="list-group list-group-flush" style="min-height: 0;">
-        <button
-          v-for="p in filteredProjects"
-          :key="p.id"
-          class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
-          :class="{
-            active: selectedProject && selectedProject.id === p.id,
-            'pinned-project': p.id === pinnedProjectId,
-          }"
-          @click="selectProject(p)"
-        >
-          <span
-            class="pin-btn"
-            :class="{ pinned: p.id === pinnedProjectId }"
-            @click.stop="projectStore.togglePin(p.id)"
-            title="Fijar proyecto"
-          >📌</span>
-          <span class="text-truncate ms-1">{{ p.id }} — {{ p.descripcion }}</span>
-        </button>
+      <button
+        class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
+        data-bs-toggle="collapse"
+        data-bs-target="#sidebar-projects-collapse"
+      >
+        ▼ Proyectos
+      </button>
+      <div id="sidebar-projects-collapse" class="collapse show overflow-y-auto flex-grow-1" style="min-height: 0;">
+        <div class="list-group list-group-flush" style="min-height: 0;">
+          <button
+            v-for="p in filteredProjects"
+            :key="p.id"
+            class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
+            :class="{
+              active: selectedProject && selectedProject.id === p.id,
+              'pinned-project': p.id === pinnedProjectId,
+            }"
+            @click="selectProject(p)"
+          >
+            <span
+              class="pin-btn"
+              :class="{ pinned: p.id === pinnedProjectId }"
+              @click.stop="projectStore.togglePin(p.id)"
+              title="Fijar proyecto"
+            >📌</span>
+            <span class="text-truncate ms-1">{{ p.id }} — {{ p.descripcion }}</span>
+          </button>
+        </div>
       </div>
     </div>
     <button
@@ -68,8 +70,8 @@
     >
       ▼ Tickets
     </button>
-    <div id="sidebar-tickets-collapse" class="collapse overflow-y-auto" style="max-height: 30%;">
-      <div class="list-group list-group-flush" style="min-height: 0;">
+      <div id="sidebar-tickets-collapse" class="collapse overflow-y-auto flex-grow-1" style="min-height: 0;">
+        <div class="list-group list-group-flush" style="min-height: 0;">
         <button
           v-for="t in filteredTickets"
           :key="t.id"
