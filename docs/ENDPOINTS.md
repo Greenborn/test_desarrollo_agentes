@@ -229,6 +229,16 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Respuesta 400:** `{ error: "Campo \"...\" es requerido" }`
 
 ---
+## Redmine (`/api/redmine`)
+
+### `POST /api/redmine/test`
+- **Auth:** Requerida
+- **Body:** ninguno
+- **Descripción:** Lee `redmine_token` y `redmine_url` de la configuración, hace una petición GET a `${redmine_url}/projects.json` con autenticación Bearer, y devuelve si la conexión fue exitosa o no.
+- **Respuesta 200:** `{ success: true, message: "Conexión exitosa a Redmine." }`
+- **Respuesta 200 (error):** `{ success: false, message: "Error: ..." }`
+
+---
 
 ## Notas
 

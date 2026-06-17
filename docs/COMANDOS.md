@@ -34,6 +34,14 @@ Los comandos registrados en frontend tienen prioridad sobre los del backend.
 
 ---
 
+## Utilidades
+
+| Comando | Descripción | Uso |
+|---|---|---|
+| `/redmine_test` | Prueba la conexión a la instancia de Redmine configurada | `/redmine_test` |
+
+---
+
 ## Navegador (Playwright)
 
 | Comando | Descripción | Uso |
