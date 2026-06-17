@@ -126,9 +126,6 @@ export const useChatStore = defineStore('chat', () => {
 
   async function loadMessages(sessionId) {
     activeSessionId.value = sessionId
-    if (!_sessionCmdCount.value[sessionId]) {
-      delete sessionStatus.value[sessionId]
-    }
     messages.value = []
     currentChunk.value = ''
     currentThinking.value = ''

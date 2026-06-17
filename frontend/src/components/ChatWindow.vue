@@ -826,19 +826,31 @@ export default {
           if (sessionId) chat.sessionStatus[sessionId] = 'idle'
           if (_isActiveSession(sessionId)) {
             const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
-            const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-            if (streamIdx >= 0) {
-              chat.messages[streamIdx].streaming = false
-              chat.messages[streamIdx].role = 'opencode_result'
-              chat.messages[streamIdx].content = fullResponse
-            }
-            // Update the LAST descripcion_result control with the new response
+            // Demote the previous descripcion_result to a plain result (no buttons)
             for (let i = chat.messages.length - 1; i >= 0; i--) {
               const m = chat.messages[i]
               if (m.controlData && m.controlData.controlType === 'descripcion_result') {
-                m.controlData.description = fullResponse
-                m.controlData.loading = false
+                chat.messages[i] = {
+                  role: 'result',
+                  content: m.controlData.description || '(descripción anterior)',
+                  _key: 'old-result-' + Date.now(),
+                }
                 break
+              }
+            }
+            // Replace stream message with the NEW descripcion_result (with buttons)
+            const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (streamIdx >= 0) {
+              chat.messages[streamIdx] = {
+                role: 'opencode_control',
+                controlData: {
+                  controlId: 'descripcion-result-' + Date.now(),
+                  controlType: 'descripcion_result',
+                  description: fullResponse,
+                  loading: false,
+                  ticket,
+                },
+                _key: 'control-' + Date.now(),
               }
             }
             // Add new followup control to continue the conversation
