@@ -90,7 +90,8 @@
 </template>
 
 <script>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch, nextTick } from 'vue'
+import { Collapse } from 'bootstrap'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
@@ -184,6 +185,15 @@ export default {
     onMounted(() => {
       projectStore.loadProjects()
       ticketStore.loadTickets()
+    })
+
+    watch(omnifilter, async (val) => {
+      if (!val) return
+      await nextTick()
+      ;['sidebar-chats-collapse', 'sidebar-projects-collapse', 'sidebar-tickets-collapse'].forEach((id) => {
+        const el = document.getElementById(id)
+        if (el) Collapse.getOrCreateInstance(el).show()
+      })
     })
 
     return {

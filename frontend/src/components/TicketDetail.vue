@@ -1,27 +1,10 @@
 <template>
   <div class="d-flex flex-column h-100 text-light p-4 overflow-y-auto" style="background: #1a1a2e;">
-    <div class="d-flex align-items-center mb-4">
+    <div class="d-flex align-items-center mb-3">
       <button class="btn btn-sm btn-outline-argentina me-3" @click="goBack">
         ← Volver al chat
       </button>
       <h5 class="mb-0">Detalle del Ticket #{{ ticket.redmine_id }}</h5>
-    </div>
-
-    <div class="card bg-dark border-secondary mb-3">
-      <div class="card-body">
-        <div class="mb-3">
-          <label class="form-label small text-secondary">ID Redmine</label>
-          <div class="form-control bg-dark text-light border-secondary">{{ ticket.redmine_id }}</div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label small text-secondary">Asunto</label>
-          <div class="form-control bg-dark text-light border-secondary">{{ ticket.subject }}</div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label small text-secondary">Proyecto</label>
-          <div class="form-control bg-dark text-light border-secondary">{{ ticket.proyecto_id }}</div>
-        </div>
-      </div>
     </div>
 
     <div class="card bg-dark border-secondary mb-3">
@@ -30,29 +13,44 @@
       </div>
       <div class="card-body">
         <div class="row">
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">Estado</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ ticket.status_name || '(sin datos)' }}</div>
+          <div class="col-6 mb-2">
+            <label class="form-label small text-secondary mb-1">ID Redmine</label>
+            <div class="text-light">{{ ticket.redmine_id }}</div>
           </div>
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">Prioridad</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ ticket.priority_name || '(sin datos)' }}</div>
+          <div class="col-6 mb-2">
+            <label class="form-label small text-secondary mb-1">Proyecto</label>
+            <div class="text-light">{{ ticket.proyecto_id }}</div>
           </div>
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">Tracker</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ ticket.tracker_name || '(sin datos)' }}</div>
+          <div class="col-12 mb-2">
+            <label class="form-label small text-secondary mb-1">Asunto</label>
+            <div class="text-light">{{ ticket.subject }}</div>
           </div>
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">Asignado a</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ ticket.assigned_to_name || '(sin datos)' }}</div>
+        </div>
+        <hr class="border-secondary my-2">
+        <div class="row">
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">Estado</label>
+            <div class="text-light">{{ ticket.status_name || '(sin datos)' }}</div>
           </div>
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">Autor</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ ticket.author_name || '(sin datos)' }}</div>
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">Prioridad</label>
+            <div class="text-light">{{ ticket.priority_name || '(sin datos)' }}</div>
           </div>
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">% completado</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ ticket.done_ratio != null ? ticket.done_ratio + '%' : '(sin datos)' }}</div>
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">Tracker</label>
+            <div class="text-light">{{ ticket.tracker_name || '(sin datos)' }}</div>
+          </div>
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">Asignado a</label>
+            <div class="text-light">{{ ticket.assigned_to_name || '(sin datos)' }}</div>
+          </div>
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">Autor</label>
+            <div class="text-light">{{ ticket.author_name || '(sin datos)' }}</div>
+          </div>
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">% completado</label>
+            <div class="text-light">{{ ticket.done_ratio != null ? ticket.done_ratio + '%' : '(sin datos)' }}</div>
           </div>
         </div>
       </div>
@@ -64,44 +62,44 @@
       </div>
       <div class="card-body">
         <div class="row">
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">Fecha inicio</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ ticket.start_date || '(sin datos)' }}</div>
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">Fecha inicio</label>
+            <div class="text-light">{{ ticket.start_date || '(sin datos)' }}</div>
           </div>
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">Fecha vencimiento</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ ticket.due_date || '(sin datos)' }}</div>
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">Fecha vencimiento</label>
+            <div class="text-light">{{ ticket.due_date || '(sin datos)' }}</div>
           </div>
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">Creado en Redmine</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ formatDate(ticket.redmine_created_on) }}</div>
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">Creado en Redmine</label>
+            <div class="text-light">{{ formatDate(ticket.redmine_created_on) }}</div>
           </div>
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">Última actualización</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ formatDate(ticket.redmine_updated_on) }}</div>
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">Última actualización</label>
+            <div class="text-light">{{ formatDate(ticket.redmine_updated_on) }}</div>
           </div>
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">Cerrado en Redmine</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ formatDate(ticket.redmine_closed_on) }}</div>
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">Cerrado en Redmine</label>
+            <div class="text-light">{{ formatDate(ticket.redmine_closed_on) }}</div>
           </div>
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">Horas estimadas</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ ticket.estimated_hours != null ? ticket.estimated_hours + ' h' : '(sin datos)' }}</div>
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">Horas estimadas</label>
+            <div class="text-light">{{ ticket.estimated_hours != null ? ticket.estimated_hours + ' h' : '(sin datos)' }}</div>
           </div>
-          <div class="col-6 mb-3">
-            <label class="form-label small text-secondary">Versión</label>
-            <div class="form-control bg-dark text-light border-secondary">{{ ticket.fixed_version_name || '(sin datos)' }}</div>
+          <div class="col-4 mb-2">
+            <label class="form-label small text-secondary mb-1">Versión</label>
+            <div class="text-light">{{ ticket.fixed_version_name || '(sin datos)' }}</div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="card bg-dark border-secondary mb-3">
+    <div class="card bg-dark border-secondary mb-0 d-flex flex-column">
       <div class="card-header border-secondary">
         <h6 class="mb-0">Descripción</h6>
       </div>
       <div class="card-body">
-        <pre class="form-control bg-dark text-light border-secondary mb-0" style="white-space: pre-wrap; word-break: break-word; min-height: 100px;">{{ ticket.description || '(sin descripción)' }}</pre>
+        <pre class="text-light mb-0" style="white-space: pre-wrap; word-break: break-word;">{{ ticket.description || '(sin descripción)' }}</pre>
       </div>
     </div>
   </div>
@@ -132,7 +130,8 @@ export default {
           hour: '2-digit',
           minute: '2-digit',
         })
-      } catch {
+      } catch (err) {
+        console.error('Error al formatear fecha:', err)
         return dateStr
       }
     }
