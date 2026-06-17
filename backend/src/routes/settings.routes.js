@@ -26,6 +26,16 @@ router.get('/', async (req, res) => {
           console.log('Error al desencriptar deepseek_key:', errDec.message);
           keys.deepseek_key = row.setting_value.slice(0, 10) + '...';
         }
+      } else if (row.setting_key === 'redmine_token' && row.setting_value) {
+        try {
+          const decrypted = decrypt(row.setting_value);
+          keys.redmine_token = decrypted.slice(0, 10) + '...';
+        } catch (errDec) {
+          console.log('Error al desencriptar redmine_token:', errDec.message);
+          keys.redmine_token = row.setting_value.slice(0, 10) + '...';
+        }
+      } else if (row.setting_key === 'redmine_url') {
+        keys.redmine_url = row.setting_value;
       } else if (row.setting_key === 'system_prompt') {
         keys.system_prompt = row.setting_value;
       } else if (row.setting_key.startsWith('documentacion_prompt_')) {
@@ -56,7 +66,7 @@ router.post('/', async (req, res) => {
     let toStore = value;
     let encrypted = false;
 
-    if (key === 'deepseek_key') {
+    if (key === 'deepseek_key' || key === 'redmine_token') {
       toStore = encrypt(value);
       encrypted = true;
     }

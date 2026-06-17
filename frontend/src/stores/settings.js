@@ -5,6 +5,8 @@ const API = '/api'
 
 export const useSettingsStore = defineStore('settings', () => {
   const deepseekKey = ref('')
+  const redmineToken = ref('')
+  const redmineUrl = ref('')
   const systemPrompt = ref('')
   const documentacionPromptBaseDatos = ref('')
   const documentacionPromptSubproyectos = ref('')
@@ -19,6 +21,8 @@ export const useSettingsStore = defineStore('settings', () => {
       const res = await fetch(`${API}/settings`, { credentials: 'include' })
       const keys = await res.json()
       deepseekKey.value = keys.deepseek_key ? keys.deepseek_key : ''
+      redmineToken.value = keys.redmine_token ? keys.redmine_token : ''
+      redmineUrl.value = keys.redmine_url ? keys.redmine_url : ''
       systemPrompt.value = keys.system_prompt ? keys.system_prompt : ''
       documentacionPromptBaseDatos.value = keys.documentacion_prompt_base_datos || ''
       documentacionPromptSubproyectos.value = keys.documentacion_prompt_subproyectos || ''
@@ -56,5 +60,5 @@ export const useSettingsStore = defineStore('settings', () => {
     saveError.value = ''
   }
 
-  return { deepseekKey, systemPrompt, documentacionPromptBaseDatos, documentacionPromptSubproyectos, documentacionPromptEndpoints, documentacionPromptWebSockets, documentacionPromptFuncionalidades, saveError, saveSuccess, clearFeedback, load, save }
+  return { deepseekKey, redmineToken, redmineUrl, systemPrompt, documentacionPromptBaseDatos, documentacionPromptSubproyectos, documentacionPromptEndpoints, documentacionPromptWebSockets, documentacionPromptFuncionalidades, saveError, saveSuccess, clearFeedback, load, save }
 })

@@ -25,6 +25,37 @@
       </button>
     </div>
 
+    <div class="mb-4" v-if="matches('token redmine')">
+      <label class="form-label">Token Redmine</label>
+      <div class="input-group">
+        <input
+          :type="showRedmineToken ? 'text' : 'password'"
+          class="form-control bg-dark text-light border-secondary"
+          v-model="redmineTokenInput"
+          placeholder="token..."
+        />
+        <button class="btn btn-outline-argentina" @click="showRedmineToken = !showRedmineToken">
+          {{ showRedmineToken ? 'Ocultar' : 'Mostrar' }}
+        </button>
+      </div>
+      <button class="btn btn-sm mt-2 btn-argentina" @click="saveRedmineToken">
+        Guardar Token
+      </button>
+    </div>
+
+    <div class="mb-4" v-if="matches('url redmine')">
+      <label class="form-label">URL Redmine</label>
+      <input
+        type="text"
+        class="form-control bg-dark text-light border-secondary"
+        v-model="redmineUrlInput"
+        placeholder="https://redmine.tudominio.com"
+      />
+      <button class="btn btn-sm mt-2 btn-argentina" @click="saveRedmineUrl">
+        Guardar URL
+      </button>
+    </div>
+
     <div class="mb-4" v-if="matches('system prompt del agente')">
       <label class="form-label">System Prompt del agente</label>
       <textarea
@@ -110,6 +141,8 @@ export default {
   setup() {
     const settings = useSettingsStore()
     const keyInput = ref('')
+    const redmineTokenInput = ref('')
+    const redmineUrlInput = ref('')
     const promptInput = ref('')
     const docBdInput = ref('')
     const docSubInput = ref('')
@@ -117,6 +150,7 @@ export default {
     const docWsInput = ref('')
     const docFuncInput = ref('')
     const showKey = ref(false)
+    const showRedmineToken = ref(false)
     const searchTerm = ref('')
 
     function matches(label) {
@@ -150,6 +184,14 @@ export default {
       keyInput.value = val
     }, { immediate: true })
 
+    watch(() => settings.redmineToken, (val) => {
+      redmineTokenInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.redmineUrl, (val) => {
+      redmineUrlInput.value = val
+    }, { immediate: true })
+
     for (const [key, refName] of Object.entries(DOC_STORE_MAP)) {
       watch(() => settings[refName], (val) => {
         DOC_INPUTS[key].value = val
@@ -159,6 +201,16 @@ export default {
     function saveKey() {
       settings.clearFeedback()
       settings.save('deepseek_key', keyInput.value)
+    }
+
+    function saveRedmineToken() {
+      settings.clearFeedback()
+      settings.save('redmine_token', redmineTokenInput.value)
+    }
+
+    function saveRedmineUrl() {
+      settings.clearFeedback()
+      settings.save('redmine_url', redmineUrlInput.value)
     }
 
     function savePrompt() {
@@ -172,9 +224,9 @@ export default {
     }
 
     return {
-      keyInput, promptInput, docBdInput, docSubInput, docEndpointsInput, docWsInput, docFuncInput, showKey, searchTerm,
+      keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput, docEndpointsInput, docWsInput, docFuncInput, showKey, showRedmineToken, searchTerm,
       settings,
-      saveKey, savePrompt, saveDoc, matches,
+      saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc, matches,
     }
   },
 }
