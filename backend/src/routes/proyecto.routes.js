@@ -105,4 +105,40 @@ router.post('/proyecto/pin', async (req, res) => {
   }
 });
 
+router.put('/proyecto/repositorio', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const { proyectoId, url_github } = req.body;
+  if (!proyectoId) {
+    return res.status(400).json({ error: 'proyectoId es requerido' });
+  }
+  try {
+    const wsId = req.session.workspaceId || 1;
+    const updated = await db('proyectos')
+      .where({ id: proyectoId, workspace_id: wsId })
+      .update({ url_github: url_github || null });
+    if (!updated) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al actualizar repositorio:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/proyecto/repositorio/:proyectoId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const wsId = req.session.workspaceId || 1;
+    const proyecto = await db('proyectos')
+      .select('url_github')
+      .where({ id: req.params.proyectoId, workspace_id: wsId })
+      .first();
+    res.json({ url_github: proyecto?.url_github || null });
+  } catch (err) {
+    console.log('Error al obtener repositorio:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

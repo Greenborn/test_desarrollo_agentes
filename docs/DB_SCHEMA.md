@@ -142,6 +142,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `redmine_updated_on` | DATETIME | nullable — fecha actualización en Redmine |
 | `redmine_parent_id` | VARCHAR(255) | nullable — ID del proyecto padre en Redmine |
 | `redmine_parent_name` | VARCHAR(255) | nullable — nombre del proyecto padre |
+| `url_github` | VARCHAR(500) | nullable — URL del repositorio GitHub |
 
 ---
 

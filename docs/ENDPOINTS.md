@@ -200,6 +200,19 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 - **Body:** `{ sessionId (req), proyectoId?: string|null }`
 - **Respuesta:** `{ success: true }`
 
+### `PUT /api/proyecto/repositorio`
+- **Auth:** Requerida
+- **Body:** `{ proyectoId: string, url_github: string }`
+- **Descripción:** Actualiza la URL del repositorio GitHub del proyecto especificado.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 400:** `{ error: "proyectoId es requerido" }`
+- **Respuesta 404:** `{ error: "Proyecto no encontrado" }`
+
+### `GET /api/proyecto/repositorio/:proyectoId`
+- **Auth:** Requerida
+- **Descripción:** Obtiene la URL del repositorio GitHub del proyecto especificado.
+- **Respuesta 200:** `{ url_github: string|null }`
+
 ### `POST /api/proyecto/pin`
 - **Auth:** Requerida
 - **Body:** `{ proyectoId: string|null }`

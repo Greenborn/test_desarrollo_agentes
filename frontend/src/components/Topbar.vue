@@ -448,6 +448,150 @@ export default {
       },
     })
 
+    register({
+      name: '/proyecto_set_repositorio',
+      category: 'Proyecto',
+      description: 'Asigna una URL de repositorio GitHub al proyecto actual de la sesión.',
+      usage: '/proyecto_set_repositorio --url=<url>',
+      async autocomplete(args, cmdStore) {
+        if (!args.join(' ').includes('--url=')) {
+          cmdStore.showAutocomplete(['--url='])
+        }
+      },
+      async execute(args, { cmdStore, chatStore }) {
+        const sessionId = chatStore.activeSessionId
+        if (!sessionId) {
+          console.error('Error en /proyecto_set_repositorio: no hay sesión de chat activa')
+          return
+        }
+        const session = chatStore.sessions.find(s => s.id === sessionId)
+        const proyectoId = session?.proyecto_id
+        if (!proyectoId) {
+          chatStore.messages.push({
+            role: 'command',
+            content: '/proyecto_set_repositorio',
+            _key: 'cmd-' + Date.now(),
+          })
+          chatStore.messages.push({
+            role: 'result',
+            content: 'No hay proyecto asignado a esta sesión. Use /proyecto_set primero.',
+            _key: 'res-' + Date.now(),
+          })
+          return
+        }
+        const urlArg = args.find(a => a.startsWith('--url='))
+        if (!urlArg) {
+          chatStore.messages.push({
+            role: 'command',
+            content: '/proyecto_set_repositorio',
+            _key: 'cmd-' + Date.now(),
+          })
+          chatStore.messages.push({
+            role: 'result',
+            content: 'Uso: /proyecto_set_repositorio --url=<url>',
+            _key: 'res-' + Date.now(),
+          })
+          return
+        }
+        const url_github = urlArg.slice('--url='.length)
+        if (!url_github) {
+          chatStore.messages.push({
+            role: 'command',
+            content: '/proyecto_set_repositorio ' + args.join(' '),
+            _key: 'cmd-' + Date.now(),
+          })
+          chatStore.messages.push({
+            role: 'result',
+            content: 'La URL no puede estar vacía.',
+            _key: 'res-' + Date.now(),
+          })
+          return
+        }
+        try {
+          const res = await fetch('/api/proyecto/repositorio', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ proyectoId, url_github }),
+          })
+          const data = await res.json()
+          chatStore.messages.push({
+            role: 'command',
+            content: `/proyecto_set_repositorio --url=${url_github}`,
+            _key: 'cmd-' + Date.now(),
+          })
+          if (data.success) {
+            chatStore.messages.push({
+              role: 'result',
+              content: `URL de repositorio configurada para "${proyectoId}": ${url_github}`,
+              _key: 'res-' + Date.now(),
+            })
+          } else {
+            chatStore.messages.push({
+              role: 'result',
+              content: `Error: ${data.error}`,
+              _key: 'err-' + Date.now(),
+            })
+          }
+        } catch (err) {
+          console.error('Error en /proyecto_set_repositorio:', err)
+        }
+      },
+    })
+
+    register({
+      name: '/proyecto_get_url_repo',
+      category: 'Proyecto',
+      description: 'Muestra la URL del repositorio configurada para el proyecto actual.',
+      usage: '/proyecto_get_url_repo',
+      async execute(args, { cmdStore, chatStore }) {
+        const sessionId = chatStore.activeSessionId
+        if (!sessionId) {
+          console.error('Error en /proyecto_get_url_repo: no hay sesión de chat activa')
+          return
+        }
+        const session = chatStore.sessions.find(s => s.id === sessionId)
+        const proyectoId = session?.proyecto_id
+        if (!proyectoId) {
+          chatStore.messages.push({
+            role: 'command',
+            content: '/proyecto_get_url_repo',
+            _key: 'cmd-' + Date.now(),
+          })
+          chatStore.messages.push({
+            role: 'result',
+            content: 'No hay proyecto asignado a esta sesión. Use /proyecto_set primero.',
+            _key: 'res-' + Date.now(),
+          })
+          return
+        }
+        try {
+          const res = await fetch(`/api/proyecto/repositorio/${encodeURIComponent(proyectoId)}`, { credentials: 'include' })
+          const data = await res.json()
+          chatStore.messages.push({
+            role: 'command',
+            content: '/proyecto_get_url_repo',
+            _key: 'cmd-' + Date.now(),
+          })
+          if (data.url_github) {
+            chatStore.messages.push({
+              role: 'result',
+              content: `URL del repositorio de "${proyectoId}": ${data.url_github}`,
+              _key: 'res-' + Date.now(),
+            })
+          } else {
+            chatStore.messages.push({
+              role: 'result',
+              content: `No hay URL de repositorio configurada para "${proyectoId}".`,
+              _key: 'res-' + Date.now(),
+            })
+          }
+        } catch (err) {
+          console.error('Error en /proyecto_get_url_repo:', err)
+        }
+      },
+    })
+
     function openSettings() {
       modal.open(SettingsView, {}, { title: 'Configuración', wide: true })
     }
