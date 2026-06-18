@@ -7,6 +7,8 @@
       <ProjectDetail v-else-if="selectedProject" class="flex-grow-1" />
       <ChatWindow v-else class="flex-grow-1" />
     </div>
+    <div class="bottom-panel" :class="{ collapsed: panelCollapsed }">
+    </div>
     <AppModal />
   </div>
 </template>
@@ -25,6 +27,7 @@ import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 import { useProjectStore } from '../stores/project.js'
 import { useTicketStore } from '../stores/ticket.js'
+import { useUiStore } from '../stores/ui.js'
 
 export default {
   components: { Topbar, SidebarChat, ChatWindow, ProjectDetail, TicketDetail, AppModal },
@@ -34,6 +37,8 @@ export default {
     const cmd = useCommandStore()
     const projectStore = useProjectStore()
     const ticketStore = useTicketStore()
+    const ui = useUiStore()
+    const { panelCollapsed } = storeToRefs(ui)
     const { selectedProject } = storeToRefs(projectStore)
     const { selectedTicket } = storeToRefs(ticketStore)
 
@@ -57,7 +62,21 @@ export default {
     watch(() => auth.user, load)
     onMounted(load)
 
-    return { selectedProject, selectedTicket }
+    return { selectedProject, selectedTicket, panelCollapsed }
   },
 }
 </script>
+
+<style scoped>
+.bottom-panel {
+  height: 30vh;
+  overflow: hidden;
+  transition: height 0.25s ease;
+  background: #1a1a2e;
+  border-top: 1px solid #374151;
+}
+.bottom-panel.collapsed {
+  height: 0;
+  border: none;
+}
+</style>

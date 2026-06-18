@@ -24,11 +24,12 @@ router.post('/command', async (req, res) => {
       try {
         const headless = parametros?.headless;
         const url = parametros?.url;
-        const idSession = await browserManager.startSession(navegador, headless);
+        const resolution = parametros?.resolution;
+        const idSession = await browserManager.startSession(navegador, headless, resolution);
         if (url) {
           await browserManager.goToUrl(idSession, url);
         }
-        return res.json({ id_session: idSession, headless: !!headless, url: url || null });
+        return res.json({ id_session: idSession, headless: !!headless, url: url || null, resolution: resolution || null });
       } catch (err) {
         return res.status(500).json({ error: err.message });
       }

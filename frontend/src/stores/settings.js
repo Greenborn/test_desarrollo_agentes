@@ -23,6 +23,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const priorityColorHigh = ref('#eab308')
   const priorityColorUrgent = ref('#ef4444')
   const priorityColorImmediate = ref('#ef4444')
+  const screenResolutions = ref([])
   const saveError = ref('')
   const saveSuccess = ref('')
 
@@ -58,6 +59,7 @@ export const useSettingsStore = defineStore('settings', () => {
       priorityColorHigh.value = keys.priority_color_high || '#eab308'
       priorityColorUrgent.value = keys.priority_color_urgent || '#ef4444'
       priorityColorImmediate.value = keys.priority_color_immediate || '#ef4444'
+      screenResolutions.value = keys.screen_resolutions || []
       applyPriorityColors()
     } catch (err) {
       console.error('Error al cargar settings:', err)
@@ -91,7 +93,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   return { deepseekKey, redmineToken, redmineUrl, systemPrompt, omnifilterDebounceMs, repoAcronimo,
-           locale,
+           locale, screenResolutions,
            documentacionPromptBaseDatos, documentacionPromptSubproyectos,
            documentacionPromptEndpoints, documentacionPromptWebSockets,
            documentacionPromptFuncionalidades, ticketDescripcionPrompt, ticketRefinarPrompt,

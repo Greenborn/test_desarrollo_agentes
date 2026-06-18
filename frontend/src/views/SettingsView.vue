@@ -246,6 +246,27 @@
             Guardar Prompt
           </button>
         </div>
+
+        <div v-if="matches('resoluciones pantalla resolucion')" class="border-top border-secondary pt-3">
+          <label class="form-label mb-2 fw-bold">Resoluciones de Pantalla</label>
+          <div class="small text-muted mb-2">Usadas por /iniciar_navegador --resolution=ID</div>
+          <div v-for="(res, i) in resolutionsEdit" :key="i" class="d-flex gap-2 mb-1 align-items-center">
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 130px;" placeholder="id" v-model="resolutionsEdit[i].id" />
+            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 90px;" placeholder="ancho" v-model.number="resolutionsEdit[i].width" min="1" />
+            <span class="text-muted small">x</span>
+            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 90px;" placeholder="alto" v-model.number="resolutionsEdit[i].height" min="1" />
+            <button class="btn btn-sm btn-outline-danger" @click="removeResolution(i)" title="Eliminar">✕</button>
+          </div>
+          <div class="d-flex gap-2 mb-2 align-items-center">
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 130px;" placeholder="nuevo id" v-model="newResId" />
+            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 90px;" placeholder="ancho" v-model.number="newResWidth" min="1" />
+            <span class="text-muted small">x</span>
+            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 90px;" placeholder="alto" v-model.number="newResHeight" min="1" />
+            <button class="btn btn-sm btn-outline-argentina" @click="addResolution">+ Agregar</button>
+            <button class="btn btn-sm btn-outline-secondary" @click="resetResolutions" title="Restaurar valores por defecto">↺</button>
+          </div>
+          <button class="btn btn-sm btn-argentina" @click="saveResolutions">Guardar Resoluciones</button>
+        </div>
       </div>
     </div>
 
@@ -297,6 +318,10 @@ export default {
     const priorityColorHighInput = ref('#eab308')
     const priorityColorUrgentInput = ref('#ef4444')
     const priorityColorImmediateInput = ref('#ef4444')
+    const resolutionsEdit = ref([])
+    const newResId = ref('')
+    const newResWidth = ref(1920)
+    const newResHeight = ref(1080)
     const selectedWId = ref(1)
     const wsMessage = ref('')
 
@@ -363,6 +388,10 @@ export default {
     watch(() => settings.priorityColorHigh, (val) => { priorityColorHighInput.value = val }, { immediate: true })
     watch(() => settings.priorityColorUrgent, (val) => { priorityColorUrgentInput.value = val }, { immediate: true })
     watch(() => settings.priorityColorImmediate, (val) => { priorityColorImmediateInput.value = val }, { immediate: true })
+
+    watch(() => settings.screenResolutions, (val) => {
+      resolutionsEdit.value = val.map(r => ({ ...r }))
+    }, { immediate: true, deep: true })
 
     watch(() => settings.ticketDescripcionPrompt, (val) => {
       descripcionPromptInput.value = val
@@ -524,6 +553,45 @@ export default {
       settings.save(key, inputMap[key].value)
     }
 
+    function addResolution() {
+      const id = newResId.value.trim()
+      if (!id) return
+      if (resolutionsEdit.value.find(r => r.id === id)) return
+      resolutionsEdit.value.push({ id, width: newResWidth.value, height: newResHeight.value })
+      newResId.value = ''
+      newResWidth.value = 1920
+      newResHeight.value = 1080
+    }
+
+    function removeResolution(index) {
+      resolutionsEdit.value.splice(index, 1)
+    }
+
+    function resetResolutions() {
+      resolutionsEdit.value = [
+        { id: 'fullhd', width: 1920, height: 1080 },
+        { id: 'hd', width: 1366, height: 768 },
+        { id: 'hd_plus', width: 1600, height: 900 },
+        { id: 'qhd', width: 2560, height: 1440 },
+        { id: '4k', width: 3840, height: 2160 },
+        { id: 'macbook_air', width: 2560, height: 1664 },
+        { id: 'macbook_pro', width: 3024, height: 1964 },
+        { id: 'iphone_14', width: 390, height: 844 },
+        { id: 'iphone_14_pro_max', width: 430, height: 932 },
+        { id: 'iphone_se', width: 375, height: 667 },
+        { id: 'pixel_7', width: 412, height: 915 },
+        { id: 'samsung_s23', width: 360, height: 780 },
+        { id: 'ipad_air', width: 820, height: 1180 },
+        { id: 'ipad_mini', width: 744, height: 1133 },
+      ]
+    }
+
+    function saveResolutions() {
+      const valid = resolutionsEdit.value.filter(r => r.id && r.id.trim() && r.width > 0 && r.height > 0)
+      if (valid.length === 0) return
+      settings.save('screen_resolutions', JSON.stringify(valid))
+    }
+
     return {
       keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput,
       docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput, refinarPromptInput,
@@ -532,9 +600,10 @@ export default {
       priorityColorLowInput, priorityColorNormalInput, priorityColorHighInput,
       priorityColorUrgentInput, priorityColorImmediateInput,
       settings, workspaces, selectedWId, wsMessage,
+      resolutionsEdit, newResId, newResWidth, newResHeight,
       saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
       saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveRepoAcronimo,
-      saveLocale, savePriorityColor, matches,
+      saveLocale, savePriorityColor, addResolution, removeResolution, resetResolutions, saveResolutions, matches,
       onWorkspaceChange, promptCreate, promptRename, confirmDelete,
     }
   },

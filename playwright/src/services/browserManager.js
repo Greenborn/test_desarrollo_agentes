@@ -22,7 +22,7 @@ function getDefaultHeadless() {
   return defaultHeadless;
 }
 
-async function startSession(navegador, headless) {
+async function startSession(navegador, headless, resolution) {
   if (!navegador) {
     throw new Error('Parámetro "navegador" es requerido');
   }
@@ -42,13 +42,18 @@ async function startSession(navegador, headless) {
     throw new Error(`No se pudo iniciar ${navegador}: ${err.message}`);
   }
 
-  const context = await browser.newContext();
+  const contextOptions = {};
+  if (resolution && resolution.width && resolution.height) {
+    contextOptions.viewport = { width: resolution.width, height: resolution.height };
+  }
+  const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
 
   const id = generateId();
-  sessions.set(id, { browser, context, page, navegador, headless: headlessMode });
+  sessions.set(id, { browser, context, page, navegador, headless: headlessMode, resolution: resolution || null });
 
-  console.log(`Sesión ${id} iniciada con ${navegador} (headless: ${headlessMode})`);
+  const resInfo = resolution ? `, resolución: ${resolution.width}x${resolution.height}` : '';
+  console.log(`Sesión ${id} iniciada con ${navegador} (headless: ${headlessMode}${resInfo})`);
   return id;
 }
 

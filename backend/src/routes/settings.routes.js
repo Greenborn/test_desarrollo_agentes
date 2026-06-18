@@ -51,6 +51,12 @@ router.get('/', async (req, res) => {
         keys.repo_acronimo = row.setting_value;
       } else if (row.setting_key === 'locale') {
         keys.locale = row.setting_value;
+      } else if (row.setting_key === 'screen_resolutions') {
+        try {
+          keys.screen_resolutions = JSON.parse(row.setting_value);
+        } catch {
+          keys.screen_resolutions = [];
+        }
       } else if (row.setting_key.startsWith('priority_color_')) {
         keys[row.setting_key] = row.setting_value;
       }
@@ -70,6 +76,22 @@ router.get('/', async (req, res) => {
       priority_color_high: '#eab308',
       priority_color_urgent: '#ef4444',
       priority_color_immediate: '#ef4444',
+      screen_resolutions: [
+        { id: 'fullhd', width: 1920, height: 1080 },
+        { id: 'hd', width: 1366, height: 768 },
+        { id: 'hd_plus', width: 1600, height: 900 },
+        { id: 'qhd', width: 2560, height: 1440 },
+        { id: '4k', width: 3840, height: 2160 },
+        { id: 'macbook_air', width: 2560, height: 1664 },
+        { id: 'macbook_pro', width: 3024, height: 1964 },
+        { id: 'iphone_14', width: 390, height: 844 },
+        { id: 'iphone_14_pro_max', width: 430, height: 932 },
+        { id: 'iphone_se', width: 375, height: 667 },
+        { id: 'pixel_7', width: 412, height: 915 },
+        { id: 'samsung_s23', width: 360, height: 780 },
+        { id: 'ipad_air', width: 820, height: 1180 },
+        { id: 'ipad_mini', width: 744, height: 1133 },
+      ],
     };
     for (const [key, def] of Object.entries(defaults)) {
       if (!keys[key]) keys[key] = def;

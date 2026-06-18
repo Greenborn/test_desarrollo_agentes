@@ -61,14 +61,14 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 ### `GET /api/settings`
 - **Auth:** Requerida
 - **Workspace:** Filtra por `workspace_id` de la sesión
-- **Respuesta:** `{ deepseek_key: string (mascarado), system_prompt: string|null, omnifilter_debounce_ms: string|null }`
+- **Respuesta:** `{ deepseek_key: string (mascarado), system_prompt: string|null, omnifilter_debounce_ms: string|null, screen_resolutions: [{ id: string, width: number, height: number }] }`
 
 ### `POST /api/settings`
 - **Auth:** Requerida
 - **Workspace:** Guarda con `workspace_id` de la sesión
 - **Body:** `{ key: string, value: string }`
 - Si `key === "deepseek_key"` se encripta con AES-256-CBC antes de almacenar
-- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `omnifilter_debounce_ms`
+- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `omnifilter_debounce_ms`, `screen_resolutions`
 - **Respuesta:** `{ success: true }`
 
 ---
@@ -232,7 +232,7 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 - **Comandos:**
   | comando | parametros | Respuesta |
   |---|---|---|
-  | `start` | `{ navegador: "chromium"|"firefox", headless?, url? }` | `{ id_session, headless, url }` |
+  | `start` | `{ navegador: "chromium"|"firefox", headless?, url?, resolution?: { width, height } }` | `{ id_session, headless, url, resolution }` |
   | `go_to_url` | `{ id_session?, url }` | `{ success: true, id_session }` |
   | `set_headless` | `{ headless: boolean\|"0"\|"1" }` | `{ success: true, reiniciado, id_session?, headless }` |
   | `close` | `{ id_session }` | `{ success: true }` |

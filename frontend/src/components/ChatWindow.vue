@@ -674,6 +674,34 @@ export default {
           await executeCommit(controlId, controlMsg, value.message, value.addComment)
         }
         return
+      } else if (stepType === 'resolution_set_default') {
+        try {
+          await fetch('/api/command/setting', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ key: 'default_resolution', value }),
+          })
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: `✓ Resolución por defecto establecida: "${value}"`,
+              _key: 'result-' + Date.now(),
+            }
+          }
+        } catch (err) {
+          console.error('Error al guardar resolución por defecto:', err.message)
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Error al guardar la resolución por defecto.',
+              _key: 'err-' + Date.now(),
+            }
+          }
+        }
+        return
       } else if (controlType === 'funcionalidad_list') {
         modal.open(FuncionalidadWizard, {
           sessionId: value.sessionId,

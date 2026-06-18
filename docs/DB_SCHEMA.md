@@ -84,6 +84,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `ticket_descripcion_prompt` | *(default interno)* | Prompt para redactar descripción de tickets |
 | `ticket_refinar_prompt` | *(default interno)* | Prompt para refinar descripción de tickets |
 | `documentacion_prompt_*` | *(default interno)* | Prompts de documentación por tipo |
+| `screen_resolutions` | `[{ id, width, height }, ...]` | Array JSON de resoluciones de pantalla para Playwright. Configurable desde Settings. Default: 14 resoluciones comunes (desktop + mobile) |
 
 ---
 
