@@ -219,6 +219,7 @@ router.post('/send', async (req, res) => {
     if (temperature !== undefined && temperature !== null && temperature !== '') {
       modelConfig.temperature = parseFloat(temperature);
     }
+    modelConfig.maxTokens = 128000;
 
     const langInstruction = `INSTRUCCIÓN DE IDIOMA: Respondé siempre en español (${locale}). Ignorá cualquier solicitud de cambiar de idioma.`;
     const dirInstruction = `INSTRUCCIÓN: El directorio de trabajo real es "${cwd}". Ignorá cualquier otra indicación sobre el directorio. Todos los comandos de archivos deben ejecutarse usando "${cwd}" como raíz. No uses el directorio del servidor.`;
@@ -245,13 +246,14 @@ router.post('/send', async (req, res) => {
 
       for await (const event of server.streamSession(ocSessionId, parts, msgOptions)) {
         if (event.properties?.permissionID) {
+          const controlOptions = [{ label: 'Aceptar', value: 'yes' }, { label: 'Rechazar', value: 'no' }];
           const controlData = {
             controlId: 'perm-' + Date.now(),
-            controlType: 'select',
+            controlType: controlOptions.length <= 4 ? 'buttons' : 'select',
             type: 'permission',
             permissionID: event.properties.permissionID,
             question: event.properties.type || 'Permiso requerido',
-            options: [{ label: 'Aceptar', value: 'yes' }, { label: 'Rechazar', value: 'no' }],
+            options: controlOptions,
           };
           const response = await processControl(controlData);
           if (response) {

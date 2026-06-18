@@ -31,6 +31,7 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | Comando | Descripción | Uso |
 |---|---|---|
 | `/opencode` | Inicia una sesión OpenCode: seleccionar proveedor, modelo, modo y enviar prompt. Después de cada respuesta se puede seguir enviando mensajes. | `/opencode` |
+| `/generar_commit` | Genera un mensaje de commit de los cambios realizados usando OpenCode. Seleccioná proveedor, modelo y modo para obtener una propuesta de commit en modo planificación. | `/generar_commit` |
 | `/opencode_fin` | Finaliza la sesión OpenCode activa | `/opencode_fin` |
 
 ---

@@ -7,9 +7,14 @@
       <ChatFormatter :text="msg.content" />
     </div>
     <div v-else-if="msg.role === 'opencode_control'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #1a2744; border: 1px solid #75AADB; color: #e0e0e0;">
-      <ChatOpencodeForm v-if="parsedControl && parsedControl.controlType === 'opencode_form'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :temperatureOptions="parsedControl.temperatureOptions || []" :temperatureValue="parsedControl.temperatureValue || ''" :modeValue="parsedControl.modeValue || 'Build'" :placeholder="parsedControl.placeholder || ''" :rows="parsedControl.rows || 3" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <ChatGenerarCommitForm v-if="parsedControl && parsedControl.controlType === 'generar_commit_form'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :temperatureOptions="parsedControl.temperatureOptions || []" :temperatureValue="parsedControl.temperatureValue || ''" :modeValue="parsedControl.modeValue || 'Plan'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <ChatOpencodeForm v-else-if="parsedControl && parsedControl.controlType === 'opencode_form'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :temperatureOptions="parsedControl.temperatureOptions || []" :temperatureValue="parsedControl.temperatureValue || ''" :modeValue="parsedControl.modeValue || 'Build'" :placeholder="parsedControl.placeholder || ''" :rows="parsedControl.rows || 3" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <ChatControlFollowup v-else-if="parsedControl && parsedControl.controlType === 'followup'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :placeholder="parsedControl.placeholder || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
-      <ControlSelect v-else-if="parsedControl && parsedControl.controlType === 'select'" :options="parsedControl.options || []" :preselect="parsedControl.preselect || ''" :placeholder="parsedControl.placeholder || 'Selecciona...'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <template v-else-if="parsedControl && parsedControl.controlType === 'select'">
+        <ChatControlButtons v-if="parsedControl.options && parsedControl.options.length <= 4" :options="parsedControl.options" :question="parsedControl.question || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+        <ControlSelect v-else :options="parsedControl.options || []" :preselect="parsedControl.preselect || ''" :placeholder="parsedControl.placeholder || 'Selecciona...'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      </template>
+      <ChatControlButtons v-else-if="parsedControl && parsedControl.controlType === 'buttons'" :options="parsedControl.options || []" :question="parsedControl.question || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <ControlTextarea v-else-if="parsedControl && parsedControl.controlType === 'textarea'" :placeholder="parsedControl.placeholder || 'Escribe...'" :rows="parsedControl.rows || 3" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <FuncionalidadListControl v-else-if="parsedControl && parsedControl.controlType === 'funcionalidad_list'" :items="parsedControl.items || []" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <RedmineProjectList v-else-if="parsedControl && parsedControl.controlType === 'redmine_projects'" :projects="parsedControl.projects || []" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
@@ -17,6 +22,7 @@
       <DescripcionInputControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_input'" :placeholder="parsedControl.placeholder || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DescripcionResultControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_result'" :description="parsedControl.description || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DescripcionResultControl v-else-if="parsedControl && parsedControl.controlType === 'refinar_result'" :description="parsedControl.description || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <CommitResultControl v-else-if="parsedControl && parsedControl.controlType === 'commit_result'" :message="parsedControl.message || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <div v-else class="d-flex flex-column gap-2">
         <pre class="mb-0 small" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
       </div>
@@ -68,19 +74,22 @@
 <script>
 import ControlSelect from './ChatControlSelect.vue'
 import ControlTextarea from './ChatControlTextarea.vue'
+import ChatControlButtons from './ChatControlButtons.vue'
 import ChatControlFollowup from './ChatControlFollowup.vue'
 import ChatOpencodeForm from './ChatOpencodeForm.vue'
+import ChatGenerarCommitForm from './ChatGenerarCommitForm.vue'
 import ChatFormatter from './ChatFormatter.vue'
 import FuncionalidadListControl from './FuncionalidadListControl.vue'
 import RedmineProjectList from './RedmineProjectList.vue'
 import TicketEditControl from './TicketEditControl.vue'
 import DescripcionInputControl from './DescripcionInputControl.vue'
 import DescripcionResultControl from './DescripcionResultControl.vue'
+import CommitResultControl from './CommitResultControl.vue'
 
 let counter = 0
 
 export default {
-  components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatOpencodeForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, DescripcionInputControl, DescripcionResultControl },
+  components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatOpencodeForm, ChatGenerarCommitForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, DescripcionInputControl, DescripcionResultControl, CommitResultControl, ChatControlButtons },
   props: {
     msg: { type: Object, required: true },
   },

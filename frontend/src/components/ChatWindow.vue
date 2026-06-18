@@ -335,6 +335,149 @@ export default {
       })
     }
 
+    async function opencodeStreamPromptCommit(sessionId, prompt, provider, model, thinking, mode, temperature) {
+      ocStreaming.value = true
+      ocChunk.value = ''
+      ocThinking.value = ''
+      _streamSessionId.value = sessionId
+      if (sessionId) chat.sessionStatus[sessionId] = 'executing'
+
+      const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
+      streamMsg._key = 'stream-' + Date.now()
+
+      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
+        onChunk(content) {
+          if (_isActiveSession(sessionId)) ocChunk.value += content
+        },
+        onThinking(content) {
+          if (_isActiveSession(sessionId)) ocThinking.value += content
+        },
+        onControl(control) {
+          if (_isActiveSession(sessionId)) {
+            chat.messages.push({
+              role: 'opencode_control',
+              content: JSON.stringify(control),
+              controlData: control,
+              _key: 'control-' + Date.now(),
+            })
+          }
+        },
+        async onDone(json, fullText) {
+          if (!_isActiveSession(sessionId)) return
+          const opencodeResponse = json.fullResponse || fullText || '(sin respuesta)'
+
+          try {
+            const systemPrompt = 'Eres un asistente que reduce mensajes de commit. Recibes un mensaje de commit y debes acortarlo a un máximo de 256 caracteres manteniendo el significado y la claridad. Devuelve ÚNICAMENTE el mensaje reducido, sin explicaciones ni formato adicional.'
+
+            const res = await fetch('/api/chat/refine', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ text: opencodeResponse, systemPrompt, sessionId }),
+            })
+
+            if (!res.ok) {
+              let errMsg = 'Error al reducir mensaje de commit'
+              try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
+              throw new Error(errMsg)
+            }
+
+            let refinedText = ''
+            ocChunk.value = ''
+            ocThinking.value = ''
+
+            const reader = res.body.getReader()
+            const decoder = new TextDecoder()
+            let buf = ''
+
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              buf += decoder.decode(value, { stream: true })
+              const lines = buf.split('\n')
+              buf = lines.pop() || ''
+
+              for (const line of lines) {
+                const t = line.trim()
+                if (!t || !t.startsWith('data: ')) continue
+                try {
+                  const j = JSON.parse(t.slice(6))
+                  if (j.type === 'response') {
+                    refinedText += j.content
+                    if (_isActiveSession(sessionId)) {
+                      ocChunk.value += j.content
+                      const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+                      if (idx >= 0) {
+                        chat.messages[idx].content = refinedText
+                      }
+                    }
+                  } else if (j.type === 'thinking') {
+                    if (_isActiveSession(sessionId)) ocThinking.value += j.content
+                  } else if (j.type === 'error') {
+                    throw new Error(j.content)
+                  }
+                } catch (e) {
+                  if (e.message && e.message !== 'Unexpected end of JSON input') throw e
+                }
+              }
+            }
+
+            ocStreaming.value = false
+            if (sessionId) chat.sessionStatus[sessionId] = 'idle'
+
+            if (_isActiveSession(sessionId)) {
+              const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+              if (idx >= 0) {
+                const finalMessage = refinedText || opencodeResponse
+                chat.messages[idx] = {
+                  role: 'opencode_control',
+                  controlData: {
+                    controlId: 'commit-result-' + Date.now(),
+                    controlType: 'commit_result',
+                    message: finalMessage,
+                    loading: false,
+                  },
+                  _key: 'control-' + Date.now(),
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error al refinar mensaje de commit:', err.message)
+            ocStreaming.value = false
+            if (sessionId) chat.sessionStatus[sessionId] = 'idle'
+            if (_isActiveSession(sessionId)) {
+              const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+              if (idx >= 0) {
+                const fallbackMessage = opencodeResponse + (err ? '\n\n[Error al reducir: ' + err.message + ']' : '')
+                chat.messages[idx] = {
+                  role: 'opencode_control',
+                  controlData: {
+                    controlId: 'commit-result-' + Date.now(),
+                    controlType: 'commit_result',
+                    message: fallbackMessage,
+                    loading: false,
+                  },
+                  _key: 'control-' + Date.now(),
+                }
+              }
+            }
+          }
+        },
+        onError(msg) {
+          ocStreaming.value = false
+          if (sessionId) chat.sessionStatus[sessionId] = 'error'
+          if (_isActiveSession(sessionId)) {
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) {
+              chat.messages[idx].streaming = false
+              chat.messages[idx].role = 'opencode_result'
+              chat.messages[idx].content = '[Error: ' + msg + ']'
+            }
+          }
+        },
+      })
+    }
+
     const DOC_LABELS = {
       base_datos: 'Base de Datos',
       subproyectos: 'Subproyectos',
@@ -431,6 +574,8 @@ export default {
 
       if (stepType === 'opencode_setup') {
         await handleOpencodeSetup(controlId, value, controlMsg)
+      } else if (stepType === 'generar_commit_setup') {
+        await handleGenerarCommitSetup(controlId, value, controlMsg)
       } else if (stepType === 'documentacion_update') {
         await handleDocumentacionUpdate(controlId, value, controlMsg)
       } else if (stepType === 'ticket_descripcion') {
@@ -511,6 +656,22 @@ export default {
           }
         } else if (value.action === 'retry') {
           await restartTicketDescripcion()
+        }
+        return
+      } else if (controlType === 'commit_result') {
+        if (value === null) {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Generación de commit cancelada.',
+              _key: 'result-' + Date.now(),
+            }
+          }
+        } else if (value.action === 'retry') {
+          await regenerateCommit(controlId, controlMsg)
+        } else if (value.action === 'confirm') {
+          await executeCommit(controlId, controlMsg, value.message)
         }
         return
       } else if (controlType === 'funcionalidad_list') {
@@ -628,6 +789,8 @@ export default {
     }
 
     let ocSetupData = { provider: '', model: '', thinking: '', mode: '', prompt: '' }
+    let commitSetupData = { provider: '', model: '', thinking: '', mode: '', temperature: '' }
+    let commitData = { prompt: '', provider: '', model: '', thinking: '', mode: '', temperature: '' }
     let docUpdateData = { provider: '', model: '', thinking: '', mode: '' }
     let descripcionData = { provider: '', model: '', thinking: '', mode: 'Plan' }
     const descripcionUserInput = ref('')
@@ -1560,6 +1723,146 @@ export default {
             mode,
             temperature,
           )
+      }
+    }
+
+    async function handleGenerarCommitSetup(controlId, value, controlMsg) {
+      const subStepType = controlMsg.controlData.subStepType
+
+      if (subStepType === 'provider') {
+        commitSetupData.provider = value
+        await ocStore.select('provider', value)
+        ocStore.selectedProvider = value
+        const models = ocStore.getModelsForProvider(value)
+        chat.messages.push({
+          role: 'opencode_control',
+          controlData: {
+            controlId: 'gc-form-' + Date.now(),
+            controlType: 'generar_commit_form',
+            stepType: 'generar_commit_setup',
+            subStepType: 'form',
+            models,
+            modelValue: ocStore.savedModel || '',
+            thinkingOptions: ocStore.thinkingOptions,
+            thinkingValue: ocStore.savedThinking || '',
+            temperatureOptions: ocStore.temperatureOptions,
+            temperatureValue: ocStore.savedTemperature || '0.7',
+            modeValue: ocStore.savedMode || 'Plan',
+          },
+          _key: 'control-' + Date.now(),
+        })
+      } else if (subStepType === 'form') {
+        const { model, thinking = '', mode = 'Plan', temperature = '0.7' } = value || {}
+        commitSetupData.model = model
+        commitSetupData.thinking = thinking
+        commitSetupData.mode = mode
+        commitSetupData.temperature = temperature
+        await ocStore.select('model', model)
+        await ocStore.select('thinking', thinking || '')
+        await ocStore.select('mode', mode)
+        if (temperature) await ocStore.select('temperature', temperature)
+        ocStore.selectedModel = model
+        ocStore.selectedThinking = thinking || ''
+        ocStore.selectedMode = mode
+        ocStore.selectedTemperature = temperature || ''
+
+        const prompt = 'Analizá los cambios realizados en el proyecto actual (revisando el diff de Git) y generá un mensaje de commit descriptivo. El mensaje debe ser conciso (máximo 300 caracteres) y reflejar claramente las modificaciones aplicadas al código. Debes comenzar en modo planificación mostrando primero la propuesta de commit. IMPORTANTE: Devuelve ÚNICAMENTE el mensaje de commit, sin explicaciones, análisis ni ningún otro texto adicional.'
+
+        commitData.prompt = prompt
+        commitData.provider = commitSetupData.provider
+        commitData.model = model
+        commitData.thinking = thinking
+        commitData.mode = mode
+        commitData.temperature = temperature
+
+        await opencodeStreamPromptCommit(
+          chat.activeSessionId,
+          prompt,
+          commitSetupData.provider,
+          model,
+          thinking,
+          mode,
+          temperature,
+        )
+      }
+    }
+
+    async function regenerateCommit(controlId, controlMsg) {
+      const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+      if (idx >= 0) {
+        chat.messages[idx].controlData.loading = true
+      }
+      await opencodeStreamPromptCommit(
+        chat.activeSessionId,
+        commitData.prompt,
+        commitData.provider,
+        commitData.model,
+        commitData.thinking,
+        commitData.mode,
+        commitData.temperature,
+      )
+    }
+
+    async function executeCommit(controlId, controlMsg, message) {
+      const sessionId = chat.activeSessionId
+      const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+      if (idx >= 0) {
+        chat.messages[idx].controlData.loading = true
+      }
+
+      try {
+        const escapedMessage = message.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+        const addRes = await fetch('/api/command/git', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ command: 'add .', sessionId }),
+        })
+        const addData = await addRes.json()
+
+        if (!addData.success) {
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Error al ejecutar git add .: ' + (addData.stderr || addData.error || 'Error desconocido'),
+              _key: 'err-' + Date.now(),
+            }
+          }
+          return
+        }
+
+        const commitRes = await fetch('/api/command/git', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ command: 'commit -m "' + escapedMessage + '"', sessionId }),
+        })
+        const commitData_ = await commitRes.json()
+
+        if (idx >= 0) {
+          if (commitData_.success) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: '✓ Commit realizado correctamente.\n\nMensaje: ' + message,
+              _key: 'result-' + Date.now(),
+            }
+          } else {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Error al realizar commit: ' + (commitData_.stderr || commitData_.error || 'Error desconocido'),
+              _key: 'err-' + Date.now(),
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error al ejecutar commit:', err.message)
+        if (idx >= 0) {
+          chat.messages[idx] = {
+            role: 'result',
+            content: 'Error de conexión: ' + err.message,
+            _key: 'err-' + Date.now(),
+          }
+        }
       }
     }
 
