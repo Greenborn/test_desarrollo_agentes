@@ -25,6 +25,7 @@ import './composables/commands/chatGetTicket.js'
 import './composables/commands/chatTicketEdit.js'
 import './composables/commands/repoCrearRama.js'
 import './composables/commands/generarCommit.js'
+import './composables/commands/despliegue.js'
 
 const app = createApp(App)
 const pinia = createPinia()

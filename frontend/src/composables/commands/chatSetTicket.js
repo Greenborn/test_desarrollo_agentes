@@ -62,6 +62,7 @@ register({
       })
       const data = await res.json()
       if (data.success) {
+        await chatStore.loadSessions()
         return `Ticket #${idTicketRedmine} asignado a la sesión actual.`
       }
       throw new Error(data.error || 'Error al asignar ticket')

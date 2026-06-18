@@ -43,6 +43,14 @@
               <template v-else>(sin datos)</template>
             </div>
           </div>
+          <div v-if="project.url_github" class="col-12 mb-2">
+            <label class="form-label small text-secondary mb-1">Repositorio GitHub</label>
+            <div class="text-light">
+              <a :href="project.url_github" target="_blank" rel="noopener noreferrer" class="github-link">
+                {{ project.url_github }}
+              </a>
+            </div>
+          </div>
           <div class="col-12 mb-0">
             <label class="form-label small text-secondary mb-1">Descripción</label>
             <div class="text-light">{{ project.descripcion || '(sin descripción)' }}</div>
@@ -110,5 +118,14 @@ export default {
 .btn-outline-argentina:hover {
   background-color: #1a2744;
   color: #75AADB;
+}
+.github-link {
+  color: #60a5fa;
+  text-decoration: none;
+  word-break: break-all;
+}
+.github-link:hover {
+  text-decoration: underline;
+  color: #93c5fd;
 }
 </style>

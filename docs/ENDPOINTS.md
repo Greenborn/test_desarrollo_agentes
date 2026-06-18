@@ -407,6 +407,26 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ---
 
+## Despliegue (`/api/despliegue`)
+
+### `POST /api/despliegue/upd-config`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number }`
+- **Descripción:** Lee el archivo `deploy.json` del directorio de trabajo de la sesión (campo `cwd` de `chat_sessions`) y guarda su contenido como JSON en la columna `despliegue_config` de la tabla `proyectos` para el proyecto vinculado a la sesión.
+- **Respuesta 200:** `{ success: true, message: "Configuración de despliegue guardada correctamente." }`
+- **Respuesta 400:** `{ success: false, error: "La sesión de chat no está vinculada a un proyecto. Use /proyecto_set para seleccionar un proyecto." }`
+- **Respuesta 404:** `{ success: false, error: "No se pudo obtener configuración de despliegue: falta el archivo \"deploy.json\". Se esperaba en: <ruta>" }`
+
+### `GET /api/despliegue/config`
+- **Auth:** Requerida
+- **Query:** `sessionId` (number, requerido)
+- **Descripción:** Obtiene la configuración de despliegue guardada para el proyecto vinculado a la sesión de chat.
+- **Respuesta 200:** `{ success: true, config: <objeto JSON> }`
+- **Respuesta 400:** `{ success: false, error: "La sesión de chat no está vinculada a un proyecto. Use /proyecto_set para seleccionar un proyecto." }`
+- **Respuesta 404:** `{ success: false, error: "No hay configuración de despliegue guardada. Use /despliegue_upd_config para cargarla." }`
+
+---
+
 ## Notas
 
 - Todas las rutas protegidas devuelven `401 { error: "Sesión no válida" }` si no hay sesión

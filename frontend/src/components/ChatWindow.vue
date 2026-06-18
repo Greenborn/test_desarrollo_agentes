@@ -1971,6 +1971,16 @@ export default {
       loadTicketInfo()
     })
 
+    watch(
+      () => {
+        const s = sessions.value.find(s => Number(s.id) === Number(activeSessionId.value))
+        return s?.id_ticket_redmine
+      },
+      () => {
+        loadTicketInfo()
+      }
+    )
+
     onMounted(() => {
       if (messagesContainer.value) {
         resizeObserver = new ResizeObserver(() => {

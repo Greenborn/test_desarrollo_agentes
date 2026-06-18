@@ -106,6 +106,15 @@ La gestión de espacios de trabajo se realiza desde el modal de Configuración:
 - Al crear un workspace nuevo se copian las settings del default
 - Al cambiar de workspace se detienen procesos activos (OpenCode, navegador)
 
+## Despliegue
+
+| Comando | Descripción | Uso |
+|---|---|---|
+| `/despliegue_upd_config` | Lee `deploy.json` del directorio del proyecto y guarda la configuración de despliegue en la base de datos. Requiere proyecto asignado con `/proyecto_set` | `/despliegue_upd_config` |
+| `/despliegue_show_config` | Muestra la configuración de despliegue guardada para el proyecto actual como JSON formateado. Requiere proyecto asignado con `/proyecto_set` | `/despliegue_show_config` |
+
+---
+
 ## Notas
 
 - Los comandos se definen mediante `register({ name, category, description, usage, execute })` desde `useCommandRegistry.js`
