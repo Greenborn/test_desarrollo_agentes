@@ -49,6 +49,19 @@ register({
         output += `\n**Descripción:**\n${t.description}`
       }
 
+      if (data.attachments && data.attachments.length > 0) {
+        output += '\n\n**Adjuntos:**\n'
+        data.attachments.forEach(a => {
+          const isImage = a.content_type && a.content_type.startsWith('image/')
+          const downloadUrl = `/api/tickets/attachments/${a.id}/download`
+          if (isImage) {
+            output += `\n![${a.filename}](${downloadUrl})\n[⬇ ${a.filename}](${downloadUrl})\n`
+          } else {
+            output += `\n[⬇ ${a.filename}](${downloadUrl}) (${(a.filesize / 1024).toFixed(1)} KB)\n`
+          }
+        })
+      }
+
       if (showComments) {
         if (data.comments && data.comments.length > 0) {
           output += '\n\n**Comentarios:**\n'

@@ -148,6 +148,11 @@ router.post('/switch', async (req, res) => {
     req.session.workspaceId = workspaceId;
     await new Promise((resolve) => req.session.save(resolve));
 
+    await db('user_settings')
+      .insert({ user_id: req.session.userId, key: 'selected_workspace_id', value: String(workspaceId) })
+      .onConflict(['user_id', 'key'])
+      .merge();
+
     res.json({ success: true, workspaceId });
   } catch (err) {
     console.log('Error al cambiar workspace:', err.message);

@@ -322,9 +322,21 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Auth:** Requerida
 - **Params:** `sessionId` — ID de la sesión de chat
 - **Query:** `?comments=true` — opcional, incluye los comentarios desde la API de Redmine
-- **Descripción:** Obtiene el `id_ticket_redmine` asignado a la sesión y, si existe, los datos completos del ticket desde la tabla `tickets` (JOIN por `redmine_id`). Si `?comments=true`, también consulta la API de Redmine (`/issues/:id.json?include=journals`) para obtener los comentarios.
-- **Respuesta 200 (con ticket):** `{ idTicketRedmine: 143, ticket: { id, proyecto_id, redmine_id, subject, description, status_name, priority_name, assigned_to_name, ... }, comments: [{ user, notes, created_on }] | null }`
-- **Respuesta 200 (sin ticket):** `{ idTicketRedmine: null, ticket: null, comments: null }`
+- **Descripción:** Obtiene el `id_ticket_redmine` asignado a la sesión y, si existe, los datos completos del ticket desde la tabla `tickets` (JOIN por `redmine_id`). Si `?comments=true`, también consulta la API de Redmine (`/issues/:id.json?include=attachments,journals`) para obtener los comentarios y los adjuntos. Los attachments se devuelven siempre que el ticket tenga ID Redmine y la conexión esté configurada.
+- **Respuesta 200 (con ticket):** `{ idTicketRedmine: 143, ticket: { id, proyecto_id, redmine_id, subject, description, status_name, priority_name, assigned_to_name, ... }, comments: [{ user, notes, created_on }] | null, attachments: [{ id, filename, content_type, content_url, description, filesize, created_on }] | null }`
+- **Respuesta 200 (sin ticket):** `{ idTicketRedmine: null, ticket: null, comments: null, attachments: null }`
+
+### `GET /api/tickets/attachments/by-ticket/:redmineId`
+- **Auth:** Requerida
+- **Params:** `redmineId` — ID numérico del ticket en Redmine
+- **Descripción:** Obtiene los adjuntos de un ticket específico desde la API de Redmine. Consulta `GET /issues/{redmineId}.json?include=attachments`. Retorna arreglo vacío si Redmine no está configurado o falla la conexión.
+- **Respuesta 200:** `{ attachments: [{ id, filename, content_type, content_url, description, filesize, created_on }] }`
+
+### `GET /api/tickets/attachments/:attachmentId/download`
+- **Auth:** Requerida
+- **Params:** `attachmentId` — ID del adjunto en Redmine
+- **Descripción:** Proxy de descarga de adjuntos. Obtiene el archivo desde `${redmineUrl}/attachments/download/{attachmentId}` usando la API key de Redmine y lo reenvía al cliente con el mismo `Content-Type` y `Content-Disposition`. Útil para mostrar imágenes inline y descargar archivos sin exponer la API key al frontend.
+- **Respuesta:** Stream binario del archivo (imagen, PDF, etc.) con headers `Content-Type` y `Content-Disposition` originales de Redmine
 
 ### `POST /api/tickets/session`
 - **Auth:** Requerida

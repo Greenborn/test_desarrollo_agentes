@@ -26,14 +26,17 @@ router.get('/sessions', async (req, res) => {
       .where({ 'chat_sessions.user_id': req.session.userId, 'chat_sessions.workspace_id': wsId })
       .orderBy('updated_at', 'desc')
       .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
+      .leftJoin('tickets', 'chat_sessions.id_ticket_redmine', 'tickets.redmine_id')
       .select(
         'chat_sessions.id',
         'title',
         'updated_at',
         'cwd',
-        'proyecto_id',
+        'chat_sessions.proyecto_id',
         'id_ticket_redmine',
-        'proyectos.descripcion as proyecto_descripcion'
+        'proyectos.descripcion as proyecto_descripcion',
+        'tickets.priority_id',
+        'tickets.priority_name'
       );
     res.json({ sessions });
   } catch (err) {

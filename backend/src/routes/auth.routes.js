@@ -29,7 +29,8 @@ router.post('/login', async (req, res) => {
     req.session.userId = user.id;
     req.session.username = user.username;
     req.session.role = user.role;
-    req.session.workspaceId = 1;
+    const userWs = await db('user_settings').where({ user_id: user.id, key: 'selected_workspace_id' }).first();
+    req.session.workspaceId = userWs ? parseInt(userWs.value, 10) : 1;
     await new Promise((resolve) => req.session.save(resolve));
     res.json({
       success: true,

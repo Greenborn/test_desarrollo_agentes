@@ -102,10 +102,29 @@
         <pre class="text-light mb-0" style="white-space: pre-wrap; word-break: break-word;">{{ ticket.description || '(sin descripción)' }}</pre>
       </div>
     </div>
+
+    <div class="card bg-dark border-secondary mt-3" v-if="attachments.length > 0">
+      <div class="card-header border-secondary">
+        <h6 class="mb-0">Adjuntos ({{ attachments.length }})</h6>
+      </div>
+      <div class="card-body">
+        <div v-for="a in attachments" :key="a.id" class="mb-3">
+          <div v-if="isImage(a)" class="mb-1">
+            <img :src="'/api/tickets/attachments/' + a.id + '/download'" :alt="a.filename" class="img-fluid rounded" style="max-width:100%;height:auto;border:1px solid #555;">
+          </div>
+          <div>
+            <a :href="'/api/tickets/attachments/' + a.id + '/download'" target="_blank" class="btn btn-sm btn-outline-argentina">
+              ⬇ {{ a.filename }} ({{ formatSize(a.filesize) }})
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTicketStore } from '../stores/ticket.js'
 
@@ -113,6 +132,7 @@ export default {
   setup() {
     const ticketStore = useTicketStore()
     const { selectedTicket } = storeToRefs(ticketStore)
+    const attachments = ref([])
 
     function goBack() {
       ticketStore.clearSelection()
@@ -136,10 +156,37 @@ export default {
       }
     }
 
+    function isImage(a) {
+      return a.content_type && a.content_type.startsWith('image/')
+    }
+
+    function formatSize(bytes) {
+      if (!bytes) return ''
+      const kb = bytes / 1024
+      if (kb < 1024) return kb.toFixed(1) + ' KB'
+      return (kb / 1024).toFixed(1) + ' MB'
+    }
+
+    async function fetchAttachments() {
+      if (!selectedTicket.value?.redmine_id) return
+      try {
+        const res = await fetch(`/api/tickets/attachments/by-ticket/${selectedTicket.value.redmine_id}`, { credentials: 'include' })
+        const data = await res.json()
+        attachments.value = data.attachments || []
+      } catch (err) {
+        console.error('Error al obtener adjuntos:', err.message)
+      }
+    }
+
+    fetchAttachments()
+
     return {
       ticket: selectedTicket,
       goBack,
       formatDate,
+      attachments,
+      isImage,
+      formatSize,
     }
   },
 }

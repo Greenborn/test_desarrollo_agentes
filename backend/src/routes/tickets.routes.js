@@ -95,6 +95,40 @@ router.get('/session/:sessionId', async (req, res) => {
         .first();
     }
 
+    let attachments = null;
+
+    if (idTicketRedmine) {
+      try {
+        const wsId = req.session.workspaceId || 1;
+        const token = await getRedmineToken(wsId);
+        const url = await getRedmineUrl(wsId);
+        if (token && url) {
+          const apiUrl = url.replace(/\/+$/, '') + `/issues/${idTicketRedmine}.json?include=attachments`;
+          const response = await fetch(apiUrl, {
+            headers: {
+              'X-Redmine-API-Key': token,
+              'Content-Type': 'application/json',
+            },
+          });
+          const data = await response.json();
+          if (data.issue?.attachments) {
+            attachments = data.issue.attachments.map(a => ({
+              id: a.id,
+              filename: a.filename,
+              content_type: a.content_type,
+              content_url: a.content_url,
+              description: a.description || '',
+              filesize: a.filesize,
+              created_on: a.created_on,
+            }));
+          }
+        }
+      } catch (e) {
+        console.log('Error al obtener attachments de Redmine:', e.message);
+        attachments = [];
+      }
+    }
+
     if (idTicketRedmine && req.query.comments === 'true') {
       try {
         const wsId = req.session.workspaceId || 1;
@@ -125,7 +159,7 @@ router.get('/session/:sessionId', async (req, res) => {
       }
     }
 
-    res.json({ idTicketRedmine, ticket, comments });
+    res.json({ idTicketRedmine, ticket, comments, attachments });
   } catch (err) {
     console.log('Error al obtener ticket de sesión:', err.message);
     res.status(500).json({ error: err.message });
@@ -289,11 +323,11 @@ router.put('/session/:sessionId', async (req, res) => {
     if (description !== undefined) { localUpdate.description = description; redmineUpdate.description = description; }
     if (status_name !== undefined) { localUpdate.status_name = status_name.trim(); }
     if (priority_name !== undefined) { localUpdate.priority_name = priority_name.trim(); }
-    if (priority_id !== undefined) { localUpdate.priority_id = priority_id; }
+    if (priority_id != null) { localUpdate.priority_id = priority_id; }
     if (assigned_to_name !== undefined) { localUpdate.assigned_to_name = assigned_to_name.trim(); }
-    if (status_id !== undefined) { redmineUpdate.status_id = status_id; }
-    if (priority_id !== undefined) { redmineUpdate.priority_id = priority_id; }
-    if (assigned_to_id !== undefined) { redmineUpdate.assigned_to_id = assigned_to_id; }
+    if (status_id != null) { redmineUpdate.status_id = status_id; }
+    if (priority_id != null) { redmineUpdate.priority_id = priority_id; }
+    if (assigned_to_id != null) { redmineUpdate.assigned_to_id = assigned_to_id; }
     if (notes !== undefined && notes.trim()) { redmineUpdate.notes = notes.trim(); }
 
     if (Object.keys(localUpdate).length > 0) {
@@ -334,6 +368,84 @@ router.put('/session/:sessionId', async (req, res) => {
     res.json({ success: true, ticket: updated });
   } catch (err) {
     console.log('Error al actualizar ticket:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/attachments/by-ticket/:redmineId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const wsId = req.session.workspaceId || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
+
+    if (!token || !url) {
+      return res.json({ attachments: [] });
+    }
+
+    const apiUrl = url.replace(/\/+$/, '') + `/issues/${req.params.redmineId}.json?include=attachments`;
+    const response = await fetch(apiUrl, {
+      headers: {
+        'X-Redmine-API-Key': token,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.log(`Error HTTP ${response.status} al obtener attachments del ticket ${req.params.redmineId}`);
+      return res.json({ attachments: [] });
+    }
+
+    const data = await response.json();
+    const attachments = (data.issue?.attachments || []).map(a => ({
+      id: a.id,
+      filename: a.filename,
+      content_type: a.content_type,
+      content_url: a.content_url,
+      description: a.description || '',
+      filesize: a.filesize,
+      created_on: a.created_on,
+    }));
+
+    res.json({ attachments });
+  } catch (err) {
+    console.log('Error al obtener attachments del ticket:', err.message);
+    res.json({ attachments: [] });
+  }
+});
+
+router.get('/attachments/:attachmentId/download', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const wsId = req.session.workspaceId || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
+
+    if (!token || !url) {
+      return res.status(404).json({ error: 'Redmine no configurado' });
+    }
+
+    const baseUrl = url.replace(/\/+$/, '');
+    const redmineRes = await fetch(`${baseUrl}/attachments/download/${req.params.attachmentId}`, {
+      headers: { 'X-Redmine-API-Key': token },
+    });
+
+    if (!redmineRes.ok) {
+      const text = await redmineRes.text();
+      console.log(`Error HTTP ${redmineRes.status} al descargar attachment ${req.params.attachmentId}: ${text.slice(0, 200)}`);
+      return res.status(redmineRes.status).json({ error: 'Error al descargar el archivo desde Redmine' });
+    }
+
+    const contentType = redmineRes.headers.get('content-type');
+    const contentDisposition = redmineRes.headers.get('content-disposition');
+    if (contentType) res.setHeader('Content-Type', contentType);
+    if (contentDisposition) res.setHeader('Content-Disposition', contentDisposition);
+
+    redmineRes.body.pipe(res);
+  } catch (err) {
+    console.log('Error al descargar attachment:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

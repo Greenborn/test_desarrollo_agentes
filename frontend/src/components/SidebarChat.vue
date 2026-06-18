@@ -19,7 +19,7 @@
             v-for="s in filteredSessions"
             :key="s.id"
             class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
-            :class="{ active: s.id === activeSessionId }"
+            :class="[{ active: s.id === activeSessionId }, ticketPriorityClass(s.priority_id)]"
             :title="sessionTooltip(s)"
             @click="selectSession(s.id)"
           >
@@ -347,18 +347,23 @@ export default {
 }
 .ticket-priority-low {
   border-left: 3px solid #6b7280 !important;
+  background-color: rgba(107, 114, 128, 0.12) !important;
 }
 .ticket-priority-normal {
   border-left: 3px solid #3b82f6 !important;
+  background-color: rgba(59, 130, 246, 0.12) !important;
 }
 .ticket-priority-high {
   border-left: 3px solid #eab308 !important;
+  background-color: rgba(234, 179, 8, 0.12) !important;
 }
 .ticket-priority-urgent {
   border-left: 3px solid #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.12) !important;
 }
 .ticket-priority-immediate {
   border-left: 3px solid #ef4444 !important;
   border-left-width: 4px !important;
+  background-color: rgba(239, 68, 68, 0.18) !important;
 }
 </style>

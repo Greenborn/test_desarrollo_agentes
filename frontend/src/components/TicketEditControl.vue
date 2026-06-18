@@ -15,11 +15,10 @@
     <div class="ticket-field row-fields">
       <div class="field-item">
         <span class="field-label">Estado:</span>
-        <select v-if="allowedStatuses.length || options.statuses.length" v-model="form.status_name" class="ticket-select" @change="onStatusChange">
+        <select v-model="form.status_name" class="ticket-select" @change="onStatusChange">
           <option value="" disabled>Selecciona estado...</option>
-          <option v-for="s in (allowedStatuses.length ? allowedStatuses : options.statuses)" :key="s.id" :value="s.name">{{ s.name }}</option>
+          <option v-for="s in statusOptions" :key="s.id || s.name" :value="s.name">{{ s.name }}</option>
         </select>
-        <input v-else v-model="form.status_name" class="ticket-input" placeholder="Estado" />
       </div>
       <div class="field-item">
         <span class="field-label">Prioridad:</span>
@@ -74,7 +73,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 
 const API = '/api'
 
@@ -96,6 +95,23 @@ export default {
       status_id: null,
       priority_id: null,
       assigned_to_id: null,
+    })
+
+    const statusOptions = computed(() => {
+      const allowed = allowedStatuses.value
+      if (allowed.length > 0) {
+        const currentStatus = props.ticket?.status_name
+        const hasCurrent = currentStatus && allowed.some(s => s.name === currentStatus)
+        if (currentStatus && !hasCurrent) {
+          const fromAll = options.statuses.find(s => s.name === currentStatus)
+          if (fromAll) {
+            return [fromAll, ...allowed]
+          }
+          return [{ id: null, name: currentStatus }, ...allowed]
+        }
+        return allowed
+      }
+      return options.statuses
     })
 
     const form = reactive({
@@ -125,7 +141,6 @@ export default {
         const res = await fetch(`${API}/tickets/ticket-options/${redmineId}`, { credentials: 'include' })
         const data = await res.json()
         if (data.statuses && data.statuses.length > 0) {
-          options.statuses = data.statuses
           allowedStatuses.value = data.statuses
         }
         if (data.priorities && data.priorities.length > 0) {
@@ -137,11 +152,21 @@ export default {
       } catch (err) {
         console.error('Error al cargar opciones del ticket:', err)
       }
+
+      if (options.statuses.length === 0) {
+        options.statuses = [
+          { id: null, name: 'Nuevo' },
+          { id: null, name: 'En Progreso' },
+          { id: null, name: 'Resuelto' },
+          { id: null, name: 'Feedback' },
+          { id: null, name: 'Cerrado' },
+          { id: null, name: 'Rechazado' },
+        ]
+      }
     }
 
     function onStatusChange() {
-      const statusList = allowedStatuses.value.length > 0 ? allowedStatuses.value : options.statuses
-      const match = statusList.find(s => s.name === form.status_name)
+      const match = statusOptions.value.find(s => s.name === form.status_name)
       selectedIds.status_id = match ? match.id : null
     }
 
@@ -197,8 +222,7 @@ export default {
     onMounted(async () => {
       await loadTicketOptions()
 
-      const statusList = allowedStatuses.value.length > 0 ? allowedStatuses.value : options.statuses
-      const statusMatch = statusList.find(s => s.name === form.status_name)
+      const statusMatch = statusOptions.value.find(s => s.name === form.status_name)
       if (statusMatch) selectedIds.status_id = statusMatch.id
 
       const priorityMatch = options.priorities.find(p => p.name === form.priority_name)
@@ -209,7 +233,7 @@ export default {
     })
 
     return {
-      form, options, allowedStatuses, errors, saving, selectedIds,
+      form, options, allowedStatuses, statusOptions, errors, saving, selectedIds,
       save, cancel, onStatusChange, onPriorityChange, onUserChange,
     }
   },
