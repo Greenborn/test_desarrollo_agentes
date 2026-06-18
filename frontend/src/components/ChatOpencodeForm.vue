@@ -15,6 +15,12 @@
         </select>
       </div>
       <div style="min-width: 140px; flex: 1;">
+        <label class="small text-light-emphasis mb-1">Temperatura</label>
+        <select v-model="selectedTemperature" class="form-select form-select-sm bg-dark text-light border-secondary font-monospace">
+          <option v-for="t in temperatureOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+        </select>
+      </div>
+      <div style="min-width: 140px; flex: 1;">
         <label class="small text-light-emphasis mb-1">Modo</label>
         <div class="btn-group btn-group-sm w-100" role="group">
           <button
@@ -53,6 +59,8 @@ export default {
     modelValue: { type: String, default: '' },
     thinkingOptions: { type: Array, default: () => [] },
     thinkingValue: { type: String, default: '' },
+    temperatureOptions: { type: Array, default: () => [] },
+    temperatureValue: { type: String, default: '' },
     modeValue: { type: String, default: 'Build' },
     placeholder: { type: String, default: '' },
     rows: { type: Number, default: 3 },
@@ -61,6 +69,7 @@ export default {
   setup(props, { emit }) {
     const selectedModel = ref(props.modelValue || '')
     const selectedThinking = ref(props.thinkingValue || '')
+    const selectedTemperature = ref(props.temperatureValue || '')
     const selectedMode = ref(props.modeValue || 'Build')
     const text = ref('')
 
@@ -82,11 +91,12 @@ export default {
         model: selectedModel.value,
         thinking: showThinking.value ? selectedThinking.value : '',
         mode: selectedMode.value,
+        temperature: selectedTemperature.value,
         prompt: text.value,
       })
     }
 
-    return { selectedModel, selectedThinking, selectedMode, text, showThinking, onModelChange, confirm }
+    return { selectedModel, selectedThinking, selectedTemperature, selectedMode, text, showThinking, onModelChange, confirm }
   },
 }
 </script>

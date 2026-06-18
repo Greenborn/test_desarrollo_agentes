@@ -49,6 +49,8 @@ router.get('/', async (req, res) => {
         keys.ticket_refinar_prompt = row.setting_value;
       } else if (row.setting_key === 'repo_acronimo') {
         keys.repo_acronimo = row.setting_value;
+      } else if (row.setting_key === 'locale') {
+        keys.locale = row.setting_value;
       }
     }
     const defaults = {
@@ -60,6 +62,7 @@ router.get('/', async (req, res) => {
       ticket_descripcion_prompt: 'Eres un asistente experto en redactar descripciones técnicas para tickets de Redmine. Tu objetivo principal es generar una descripción ÓPTIMA y detallada para el siguiente ticket:\n\nContexto del ticket:\n- Título: {subject}\n- Estado actual: {status}\n- Prioridad: {priority}\n- Asignado a: {assigned_to}\n\nInstrucciones:\n1. Genera una descripción clara, precisa y bien estructurada que explique el problema o requerimiento del ticket.\n2. Utiliza la siguiente solicitud del usuario como guía para el contenido:\n{user_input}\n3. La descripción debe ser profesional, técnica y útil para desarrolladores.\n4. Incluye solo información relevante al ticket, sin divagaciones.',
       ticket_refinar_prompt: 'Eres un asistente especializado en refinar descripciones técnicas de tickets para Redmine. Toma la descripción proporcionada y transfórmala en una descripción estructurada con las siguientes secciones:\n\n## Objetivo\nDescripción general de la tarea o cambio a realizar, explicando el propósito y la idea principal.\n\n## Cambios a realizar\nInforme detallado a medio nivel de los cambios concretos que deben aplicarse, organizado de forma clara.\n\nReglas:\n- No inventes nada que no esté presente en el texto original.\n- Sé conciso y técnico, apropiado para desarrolladores.\n- Devuelve únicamente la descripción formateada, sin comentarios adicionales.',
       repo_acronimo: 'TKT',
+      locale: 'es_ES.UTF-8',
     };
     for (const [key, def] of Object.entries(defaults)) {
       if (!keys[key]) keys[key] = def;

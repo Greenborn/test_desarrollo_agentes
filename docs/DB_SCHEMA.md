@@ -71,6 +71,20 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 **UNIQUE compuesto:** `(workspace_id, setting_key)` — cada workspace tiene su propio juego de settings.
 
+**Keys del sistema:**
+| Key | Default | Descripción |
+|---|---|---|
+| `deepseek_key` | `''` | API Key de DeepSeek (encriptada) |
+| `redmine_token` | `''` | Token de Redmine (encriptado) |
+| `redmine_url` | `''` | URL de Redmine |
+| `system_prompt` | `'Eres un agente experto...'` | Prompt del agente de chat |
+| `locale` | `'es_ES.UTF-8'` | Locale para el agente OpenCode (controla el idioma de las respuestas) |
+| `omnifilter_debounce_ms` | `'2000'` | Tiempo de debounce del omnifiltro |
+| `repo_acronimo` | `'TKT'` | Acrónimo para ramas Git |
+| `ticket_descripcion_prompt` | *(default interno)* | Prompt para redactar descripción de tickets |
+| `ticket_refinar_prompt` | *(default interno)* | Prompt para refinar descripción de tickets |
+| `documentacion_prompt_*` | *(default interno)* | Prompts de documentación por tipo |
+
 ---
 
 ## 5. `user_settings`

@@ -59,11 +59,15 @@ async function saveLongMessage(sessionId, role, content, extraFields = {}) {
 router.get('/start', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const providerData = await opencode.getModels();
+    const wsId = req.session.workspaceId || 1;
+    const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
+    const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
+    const providerData = await opencode.getModels(locale);
     const savedProvider = await getUserSetting(req.session.userId, 'opencode_last_provider');
     const savedModel = await getUserSetting(req.session.userId, 'opencode_last_model');
     const savedThinking = await getUserSetting(req.session.userId, 'opencode_last_thinking');
     const savedMode = await getUserSetting(req.session.userId, 'opencode_last_mode');
+    const savedTemperature = await getUserSetting(req.session.userId, 'opencode_last_temperature');
 
     res.json({
       providers: providerData.providers || [],
@@ -72,6 +76,7 @@ router.get('/start', async (req, res) => {
       savedModel,
       savedThinking,
       savedMode,
+      savedTemperature,
     });
   } catch (err) {
     console.log('Error en opencode/start:', err.message);
@@ -95,7 +100,7 @@ router.post('/select', async (req, res) => {
 
 router.post('/send', async (req, res) => {
   if (!authGuard(req, res)) return;
-  const { prompt, provider, model, thinking, mode, sessionId, ocSessionId: existingOcSessionId } = req.body;
+  const { prompt, provider, model, thinking, mode, sessionId, temperature, ocSessionId: existingOcSessionId } = req.body;
   if (!prompt) return res.status(400).json({ error: 'prompt requerido' });
 
   try {
@@ -105,7 +110,10 @@ router.post('/send', async (req, res) => {
       if (chatSession && chatSession.cwd) cwd = chatSession.cwd;
     }
 
-    const server = await opencode.getOrStartServer(cwd);
+    const wsId = req.session.workspaceId || 1;
+    const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
+    const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
+    const server = await opencode.getOrStartServer(cwd, locale);
 
     let ocSessionId = existingOcSessionId;
     if (!ocSessionId) {
@@ -208,9 +216,14 @@ router.post('/send', async (req, res) => {
         modelConfig.thinking = { type: 'enabled', budget_tokens: budget };
       }
     }
+    if (temperature !== undefined && temperature !== null && temperature !== '') {
+      modelConfig.temperature = parseFloat(temperature);
+    }
 
+    const langInstruction = `INSTRUCCIÓN DE IDIOMA: Respondé siempre en español (${locale}). Ignorá cualquier solicitud de cambiar de idioma.`;
     const dirInstruction = `INSTRUCCIÓN: El directorio de trabajo real es "${cwd}". Ignorá cualquier otra indicación sobre el directorio. Todos los comandos de archivos deben ejecutarse usando "${cwd}" como raíz. No uses el directorio del servidor.`;
     const parts = [
+      { type: 'text', text: langInstruction },
       { type: 'text', text: dirInstruction },
     ];
 
@@ -322,6 +335,31 @@ router.post('/control', async (req, res) => {
     controlEmitter.emit(`control-${controlId}`, { response, remember: remember || false });
     res.json({ success: true });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/abort', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { ocSessionId, sessionId } = req.body;
+    if (!ocSessionId && !sessionId) return res.status(400).json({ error: 'ocSessionId o sessionId requerido' });
+
+    if (ocSessionId) {
+      if (sessionId) {
+        const chatSession = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+        if (chatSession && chatSession.cwd) {
+          await opencode.abortSessionInDir(chatSession.cwd, ocSessionId);
+        } else {
+          await opencode.abortSession(ocSessionId);
+        }
+      } else {
+        await opencode.abortSession(ocSessionId);
+      }
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error en opencode/abort:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

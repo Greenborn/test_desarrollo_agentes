@@ -12,16 +12,26 @@ export const useOpencodeStore = defineStore('opencode', () => {
   const savedModel = ref('')
   const savedThinking = ref('')
   const savedMode = ref('')
+  const savedTemperature = ref('')
   const selectedProvider = ref('')
   const selectedModel = ref('')
   const selectedThinking = ref('')
   const selectedMode = ref('')
+  const selectedTemperature = ref('')
 
   const thinkingOptions = [
     { label: 'Low — mínimo esfuerzo de razonamiento', value: 'low' },
     { label: 'Medium — equilibrio entre velocidad y profundidad', value: 'medium' },
     { label: 'High — máximo razonamiento profundo', value: 'high' },
   ]
+
+  const temperatureOptions = [
+    { label: 'Precisa (0.0)', value: '0' },
+    { label: 'Balanceada (0.7)', value: '0.7' },
+    { label: 'Creativa (1.5)', value: '1.5' },
+  ]
+  const messageQueue = ref([])
+  const processing = ref(false)
   const streaming = ref(false)
   const streamText = ref('')
   const streamThinking = ref('')
@@ -67,6 +77,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
       savedModel.value = data.savedModel || ''
       savedThinking.value = data.savedThinking || ''
       savedMode.value = data.savedMode || ''
+      savedTemperature.value = data.savedTemperature || ''
       return data
     } catch (err) {
       console.error('Error en opencode start:', err)
@@ -87,8 +98,8 @@ export const useOpencodeStore = defineStore('opencode', () => {
     }
   }
 
-  async function streamPrompt(sessionId, prompt, provider, model, thinking, mode, callbacks) {
-    const body = { prompt, provider, model, thinking, mode, sessionId }
+  async function streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, callbacks) {
+    const body = { prompt, provider, model, thinking, mode, temperature, sessionId }
     if (ocSessionId.value) body.ocSessionId = ocSessionId.value
 
     streaming.value = true
@@ -169,14 +180,18 @@ export const useOpencodeStore = defineStore('opencode', () => {
     selectedModel.value = ''
     selectedThinking.value = ''
     selectedMode.value = ''
+    selectedTemperature.value = ''
+    messageQueue.value = []
+    processing.value = false
   }
 
   return {
     step, ocSessionId, defaultModels, providers,
-    savedProvider, savedModel, savedThinking, savedMode,
-    selectedProvider, selectedModel, selectedThinking, selectedMode,
+    savedProvider, savedModel, savedThinking, savedMode, savedTemperature,
+    selectedProvider, selectedModel, selectedThinking, selectedMode, selectedTemperature,
     streaming, streamText, streamThinking,
-    thinkingOptions,
+    thinkingOptions, temperatureOptions,
+    messageQueue, processing,
     getAvailableProviders, getModelsForProvider, modelSupportsReasoning,
     start, select, streamPrompt, finish,
   }

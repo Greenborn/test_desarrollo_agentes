@@ -4,9 +4,10 @@ const servers = {};
 let nextPort = 4200;
 
 class OpenCodeServer {
-  constructor(directory, port) {
+  constructor(directory, port, locale) {
     this.directory = directory;
     this.port = port;
+    this.locale = locale || 'es_ES.UTF-8';
     this.process = null;
     this.ready = false;
   }
@@ -19,7 +20,7 @@ class OpenCodeServer {
     return new Promise((resolve, reject) => {
       this.process = spawn('opencode', ['serve', '--port', String(this.port)], {
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env },
+        env: { ...process.env, LANG: this.locale, LC_ALL: this.locale },
         cwd: this.directory,
       });
 
@@ -176,10 +177,10 @@ class OpenCodeServer {
   }
 }
 
-async function getOrStartServer(directory) {
+async function getOrStartServer(directory, locale) {
   if (servers[directory]) return servers[directory];
   const port = nextPort++;
-  const srv = new OpenCodeServer(directory, port);
+  const srv = new OpenCodeServer(directory, port, locale);
   servers[directory] = srv;
   await srv.start();
   await srv.waitForReady();
@@ -199,10 +200,10 @@ function stopAllServers() {
   }
 }
 
-async function getModels() {
+async function getModels(locale) {
   const firstKey = Object.keys(servers)[0];
   if (firstKey) return servers[firstKey].api('/config/providers');
-  const fallback = new OpenCodeServer(process.cwd(), nextPort++);
+  const fallback = new OpenCodeServer(process.cwd(), nextPort++, locale);
   await fallback.start();
   await fallback.waitForReady();
   const data = await fallback.api('/config/providers');
@@ -216,10 +217,20 @@ async function abortSessionInDir(directory, ocSessionId) {
   }
 }
 
+async function abortSession(ocSessionId) {
+  for (const dir of Object.keys(servers)) {
+    try {
+      await servers[dir].abortSession(ocSessionId);
+      return;
+    } catch {}
+  }
+}
+
 export default {
   getOrStartServer,
   stopServer,
   stopAllServers,
   getModels,
   abortSessionInDir,
+  abortSession,
 };

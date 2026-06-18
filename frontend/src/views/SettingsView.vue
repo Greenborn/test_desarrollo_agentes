@@ -113,6 +113,19 @@
             Guardar
           </button>
         </div>
+
+        <div v-if="matches('locale idioma')">
+          <label class="form-label">Locale (idioma del agente OpenCode)</label>
+          <input
+            type="text"
+            class="form-control bg-dark text-light border-secondary"
+            v-model="localeInput"
+            placeholder="es_ES.UTF-8"
+          />
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveLocale">
+            Guardar
+          </button>
+        </div>
       </div>
 
       <div class="col-md-6 d-flex flex-column gap-4">
@@ -244,6 +257,7 @@ export default {
     const refinarPromptInput = ref('')
     const omnifilterDebounceInput = ref(2000)
     const repoAcronimoInput = ref('TKT')
+    const localeInput = ref('es_ES.UTF-8')
     const selectedWId = ref(1)
     const wsMessage = ref('')
 
@@ -299,6 +313,10 @@ export default {
 
     watch(() => settings.repoAcronimo, (val) => {
       repoAcronimoInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.locale, (val) => {
+      localeInput.value = val
     }, { immediate: true })
 
     watch(() => settings.ticketDescripcionPrompt, (val) => {
@@ -444,13 +462,20 @@ export default {
       settings.save('ticket_refinar_prompt', refinarPromptInput.value)
     }
 
+    function saveLocale() {
+      settings.clearFeedback()
+      settings.save('locale', localeInput.value)
+    }
+
     return {
       keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput,
       docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput, refinarPromptInput,
       showKey, showRedmineToken, searchTerm, omnifilterDebounceInput, repoAcronimoInput,
+      localeInput,
       settings, workspaces, selectedWId, wsMessage,
       saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
-      saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveRepoAcronimo, matches,
+      saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveRepoAcronimo,
+      saveLocale, matches,
       onWorkspaceChange, promptCreate, promptRename, confirmDelete,
     }
   },

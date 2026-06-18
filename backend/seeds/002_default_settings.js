@@ -21,5 +21,10 @@ export async function seed(knex) {
       setting_value: '',
       encrypted: false,
     },
+    {
+      setting_key: 'locale',
+      setting_value: 'es_ES.UTF-8',
+      encrypted: false,
+    },
   ]);
 }

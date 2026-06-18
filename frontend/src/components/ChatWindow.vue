@@ -32,20 +32,23 @@
             <div style="white-space: pre-wrap;">{{ currentChunk }}<span class="blink">▌</span></div>
           </div>
         </div>
-        <div v-if="ocStreaming && _isActiveSession(_streamSessionId)" class="text-start mb-3">
-          <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 90%; background: #1a2744; border: 1px solid #75AADB; color: #f0f0f0;">
-            <div v-if="ocThinking" class="mb-2">
-              <button class="btn btn-sm w-100 text-start btn-outline-argentina" data-bs-toggle="collapse" data-bs-target="#oc-think-stream">
-                🧠 OpenCode razonando...
-              </button>
-              <div class="collapse show mt-1" id="oc-think-stream">
-                <pre class="mb-0 small text-muted" style="white-space: pre-wrap;">{{ ocThinking }}</pre>
-              </div>
-            </div>
-            <div style="white-space: pre-wrap;">{{ ocChunk }}<span class="blink">▌</span></div>
+      </template>
+    </div>
+    <div v-if="ocStreaming && activeSessionId && _isActiveSession(_streamSessionId)" class="border-top p-2" style="border-color: #374151; background: #0d1b2a;">
+      <div class="rounded-3 p-3 text-start" style="background: #1a2744; border: 1px solid #75AADB; color: #f0f0f0;">
+        <div v-if="ocThinking" class="mb-2">
+          <button class="btn btn-sm w-100 text-start btn-outline-argentina" data-bs-toggle="collapse" data-bs-target="#oc-think-stream">
+            🧠 OpenCode razonando...
+          </button>
+          <div class="collapse show mt-1" id="oc-think-stream">
+            <pre class="mb-0 small text-muted" style="white-space: pre-wrap;">{{ ocThinking }}</pre>
           </div>
         </div>
-      </template>
+        <div style="white-space: pre-wrap;">{{ ocChunk }}<span class="blink">▌</span></div>
+        <div class="mt-2">
+          <button class="btn btn-sm btn-outline-danger" @click="abortOpencode">⏹ Detener</button>
+        </div>
+      </div>
     </div>
     <div class="border-top p-2" style="border-color: #374151;" v-if="activeSessionId">
       <form @submit.prevent="send" class="d-flex gap-2">
@@ -176,9 +179,63 @@ export default {
 
       if (raw.startsWith('/')) {
         executeCommand(raw)
+      } else if (ocStore.ocSessionId) {
+        if (ocStreaming.value) {
+          ocStore.messageQueue.push(raw)
+          chat.messages.push({
+            role: 'opencode_info',
+            content: JSON.stringify({ type: 'queued', message: `⏳ Mensaje encolado: "${raw.slice(0, 80)}${raw.length > 80 ? '...' : ''}"` }),
+            _key: 'queue-' + Date.now(),
+          })
+        } else {
+          sendToOpencode(raw)
+        }
       } else {
         chat.sendMessage(chat.activeSessionId, raw)
       }
+    }
+
+    async function sendToOpencode(prompt) {
+      if (!ocStore.selectedProvider) {
+        chat.messages.push({
+          role: 'opencode_info',
+          content: JSON.stringify({ type: 'info', message: 'No hay sesión OpenCode configurada. Ejecutá /opencode primero.' }),
+          _key: 'info-' + Date.now(),
+        })
+        return
+      }
+      await opencodeStreamPrompt(
+        chat.activeSessionId,
+        prompt,
+        ocStore.selectedProvider,
+        ocStore.selectedModel,
+        ocStore.selectedThinking,
+        ocStore.selectedMode,
+        ocStore.selectedTemperature,
+      )
+    }
+
+    async function abortOpencode() {
+      try {
+        await fetch('/api/opencode/abort', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, sessionId: chat.activeSessionId }),
+        })
+      } catch (err) {
+        console.error('Error al abortar opencode:', err)
+      }
+      ocStreaming.value = false
+      if (chat.activeSessionId) {
+        chat.sessionStatus[chat.activeSessionId] = 'idle'
+      }
+      chat.messages.push({
+        role: 'opencode_info',
+        content: JSON.stringify({ type: 'info', message: '⏹ Tarea detenida por el usuario.' }),
+        _key: 'abort-' + Date.now(),
+      })
+      ocStore.messageQueue.value = []
     }
 
     function onContextMenu(e, msg) {
@@ -201,17 +258,14 @@ export default {
       closeCtxMenu()
     }
 
-    async function opencodeStreamPrompt(sessionId, prompt, provider, model, thinking, mode) {
+    async function opencodeStreamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature) {
       ocStreaming.value = true
       ocChunk.value = ''
       ocThinking.value = ''
       _streamSessionId.value = sessionId
       if (sessionId) chat.sessionStatus[sessionId] = 'executing'
 
-      const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
-      streamMsg._key = 'stream-' + Date.now()
-
-      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, {
+      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
         onChunk(content) {
           if (_isActiveSession(sessionId)) ocChunk.value += content
         },
@@ -232,12 +286,21 @@ export default {
           ocStreaming.value = false
           if (sessionId) chat.sessionStatus[sessionId] = 'idle'
           if (_isActiveSession(sessionId)) {
-            const streamKey = streamMsg._key
-            const idx = chat.messages.findIndex((m) => m._key === streamKey)
-            if (idx >= 0) {
-              chat.messages[idx].streaming = false
-              chat.messages[idx].role = 'opencode_result'
-              chat.messages[idx].content = json.fullResponse || fullText || '(sin respuesta)'
+            const content = json.fullResponse || fullText || '(sin respuesta)'
+            chat.messages.push({
+              role: 'opencode_result',
+              content,
+              _key: 'result-' + Date.now(),
+            })
+            const next = ocStore.messageQueue.shift()
+            if (next && _isActiveSession(sessionId)) {
+              const queueMsg = chat.messages.find((m) => m.role === 'opencode_info' && m.content?.includes('encolado'))
+              if (queueMsg) {
+                const qIdx = chat.messages.indexOf(queueMsg)
+                if (qIdx >= 0) chat.messages.splice(qIdx, 1)
+              }
+              sendToOpencode(next)
+              return
             }
             chat.messages.push({
               role: 'opencode_control',
@@ -248,6 +311,8 @@ export default {
                 modelValue: ocStore.selectedModel || '',
                 thinkingOptions: ocStore.thinkingOptions,
                 thinkingValue: ocStore.selectedThinking || '',
+                temperatureOptions: ocStore.temperatureOptions,
+                temperatureValue: ocStore.selectedTemperature || ocStore.savedTemperature || '0.7',
                 modeValue: ocStore.selectedMode || 'Build',
                 placeholder: 'Escribe otro mensaje para OpenCode...',
                 rows: 3,
@@ -260,12 +325,11 @@ export default {
           ocStreaming.value = false
           if (sessionId) chat.sessionStatus[sessionId] = 'error'
           if (_isActiveSession(sessionId)) {
-            const streamKey = streamMsg._key
-            const idx = chat.messages.findIndex((m) => m._key === streamKey)
-            if (idx >= 0) {
-              chat.messages[idx].content = `[Error: ${msg}]`
-              chat.messages[idx].streaming = false
-            }
+            chat.messages.push({
+              role: 'opencode_result',
+              content: `[Error: ${msg}]`,
+              _key: 'error-' + Date.now(),
+            })
           }
         },
       })
@@ -508,10 +572,11 @@ export default {
         }
         return
       } else if (controlType === 'followup') {
-        const { model, thinking, prompt } = value
+        const { model, thinking, temperature, prompt } = value
         if (!prompt) return
         ocStore.selectedModel = model || ocStore.selectedModel
         ocStore.selectedThinking = thinking || ocStore.selectedThinking
+        ocStore.selectedTemperature = temperature || ocStore.selectedTemperature
         await opencodeStreamPrompt(
           chat.activeSessionId,
           prompt,
@@ -519,13 +584,15 @@ export default {
           ocStore.selectedModel,
           ocStore.selectedThinking,
           ocStore.selectedMode,
+          ocStore.selectedTemperature,
         )
       } else if (controlType === 'opencode_form') {
-        const { model, thinking, mode, prompt } = value
+        const { model, thinking, mode, temperature, prompt } = value
         if (!prompt) return
         ocStore.selectedModel = model || ocStore.selectedModel
         ocStore.selectedThinking = thinking || ocStore.selectedThinking
         ocStore.selectedMode = mode || ocStore.selectedMode
+        ocStore.selectedTemperature = temperature || ocStore.selectedTemperature
         await opencodeStreamPrompt(
           chat.activeSessionId,
           prompt,
@@ -533,6 +600,7 @@ export default {
           ocStore.selectedModel,
           ocStore.selectedThinking,
           ocStore.selectedMode,
+          ocStore.selectedTemperature,
         )
       } else {
         // Runtime OpenCode control
@@ -1451,41 +1519,47 @@ export default {
         const models = ocStore.getModelsForProvider(value)
         chat.messages.push({
           role: 'opencode_control',
-          controlData: {
-            controlId: 'opencode-form-' + Date.now(),
-            controlType: 'opencode_form',
-            stepType: 'opencode_setup',
-            subStepType: 'form',
-            models,
-            modelValue: ocStore.savedModel || '',
-            thinkingOptions: ocStore.thinkingOptions,
-            thinkingValue: ocStore.savedThinking || '',
-            modeValue: ocStore.savedMode || 'Build',
-            placeholder: 'Describe qué quieres que OpenCode haga...',
-            rows: 5,
-          },
-          _key: 'control-' + Date.now(),
-        })
-      } else if (subStepType === 'form') {
-        const { model, thinking, mode, prompt } = value
-        ocSetupData.model = model
-        ocSetupData.thinking = thinking
-        ocSetupData.mode = mode
-        ocSetupData.prompt = prompt
-        await ocStore.select('model', model)
-        await ocStore.select('thinking', thinking || '')
-        await ocStore.select('mode', mode)
-        ocStore.selectedModel = model
-        ocStore.selectedThinking = thinking || ''
-        ocStore.selectedMode = mode
-        await opencodeStreamPrompt(
-          chat.activeSessionId,
-          prompt,
-          ocSetupData.provider,
-          model,
-          thinking,
-          mode,
-        )
+            controlData: {
+              controlId: 'opencode-form-' + Date.now(),
+              controlType: 'opencode_form',
+              stepType: 'opencode_setup',
+              subStepType: 'form',
+              models,
+              modelValue: ocStore.savedModel || '',
+              thinkingOptions: ocStore.thinkingOptions,
+              thinkingValue: ocStore.savedThinking || '',
+              temperatureOptions: ocStore.temperatureOptions,
+              temperatureValue: ocStore.savedTemperature || '0.7',
+              modeValue: ocStore.savedMode || 'Build',
+              placeholder: 'Describe qué quieres que OpenCode haga...',
+              rows: 5,
+            },
+            _key: 'control-' + Date.now(),
+          })
+        } else if (subStepType === 'form') {
+          const { model, thinking, mode, temperature, prompt } = value
+          ocSetupData.model = model
+          ocSetupData.thinking = thinking
+          ocSetupData.mode = mode
+          ocSetupData.temperature = temperature
+          ocSetupData.prompt = prompt
+          await ocStore.select('model', model)
+          await ocStore.select('thinking', thinking || '')
+          await ocStore.select('mode', mode)
+          if (temperature) await ocStore.select('temperature', temperature)
+          ocStore.selectedModel = model
+          ocStore.selectedThinking = thinking || ''
+          ocStore.selectedMode = mode
+          ocStore.selectedTemperature = temperature || ''
+          await opencodeStreamPrompt(
+            chat.activeSessionId,
+            prompt,
+            ocSetupData.provider,
+            model,
+            thinking,
+            mode,
+            temperature,
+          )
       }
     }
 

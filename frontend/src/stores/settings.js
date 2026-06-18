@@ -17,6 +17,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const ticketRefinarPrompt = ref('')
   const omnifilterDebounceMs = ref(2000)
   const repoAcronimo = ref('TKT')
+  const locale = ref('es_ES.UTF-8')
   const saveError = ref('')
   const saveSuccess = ref('')
 
@@ -37,6 +38,7 @@ export const useSettingsStore = defineStore('settings', () => {
       ticketRefinarPrompt.value = keys.ticket_refinar_prompt || ''
       omnifilterDebounceMs.value = keys.omnifilter_debounce_ms ? parseInt(keys.omnifilter_debounce_ms, 10) : 2000
       repoAcronimo.value = keys.repo_acronimo || 'TKT'
+      locale.value = keys.locale || 'es_ES.UTF-8'
     } catch (err) {
       console.error('Error al cargar settings:', err)
     }
@@ -69,6 +71,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   return { deepseekKey, redmineToken, redmineUrl, systemPrompt, omnifilterDebounceMs, repoAcronimo,
+           locale,
            documentacionPromptBaseDatos, documentacionPromptSubproyectos,
            documentacionPromptEndpoints, documentacionPromptWebSockets,
            documentacionPromptFuncionalidades, ticketDescripcionPrompt, ticketRefinarPrompt,
