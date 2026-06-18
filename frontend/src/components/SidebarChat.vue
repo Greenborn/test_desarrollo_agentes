@@ -24,6 +24,7 @@
             @click="selectSession(s.id)"
           >
             <span class="status-led" :class="getSessionStatus(s.id)"></span>
+            <span v-if="s.id_ticket_redmine" class="ticket-badge">#{{ s.id_ticket_redmine }}</span>
             <span class="text-truncate">{{ s.title }}</span>
             <span
               class="delete-btn"
@@ -340,6 +341,14 @@ export default {
 .status-led.error {
   background-color: #ef4444;
   box-shadow: 0 0 6px #ef4444;
+}
+.ticket-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #60a5fa;
+  margin-right: 4px;
+  flex-shrink: 0;
 }
 .pinned-project {
   background-color: #1a3344 !important;
