@@ -51,7 +51,7 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/iniciar_navegador` | Abre un navegador (chrome/firefox). Acepta `--resolution=ID` para definir resolución de pantalla. Usa Tab para autocompletar `--resolution=` con las IDs disponibles | `/iniciar_navegador [chrome\|firefox] [--resolution=ID] [url]` |
+| `/iniciar_navegador` | Abre un navegador (chrome/firefox). Acepta `--resolution=ID`, `--navegador=chrome|firefox` y `--url=URL`. Usa Tab para autocompletar cada flag | `/iniciar_navegador [--navegador=chrome\|firefox] [--resolution=ID] [--url=URL]` |
 | `/resoluciones_get_all` | Muestra las resoluciones de pantalla configuradas con selector interactivo para establecer una por defecto | `/resoluciones_get_all` |
 | `/resolucion_default` | Muestra la resolución de pantalla por defecto configurada | `/resolucion_default` |
 | `/navegador_go_to` | Navega a una URL en la sesión de navegador activa | `/navegador_go_to <url>` |
