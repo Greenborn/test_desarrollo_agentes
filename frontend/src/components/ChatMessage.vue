@@ -7,7 +7,8 @@
       <ChatFormatter :text="msg.content" />
     </div>
     <div v-else-if="msg.role === 'opencode_control'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #1a2744; border: 1px solid #75AADB; color: #e0e0e0;">
-      <ChatControlFollowup v-if="parsedControl && parsedControl.controlType === 'followup'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :placeholder="parsedControl.placeholder || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <ChatOpencodeForm v-if="parsedControl && parsedControl.controlType === 'opencode_form'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :modeValue="parsedControl.modeValue || 'Build'" :placeholder="parsedControl.placeholder || ''" :rows="parsedControl.rows || 3" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <ChatControlFollowup v-else-if="parsedControl && parsedControl.controlType === 'followup'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :placeholder="parsedControl.placeholder || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <ControlSelect v-else-if="parsedControl && parsedControl.controlType === 'select'" :options="parsedControl.options || []" :preselect="parsedControl.preselect || ''" :placeholder="parsedControl.placeholder || 'Selecciona...'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <ControlTextarea v-else-if="parsedControl && parsedControl.controlType === 'textarea'" :placeholder="parsedControl.placeholder || 'Escribe...'" :rows="parsedControl.rows || 3" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <FuncionalidadListControl v-else-if="parsedControl && parsedControl.controlType === 'funcionalidad_list'" :items="parsedControl.items || []" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
@@ -15,6 +16,7 @@
       <TicketEditControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_edit'" :ticket="parsedControl.ticket" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DescripcionInputControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_input'" :placeholder="parsedControl.placeholder || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DescripcionResultControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_result'" :description="parsedControl.description || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <DescripcionResultControl v-else-if="parsedControl && parsedControl.controlType === 'refinar_result'" :description="parsedControl.description || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <div v-else class="d-flex flex-column gap-2">
         <pre class="mb-0 small" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
       </div>
@@ -67,6 +69,7 @@
 import ControlSelect from './ChatControlSelect.vue'
 import ControlTextarea from './ChatControlTextarea.vue'
 import ChatControlFollowup from './ChatControlFollowup.vue'
+import ChatOpencodeForm from './ChatOpencodeForm.vue'
 import ChatFormatter from './ChatFormatter.vue'
 import FuncionalidadListControl from './FuncionalidadListControl.vue'
 import RedmineProjectList from './RedmineProjectList.vue'
@@ -77,7 +80,7 @@ import DescripcionResultControl from './DescripcionResultControl.vue'
 let counter = 0
 
 export default {
-  components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, DescripcionInputControl, DescripcionResultControl },
+  components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatOpencodeForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, DescripcionInputControl, DescripcionResultControl },
   props: {
     msg: { type: Object, required: true },
   },

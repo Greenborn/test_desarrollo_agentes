@@ -1,6 +1,6 @@
 <template>
   <nav class="navbar navbar-dark px-3" style="background: #1a2744; border-bottom: 2px solid #75AADB;">
-    <router-link class="navbar-brand mb-0 h1 text-decoration-none" to="/">Agent Orchestrator</router-link>
+    <router-link class="navbar-brand mb-0 h1 text-decoration-none" to="/">{{ workspaceName }}</router-link>
     <button class="btn btn-sm btn-outline-secondary border-0 me-1" style="color: #75AADB;" @click="toggleSidebar" title="Toggle sidebar">
       <svg v-if="sidebarCollapsed" width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 3.5a.5.5 0 0 0-.832-.374l-4.5 4.5a.5.5 0 0 0 0 .748l4.5 4.5A.5.5 0 0 0 9.5 12.5v-9z"/></svg>
       <svg v-else width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M6.5 12.5a.5.5 0 0 0 .832.374l4.5-4.5a.5.5 0 0 0 0-.748l-4.5-4.5A.5.5 0 0 0 6.5 3.5v9z"/></svg>
@@ -20,7 +20,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/auth.js'
 import { useRouter } from 'vue-router'
@@ -30,6 +30,7 @@ import { useUiStore } from '../stores/ui.js'
 import { useOpencodeStore } from '../stores/opencode.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useChatStore } from '../stores/chat.js'
+import { useWorkspaceStore } from '../stores/workspace.js'
 import CommandInput from './CommandInput.vue'
 import HelpContent from './HelpModal.vue'
 import CrearProyectoModal from './CrearProyectoModal.vue'
@@ -44,8 +45,16 @@ export default {
     const modal = useModalStore()
     const ocStore = useOpencodeStore()
     const ui = useUiStore()
+    const wsStore = useWorkspaceStore()
     const { user } = storeToRefs(auth)
+    const { workspaces } = storeToRefs(wsStore)
     const { register } = useCommandRegistry()
+
+    const workspaceName = computed(() => {
+      if (!auth.user) return 'Agent Orchestrator'
+      const ws = workspaces.value.find(w => w.id === auth.user.workspaceId)
+      return ws ? ws.name : 'Por Defecto'
+    })
     const router = useRouter()
     const navegadorSessionId = ref(null)
 
@@ -482,11 +491,12 @@ export default {
     })
 
     function openSettings() {
-      modal.open(SettingsView, {}, { title: 'Configuración' })
+      modal.open(SettingsView, {}, { title: 'Configuración', wide: true })
     }
 
     onMounted(() => {
       cmdStore.loadLastDirectory()
+      wsStore.loadWorkspaces()
     })
 
     function logout() {
@@ -494,7 +504,7 @@ export default {
       router.push('/')
     }
 
-    return { user, logout, openSettings, sidebarCollapsed: ui.sidebarCollapsed, toggleSidebar: ui.toggleSidebar }
+    return { user, logout, openSettings, sidebarCollapsed: ui.sidebarCollapsed, toggleSidebar: ui.toggleSidebar, workspaceName }
   },
 }
 </script>

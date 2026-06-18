@@ -167,6 +167,68 @@ router.delete('/sessions/:sessionId/messages/:messageId', async (req, res) => {
   }
 });
 
+router.post('/refine', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const { text, systemPrompt, sessionId } = req.body;
+  if (!text) return res.status(400).json({ error: 'text requerido' });
+  if (!systemPrompt) return res.status(400).json({ error: 'systemPrompt requerido' });
+
+  const wsId = req.session.workspaceId || 1;
+  const messages = [{ role: 'user', content: text }];
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+
+  let usageData = null;
+
+  try {
+    for await (const chunk of streamChat(messages, wsId, systemPrompt)) {
+      if (chunk.type === 'usage') {
+        usageData = chunk;
+        continue;
+      }
+      res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+    }
+
+    if (usageData && sessionId) {
+      try {
+        const chatSess = await db('chat_sessions').where({ id: sessionId }).select('proyecto_id').first();
+        const idProyecto = chatSess?.proyecto_id;
+        if (idProyecto) {
+          const gastosPort = process.env.SERVICIO_GASTOS_PORT || 4100;
+          const precio = (usageData.completion_tokens || 0) * 0.0000011;
+          await fetch(`http://localhost:${gastosPort}/api/gastos/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id_chat_session: parseInt(sessionId),
+              id_proyecto: idProyecto,
+              precio: precio,
+              tokens: usageData.total_tokens || 0,
+            }),
+          });
+        }
+      } catch (e) {
+        console.log('[gastos] error al registrar en refine:', e.message);
+      }
+    }
+
+    res.write('data: {"type":"done"}\n\n');
+    res.end();
+  } catch (err) {
+    console.log('Error en refine:', err.message);
+    if (res.headersSent) {
+      res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
+      res.end();
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
 router.delete('/sessions/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {

@@ -314,6 +314,52 @@ router.post('/git', async (req, res) => {
   }
 });
 
+router.post('/git-verify', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { sessionId } = req.body;
+    let cwd = process.cwd();
+    if (sessionId) {
+      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+      if (session && session.cwd) cwd = session.cwd;
+    }
+    try {
+      const rootPath = execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf-8' }).trim();
+      res.json({ isRepo: true, rootPath, error: null });
+    } catch (err) {
+      res.json({ isRepo: false, rootPath: null, error: 'El directorio no es un repositorio Git.' });
+    }
+  } catch (err) {
+    console.log('Error en git-verify:', err.message);
+    res.json({ isRepo: false, rootPath: null, error: err.message });
+  }
+});
+
+router.post('/git-list-branches', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { sessionId } = req.body;
+    let cwd = process.cwd();
+    if (sessionId) {
+      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+      if (session && session.cwd) cwd = session.cwd;
+    }
+    try {
+      const output = execSync('git branch --list', { cwd, encoding: 'utf-8' });
+      const branches = output.split('\n').filter(Boolean).map(b => b.replace(/^\*?\s*/, '').trim());
+      const current = output.split('\n').find(b => b.startsWith('*'));
+      const currentBranch = current ? current.replace(/^\*\s*/, '').trim() : null;
+      res.json({ branches, current: currentBranch, error: null });
+    } catch (err) {
+      console.log('Error al listar ramas:', err.message);
+      res.json({ branches: [], current: null, error: err.message });
+    }
+  } catch (err) {
+    console.log('Error en git-list-branches:', err.message);
+    res.json({ branches: [], current: null, error: err.message });
+  }
+});
+
 router.post('/execute', async (req, res) => {
   if (!authGuard(req, res)) return;
   const { command, sessionId } = req.body;

@@ -91,7 +91,7 @@
 </template>
 
 <script>
-import { computed, onMounted, watch, reactive } from 'vue'
+import { computed, watch, reactive } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
@@ -207,11 +207,6 @@ export default {
         })
       }
       return list
-    })
-
-    onMounted(() => {
-      projectStore.loadProjects()
-      ticketStore.loadTickets()
     })
 
     watch(omnifilter, (val) => {

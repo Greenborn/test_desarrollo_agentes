@@ -19,12 +19,14 @@
 import { ref } from 'vue'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
+import { useProjectStore } from '../stores/project.js'
 
 export default {
   emits: ['close'],
   setup(props, { emit }) {
     const chatStore = useChatStore()
     const cmdStore = useCommandStore()
+    const projectStore = useProjectStore()
     const proyectoId = ref('')
     const descripcion = ref('')
 
@@ -61,6 +63,7 @@ export default {
           content: `Proyecto "${proyectoId.value}" creado y asignado.`,
           _key: 'res-' + Date.now(),
         })
+        await projectStore.loadProjects()
         emit('close')
       } catch (err) {
         console.error('Error al crear proyecto:', err)

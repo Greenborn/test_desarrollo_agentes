@@ -39,11 +39,11 @@ export function normalizeMessages(messages) {
   });
 }
 
-export async function* streamChat(messages, workspaceId) {
+export async function* streamChat(messages, workspaceId, customSystemPrompt = null) {
   const apiKey = await getDeepSeekKey(workspaceId);
   if (!apiKey) throw new Error('DeepSeek API key no configurada');
 
-  const systemPrompt = await getSystemPrompt(workspaceId);
+  const systemPrompt = customSystemPrompt || await getSystemPrompt(workspaceId);
 
   const body = {
     model: 'deepseek-chat',

@@ -1,178 +1,212 @@
 <template>
-  <div class="container py-4 text-light" style="max-width: 640px;">
-    <div class="d-flex gap-2 mb-3 align-items-center">
-      <input
-        type="text"
-        class="form-control bg-dark text-light border-secondary"
-        placeholder="Buscar configuración..."
-        v-model="searchTerm"
-      />
-    </div>
-
-    <div class="d-flex gap-2 mb-3 align-items-center">
-      <select
-        class="form-select bg-dark text-light border-secondary flex-grow-1"
-        v-model="selectedWId"
-        @change="onWorkspaceChange"
-      >
-        <option v-for="w in workspaces" :key="w.id" :value="w.id">{{ w.name }}</option>
-      </select>
-      <button class="btn btn-sm btn-outline-argentina" style="white-space: nowrap;" @click="promptCreate">+ Nuevo</button>
-      <button class="btn btn-sm btn-outline-argentina" style="white-space: nowrap;" @click="promptRename" v-if="selectedWId !== 1">Editar</button>
-      <button class="btn btn-sm btn-outline-danger" style="white-space: nowrap;" @click="confirmDelete" v-if="selectedWId !== 1">Eliminar</button>
-    </div>
-
-    <div class="mb-4" v-if="matches('api key deepseek')">
-      <label class="form-label">API Key DeepSeek</label>
-      <div class="input-group">
+  <div class="h-100 d-flex flex-column text-light gap-3">
+    <div class="flex-shrink-0">
+      <div class="d-flex gap-2 align-items-center flex-wrap">
         <input
-          :type="showKey ? 'text' : 'password'"
+          type="text"
           class="form-control bg-dark text-light border-secondary"
-          v-model="keyInput"
-          placeholder="sk-..."
+          style="min-width: 120px; flex: 3 1 180px;"
+          placeholder="Buscar configuración..."
+          v-model="searchTerm"
         />
-        <button class="btn btn-outline-argentina" @click="showKey = !showKey">
-          {{ showKey ? 'Ocultar' : 'Mostrar' }}
-        </button>
+        <select
+          class="form-select bg-dark text-light border-secondary"
+          style="width: auto; min-width: 140px; flex: 0 1 auto;"
+          v-model="selectedWId"
+          @change="onWorkspaceChange"
+        >
+          <option v-for="w in workspaces" :key="w.id" :value="w.id">{{ w.name }}</option>
+        </select>
+        <button class="btn btn-sm btn-outline-argentina flex-shrink-0" @click="promptCreate">+ Nuevo</button>
+        <button class="btn btn-sm btn-outline-argentina flex-shrink-0" @click="promptRename" v-if="selectedWId !== 1">Editar</button>
+        <button class="btn btn-sm btn-outline-danger flex-shrink-0" @click="confirmDelete" v-if="selectedWId !== 1">Eliminar</button>
       </div>
-      <button class="btn btn-sm mt-2 btn-argentina" @click="saveKey">
-        Guardar Key
-      </button>
     </div>
 
-    <div class="mb-4" v-if="matches('token redmine')">
-      <label class="form-label">Token Redmine</label>
-      <div class="input-group">
-        <input
-          :type="showRedmineToken ? 'text' : 'password'"
-          class="form-control bg-dark text-light border-secondary"
-          v-model="redmineTokenInput"
-          placeholder="token..."
-        />
-        <button class="btn btn-outline-argentina" @click="showRedmineToken = !showRedmineToken">
-          {{ showRedmineToken ? 'Ocultar' : 'Mostrar' }}
-        </button>
+    <div class="row g-4 flex-grow-1 overflow-auto" style="min-height: 0;">
+      <div class="col-md-6 d-flex flex-column gap-4">
+        <div v-if="matches('api key deepseek')">
+          <label class="form-label">API Key DeepSeek</label>
+          <div class="input-group">
+            <input
+              :type="showKey ? 'text' : 'password'"
+              class="form-control bg-dark text-light border-secondary"
+              v-model="keyInput"
+              placeholder="sk-..."
+            />
+            <button class="btn btn-outline-argentina" @click="showKey = !showKey">
+              {{ showKey ? 'Ocultar' : 'Mostrar' }}
+            </button>
+          </div>
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveKey">
+            Guardar Key
+          </button>
+        </div>
+
+        <div v-if="matches('token redmine')">
+          <label class="form-label">Token Redmine</label>
+          <div class="input-group">
+            <input
+              :type="showRedmineToken ? 'text' : 'password'"
+              class="form-control bg-dark text-light border-secondary"
+              v-model="redmineTokenInput"
+              placeholder="token..."
+            />
+            <button class="btn btn-outline-argentina" @click="showRedmineToken = !showRedmineToken">
+              {{ showRedmineToken ? 'Ocultar' : 'Mostrar' }}
+            </button>
+          </div>
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveRedmineToken">
+            Guardar Token
+          </button>
+        </div>
+
+        <div v-if="matches('url redmine')">
+          <label class="form-label">URL Redmine</label>
+          <input
+            type="text"
+            class="form-control bg-dark text-light border-secondary"
+            v-model="redmineUrlInput"
+            placeholder="https://redmine.tudominio.com"
+          />
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveRedmineUrl">
+            Guardar URL
+          </button>
+        </div>
+
+        <div v-if="matches('system prompt del agente')">
+          <label class="form-label">System Prompt del agente</label>
+          <textarea
+            class="form-control font-monospace bg-dark text-light border-secondary"
+            rows="8"
+            v-model="promptInput"
+          ></textarea>
+          <button class="btn btn-sm mt-2 btn-argentina" @click="savePrompt">
+            Guardar Prompt
+          </button>
+        </div>
+
+        <div v-if="matches('debounce omnifiltro')">
+          <label class="form-label">Omnifiltro — Tiempo de debounce (ms)</label>
+          <input
+            type="number"
+            class="form-control bg-dark text-light border-secondary"
+            v-model.number="omnifilterDebounceInput"
+            min="0"
+            step="100"
+            placeholder="2000"
+          />
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveOmnifilterDebounce">
+            Guardar
+          </button>
+        </div>
+
+        <div v-if="matches('acronimo rama repositorio git')">
+          <label class="form-label">Acrónimo para ramas Git</label>
+          <input
+            type="text"
+            class="form-control bg-dark text-light border-secondary"
+            v-model="repoAcronimoInput"
+            placeholder="TKT"
+          />
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveRepoAcronimo">
+            Guardar
+          </button>
+        </div>
       </div>
-      <button class="btn btn-sm mt-2 btn-argentina" @click="saveRedmineToken">
-        Guardar Token
-      </button>
+
+      <div class="col-md-6 d-flex flex-column gap-4">
+        <div v-if="matches('base de datos')">
+          <label class="form-label">Prompt Documentación - Base de Datos</label>
+          <textarea
+            class="form-control font-monospace bg-dark text-light border-secondary"
+            rows="4"
+            v-model="docBdInput"
+          ></textarea>
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('base_datos')">
+            Guardar Prompt
+          </button>
+        </div>
+
+        <div v-if="matches('subproyectos')">
+          <label class="form-label">Prompt Documentación - Subproyectos</label>
+          <textarea
+            class="form-control font-monospace bg-dark text-light border-secondary"
+            rows="4"
+            v-model="docSubInput"
+          ></textarea>
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('subproyectos')">
+            Guardar Prompt
+          </button>
+        </div>
+
+        <div v-if="matches('endpoints')">
+          <label class="form-label">Prompt Documentación - Endpoints</label>
+          <textarea
+            class="form-control font-monospace bg-dark text-light border-secondary"
+            rows="4"
+            v-model="docEndpointsInput"
+          ></textarea>
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('endpoints')">
+            Guardar Prompt
+          </button>
+        </div>
+
+        <div v-if="matches('websockets')">
+          <label class="form-label">Prompt Documentación - WebSockets</label>
+          <textarea
+            class="form-control font-monospace bg-dark text-light border-secondary"
+            rows="4"
+            v-model="docWsInput"
+          ></textarea>
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('web_sockets')">
+            Guardar Prompt
+          </button>
+        </div>
+
+        <div v-if="matches('funcionalidades')">
+          <label class="form-label">Prompt Documentación - Funcionalidades</label>
+          <textarea
+            class="form-control font-monospace bg-dark text-light border-secondary"
+            rows="4"
+            v-model="docFuncInput"
+          ></textarea>
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('funcionalidades')">
+            Guardar Prompt
+          </button>
+        </div>
+
+        <div v-if="matches('descripcion ticket prompt redactar')">
+          <label class="form-label">Prompt de Sistema — Redactar Descripción Ticket</label>
+          <textarea
+            class="form-control font-monospace bg-dark text-light border-secondary"
+            rows="4"
+            v-model="descripcionPromptInput"
+          ></textarea>
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDescripcionPrompt">
+            Guardar Prompt
+          </button>
+        </div>
+
+        <div v-if="matches('refinar descripcion ticket prompt')">
+          <label class="form-label">Prompt de Sistema — Refinar Descripción Ticket (DeepSeek)</label>
+          <textarea
+            class="form-control font-monospace bg-dark text-light border-secondary"
+            rows="4"
+            v-model="refinarPromptInput"
+          ></textarea>
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveRefinarPrompt">
+            Guardar Prompt
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div class="mb-4" v-if="matches('url redmine')">
-      <label class="form-label">URL Redmine</label>
-      <input
-        type="text"
-        class="form-control bg-dark text-light border-secondary"
-        v-model="redmineUrlInput"
-        placeholder="https://redmine.tudominio.com"
-      />
-      <button class="btn btn-sm mt-2 btn-argentina" @click="saveRedmineUrl">
-        Guardar URL
-      </button>
+    <div class="flex-shrink-0">
+      <div v-if="settings.saveSuccess" class="alert alert-success py-2 small mb-0">{{ settings.saveSuccess }}</div>
+      <div v-if="settings.saveError" class="alert alert-danger py-2 small mb-0">{{ settings.saveError }}</div>
+      <div v-if="wsMessage" class="alert alert-info py-2 small mb-0">{{ wsMessage }}</div>
     </div>
-
-    <div class="mb-4" v-if="matches('system prompt del agente')">
-      <label class="form-label">System Prompt del agente</label>
-      <textarea
-        class="form-control font-monospace bg-dark text-light border-secondary"
-        rows="8"
-        v-model="promptInput"
-      ></textarea>
-      <button class="btn btn-sm mt-2 btn-argentina" @click="savePrompt">
-        Guardar Prompt
-      </button>
-    </div>
-
-    <div class="mb-4" v-if="matches('base de datos')">
-      <label class="form-label">Prompt Documentación - Base de Datos</label>
-      <textarea
-        class="form-control font-monospace bg-dark text-light border-secondary"
-        rows="4"
-        v-model="docBdInput"
-      ></textarea>
-      <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('base_datos')">
-        Guardar Prompt
-      </button>
-    </div>
-
-    <div class="mb-4" v-if="matches('subproyectos')">
-      <label class="form-label">Prompt Documentación - Subproyectos</label>
-      <textarea
-        class="form-control font-monospace bg-dark text-light border-secondary"
-        rows="4"
-        v-model="docSubInput"
-      ></textarea>
-      <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('subproyectos')">
-        Guardar Prompt
-      </button>
-    </div>
-
-    <div class="mb-4" v-if="matches('endpoints')">
-      <label class="form-label">Prompt Documentación - Endpoints</label>
-      <textarea
-        class="form-control font-monospace bg-dark text-light border-secondary"
-        rows="4"
-        v-model="docEndpointsInput"
-      ></textarea>
-      <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('endpoints')">
-        Guardar Prompt
-      </button>
-    </div>
-
-    <div class="mb-4" v-if="matches('websockets')">
-      <label class="form-label">Prompt Documentación - WebSockets</label>
-      <textarea
-        class="form-control font-monospace bg-dark text-light border-secondary"
-        rows="4"
-        v-model="docWsInput"
-      ></textarea>
-      <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('web_sockets')">
-        Guardar Prompt
-      </button>
-    </div>
-
-    <div class="mb-4" v-if="matches('funcionalidades')">
-      <label class="form-label">Prompt Documentación - Funcionalidades</label>
-      <textarea
-        class="form-control font-monospace bg-dark text-light border-secondary"
-        rows="4"
-        v-model="docFuncInput"
-      ></textarea>
-      <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('funcionalidades')">
-        Guardar Prompt
-      </button>
-    </div>
-
-    <div class="mb-4" v-if="matches('descripcion ticket prompt redactar')">
-      <label class="form-label">Prompt de Sistema — Redactar Descripción Ticket</label>
-      <textarea
-        class="form-control font-monospace bg-dark text-light border-secondary"
-        rows="4"
-        v-model="descripcionPromptInput"
-      ></textarea>
-      <button class="btn btn-sm mt-2 btn-argentina" @click="saveDescripcionPrompt">
-        Guardar Prompt
-      </button>
-    </div>
-
-    <div class="mb-4" v-if="matches('debounce omnifiltro')">
-      <label class="form-label">Omnifiltro — Tiempo de debounce (ms)</label>
-      <input
-        type="number"
-        class="form-control bg-dark text-light border-secondary"
-        v-model.number="omnifilterDebounceInput"
-        min="0"
-        step="100"
-        placeholder="2000"
-      />
-      <button class="btn btn-sm mt-2 btn-argentina" @click="saveOmnifilterDebounce">
-        Guardar
-      </button>
-    </div>
-
-    <div v-if="settings.saveSuccess" class="alert alert-success py-2 small">{{ settings.saveSuccess }}</div>
-    <div v-if="settings.saveError" class="alert alert-danger py-2 small">{{ settings.saveError }}</div>
-    <div v-if="wsMessage" class="alert alert-info py-2 small">{{ wsMessage }}</div>
   </div>
 </template>
 
@@ -207,7 +241,9 @@ export default {
     const showRedmineToken = ref(false)
     const searchTerm = ref('')
     const descripcionPromptInput = ref('')
+    const refinarPromptInput = ref('')
     const omnifilterDebounceInput = ref(2000)
+    const repoAcronimoInput = ref('TKT')
     const selectedWId = ref(1)
     const wsMessage = ref('')
 
@@ -261,8 +297,16 @@ export default {
       omnifilterDebounceInput.value = val
     }, { immediate: true })
 
+    watch(() => settings.repoAcronimo, (val) => {
+      repoAcronimoInput.value = val
+    }, { immediate: true })
+
     watch(() => settings.ticketDescripcionPrompt, (val) => {
       descripcionPromptInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.ticketRefinarPrompt, (val) => {
+      refinarPromptInput.value = val
     }, { immediate: true })
 
     for (const [key, refName] of Object.entries(DOC_STORE_MAP)) {
@@ -293,7 +337,7 @@ export default {
       wsMessage.value = 'Deteniendo procesos y cambiando espacio de trabajo...'
       const result = await wsStore.selectWorkspace(newId)
       if (result.success) {
-        auth.user.value = { ...auth.user.value, workspaceId: newId }
+        auth.user = { ...auth.user, workspaceId: newId }
         chatStore.stopAllExecutions()
         await wsStore.loadWorkspaces()
         await reloadSettings()
@@ -343,7 +387,7 @@ export default {
       if (result.success) {
         workspaces.value = workspaces.value.filter(w => w.id !== ws.id)
         selectedWId.value = 1
-        auth.user.value = { ...auth.user.value, workspaceId: 1 }
+        auth.user = { ...auth.user, workspaceId: 1 }
         await wsStore.selectWorkspace(1)
         chatStore.stopAllExecutions()
         await wsStore.loadWorkspaces()
@@ -390,13 +434,23 @@ export default {
       settings.save('ticket_descripcion_prompt', descripcionPromptInput.value)
     }
 
+    function saveRepoAcronimo() {
+      settings.clearFeedback()
+      settings.save('repo_acronimo', repoAcronimoInput.value)
+    }
+
+    function saveRefinarPrompt() {
+      settings.clearFeedback()
+      settings.save('ticket_refinar_prompt', refinarPromptInput.value)
+    }
+
     return {
       keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput,
-      docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput,
-      showKey, showRedmineToken, searchTerm, omnifilterDebounceInput,
+      docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput, refinarPromptInput,
+      showKey, showRedmineToken, searchTerm, omnifilterDebounceInput, repoAcronimoInput,
       settings, workspaces, selectedWId, wsMessage,
       saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
-      saveOmnifilterDebounce, saveDescripcionPrompt, matches,
+      saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveRepoAcronimo, matches,
       onWorkspaceChange, promptCreate, promptRename, confirmDelete,
     }
   },

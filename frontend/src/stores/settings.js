@@ -14,7 +14,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const documentacionPromptWebSockets = ref('')
   const documentacionPromptFuncionalidades = ref('')
   const ticketDescripcionPrompt = ref('')
+  const ticketRefinarPrompt = ref('')
   const omnifilterDebounceMs = ref(2000)
+  const repoAcronimo = ref('TKT')
   const saveError = ref('')
   const saveSuccess = ref('')
 
@@ -32,7 +34,9 @@ export const useSettingsStore = defineStore('settings', () => {
       documentacionPromptWebSockets.value = keys.documentacion_prompt_web_sockets || ''
       documentacionPromptFuncionalidades.value = keys.documentacion_prompt_funcionalidades || ''
       ticketDescripcionPrompt.value = keys.ticket_descripcion_prompt || ''
+      ticketRefinarPrompt.value = keys.ticket_refinar_prompt || ''
       omnifilterDebounceMs.value = keys.omnifilter_debounce_ms ? parseInt(keys.omnifilter_debounce_ms, 10) : 2000
+      repoAcronimo.value = keys.repo_acronimo || 'TKT'
     } catch (err) {
       console.error('Error al cargar settings:', err)
     }
@@ -64,9 +68,9 @@ export const useSettingsStore = defineStore('settings', () => {
     saveError.value = ''
   }
 
-  return { deepseekKey, redmineToken, redmineUrl, systemPrompt, omnifilterDebounceMs,
+  return { deepseekKey, redmineToken, redmineUrl, systemPrompt, omnifilterDebounceMs, repoAcronimo,
            documentacionPromptBaseDatos, documentacionPromptSubproyectos,
            documentacionPromptEndpoints, documentacionPromptWebSockets,
-           documentacionPromptFuncionalidades, ticketDescripcionPrompt, saveError, saveSuccess,
-           clearFeedback, load, save }
+           documentacionPromptFuncionalidades, ticketDescripcionPrompt, ticketRefinarPrompt,
+           saveError, saveSuccess, clearFeedback, load, save }
 })

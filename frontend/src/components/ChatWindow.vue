@@ -198,11 +198,12 @@ export default {
               role: 'opencode_control',
               controlData: {
                 controlId: 'followup-' + Date.now(),
-                controlType: 'followup',
+                controlType: 'opencode_form',
                 models: ocStore.getModelsForProvider(ocStore.selectedProvider),
                 modelValue: ocStore.selectedModel || '',
                 thinkingOptions: ocStore.thinkingOptions,
                 thinkingValue: ocStore.selectedThinking || '',
+                modeValue: ocStore.selectedMode || 'Build',
                 placeholder: 'Escribe otro mensaje para OpenCode...',
                 rows: 3,
               },
@@ -324,11 +325,13 @@ export default {
       } else if (stepType === 'documentacion_update') {
         await handleDocumentacionUpdate(controlId, value, controlMsg)
       } else if (stepType === 'ticket_descripcion') {
-        if (controlType === 'followup') {
-          const { model, thinking, prompt } = value
+        if (controlType === 'followup' || controlType === 'opencode_form') {
+          const { model, thinking, mode, prompt } = value
           if (!prompt) return
           ocStore.selectedModel = model || ocStore.selectedModel
           ocStore.selectedThinking = thinking || ocStore.selectedThinking
+          ocStore.selectedMode = mode || ocStore.selectedMode
+          descripcionData.mode = ocStore.selectedMode
           await opencodeStreamDescripcionFollowup(chat.activeSessionId, prompt, controlMsg.controlData.ticket)
         } else if (value === null) {
           const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
@@ -340,11 +343,26 @@ export default {
           await handleTicketDescripcion(controlId, value, controlMsg)
         }
         // Let generic replacement run below
+      } else if (stepType === 'repo_crear_rama') {
+        await handleRepoCrearRama(controlId, value, controlMsg)
+        return
       } else if (controlType === 'descripcion_result') {
         if (value === null) {
           const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
           if (idx >= 0) {
             chat.messages[idx] = { role: 'result', content: 'Edición de descripción cancelada.', _key: 'result-' + Date.now() }
+          }
+        } else if (value.action === 'accept') {
+          await refinarDescripcionConDeepSeek(controlId, controlMsg, value.description)
+        } else if (value.action === 'retry') {
+          await regenerateDescripcion(controlId, controlMsg)
+        }
+        return
+      } else if (controlType === 'refinar_result') {
+        if (value === null) {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = { role: 'result', content: 'Descripción descartada.', _key: 'result-' + Date.now() }
           }
         } else if (value.action === 'accept') {
           try {
@@ -383,7 +401,7 @@ export default {
             }
           }
         } else if (value.action === 'retry') {
-          await regenerateDescripcion(controlId, controlMsg)
+          await restartTicketDescripcion()
         }
         return
       } else if (controlType === 'funcionalidad_list') {
@@ -457,6 +475,20 @@ export default {
           ocStore.selectedThinking,
           ocStore.selectedMode,
         )
+      } else if (controlType === 'opencode_form') {
+        const { model, thinking, mode, prompt } = value
+        if (!prompt) return
+        ocStore.selectedModel = model || ocStore.selectedModel
+        ocStore.selectedThinking = thinking || ocStore.selectedThinking
+        ocStore.selectedMode = mode || ocStore.selectedMode
+        await opencodeStreamPrompt(
+          chat.activeSessionId,
+          prompt,
+          ocStore.selectedProvider,
+          ocStore.selectedModel,
+          ocStore.selectedThinking,
+          ocStore.selectedMode,
+        )
       } else {
         // Runtime OpenCode control
         try {
@@ -486,6 +518,7 @@ export default {
     let docUpdateData = { provider: '', model: '', thinking: '', mode: '' }
     let descripcionData = { provider: '', model: '', thinking: '', mode: 'Plan' }
     const descripcionUserInput = ref('')
+    let repoCrearRamaData = { proyectoId: '', ticketRedmineId: '', baseBranch: '', repoAcronimo: '' }
 
     async function handleDocumentacionUpdate(controlId, value, controlMsg) {
       const subStepType = controlMsg.controlData.subStepType
@@ -699,6 +732,201 @@ export default {
       }
     }
 
+    async function handleRepoCrearRama(controlId, value, controlMsg) {
+      const subStepType = controlMsg.controlData.subStepType
+
+      if (subStepType === 'project') {
+        repoCrearRamaData.proyectoId = value
+        repoCrearRamaData.repoAcronimo = controlMsg.controlData.repoAcronimo || 'TKT'
+
+        try {
+          const res = await fetch('/api/proyecto/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ sessionId: chat.activeSessionId, proyectoId: value, cwd: '' }),
+          })
+          const data = await res.json()
+          if (!data.success) {
+            console.error('Error al asignar proyecto:', data.error)
+          }
+        } catch (err) {
+          console.error('Error al asignar proyecto:', err.message)
+        }
+
+        const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
+        if (idx >= 0) {
+          chat.messages[idx] = { role: 'opencode_confirmed', content: value, _key: 'confirmed-' + Date.now() }
+        }
+
+        await chat.loadSessions()
+        const updatedSession = chat.sessions.find(s => s.id === chat.activeSessionId)
+
+        if (updatedSession && updatedSession.id_ticket_redmine) {
+          repoCrearRamaData.ticketRedmineId = updatedSession.id_ticket_redmine
+          await showBranchSelector(controlMsg.controlData.sessionId, repoCrearRamaData.repoAcronimo, updatedSession.proyecto_id, updatedSession.id_ticket_redmine)
+        } else {
+          const ticketRes = await fetch('/api/tickets', { credentials: 'include' })
+          const ticketData = await ticketRes.json()
+          let tickets = ticketData.tickets || []
+          if (value) {
+            tickets = tickets.filter(t => t.proyecto_id === value)
+          }
+          const options = tickets.map(t => ({
+            label: `#${t.redmine_id} — ${t.subject || ''}`,
+            value: String(t.redmine_id),
+          }))
+          chat.messages.push({
+            role: 'opencode_control',
+            controlData: {
+              controlId: 'repo-ticket-' + Date.now(),
+              controlType: 'select',
+              stepType: 'repo_crear_rama',
+              subStepType: 'ticket',
+              options,
+              placeholder: 'Selecciona ticket...',
+              proyectoId: value,
+              sessionId: controlMsg.controlData.sessionId,
+              repoAcronimo: repoCrearRamaData.repoAcronimo,
+            },
+            _key: 'control-' + Date.now(),
+          })
+        }
+      } else if (subStepType === 'ticket') {
+        repoCrearRamaData.ticketRedmineId = value
+        repoCrearRamaData.proyectoId = controlMsg.controlData.proyectoId || ''
+        repoCrearRamaData.repoAcronimo = controlMsg.controlData.repoAcronimo || 'TKT'
+
+        try {
+          const res = await fetch('/api/tickets/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ sessionId: chat.activeSessionId, idTicketRedmine: parseInt(value) }),
+          })
+          const data = await res.json()
+          if (!data.success) {
+            console.error('Error al asignar ticket:', data.error)
+          }
+        } catch (err) {
+          console.error('Error al asignar ticket:', err.message)
+        }
+
+        const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
+        if (idx >= 0) {
+          chat.messages[idx] = { role: 'opencode_confirmed', content: '#' + value, _key: 'confirmed-' + Date.now() }
+        }
+
+        await chat.loadSessions()
+        const updatedSession = chat.sessions.find(s => s.id === chat.activeSessionId)
+
+        await showBranchSelector(controlMsg.controlData.sessionId, repoCrearRamaData.repoAcronimo, repoCrearRamaData.proyectoId || updatedSession?.proyecto_id, parseInt(value))
+      } else if (subStepType === 'branch') {
+        repoCrearRamaData.baseBranch = value
+        const proyectoId = controlMsg.controlData.proyectoId || repoCrearRamaData.proyectoId
+        const ticketRedmineId = controlMsg.controlData.ticketRedmineId || repoCrearRamaData.ticketRedmineId
+        const repoAcronimo = controlMsg.controlData.repoAcronimo || repoCrearRamaData.repoAcronimo || 'TKT'
+        const sessionId = controlMsg.controlData.sessionId || chat.activeSessionId
+        const branchName = repoAcronimo + '-' + ticketRedmineId
+
+        try {
+          const checkoutRes = await fetch('/api/command/git', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: 'checkout ' + value, sessionId }),
+          })
+          const checkoutData = await checkoutRes.json()
+
+          if (!checkoutData.success) {
+            const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: 'Error al cambiar a rama base "' + value + '": ' + (checkoutData.stderr || checkoutData.error || 'Error desconocido'),
+                _key: 'err-' + Date.now(),
+              }
+            }
+            return
+          }
+
+          const branchRes = await fetch('/api/command/git', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: 'checkout -b ' + branchName, sessionId }),
+          })
+          const branchData = await branchRes.json()
+
+          const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            if (branchData.success) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: 'Rama creada correctamente: `' + branchName + '` (base: `' + value + '`)',
+                _key: 'result-' + Date.now(),
+              }
+            } else {
+              chat.messages[idx] = {
+                role: 'result',
+                content: 'Error al crear rama "' + branchName + '": ' + (branchData.stderr || branchData.error || 'Error desconocido'),
+                _key: 'err-' + Date.now(),
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error en repo:crear_rama:', err.message)
+          const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Error de conexión: ' + err.message,
+              _key: 'err-' + Date.now(),
+            }
+          }
+        }
+      }
+    }
+
+    async function showBranchSelector(sessionId, repoAcronimo, proyectoId, ticketRedmineId) {
+      try {
+        const branchRes = await fetch('/api/command/git-list-branches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ sessionId }),
+        })
+        const branchData = await branchRes.json()
+        const branchOptions = (branchData.branches || []).map(b => ({ label: b, value: b }))
+        const preselect = branchData.current && branchData.branches.includes(branchData.current) ? branchData.current : 'DEV'
+
+        chat.messages.push({
+          role: 'opencode_control',
+          controlData: {
+            controlId: 'repo-branch-' + Date.now(),
+            controlType: 'select',
+            stepType: 'repo_crear_rama',
+            subStepType: 'branch',
+            options: branchOptions,
+            placeholder: 'Selecciona rama base...',
+            preselect,
+            proyectoId,
+            ticketRedmineId,
+            sessionId,
+            repoAcronimo,
+          },
+          _key: 'control-' + Date.now(),
+        })
+      } catch (err) {
+        console.error('Error al obtener ramas:', err.message)
+        chat.messages.push({
+          role: 'result',
+          content: 'Error al listar ramas Git: ' + err.message,
+          _key: 'err-' + Date.now(),
+        })
+      }
+    }
+
     async function opencodeStreamDescripcion(sessionId, prompt, provider, model, thinking, mode, ticket) {
       ocStreaming.value = true
       ocChunk.value = ''
@@ -752,13 +980,14 @@ export default {
               role: 'opencode_control',
               controlData: {
                 controlId: 'followup-' + Date.now(),
-                controlType: 'followup',
+                controlType: 'opencode_form',
                 stepType: 'ticket_descripcion',
                 ticket,
                 models: ocStore.getModelsForProvider(ocStore.selectedProvider),
                 modelValue: ocStore.selectedModel || '',
                 thinkingOptions: ocStore.thinkingOptions,
                 thinkingValue: ocStore.selectedThinking || '',
+                modeValue: ocStore.selectedMode || 'Plan',
                 placeholder: 'Escribe otro mensaje para OpenCode...',
                 rows: 3,
               },
@@ -770,6 +999,7 @@ export default {
           ocStreaming.value = false
           if (sessionId) chat.sessionStatus[sessionId] = 'error'
           if (_isActiveSession(sessionId)) {
+            const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (idx >= 0) {
               chat.messages[idx].content = '[Error: ' + msg + ']'
@@ -804,7 +1034,7 @@ export default {
       const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
       streamMsg._key = 'stream-' + Date.now()
 
-      await ocStore.streamPrompt(sessionId, userPrompt, descripcionData.provider, descripcionData.model, descripcionData.thinking, descripcionData.mode, {
+      await ocStore.streamPrompt(sessionId, userPrompt, descripcionData.provider, ocStore.selectedModel || descripcionData.model, ocStore.selectedThinking || descripcionData.thinking, ocStore.selectedMode || descripcionData.mode, {
         onChunk(content) {
           if (_isActiveSession(sessionId)) ocChunk.value += content
         },
@@ -858,13 +1088,14 @@ export default {
               role: 'opencode_control',
               controlData: {
                 controlId: 'followup-' + Date.now(),
-                controlType: 'followup',
+                controlType: 'opencode_form',
                 stepType: 'ticket_descripcion',
                 ticket,
                 models: ocStore.getModelsForProvider(ocStore.selectedProvider),
                 modelValue: ocStore.selectedModel || '',
                 thinkingOptions: ocStore.thinkingOptions,
                 thinkingValue: ocStore.selectedThinking || '',
+                modeValue: ocStore.selectedMode || 'Plan',
                 placeholder: 'Escribe otro mensaje para OpenCode...',
                 rows: 3,
               },
@@ -884,6 +1115,170 @@ export default {
           }
         },
       })
+    }
+
+    async function refinarDescripcionConDeepSeek(controlId, controlMsg, description) {
+      ocStreaming.value = true
+      ocChunk.value = ''
+      ocThinking.value = ''
+      const sid = chat.activeSessionId
+      if (sid) chat.sessionStatus[sid] = 'executing'
+      _streamSessionId.value = sid
+
+      const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
+      streamMsg._key = 'stream-' + Date.now()
+
+      try {
+        const settingsRes = await fetch('/api/settings', { credentials: 'include' })
+        const settingsKeys = await settingsRes.json()
+        const systemPrompt = settingsKeys.ticket_refinar_prompt || 'Eres un asistente especializado en refinar descripciones técnicas. Mejora la redacción, estructura y claridad del texto. Devuelve únicamente la descripción refinada.'
+
+        const res = await fetch('/api/chat/refine', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ text: description, systemPrompt, sessionId: sid }),
+        })
+
+        if (!res.ok) {
+          let errMsg = 'Error al refinar descripción'
+          try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
+          throw new Error(errMsg)
+        }
+
+        let fullResponse = ''
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buf = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buf += decoder.decode(value, { stream: true })
+          const lines = buf.split('\n')
+          buf = lines.pop() || ''
+          for (const line of lines) {
+            const t = line.trim()
+            if (!t || !t.startsWith('data: ')) continue
+            try {
+              const j = JSON.parse(t.slice(6))
+              if (j.type === 'response') {
+                fullResponse += j.content
+                if (_isActiveSession(sid)) ocChunk.value += j.content
+              } else if (j.type === 'thinking') {
+                if (_isActiveSession(sid)) ocThinking.value += j.content
+              } else if (j.type === 'error') {
+                throw new Error(j.content)
+              }
+            } catch (e) {
+              if (e.message && e.message !== 'Unexpected end of JSON input') throw e
+            }
+          }
+        }
+
+        ocStreaming.value = false
+        if (sid) chat.sessionStatus[sid] = 'idle'
+
+        if (_isActiveSession(sid)) {
+          const ticket = controlMsg?.controlData?.ticket || {}
+          // Demote old descripcion_result to plain result
+          const oldIdx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (oldIdx >= 0) {
+            chat.messages[oldIdx] = {
+              role: 'result',
+              content: '✓ Descripción aceptada, refinando...',
+              _key: 'old-result-' + Date.now(),
+            }
+          }
+          // Replace stream message with refinar_result (has accept/retry/cancel)
+          const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (streamIdx >= 0) {
+            chat.messages[streamIdx] = {
+              role: 'opencode_control',
+              controlData: {
+                controlId: 'refinar-result-' + Date.now(),
+                controlType: 'refinar_result',
+                description: fullResponse,
+                loading: false,
+                ticket,
+              },
+              _key: 'control-' + Date.now(),
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error al refinar descripción:', err.message)
+        ocStreaming.value = false
+        if (sid) chat.sessionStatus[sid] = 'error'
+        const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+        if (streamIdx >= 0 && _isActiveSession(sid)) {
+          chat.messages[streamIdx].content = '[Error: ' + err.message + ']'
+          chat.messages[streamIdx].streaming = false
+        }
+      }
+    }
+
+    async function restartTicketDescripcion() {
+      const sid = chat.activeSessionId
+      if (!sid) return
+
+      try {
+        const res = await fetch(`/api/tickets/session/${sid}`, { credentials: 'include' })
+        const data = await res.json()
+        if (!data.idTicketRedmine || !data.ticket) {
+          chat.messages.push({
+            role: 'result',
+            content: 'Error: No hay ticket asignado a esta sesión.',
+            _key: 'err-' + Date.now(),
+          })
+          return
+        }
+
+        const ocStore = useOpencodeStore()
+        const startData = await ocStore.start()
+        if (!startData) {
+          chat.messages.push({
+            role: 'result',
+            content: 'Error al iniciar OpenCode.',
+            _key: 'err-' + Date.now(),
+          })
+          return
+        }
+
+        const providerList = ocStore.getAvailableProviders()
+        if (providerList.length === 0) {
+          chat.messages.push({
+            role: 'result',
+            content: 'No se encontraron proveedores de OpenCode.',
+            _key: 'err-' + Date.now(),
+          })
+          return
+        }
+
+        const preselectProvider = ocStore.savedProvider || providerList[0].value
+        chat.messages.push({
+          role: 'opencode_control',
+          controlData: {
+            controlId: 'provider-' + Date.now(),
+            controlType: 'select',
+            stepType: 'ticket_descripcion',
+            subStepType: 'provider',
+            options: providerList,
+            placeholder: 'Selecciona proveedor...',
+            preselect: preselectProvider,
+            ticket: data.ticket,
+            sessionId: sid,
+          },
+          _key: 'control-' + Date.now(),
+        })
+      } catch (err) {
+        console.error('Error al reiniciar:', err.message)
+        chat.messages.push({
+          role: 'result',
+          content: 'Error al reiniciar el proceso: ' + err.message,
+          _key: 'err-' + Date.now(),
+        })
+      }
     }
 
     async function regenerateDescripcion(controlId, controlMsg) {
@@ -1012,84 +1407,39 @@ export default {
         chat.messages.push({
           role: 'opencode_control',
           controlData: {
-            controlId: 'model-' + Date.now(),
-            controlType: 'select',
+            controlId: 'opencode-form-' + Date.now(),
+            controlType: 'opencode_form',
             stepType: 'opencode_setup',
-            subStepType: 'model',
-            options: models,
-            placeholder: 'Selecciona modelo...',
-            preselect: ocStore.savedModel || '',
-          },
-          _key: 'control-' + Date.now(),
-        })
-      } else if (subStepType === 'model') {
-        ocSetupData.model = value
-        await ocStore.select('model', value)
-        ocStore.selectedModel = value
-        if (ocStore.modelSupportsReasoning(ocSetupData.provider, value)) {
-          chat.messages.push({
-            role: 'opencode_control',
-            controlData: {
-              controlId: 'thinking-' + Date.now(),
-              controlType: 'select',
-              stepType: 'opencode_setup',
-              subStepType: 'thinking',
-              options: ocStore.thinkingOptions,
-              placeholder: 'Selecciona nivel de pensamiento...',
-              preselect: ocStore.savedThinking || 'medium',
-            },
-            _key: 'control-' + Date.now(),
-          })
-        } else {
-          // Skip thinking step, go directly to mode
-          const fakeMsg = { controlData: { subStepType: 'thinking' } }
-          await handleOpencodeSetup(null, null, fakeMsg)
-        }
-      } else if (subStepType === 'thinking') {
-        ocSetupData.thinking = value
-        await ocStore.select('thinking', value)
-        ocStore.selectedThinking = value
-        chat.messages.push({
-          role: 'opencode_control',
-          controlData: {
-            controlId: 'mode-' + Date.now(),
-            controlType: 'select',
-            stepType: 'opencode_setup',
-            subStepType: 'mode',
-            options: [
-              { label: 'Plan — solo planificar, sin cambios', value: 'Plan' },
-              { label: 'Build — planificar y ejecutar cambios', value: 'Build' },
-            ],
-            placeholder: 'Selecciona modo...',
-            preselect: ocStore.savedMode || 'Build',
-          },
-          _key: 'control-' + Date.now(),
-        })
-      } else if (subStepType === 'mode') {
-        ocSetupData.mode = value
-        await ocStore.select('mode', value)
-        ocStore.selectedMode = value
-        chat.messages.push({
-          role: 'opencode_control',
-          controlData: {
-            controlId: 'prompt-' + Date.now(),
-            controlType: 'textarea',
-            stepType: 'opencode_setup',
-            subStepType: 'prompt',
+            subStepType: 'form',
+            models,
+            modelValue: ocStore.savedModel || '',
+            thinkingOptions: ocStore.thinkingOptions,
+            thinkingValue: ocStore.savedThinking || '',
+            modeValue: ocStore.savedMode || 'Build',
             placeholder: 'Describe qué quieres que OpenCode haga...',
             rows: 5,
           },
           _key: 'control-' + Date.now(),
         })
-      } else if (subStepType === 'prompt') {
-        ocSetupData.prompt = value
+      } else if (subStepType === 'form') {
+        const { model, thinking, mode, prompt } = value
+        ocSetupData.model = model
+        ocSetupData.thinking = thinking
+        ocSetupData.mode = mode
+        ocSetupData.prompt = prompt
+        await ocStore.select('model', model)
+        await ocStore.select('thinking', thinking || '')
+        await ocStore.select('mode', mode)
+        ocStore.selectedModel = model
+        ocStore.selectedThinking = thinking || ''
+        ocStore.selectedMode = mode
         await opencodeStreamPrompt(
           chat.activeSessionId,
-          value,
+          prompt,
           ocSetupData.provider,
-          ocSetupData.model,
-          ocSetupData.thinking,
-          ocSetupData.mode,
+          model,
+          thinking,
+          mode,
         )
       }
     }

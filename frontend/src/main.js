@@ -23,6 +23,7 @@ import './composables/commands/git.js'
 import './composables/commands/chatSetTicket.js'
 import './composables/commands/chatGetTicket.js'
 import './composables/commands/chatTicketEdit.js'
+import './composables/commands/repoCrearRama.js'
 
 const app = createApp(App)
 const pinia = createPinia()
