@@ -671,7 +671,7 @@ export default {
         } else if (value.action === 'retry') {
           await regenerateCommit(controlId, controlMsg)
         } else if (value.action === 'confirm') {
-          await executeCommit(controlId, controlMsg, value.message)
+          await executeCommit(controlId, controlMsg, value.message, value.addComment)
         }
         return
       } else if (controlType === 'funcionalidad_list') {
@@ -1803,7 +1803,7 @@ export default {
       )
     }
 
-    async function executeCommit(controlId, controlMsg, message) {
+    async function executeCommit(controlId, controlMsg, message, addComment) {
       const sessionId = chat.activeSessionId
       const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
       if (idx >= 0) {
@@ -1811,7 +1811,13 @@ export default {
       }
 
       try {
-        const escapedMessage = message.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+        const session = sessions.value.find(s => Number(s.id) === Number(sessionId))
+        const idTicket = session?.id_ticket_redmine || ticketInfo.value?.redmine_id || null
+
+        const cleanMsg = message.replace(/^\[#\d+\]\s*/g, '').trim()
+        const commitMsg = idTicket ? '[#' + idTicket + '] ' + cleanMsg : cleanMsg
+        const escapedMessage = commitMsg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+
         const addRes = await fetch('/api/command/git', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1839,19 +1845,65 @@ export default {
         })
         const commitData_ = await commitRes.json()
 
-        if (idx >= 0) {
-          if (commitData_.success) {
-            chat.messages[idx] = {
-              role: 'result',
-              content: '✓ Commit realizado correctamente.\n\nMensaje: ' + message,
-              _key: 'result-' + Date.now(),
-            }
-          } else {
+        if (!commitData_.success) {
+          if (idx >= 0) {
             chat.messages[idx] = {
               role: 'result',
               content: 'Error al realizar commit: ' + (commitData_.stderr || commitData_.error || 'Error desconocido'),
               _key: 'err-' + Date.now(),
             }
+          }
+          return
+        }
+
+        let resultLines = ['✓ Commit realizado correctamente.', '', 'Mensaje: ' + commitMsg]
+
+        if (addComment && idTicket) {
+          try {
+            const proyectoId = session?.proyecto_id || null
+            let commitUrl = ''
+            if (proyectoId) {
+              const repoRes = await fetch('/api/proyecto/repositorio/' + encodeURIComponent(proyectoId), { credentials: 'include' })
+              const repoData = await repoRes.json()
+              if (repoData.url_github) {
+                const hashRes = await fetch('/api/command/git', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ command: 'rev-parse HEAD', sessionId }),
+                })
+                const hashData = await hashRes.json()
+                if (hashData.success && hashData.stdout) {
+                  const hash = hashData.stdout.trim()
+                  commitUrl = repoData.url_github.replace(/\/+$/, '') + '/commit/' + hash
+                }
+              }
+            }
+
+            const notes = cleanMsg + '\n\n' + commitUrl
+            const ticketRes = await fetch('/api/tickets/session/' + sessionId, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ notes }),
+            })
+            const ticketData = await ticketRes.json()
+            if (ticketData.success) {
+              resultLines.push('', '✓ Comentario agregado al ticket #' + idTicket + '.')
+            } else {
+              resultLines.push('', '✗ Error al agregar comentario al ticket: ' + (ticketData.error || 'Error desconocido'))
+            }
+          } catch (err) {
+            console.error('Error al agregar comentario al ticket:', err.message)
+            resultLines.push('', '✗ Error al agregar comentario al ticket: ' + err.message)
+          }
+        }
+
+        if (idx >= 0) {
+          chat.messages[idx] = {
+            role: 'result',
+            content: resultLines.join('\n'),
+            _key: 'result-' + Date.now(),
           }
         }
       } catch (err) {

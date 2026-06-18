@@ -4,6 +4,10 @@
     <div class="result-text p-3 mb-2 rounded-3" style="background: #0f1a2e; border: 1px solid #374151; color: #e0e0e0; white-space: pre-wrap; word-break: break-word; font-size: 0.875rem;">
       {{ message }}
     </div>
+    <label class="d-flex align-items-center gap-2 mb-2" style="color: #9ca3af; font-size: 0.8rem; cursor: pointer;">
+      <input type="checkbox" v-model="addComment" class="form-check-input" style="cursor: pointer;" />
+      Agregar comentario al ticket
+    </label>
     <div class="d-flex gap-2">
       <button class="btn btn-sm btn-success" @click="confirmar">
         Confirmar
@@ -19,6 +23,8 @@
 </template>
 
 <script>
+import { ref } from 'vue'
+
 export default {
   props: {
     message: { type: String, required: true },
@@ -26,8 +32,10 @@ export default {
   },
   emits: ['confirm'],
   setup(props, { emit }) {
+    const addComment = ref(true)
+
     function confirmar() {
-      emit('confirm', { action: 'confirm', message: props.message })
+      emit('confirm', { action: 'confirm', message: props.message, addComment: addComment.value })
     }
 
     function reintentar() {
@@ -38,7 +46,7 @@ export default {
       emit('confirm', null)
     }
 
-    return { confirmar, reintentar, cancelar }
+    return { addComment, confirmar, reintentar, cancelar }
   },
 }
 </script>
