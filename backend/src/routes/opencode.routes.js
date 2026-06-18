@@ -31,6 +31,31 @@ async function saveUserSetting(userId, key, value) {
     .merge();
 }
 
+const MAX_MSG_LENGTH = 50000;
+
+async function saveLongMessage(sessionId, role, content, extraFields = {}) {
+  if (!content) {
+    await db('chat_messages').insert({ session_id: sessionId, role, content: '(sin respuesta)', ...extraFields });
+    return;
+  }
+
+  const parts = [];
+  for (let i = 0; i < content.length; i += MAX_MSG_LENGTH) {
+    parts.push(content.slice(i, i + MAX_MSG_LENGTH));
+  }
+
+  const inserts = parts.map((part, i) => ({
+    session_id: sessionId,
+    role,
+    content: parts.length > 1
+      ? `[Parte ${i + 1}/${parts.length}]\n${part}`
+      : part,
+    ...extraFields,
+  }));
+
+  await db('chat_messages').insert(inserts);
+}
+
 router.get('/start', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
@@ -86,12 +111,13 @@ router.post('/send', async (req, res) => {
     if (!ocSessionId) {
       const ocSession = await server.createSession('Agent Orchestrator - ' + (prompt.slice(0, 50)));
       ocSessionId = ocSession.id;
-      if (sessionId) {
-        await db('chat_messages').insert({
-          session_id: sessionId, role: 'opencode_info',
-          content: JSON.stringify({ type: 'session_created', ocSessionId }),
-        });
-      }
+    }
+
+    if (sessionId) {
+      await db('chat_messages').insert({
+        session_id: sessionId, role: 'user', content: prompt,
+      });
+      await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
     }
 
     res.writeHead(200, {
@@ -155,7 +181,7 @@ router.post('/send', async (req, res) => {
             session_id: sessionId,
             role: 'opencode_control',
             content: JSON.stringify(controlData),
-          }).catch(() => {});
+          }).catch((e) => console.log('Error al guardar control:', e.message));
         }
 
         const timeout = setTimeout(() => {
@@ -247,16 +273,9 @@ router.post('/send', async (req, res) => {
       const diff = await server.getSessionDiff(ocSessionId);
 
       if (sessionId) {
-        await db('chat_messages').insert({
-          session_id: sessionId,
-          role: 'opencode_result',
-          content: fullResponse || '(sin respuesta)',
-        });
-        await db('chat_messages').insert({
-          session_id: sessionId,
-          role: 'opencode_info',
-          content: JSON.stringify({ type: 'finished', hash: ocSessionId, diff: diff || [] }),
-        });
+        await saveLongMessage(sessionId, 'opencode_result', fullResponse);
+        await saveLongMessage(sessionId, 'opencode_info', JSON.stringify({ type: 'finished', hash: ocSessionId, diff: diff || [] }));
+        await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
       }
 
       await registrarGastos(sessionId, ocSessionId, server, fullResponse);
@@ -271,17 +290,11 @@ router.post('/send', async (req, res) => {
       } catch {}
       if (sessionId) {
         try {
-          await db('chat_messages').insert({
-            session_id: sessionId,
-            role: 'opencode_result',
-            content: JSON.stringify({ error: msgErr.message }),
-          });
-          await db('chat_messages').insert({
-            session_id: sessionId,
-            role: 'opencode_info',
-            content: JSON.stringify({ type: 'error', error: msgErr.message }),
-          });
-        } catch {}
+          await saveLongMessage(sessionId, 'opencode_result', JSON.stringify({ error: msgErr.message }));
+          await saveLongMessage(sessionId, 'opencode_info', JSON.stringify({ type: 'error', error: msgErr.message }));
+        } catch (e) {
+          console.log('Error al guardar mensajes de error:', e.message);
+        }
       }
       await registrarGastos(sessionId, ocSessionId, server, fullResponse).catch((e) => console.log('[gastos] error en catch post-error:', e.message));
       res.end();

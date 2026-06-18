@@ -38,7 +38,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 |---|---|---|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
 | `session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
-| `role` | ENUM(`'user'`, `'assistant'`, `'command'`, `'result'`, `'opencode_info'`, `'opencode_result'`) | NOT NULL |
+| `role` | ENUM(`'user'`, `'assistant'`, `'command'`, `'result'`, `'opencode_info'`, `'opencode_result'`, `'opencode_control'`) | NOT NULL |
 | `content` | TEXT | NOT NULL |
 | `thinking` | TEXT | nullable — contenido del thinking de DeepSeek |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |

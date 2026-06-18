@@ -247,6 +247,7 @@ export default {
             streamMsg.streaming = false
             streamMsg.role = 'opencode_result'
             streamMsg.content = json.fullResponse || fullText || '(sin respuesta)'
+            chatStore.loadMessages(sessionId)
           },
           onError(msg) {
             streamMsg.content = `[Error: ${msg}]`

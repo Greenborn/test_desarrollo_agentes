@@ -36,6 +36,13 @@
         </select>
         <input v-else v-model="form.assigned_to_name" class="ticket-input" placeholder="Asignado a" />
       </div>
+      <div class="field-item">
+        <span class="field-label">% Avance:</span>
+        <div class="done-ratio-wrapper">
+          <input type="range" min="0" max="100" step="1" v-model.number="form.done_ratio" class="done-ratio-slider" />
+          <span class="done-ratio-value">{{ form.done_ratio ?? 0 }}%</span>
+        </div>
+      </div>
     </div>
     <div class="ticket-field">
       <span class="field-value-readonly">Proyecto: {{ ticket.proyecto_id }}</span>
@@ -120,6 +127,7 @@ export default {
       status_name: props.ticket?.status_name || '',
       priority_name: props.ticket?.priority_name || '',
       assigned_to_name: props.ticket?.assigned_to_name || '',
+      done_ratio: props.ticket?.done_ratio ?? null,
       notes: '',
     })
 
@@ -205,6 +213,7 @@ export default {
           status_id: selectedIds.status_id,
           priority_id: selectedIds.priority_id,
           assigned_to_id: selectedIds.assigned_to_id,
+          done_ratio: form.done_ratio,
           notes: form.notes || undefined,
         }
         emit('confirm', payload)
@@ -335,6 +344,26 @@ export default {
 
 .ticket-select:focus {
   border-color: #5a8fc0;
+}
+
+.done-ratio-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.done-ratio-slider {
+  flex: 1;
+  min-width: 60px;
+  accent-color: #75AADB;
+  cursor: pointer;
+}
+
+.done-ratio-value {
+  min-width: 36px;
+  text-align: right;
+  color: #e0e0e0;
+  font-size: 0.875rem;
 }
 
 .ticket-select option {

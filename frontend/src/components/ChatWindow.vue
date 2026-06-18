@@ -1,12 +1,19 @@
 <template>
   <div class="d-flex flex-column h-100 overflow-x-hidden" @click="closeCtxMenu">
-    <div v-if="activeSessionId && ticketInfo" class="ticket-info-bar px-3 d-flex align-items-center gap-2" :class="priorityClass(ticketInfo.priority_id)">
-      <span class="priority-dot" :class="priorityClass(ticketInfo.priority_id)"></span>
-      <span class="ticket-id">#{{ ticketInfo.redmine_id }}</span>
-      <span class="ticket-sep text-muted">—</span>
-      <span class="ticket-subject text-truncate">{{ ticketInfo.subject }}</span>
+    <div v-if="activeSessionId" class="ticket-info-bar px-3 d-flex align-items-center gap-2" :class="ticketInfo ? priorityClass(ticketInfo.priority_id) : 'priority-none'">
+      <template v-if="ticketInfo">
+        <span class="priority-dot" :class="priorityClass(ticketInfo.priority_id)"></span>
+        <span class="ticket-id">#{{ ticketInfo.redmine_id }}</span>
+        <span class="ticket-sep text-muted">—</span>
+        <span class="ticket-subject text-truncate">{{ ticketInfo.subject }}</span>
+      </template>
+      <div class="zoom-controls ms-auto d-flex align-items-center gap-1">
+        <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomOut" :disabled="chatZoom <= 50" title="Alejar">−</button>
+        <span class="zoom-level small" @click="chatZoom = 100; saveZoom(100)" style="cursor:pointer; min-width:36px; text-align:center;" title="Restablecer zoom">{{ chatZoom }}%</span>
+        <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomIn" :disabled="chatZoom >= 200" title="Acercar">+</button>
+      </div>
     </div>
-    <div class="flex-grow-1 overflow-y-auto p-3" ref="messagesContainer">
+    <div class="flex-grow-1 overflow-y-auto p-3" ref="messagesContainer" :style="{ fontSize: chatZoom + '%' }">
       <div v-if="!activeSessionId" class="text-center text-muted mt-5">
         <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
       </div>
@@ -89,6 +96,44 @@ export default {
     const ocThinking = ref('')
     const _streamSessionId = ref(null)
     const ticketInfo = ref(null)
+    const chatZoom = ref(100)
+
+    async function loadZoom() {
+      try {
+        const res = await fetch('/api/command/setting/chat_zoom', { credentials: 'include' })
+        const data = await res.json()
+        if (data.value !== null && data.value !== undefined) {
+          chatZoom.value = parseInt(data.value) || 100
+        }
+      } catch (err) {
+        console.error('Error al cargar zoom:', err)
+      }
+    }
+
+    async function saveZoom(val) {
+      try {
+        await fetch('/api/command/setting', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ key: 'chat_zoom', value: String(val) }),
+        })
+      } catch (err) {
+        console.error('Error al guardar zoom:', err)
+      }
+    }
+
+    function zoomIn() {
+      const next = Math.min(200, chatZoom.value + 10)
+      chatZoom.value = next
+      saveZoom(next)
+    }
+
+    function zoomOut() {
+      const next = Math.max(50, chatZoom.value - 10)
+      chatZoom.value = next
+      saveZoom(next)
+    }
 
     function _isActiveSession(sid) {
       return sid && Number(chat.activeSessionId) === Number(sid)
@@ -1507,6 +1552,7 @@ export default {
         resizeObserver.observe(messagesContainer.value)
       }
       loadTicketInfo()
+      loadZoom()
     })
 
     onUnmounted(() => {
@@ -1534,6 +1580,9 @@ export default {
       messagesContainer,
       ticketInfo,
       priorityClass,
+      chatZoom,
+      zoomIn,
+      zoomOut,
     }
   },
 }
@@ -1665,5 +1714,31 @@ html, body {
 .priority-dot.priority-immediate {
   background: #ef4444;
   box-shadow: 0 0 4px #ef4444;
+}
+.zoom-controls {
+  flex-shrink: 0;
+}
+.zoom-btn {
+  line-height: 1;
+  font-size: 0.85rem;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  color: #9ca3af;
+  border-color: #4b5563;
+}
+.zoom-btn:hover {
+  color: #e0e0e0;
+  border-color: #75AADB;
+}
+.zoom-btn:disabled {
+  opacity: 0.4;
+}
+.zoom-level {
+  color: #9ca3af;
+  font-weight: 500;
+  user-select: none;
+}
+.zoom-level:hover {
+  color: #e0e0e0;
 }
 </style>

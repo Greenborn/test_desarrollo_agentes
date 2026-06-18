@@ -299,10 +299,14 @@ router.get('/statuses/:ticketId', async (req, res) => {
 router.put('/session/:sessionId', async (req, res) => {
   if (!authGuard(req, res)) return;
 
-  const { subject, description, status_name, priority_name, assigned_to_name, status_id, priority_id, assigned_to_id, notes } = req.body;
+  const { subject, description, status_name, priority_name, assigned_to_name, status_id, priority_id, assigned_to_id, notes, done_ratio } = req.body;
 
   if (subject !== undefined && subject.trim().length === 0) {
     return res.status(400).json({ error: 'El asunto no puede estar vacío.' });
+  }
+
+  if (done_ratio !== undefined && (done_ratio < 0 || done_ratio > 100)) {
+    return res.status(400).json({ error: 'El porcentaje de avance debe estar entre 0 y 100.' });
   }
 
   try {
@@ -325,6 +329,7 @@ router.put('/session/:sessionId', async (req, res) => {
     if (priority_name !== undefined) { localUpdate.priority_name = priority_name.trim(); }
     if (priority_id != null) { localUpdate.priority_id = priority_id; }
     if (assigned_to_name !== undefined) { localUpdate.assigned_to_name = assigned_to_name.trim(); }
+    if (done_ratio !== undefined) { localUpdate.done_ratio = done_ratio; redmineUpdate.done_ratio = done_ratio; }
     if (status_id != null) { redmineUpdate.status_id = status_id; }
     if (priority_id != null) { redmineUpdate.priority_id = priority_id; }
     if (assigned_to_id != null) { redmineUpdate.assigned_to_id = assigned_to_id; }
