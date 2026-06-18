@@ -126,6 +126,40 @@
             Guardar
           </button>
         </div>
+
+        <div v-if="matches('colores prioridad')" class="border-top border-secondary pt-3">
+          <label class="form-label mb-2 fw-bold">Colores de Prioridad</label>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="small text-nowrap" style="width: 90px;">Baja</span>
+            <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 50px; height: 32px;" v-model="priorityColorLowInput" />
+            <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 100px;" v-model="priorityColorLowInput" placeholder="#hex" />
+            <button class="btn btn-sm btn-argentina" @click="savePriorityColor('priority_color_low')">Guardar</button>
+          </div>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="small text-nowrap" style="width: 90px;">Normal</span>
+            <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 50px; height: 32px;" v-model="priorityColorNormalInput" />
+            <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 100px;" v-model="priorityColorNormalInput" placeholder="#hex" />
+            <button class="btn btn-sm btn-argentina" @click="savePriorityColor('priority_color_normal')">Guardar</button>
+          </div>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="small text-nowrap" style="width: 90px;">Alta</span>
+            <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 50px; height: 32px;" v-model="priorityColorHighInput" />
+            <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 100px;" v-model="priorityColorHighInput" placeholder="#hex" />
+            <button class="btn btn-sm btn-argentina" @click="savePriorityColor('priority_color_high')">Guardar</button>
+          </div>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="small text-nowrap" style="width: 90px;">Urgente</span>
+            <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 50px; height: 32px;" v-model="priorityColorUrgentInput" />
+            <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 100px;" v-model="priorityColorUrgentInput" placeholder="#hex" />
+            <button class="btn btn-sm btn-argentina" @click="savePriorityColor('priority_color_urgent')">Guardar</button>
+          </div>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="small text-nowrap" style="width: 90px;">Inmediata</span>
+            <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 50px; height: 32px;" v-model="priorityColorImmediateInput" />
+            <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 100px;" v-model="priorityColorImmediateInput" placeholder="#hex" />
+            <button class="btn btn-sm btn-argentina" @click="savePriorityColor('priority_color_immediate')">Guardar</button>
+          </div>
+        </div>
       </div>
 
       <div class="col-md-6 d-flex flex-column gap-4">
@@ -258,6 +292,11 @@ export default {
     const omnifilterDebounceInput = ref(2000)
     const repoAcronimoInput = ref('TKT')
     const localeInput = ref('es_ES.UTF-8')
+    const priorityColorLowInput = ref('#6b7280')
+    const priorityColorNormalInput = ref('#3b82f6')
+    const priorityColorHighInput = ref('#eab308')
+    const priorityColorUrgentInput = ref('#ef4444')
+    const priorityColorImmediateInput = ref('#ef4444')
     const selectedWId = ref(1)
     const wsMessage = ref('')
 
@@ -318,6 +357,12 @@ export default {
     watch(() => settings.locale, (val) => {
       localeInput.value = val
     }, { immediate: true })
+
+    watch(() => settings.priorityColorLow, (val) => { priorityColorLowInput.value = val }, { immediate: true })
+    watch(() => settings.priorityColorNormal, (val) => { priorityColorNormalInput.value = val }, { immediate: true })
+    watch(() => settings.priorityColorHigh, (val) => { priorityColorHighInput.value = val }, { immediate: true })
+    watch(() => settings.priorityColorUrgent, (val) => { priorityColorUrgentInput.value = val }, { immediate: true })
+    watch(() => settings.priorityColorImmediate, (val) => { priorityColorImmediateInput.value = val }, { immediate: true })
 
     watch(() => settings.ticketDescripcionPrompt, (val) => {
       descripcionPromptInput.value = val
@@ -467,15 +512,29 @@ export default {
       settings.save('locale', localeInput.value)
     }
 
+    function savePriorityColor(key) {
+      settings.clearFeedback()
+      const inputMap = {
+        priority_color_low: priorityColorLowInput,
+        priority_color_normal: priorityColorNormalInput,
+        priority_color_high: priorityColorHighInput,
+        priority_color_urgent: priorityColorUrgentInput,
+        priority_color_immediate: priorityColorImmediateInput,
+      }
+      settings.save(key, inputMap[key].value)
+    }
+
     return {
       keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput,
       docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput, refinarPromptInput,
       showKey, showRedmineToken, searchTerm, omnifilterDebounceInput, repoAcronimoInput,
       localeInput,
+      priorityColorLowInput, priorityColorNormalInput, priorityColorHighInput,
+      priorityColorUrgentInput, priorityColorImmediateInput,
       settings, workspaces, selectedWId, wsMessage,
       saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
       saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveRepoAcronimo,
-      saveLocale, matches,
+      saveLocale, savePriorityColor, matches,
       onWorkspaceChange, promptCreate, promptRename, confirmDelete,
     }
   },

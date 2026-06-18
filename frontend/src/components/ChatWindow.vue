@@ -2089,24 +2089,24 @@ html, body {
   transition: background 0.2s, border-color 0.2s;
 }
 .ticket-info-bar.priority-low {
-  background: #374151;
-  border-bottom-color: #4b5563;
+  background: color-mix(in srgb, var(--priority-low-color, #6b7280) 15%, #0f1a2e);
+  border-bottom-color: var(--priority-low-color, #6b7280);
 }
 .ticket-info-bar.priority-normal {
-  background: #1a2744;
-  border-bottom: 2px solid #3b82f6;
+  background: color-mix(in srgb, var(--priority-normal-color, #3b82f6) 15%, #0f1a2e);
+  border-bottom: 2px solid var(--priority-normal-color, #3b82f6);
 }
 .ticket-info-bar.priority-high {
-  background: #2a2400;
-  border-bottom: 2px solid #eab308;
+  background: color-mix(in srgb, var(--priority-high-color, #eab308) 15%, #0f1a2e);
+  border-bottom: 2px solid var(--priority-high-color, #eab308);
 }
 .ticket-info-bar.priority-urgent {
-  background: #2a0808;
-  border-bottom: 2px solid #ef4444;
+  background: color-mix(in srgb, var(--priority-urgent-color, #ef4444) 15%, #0f1a2e);
+  border-bottom: 2px solid var(--priority-urgent-color, #ef4444);
 }
 .ticket-info-bar.priority-immediate {
-  background: #3a0505;
-  border-bottom: 2px solid #ef4444;
+  background: color-mix(in srgb, var(--priority-immediate-color, #ef4444) 18%, #0f1a2e);
+  border-bottom: 2px solid var(--priority-immediate-color, #ef4444);
   border-bottom-width: 3px;
 }
 .ticket-id {
@@ -2129,20 +2129,20 @@ html, body {
   background: #6b7280;
 }
 .priority-dot.priority-low {
-  background: #9ca3af;
+  background: var(--priority-low-color, #9ca3af);
 }
 .priority-dot.priority-normal {
-  background: #3b82f6;
+  background: var(--priority-normal-color, #3b82f6);
 }
 .priority-dot.priority-high {
-  background: #eab308;
+  background: var(--priority-high-color, #eab308);
 }
 .priority-dot.priority-urgent {
-  background: #ef4444;
+  background: var(--priority-urgent-color, #ef4444);
 }
 .priority-dot.priority-immediate {
-  background: #ef4444;
-  box-shadow: 0 0 4px #ef4444;
+  background: var(--priority-immediate-color, #ef4444);
+  box-shadow: 0 0 4px var(--priority-immediate-color, #ef4444);
 }
 .zoom-controls {
   flex-shrink: 0;

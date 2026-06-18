@@ -270,8 +270,8 @@ export default {
   background-color: #1a2744;
 }
 .list-group-item.active {
-  background-color: #1a2a4e !important;
   border-color: #75AADB !important;
+  border-width: 1.5px;
   color: #e0e0e0 !important;
   font-weight: 600;
 }
@@ -355,24 +355,24 @@ export default {
   border-left: 3px solid #75AADB !important;
 }
 .ticket-priority-low {
-  border-left: 3px solid #6b7280 !important;
-  background-color: rgba(107, 114, 128, 0.12) !important;
+  border-left: 3px solid var(--priority-low-color, #6b7280) !important;
+  background: color-mix(in srgb, var(--priority-low-color, #6b7280) 12%, transparent) !important;
 }
 .ticket-priority-normal {
-  border-left: 3px solid #3b82f6 !important;
-  background-color: rgba(59, 130, 246, 0.12) !important;
+  border-left: 3px solid var(--priority-normal-color, #3b82f6) !important;
+  background: color-mix(in srgb, var(--priority-normal-color, #3b82f6) 12%, transparent) !important;
 }
 .ticket-priority-high {
-  border-left: 3px solid #eab308 !important;
-  background-color: rgba(234, 179, 8, 0.12) !important;
+  border-left: 3px solid var(--priority-high-color, #eab308) !important;
+  background: color-mix(in srgb, var(--priority-high-color, #eab308) 12%, transparent) !important;
 }
 .ticket-priority-urgent {
-  border-left: 3px solid #ef4444 !important;
-  background-color: rgba(239, 68, 68, 0.12) !important;
+  border-left: 3px solid var(--priority-urgent-color, #ef4444) !important;
+  background: color-mix(in srgb, var(--priority-urgent-color, #ef4444) 12%, transparent) !important;
 }
 .ticket-priority-immediate {
-  border-left: 3px solid #ef4444 !important;
+  border-left: 3px solid var(--priority-immediate-color, #ef4444) !important;
   border-left-width: 4px !important;
-  background-color: rgba(239, 68, 68, 0.18) !important;
+  background: color-mix(in srgb, var(--priority-immediate-color, #ef4444) 18%, transparent) !important;
 }
 </style>

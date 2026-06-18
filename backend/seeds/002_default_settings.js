@@ -26,5 +26,30 @@ export async function seed(knex) {
       setting_value: 'es_ES.UTF-8',
       encrypted: false,
     },
+    {
+      setting_key: 'priority_color_low',
+      setting_value: '#6b7280',
+      encrypted: false,
+    },
+    {
+      setting_key: 'priority_color_normal',
+      setting_value: '#3b82f6',
+      encrypted: false,
+    },
+    {
+      setting_key: 'priority_color_high',
+      setting_value: '#eab308',
+      encrypted: false,
+    },
+    {
+      setting_key: 'priority_color_urgent',
+      setting_value: '#ef4444',
+      encrypted: false,
+    },
+    {
+      setting_key: 'priority_color_immediate',
+      setting_value: '#ef4444',
+      encrypted: false,
+    },
   ]);
 }

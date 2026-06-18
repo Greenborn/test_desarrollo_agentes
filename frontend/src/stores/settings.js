@@ -18,8 +18,22 @@ export const useSettingsStore = defineStore('settings', () => {
   const omnifilterDebounceMs = ref(2000)
   const repoAcronimo = ref('TKT')
   const locale = ref('es_ES.UTF-8')
+  const priorityColorLow = ref('#6b7280')
+  const priorityColorNormal = ref('#3b82f6')
+  const priorityColorHigh = ref('#eab308')
+  const priorityColorUrgent = ref('#ef4444')
+  const priorityColorImmediate = ref('#ef4444')
   const saveError = ref('')
   const saveSuccess = ref('')
+
+  function applyPriorityColors() {
+    const root = document.documentElement
+    root.style.setProperty('--priority-low-color', priorityColorLow.value)
+    root.style.setProperty('--priority-normal-color', priorityColorNormal.value)
+    root.style.setProperty('--priority-high-color', priorityColorHigh.value)
+    root.style.setProperty('--priority-urgent-color', priorityColorUrgent.value)
+    root.style.setProperty('--priority-immediate-color', priorityColorImmediate.value)
+  }
 
   async function load() {
     try {
@@ -39,6 +53,12 @@ export const useSettingsStore = defineStore('settings', () => {
       omnifilterDebounceMs.value = keys.omnifilter_debounce_ms ? parseInt(keys.omnifilter_debounce_ms, 10) : 2000
       repoAcronimo.value = keys.repo_acronimo || 'TKT'
       locale.value = keys.locale || 'es_ES.UTF-8'
+      priorityColorLow.value = keys.priority_color_low || '#6b7280'
+      priorityColorNormal.value = keys.priority_color_normal || '#3b82f6'
+      priorityColorHigh.value = keys.priority_color_high || '#eab308'
+      priorityColorUrgent.value = keys.priority_color_urgent || '#ef4444'
+      priorityColorImmediate.value = keys.priority_color_immediate || '#ef4444'
+      applyPriorityColors()
     } catch (err) {
       console.error('Error al cargar settings:', err)
     }
@@ -75,5 +95,6 @@ export const useSettingsStore = defineStore('settings', () => {
            documentacionPromptBaseDatos, documentacionPromptSubproyectos,
            documentacionPromptEndpoints, documentacionPromptWebSockets,
            documentacionPromptFuncionalidades, ticketDescripcionPrompt, ticketRefinarPrompt,
-           saveError, saveSuccess, clearFeedback, load, save }
+           priorityColorLow, priorityColorNormal, priorityColorHigh, priorityColorUrgent, priorityColorImmediate,
+           saveError, saveSuccess, clearFeedback, load, save, applyPriorityColors }
 })
