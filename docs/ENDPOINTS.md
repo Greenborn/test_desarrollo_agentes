@@ -425,6 +425,24 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Respuesta 400:** `{ success: false, error: "La sesión de chat no está vinculada a un proyecto. Use /proyecto_set para seleccionar un proyecto." }`
 - **Respuesta 404:** `{ success: false, error: "No hay configuración de despliegue guardada. Use /despliegue_upd_config para cargarla." }`
 
+### `POST /api/despliegue/iniciar-instancia-dev`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number }`
+- **Descripción:** Lee la configuración de despliegue del proyecto vinculado a la sesión, identifica subproyectos desde `install[]` (backends por `pm2[]`, fronts por `build[]`), ejecuta `npm ci` en paralelo en cada uno y luego inicia los procesos de desarrollo: `npx nodemon` para backends, `npm run dev` para fronts. Los procesos quedan bajo gestión del servidor (órbita de control).
+- **Respuesta 200:** `{ success: true, results: [{ name: string, type: "backend"|"frontend", status: "running"|"error", error?: string }] }`
+- **Respuesta 400:** `{ success: false, error: "..." }` (sin proyecto, sin config de despliegue, etc.)
+
+### `POST /api/despliegue/detener-instancia-dev`
+- **Auth:** Requerida
+- **Body:** ninguno
+- **Descripción:** Detiene todos los procesos de desarrollo activos iniciados con `/iniciar_instancia_dev`.
+- **Respuesta 200:** `{ success: true }`
+
+### `GET /api/despliegue/estado-instancia-dev`
+- **Auth:** Requerida
+- **Descripción:** Devuelve el estado actual de cada proceso de desarrollo gestionado por el servidor.
+- **Respuesta 200:** `{ success: true, processes: [{ name: string, type: "backend"|"frontend", status: "running"|"stopped"|"error" }] }`
+
 ---
 
 ## Notas

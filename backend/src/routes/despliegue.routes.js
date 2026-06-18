@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import db from '../config/db.js';
 import sessionAuth from '../middlewares/sessionAuth.js';
+import * as devInstanceManager from '../services/devInstanceManager.js';
 
 const router = express.Router();
 
@@ -103,6 +104,79 @@ router.get('/config', async (req, res) => {
   } catch (err) {
     console.log('Error en GET /api/despliegue/config:', err);
     res.status(500).json({ success: false, error: 'Error al obtener configuración de despliegue.' });
+  }
+});
+
+router.post('/iniciar-instancia-dev', async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'Se requiere sessionId.' });
+    }
+
+    const session = await db('chat_sessions')
+      .where({ id: sessionId, user_id: req.session.userId })
+      .select('proyecto_id', 'cwd')
+      .first();
+
+    if (!session || !session.proyecto_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'La sesión de chat no está vinculada a un proyecto. Use /proyecto_set para seleccionar un proyecto.',
+      });
+    }
+
+    const proyecto = await db('proyectos')
+      .where({ id: session.proyecto_id })
+      .select('despliegue_config')
+      .first();
+
+    if (!proyecto || !proyecto.despliegue_config) {
+      return res.status(400).json({
+        success: false,
+        error: 'No hay configuración de despliegue guardada. Use /despliegue_upd_config para cargarla.',
+      });
+    }
+
+    let deployConfig;
+    try {
+      deployConfig = JSON.parse(proyecto.despliegue_config);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        error: 'La configuración de despliegue guardada no es JSON válido.',
+      });
+    }
+
+    const projectRoot = session.cwd || process.cwd();
+
+    const results = await devInstanceManager.startDevInstance(projectRoot, deployConfig);
+
+    res.json({ success: true, results });
+  } catch (err) {
+    console.log('Error en POST /api/despliegue/iniciar-instancia-dev:', err);
+    res.status(500).json({ success: false, error: 'Error al iniciar instancia de desarrollo.' });
+  }
+});
+
+router.post('/detener-instancia-dev', async (req, res) => {
+  try {
+    devInstanceManager.stopAll();
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error en POST /api/despliegue/detener-instancia-dev:', err);
+    res.status(500).json({ success: false, error: 'Error al detener instancia de desarrollo.' });
+  }
+});
+
+router.get('/estado-instancia-dev', async (req, res) => {
+  try {
+    const processes = devInstanceManager.getStatus();
+    res.json({ success: true, processes });
+  } catch (err) {
+    console.log('Error en GET /api/despliegue/estado-instancia-dev:', err);
+    res.status(500).json({ success: false, error: 'Error al obtener estado de la instancia de desarrollo.' });
   }
 });
 

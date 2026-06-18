@@ -112,6 +112,9 @@ La gestión de espacios de trabajo se realiza desde el modal de Configuración:
 |---|---|---|
 | `/despliegue_upd_config` | Lee `deploy.json` del directorio del proyecto y guarda la configuración de despliegue en la base de datos. Requiere proyecto asignado con `/proyecto_set` | `/despliegue_upd_config` |
 | `/despliegue_show_config` | Muestra la configuración de despliegue guardada para el proyecto actual como JSON formateado. Requiere proyecto asignado con `/proyecto_set` | `/despliegue_show_config` |
+| `/iniciar_instancia_dev` | Lee la configuración de despliegue, ejecuta `npm ci` en paralelo en cada subproyecto e inicia los procesos de desarrollo: `nodemon` para backends (entradas en `pm2[]`), `npm run dev` para fronts (entradas en `build[]`). Requiere proyecto asignado y configuración de despliegue cargada | `/iniciar_instancia_dev` |
+| `/instancia_dev_detener` | Detiene todos los procesos de desarrollo iniciados con `/iniciar_instancia_dev` | `/instancia_dev_detener` |
+| `/instancia_dev_estado` | Muestra el estado (running/stopped/error) de cada proceso de desarrollo | `/instancia_dev_estado` |
 
 ---
 

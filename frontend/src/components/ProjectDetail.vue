@@ -58,17 +58,39 @@
         </div>
       </div>
     </div>
+
+    <div v-if="deployConfig" class="card bg-dark border-secondary mb-3">
+      <div class="card-header border-secondary">
+        <h6 class="mb-0">Configuración de Despliegue</h6>
+      </div>
+      <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+        <JsonTreeView :data="deployConfig" />
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useProjectStore } from '../stores/project.js'
+import JsonTreeView from './JsonTreeView.vue'
 
 export default {
+  components: { JsonTreeView },
   setup() {
     const projectStore = useProjectStore()
     const { selectedProject } = storeToRefs(projectStore)
+
+    const deployConfig = computed(() => {
+      const raw = selectedProject.value?.despliegue_config
+      if (!raw) return null
+      try {
+        return JSON.parse(raw)
+      } catch (err) {
+        return null
+      }
+    })
 
     function goBack() {
       projectStore.clearSelection()
@@ -101,6 +123,7 @@ export default {
 
     return {
       project: selectedProject,
+      deployConfig,
       goBack,
       formatDate,
       statusLabel,
