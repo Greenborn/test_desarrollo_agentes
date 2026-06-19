@@ -1,4 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
+import { parseCommandArgs } from '../parseCommandArgs.js';
 
 const { register } = useCommandRegistry();
 
@@ -6,42 +7,43 @@ register({
   name: '/arbol_directorios',
   category: 'Navegación',
   description: 'Muestra el árbol de directorios en formato JSON. Si no se especifica ruta, usa el directorio base de la sesión.',
-  usage: '/arbol_directorios [ruta]',
+  usage: '/arbol_directorios [--dir=&lt;ruta&gt;] [--gitignore=&lt;bool&gt;] [--filter-extension=&lt;ext1,ext2&gt;]',
   autocomplete(args, cmdStore) {
-    const last = args.length > 0 ? args[args.length - 1] : ''
-    if (last) {
-      cmdStore.fetchAutocomplete(last, cmdStore.currentDir)
-    } else if (cmdStore.currentDir) {
-      cmdStore.fetchAutocomplete(cmdStore.currentDir, cmdStore.currentDir)
+    const dirArg = args.find(a => a.startsWith('--dir='))
+    if (dirArg) {
+      const prefix = dirArg.slice('--dir='.length) || '/'
+      cmdStore.fetchAutocomplete(prefix, cmdStore.currentDir)
+    } else {
+      const hasGitignore = args.find(a => a.startsWith('--gitignore'))
+      const hasFilter = args.find(a => a.startsWith('--filter-extension'))
+      const suggestions = []
+      if (!dirArg) suggestions.push('--dir=')
+      if (!hasGitignore) suggestions.push('--gitignore=')
+      if (!hasFilter) suggestions.push('--filter-extension=')
+      cmdStore.showAutocomplete(suggestions)
     }
   },
   async execute(args, { cmdStore, chatStore }) {
-    let useGitignore = true
-    let filterExtension = ''
-    const dirArgs = []
-    for (const arg of args) {
-      if (arg.startsWith('--')) {
-        const [key, val] = arg.slice(2).split('=')
-        const cleanVal = val ? val.replace(/^["']|["']$/g, '') : ''
-        if (key === 'gitignore') useGitignore = cleanVal !== 'false'
-        if (key === 'filter-extension') filterExtension = cleanVal
-      } else {
-        dirArgs.push(arg)
-      }
-    }
-    const dir = dirArgs.join(' ')
+    const { params } = parseCommandArgs(args, {
+      dir: { required: false },
+      gitignore: { required: false },
+      'filter-extension': { required: false },
+    })
+    const dir = params.dir || ''
+    const useGitignore = params.gitignore === undefined ? true : params.gitignore !== 'false'
+    const filterExtension = params['filter-extension'] || ''
     const sessionId = chatStore.activeSessionId
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
 
     try {
-      const params = new URLSearchParams()
-      if (dir) params.set('dir', dir)
-      params.set('sessionId', sessionId)
-      params.set('useGitignore', String(useGitignore))
-      if (filterExtension) params.set('filterExtension', filterExtension)
-      const res = await fetch(`/api/command/arbol-directorios?${params.toString()}`, { credentials: 'include' })
+      const qparams = new URLSearchParams()
+      if (dir) qparams.set('dir', dir)
+      qparams.set('sessionId', sessionId)
+      qparams.set('useGitignore', String(useGitignore))
+      if (filterExtension) qparams.set('filterExtension', filterExtension)
+      const res = await fetch(`/api/command/arbol-directorios?${qparams.toString()}`, { credentials: 'include' })
       const data = await res.json()
 
       if (!data.success) {

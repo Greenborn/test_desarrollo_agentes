@@ -22,9 +22,15 @@ function processInline(text) {
   result = result.replace(/\*(.+?)\*/g, '<em>$1</em>')
   result = result.replace(/(^|\s)_([^_]+)_(\s|$)/g, '$1<em>$2</em>$3')
 
-  result = result.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%;height:auto;border-radius:4px;margin:4px 0;display:block;">')
+  result = result.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+    if (/^\s*(javascript|data|vbscript):/i.test(src)) return match
+    return `<img src="${src}" alt="${alt}" style="max-width:100%;height:auto;border-radius:4px;margin:4px 0;display:block;">`
+  })
 
-  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) => {
+    if (/^\s*(javascript|data|vbscript):/i.test(href)) return text
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`
+  })
 
   return result
 }

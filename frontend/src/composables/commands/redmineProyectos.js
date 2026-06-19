@@ -1,15 +1,16 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
+import { parseCommandArgs } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
 register({
   name: '/redmine_proyectos',
   category: 'Utilidades',
-  description: 'Lista proyectos Redmine. Con import_all importa todos a la base de datos local.',
-  usage: '/redmine_proyectos [import_all]',
+  description: 'Lista proyectos Redmine. Con --import importa todos a la base de datos local.',
+  usage: '/redmine_proyectos [--import]',
   autocomplete(args, cmdStore) {
-    if (args.length === 0 || (args.length === 1 && !args[0].startsWith('import'))) {
-      cmdStore.showAutocomplete(['import_all'])
+    if (!args.find(a => a.startsWith('--import'))) {
+      cmdStore.showAutocomplete(['--import'])
     } else {
       cmdStore.hideAutocomplete()
     }
@@ -20,7 +21,8 @@ register({
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
 
-    const isImportAll = args.includes('import_all')
+    const { params } = parseCommandArgs(args, { import: { required: false } })
+    const isImportAll = params.import === 'true'
 
     try {
       if (isImportAll) {

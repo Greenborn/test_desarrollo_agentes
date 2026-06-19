@@ -1,17 +1,27 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
 import { useOpencodeStore } from '../../stores/opencode.js'
+import { parseCommandArgs } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
 register({
-  name: '/chat_ticket_edit',
+  name: '/chat_edit_ticket',
   category: 'Proyecto',
-  description: 'Abre un editor inline para modificar los datos del ticket de Redmine asignado a la sesión actual. Con el argumento "descripcion" abre un asistente con OpenCode para redactar una descripción.',
-  usage: '/chat_ticket_edit [descripcion]',
+  description: 'Abre un editor inline para modificar los datos del ticket de Redmine asignado a la sesión actual. Con --mode=descripcion abre un asistente con OpenCode para redactar una descripción.',
+  usage: '/chat_edit_ticket [--mode=descripcion]',
   async autocomplete(args, cmdStore) {
-    const current = args[0] || ''
-    const filtered = ['descripcion'].filter((t) => t.startsWith(current))
-    cmdStore.showAutocomplete(filtered)
+    const modeArg = args.find(a => a.startsWith('--mode='))
+    if (modeArg) {
+      const val = modeArg.slice('--mode='.length)
+      if (val === 'descripcion') {
+        cmdStore.hideAutocomplete()
+      } else {
+        const filtered = ['descripcion'].filter(t => t.startsWith(val))
+        cmdStore.showAutocomplete(filtered.map(v => ({ display: v, value: `--mode=${v}` })))
+      }
+    } else {
+      cmdStore.showAutocomplete(['--mode='])
+    }
   },
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId
@@ -26,7 +36,9 @@ register({
       throw new Error('No hay ticket asignado a esta sesión.')
     }
 
-    if (args[0] === 'descripcion') {
+    const { params } = parseCommandArgs(args, { mode: { required: false } })
+
+    if (params.mode === 'descripcion') {
       const ocStore = useOpencodeStore()
       const startData = await ocStore.start()
       if (!startData) {

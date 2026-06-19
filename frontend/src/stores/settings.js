@@ -78,12 +78,39 @@ export const useSettingsStore = defineStore('settings', () => {
       const data = await res.json()
       if (data.success) {
         saveSuccess.value = 'Guardado correctamente'
+        updateLocalSetting(key, value)
       } else {
         saveError.value = data.error ? data.error : 'Error al guardar'
       }
-      await load()
     } catch (err) {
       saveError.value = 'Error de conexión'
+    }
+  }
+
+  function updateLocalSetting(key, value) {
+    switch (key) {
+      case 'deepseek_key': deepseekKey.value = value; break
+      case 'redmine_token': redmineToken.value = value; break
+      case 'redmine_url': redmineUrl.value = value; break
+      case 'system_prompt': systemPrompt.value = value; break
+      case 'documentacion_prompt_base_datos': documentacionPromptBaseDatos.value = value; break
+      case 'documentacion_prompt_subproyectos': documentacionPromptSubproyectos.value = value; break
+      case 'documentacion_prompt_endpoints': documentacionPromptEndpoints.value = value; break
+      case 'documentacion_prompt_web_sockets': documentacionPromptWebSockets.value = value; break
+      case 'documentacion_prompt_funcionalidades': documentacionPromptFuncionalidades.value = value; break
+      case 'ticket_descripcion_prompt': ticketDescripcionPrompt.value = value; break
+      case 'ticket_refinar_prompt': ticketRefinarPrompt.value = value; break
+      case 'omnifilter_debounce_ms': omnifilterDebounceMs.value = parseInt(value, 10) || 2000; break
+      case 'repo_acronimo': repoAcronimo.value = value; break
+      case 'locale': locale.value = value; break
+      case 'priority_color_low': priorityColorLow.value = value; applyPriorityColors(); break
+      case 'priority_color_normal': priorityColorNormal.value = value; applyPriorityColors(); break
+      case 'priority_color_high': priorityColorHigh.value = value; applyPriorityColors(); break
+      case 'priority_color_urgent': priorityColorUrgent.value = value; applyPriorityColors(); break
+      case 'priority_color_immediate': priorityColorImmediate.value = value; applyPriorityColors(); break
+      case 'screen_resolutions':
+        try { screenResolutions.value = JSON.parse(value) } catch { screenResolutions.value = [] }
+        break
     }
   }
 

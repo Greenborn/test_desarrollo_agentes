@@ -293,10 +293,45 @@ export const useChatStore = defineStore('chat', () => {
     sessionStatus.value = {}
   }
 
+  function pushMessage(msg) {
+    messages.value.push(msg)
+  }
+
+  function updateMessageByKey(key, updates) {
+    const idx = messages.value.findIndex(m => (m.id || m._key) === key)
+    if (idx >= 0) {
+      messages.value[idx] = { ...messages.value[idx], ...updates }
+    }
+    return idx
+  }
+
+  function updateMessageAt(idx, msg) {
+    if (idx >= 0 && idx < messages.value.length) {
+      messages.value[idx] = msg
+    }
+  }
+
+  function spliceMessages(start, deleteCount, ...items) {
+    if (deleteCount === undefined) {
+      messages.value.splice(start)
+    } else {
+      messages.value.splice(start, deleteCount, ...items)
+    }
+  }
+
+  function findMessageIndex(key) {
+    return messages.value.findIndex(m => (m.id || m._key) === key)
+  }
+
+  function setSessionStatus(sid, status) {
+    if (sid) sessionStatus.value[sid] = status
+  }
+
   return {
     sessions, activeSessionId, messages,
     streaming, creating, executing, sessionStatus, currentChunk, currentThinking,
     loadSessions, createSession, createSessionIfNeeded, runCommand, loadMessages,
     sendMessage, deleteMessage, deleteSession, stopAllExecutions,
+    pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
   }
 })

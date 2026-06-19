@@ -27,7 +27,7 @@ router.post('/upd-config', async (req, res) => {
     if (!session || !session.proyecto_id) {
       return res.status(400).json({
         success: false,
-        error: 'La sesión de chat no está vinculada a un proyecto. Use /proyecto_set para seleccionar un proyecto.',
+        error: 'La sesión de chat no está vinculada a un proyecto. Use /chat_set_proyecto para seleccionar un proyecto.',
       });
     }
 
@@ -79,7 +79,7 @@ router.get('/config', async (req, res) => {
     if (!session || !session.proyecto_id) {
       return res.status(400).json({
         success: false,
-        error: 'La sesión de chat no está vinculada a un proyecto. Use /proyecto_set para seleccionar un proyecto.',
+        error: 'La sesión de chat no está vinculada a un proyecto. Use /chat_set_proyecto para seleccionar un proyecto.',
       });
     }
 
@@ -125,7 +125,7 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
     if (!session || !session.proyecto_id) {
       return res.status(400).json({
         success: false,
-        error: 'La sesión de chat no está vinculada a un proyecto. Use /proyecto_set para seleccionar un proyecto.',
+        error: 'La sesión de chat no está vinculada a un proyecto. Use /chat_set_proyecto para seleccionar un proyecto.',
       });
     }
 

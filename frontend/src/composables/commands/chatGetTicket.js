@@ -1,18 +1,19 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
 register({
   name: '/chat_get_ticket',
   category: 'Proyecto',
-  description: 'Muestra el ticket de Redmine asignado a la sesión actual. Con --comments=true muestra también los comentarios.',
-  usage: '/chat_get_ticket [--comments=true]',
+  description: 'Muestra el ticket de Redmine asignado a la sesión actual. Con --comments muestra también los comentarios.',
+  usage: '/chat_get_ticket [--comments]',
   async autocomplete(args, cmdStore) {
-    const current = args.join(' ')
-    if (!current.includes('--comments')) {
-      cmdStore.showAutocomplete(['--comments=true'])
-    } else {
+    const usedFlags = getUsedFlags(args)
+    if (usedFlags.includes('--comments')) {
       cmdStore.hideAutocomplete()
+    } else {
+      cmdStore.showAutocomplete(['--comments'])
     }
   },
   async execute(args, { chatStore }) {
@@ -21,7 +22,8 @@ register({
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
 
-    const showComments = args.some(a => a === '--comments=true' || a === '--comments')
+    const { params } = parseCommandArgs(args, { comments: { required: false } })
+    const showComments = params.comments === 'true'
 
     try {
       const url = `/api/tickets/session/${sessionId}${showComments ? '?comments=true' : ''}`

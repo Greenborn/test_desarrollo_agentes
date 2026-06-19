@@ -3,6 +3,18 @@ import { ref } from 'vue'
 
 const API = '/api'
 
+const thinkingOptions = [
+  { label: 'Low — mínimo esfuerzo de razonamiento', value: 'low' },
+  { label: 'Medium — equilibrio entre velocidad y profundidad', value: 'medium' },
+  { label: 'High — máximo razonamiento profundo', value: 'high' },
+]
+
+const temperatureOptions = [
+  { label: 'Precisa (0.0)', value: '0' },
+  { label: 'Balanceada (0.7)', value: '0.7' },
+  { label: 'Creativa (1.5)', value: '1.5' },
+]
+
 export const useOpencodeStore = defineStore('opencode', () => {
   const step = ref('idle')
   const ocSessionId = ref(null)
@@ -19,17 +31,6 @@ export const useOpencodeStore = defineStore('opencode', () => {
   const selectedMode = ref('')
   const selectedTemperature = ref('')
 
-  const thinkingOptions = [
-    { label: 'Low — mínimo esfuerzo de razonamiento', value: 'low' },
-    { label: 'Medium — equilibrio entre velocidad y profundidad', value: 'medium' },
-    { label: 'High — máximo razonamiento profundo', value: 'high' },
-  ]
-
-  const temperatureOptions = [
-    { label: 'Precisa (0.0)', value: '0' },
-    { label: 'Balanceada (0.7)', value: '0.7' },
-    { label: 'Creativa (1.5)', value: '1.5' },
-  ]
   const messageQueue = ref([])
   const processing = ref(false)
   const streaming = ref(false)
@@ -116,7 +117,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
 
       if (!res.ok) {
         let errMsg = 'Error en conexión con OpenCode'
-        try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
+        try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch (e) { console.error('Error al parsear error response:', e) }
         streaming.value = false
         if (callbacks?.onError) callbacks.onError(errMsg)
         return
@@ -156,7 +157,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
               streaming.value = false
               if (callbacks?.onError) callbacks.onError(j.content)
             }
-          } catch {}
+          } catch (e) { console.error('Error al parsear SSE JSON en opencode:', e) }
         }
       }
 

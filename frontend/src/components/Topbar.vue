@@ -25,6 +25,7 @@ import { useCommandStore } from '../stores/command.js'
 import { useModalStore } from '../stores/modal.js'
 import { useOpencodeStore } from '../stores/opencode.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
+import { parseCommandArgs } from '../composables/parseCommandArgs.js'
 import { useChatStore } from '../stores/chat.js'
 import { useWorkspaceStore } from '../stores/workspace.js'
 import CommandInput from './CommandInput.vue'
@@ -68,18 +69,23 @@ export default {
       name: '/cd',
       category: 'Navegación',
       description: 'Cambia el directorio de trabajo. Soporta rutas absolutas, relativas, ".", "..", "~" y autocompletado con Tab.',
-      usage: '/cd &lt;ruta&gt;',
+      usage: '/cd --dir=&lt;ruta&gt;',
       autocomplete(args, cmdStore) {
-        const last = args.length > 0 ? args[args.length - 1] : ''
-        const prefix = last ? last : '/'
-        cmdStore.fetchAutocomplete(prefix, cmdStore.currentDir)
+        const dirArg = args.find(a => a.startsWith('--dir='))
+        if (dirArg) {
+          const prefix = dirArg.slice('--dir='.length) || '/'
+          cmdStore.fetchAutocomplete(prefix, cmdStore.currentDir)
+        } else {
+          cmdStore.showAutocomplete(['--dir='])
+        }
       },
       async execute(args, { cmdStore, chatStore }) {
-        const dir = args.join(' ')
-        if (!dir) {
-          console.error('Error en /cd: debe especificar un directorio')
+        const { params, errors } = parseCommandArgs(args, { dir: { required: true } })
+        if (errors.length > 0) {
+          console.error('Error en /cd:', errors.join('. '))
           return
         }
+        const dir = params.dir
         const sessionId = chatStore.activeSessionId
         try {
           const res = await fetch('/api/command/execute', {
@@ -105,24 +111,26 @@ export default {
       name: '/ls',
       category: 'Navegación',
       description: 'Lista el contenido del directorio actual o del especificado.',
-      usage: '/ls [ruta]',
+      usage: '/ls [--dir=&lt;ruta&gt;]',
       autocomplete(args, cmdStore) {
-        const last = args.length > 0 ? args[args.length - 1] : ''
-        if (last) {
-          cmdStore.fetchAutocomplete(last, cmdStore.currentDir)
-        } else if (cmdStore.currentDir) {
-          cmdStore.fetchAutocomplete(cmdStore.currentDir, cmdStore.currentDir)
+        const dirArg = args.find(a => a.startsWith('--dir='))
+        if (dirArg) {
+          const prefix = dirArg.slice('--dir='.length) || '/'
+          cmdStore.fetchAutocomplete(prefix, cmdStore.currentDir)
+        } else {
+          cmdStore.showAutocomplete(['--dir='])
         }
       },
       async execute(args, { cmdStore, chatStore }) {
-        const dir = args.join(' ')
+        const { params } = parseCommandArgs(args, { dir: { required: false } })
+        const dir = params.dir || ''
         const sessionId = chatStore.activeSessionId
         try {
           const res = await fetch('/api/command/execute', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ command: `/ls ${dir}`, sessionId }),
+            body: JSON.stringify({ command: `/ls ${dir}`.trimEnd(), sessionId }),
           })
           const data = await res.json()
           if (!data.success) console.error('Error en /ls:', data.result)
@@ -223,13 +231,24 @@ export default {
       name: '/navegador_go_to',
       category: 'Navegador',
       description: 'Navega a una URL en la sesión de navegador activa.',
-      usage: '/navegador_go_to &lt;url&gt;',
+      usage: '/navegador_go_to --url=&lt;url&gt;',
+      async autocomplete(args, cmdStore) {
+        const urlArg = args.find(a => a.startsWith('--url='))
+        if (urlArg) {
+          if (urlArg.slice('--url='.length)) {
+            cmdStore.hideAutocomplete()
+          }
+        } else {
+          cmdStore.showAutocomplete(['--url='])
+        }
+      },
       async execute(args, { cmdStore, chatStore }) {
-        const url = args.join('')
-        if (!url) {
-          console.error('Error en /navegador_go_to: debe especificar una URL')
+        const { params, errors } = parseCommandArgs(args, { url: { required: true } })
+        if (errors.length > 0) {
+          console.error('Error en /navegador_go_to:', errors.join('. '))
           return
         }
+        const url = params.url
         const sessionId = chatStore.activeSessionId
         try {
           const res = await navegadorFetch('go_to_url', { id_session: navegadorSessionId.value, url }, sessionId)
@@ -250,11 +269,30 @@ export default {
       name: '/navegador_set_headless',
       category: 'Navegador',
       description: 'Cambia el modo headless del navegador (0 = visible, 1 = headless). Si hay sesión activa, la reinicia.',
-      usage: '/navegador_set_headless &lt;0|1&gt;',
+      usage: '/navegador_set_headless --mode=&lt;0|1&gt;',
+      autocomplete(args, cmdStore) {
+        const modeArg = args.find(a => a.startsWith('--mode='))
+        if (modeArg) {
+          const val = modeArg.slice('--mode='.length)
+          if (val === '0' || val === '1') {
+            cmdStore.hideAutocomplete()
+          } else {
+            const filtered = ['0', '1'].filter(v => v.startsWith(val))
+            cmdStore.showAutocomplete(filtered.map(v => ({ display: v === '0' ? '0 (visible)' : '1 (headless)', value: `--mode=${v}` })))
+          }
+        } else {
+          cmdStore.showAutocomplete(['--mode='])
+        }
+      },
       async execute(args, { cmdStore, chatStore }) {
-        const val = args[0]
+        const { params, errors } = parseCommandArgs(args, { mode: { required: true } })
+        if (errors.length > 0) {
+          console.error('Error en /navegador_set_headless:', errors.join('. '))
+          return
+        }
+        const val = params.mode
         if (val !== '0' && val !== '1') {
-          console.error('Error en /navegador_set_headless: use 0 (visible) o 1 (headless)')
+          console.error('Error en /navegador_set_headless: use --mode=0 (visible) o --mode=1 (headless)')
           return
         }
         const sessionId = chatStore.activeSessionId
@@ -330,28 +368,41 @@ export default {
     })
 
     register({
-      name: '/proyecto_set',
+      name: '/chat_set_proyecto',
       category: 'Proyecto',
       description: 'Asigna un proyecto a la sesión actual, o crea uno nuevo si se invoca sin parámetros.',
-      usage: '/proyecto_set [id_proyecto]',
+      usage: '/chat_set_proyecto [--id=&lt;id_proyecto&gt;]',
       async autocomplete(args, cmdStore) {
-        try {
-          const res = await fetch('/api/proyecto', { credentials: 'include' })
-          const data = await res.json()
-          if (data.proyectos) {
-            cmdStore.showAutocomplete(data.proyectos.map((p) => p.id))
+        const idArg = args.find(a => a.startsWith('--id='))
+        if (idArg) {
+          const val = idArg.slice('--id='.length)
+          try {
+            const res = await fetch('/api/proyecto', { credentials: 'include' })
+            const data = await res.json()
+            if (data.proyectos) {
+              const prefix = val.toLowerCase()
+              const filtered = data.proyectos.filter(p => p.id.toLowerCase().includes(prefix))
+              if (val && filtered.length === 1 && filtered[0].id === val) {
+                cmdStore.hideAutocomplete()
+              } else {
+                cmdStore.showAutocomplete(filtered.map(p => ({ display: p.id, value: `--id=${p.id}` })))
+              }
+            }
+          } catch (err) {
+            console.error('Error en autocomplete de /chat_set_proyecto:', err)
           }
-        } catch (err) {
-          console.error('Error en autocomplete de /proyecto_set:', err)
+        } else {
+          cmdStore.showAutocomplete(['--id='])
         }
       },
       async execute(args, { cmdStore, chatStore }) {
         const sessionId = chatStore.activeSessionId
         if (!sessionId) {
-          console.error('Error en /proyecto_set: no hay sesión de chat activa')
+          console.error('Error en /chat_set_proyecto: no hay sesión de chat activa')
           return
         }
-        const proyectoId = args[0]
+        const { params } = parseCommandArgs(args, { id: { required: false } })
+        const proyectoId = params.id
         if (!proyectoId) {
           modal.open(CrearProyectoModal, {}, { title: 'Nuevo Proyecto' })
           return
@@ -366,7 +417,7 @@ export default {
           const data = await res.json()
           chatStore.messages.push({
             role: 'command',
-            content: `/proyecto_set ${proyectoId}`,
+            content: `/chat_set_proyecto --id=${proyectoId}`,
             _key: 'cmd-' + Date.now(),
           })
           if (data.success) {
@@ -383,20 +434,20 @@ export default {
             })
           }
         } catch (err) {
-          console.error('Error en /proyecto_set:', err)
+          console.error('Error en /chat_set_proyecto:', err)
         }
       },
     })
 
     register({
-      name: '/proyecto_info',
+      name: '/chat_get_proyecto',
       category: 'Proyecto',
       description: 'Muestra el ID del proyecto asignado a la sesión actual.',
-      usage: '/proyecto_info',
+      usage: '/chat_get_proyecto',
       async execute(args, { cmdStore, chatStore }) {
         const sessionId = chatStore.activeSessionId
         if (!sessionId) {
-          console.error('Error en /proyecto_info: no hay sesión de chat activa')
+          console.error('Error en /chat_get_proyecto: no hay sesión de chat activa')
           return
         }
         try {
@@ -404,7 +455,7 @@ export default {
           const data = await res.json()
           chatStore.messages.push({
             role: 'command',
-            content: '/proyecto_info',
+            content: '/chat_get_proyecto',
             _key: 'cmd-' + Date.now(),
           })
           chatStore.messages.push({
@@ -413,25 +464,25 @@ export default {
             _key: 'res-' + Date.now(),
           })
         } catch (err) {
-          console.error('Error en /proyecto_info:', err)
+          console.error('Error en /chat_get_proyecto:', err)
         }
       },
     })
 
     register({
-      name: '/proyecto_set_repositorio',
+      name: '/chat_set_repositorio',
       category: 'Proyecto',
       description: 'Asigna una URL de repositorio GitHub al proyecto actual de la sesión.',
-      usage: '/proyecto_set_repositorio --url=<url>',
+      usage: '/chat_set_repositorio --url=<url>',
       async autocomplete(args, cmdStore) {
-        if (!args.join(' ').includes('--url=')) {
+        if (!args.find(a => a.startsWith('--url='))) {
           cmdStore.showAutocomplete(['--url='])
         }
       },
       async execute(args, { cmdStore, chatStore }) {
         const sessionId = chatStore.activeSessionId
         if (!sessionId) {
-          console.error('Error en /proyecto_set_repositorio: no hay sesión de chat activa')
+          console.error('Error en /chat_set_repositorio: no hay sesión de chat activa')
           return
         }
         const session = chatStore.sessions.find(s => s.id === sessionId)
@@ -439,12 +490,12 @@ export default {
         if (!proyectoId) {
           chatStore.messages.push({
             role: 'command',
-            content: '/proyecto_set_repositorio',
+            content: '/chat_set_repositorio',
             _key: 'cmd-' + Date.now(),
           })
           chatStore.messages.push({
             role: 'result',
-            content: 'No hay proyecto asignado a esta sesión. Use /proyecto_set primero.',
+            content: 'No hay proyecto asignado a esta sesión. Use /chat_set_proyecto primero.',
             _key: 'res-' + Date.now(),
           })
           return
@@ -453,12 +504,12 @@ export default {
         if (!urlArg) {
           chatStore.messages.push({
             role: 'command',
-            content: '/proyecto_set_repositorio',
+            content: '/chat_set_repositorio',
             _key: 'cmd-' + Date.now(),
           })
           chatStore.messages.push({
             role: 'result',
-            content: 'Uso: /proyecto_set_repositorio --url=<url>',
+            content: 'Uso: /chat_set_repositorio --url=<url>',
             _key: 'res-' + Date.now(),
           })
           return
@@ -467,7 +518,7 @@ export default {
         if (!url_github) {
           chatStore.messages.push({
             role: 'command',
-            content: '/proyecto_set_repositorio ' + args.join(' '),
+            content: '/chat_set_repositorio ' + args.join(' '),
             _key: 'cmd-' + Date.now(),
           })
           chatStore.messages.push({
@@ -487,7 +538,7 @@ export default {
           const data = await res.json()
           chatStore.messages.push({
             role: 'command',
-            content: `/proyecto_set_repositorio --url=${url_github}`,
+            content: `/chat_set_repositorio --url=${url_github}`,
             _key: 'cmd-' + Date.now(),
           })
           if (data.success) {
@@ -504,20 +555,20 @@ export default {
             })
           }
         } catch (err) {
-          console.error('Error en /proyecto_set_repositorio:', err)
+          console.error('Error en /chat_set_repositorio:', err)
         }
       },
     })
 
     register({
-      name: '/proyecto_get_url_repo',
+      name: '/chat_get_repositorio_url',
       category: 'Proyecto',
       description: 'Muestra la URL del repositorio configurada para el proyecto actual.',
-      usage: '/proyecto_get_url_repo',
+      usage: '/chat_get_repositorio_url',
       async execute(args, { cmdStore, chatStore }) {
         const sessionId = chatStore.activeSessionId
         if (!sessionId) {
-          console.error('Error en /proyecto_get_url_repo: no hay sesión de chat activa')
+          console.error('Error en /chat_get_repositorio_url: no hay sesión de chat activa')
           return
         }
         const session = chatStore.sessions.find(s => s.id === sessionId)
@@ -525,12 +576,12 @@ export default {
         if (!proyectoId) {
           chatStore.messages.push({
             role: 'command',
-            content: '/proyecto_get_url_repo',
+            content: '/chat_get_repositorio_url',
             _key: 'cmd-' + Date.now(),
           })
           chatStore.messages.push({
             role: 'result',
-            content: 'No hay proyecto asignado a esta sesión. Use /proyecto_set primero.',
+            content: 'No hay proyecto asignado a esta sesión. Use /chat_set_proyecto primero.',
             _key: 'res-' + Date.now(),
           })
           return
@@ -540,7 +591,7 @@ export default {
           const data = await res.json()
           chatStore.messages.push({
             role: 'command',
-            content: '/proyecto_get_url_repo',
+            content: '/chat_get_repositorio_url',
             _key: 'cmd-' + Date.now(),
           })
           if (data.url_github) {
@@ -557,7 +608,7 @@ export default {
             })
           }
         } catch (err) {
-          console.error('Error en /proyecto_get_url_repo:', err)
+          console.error('Error en /chat_get_repositorio_url:', err)
         }
       },
     })

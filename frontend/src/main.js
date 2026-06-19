@@ -42,7 +42,7 @@ window.fetch = async function (url, options = {}) {
     if (!urlStr.includes('/api/auth/')) {
       const auth = useAuthStore()
       if (auth.user) {
-        auth.user = null
+        auth.forceLogout()
         router.push('/')
       }
     }

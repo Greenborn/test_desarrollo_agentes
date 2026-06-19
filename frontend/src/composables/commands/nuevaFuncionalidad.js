@@ -19,7 +19,7 @@ register({
       const res = await fetch(`/api/proyecto/session/${sessionId}`, { credentials: 'include' });
       const data = await res.json();
       if (!data.proyectoId) {
-        throw new Error('No hay proyecto seleccionado. Use /proyecto_set primero.');
+        throw new Error('No hay proyecto seleccionado. Use /chat_set_proyecto primero.');
       }
       const modal = useModalStore();
       modal.open(FuncionalidadWizard, { sessionId, proyectoId: data.proyectoId }, {

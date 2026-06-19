@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, shallowRef } from 'vue'
+import { ref } from 'vue'
 
 export const useModalStore = defineStore('modal', () => {
   const stack = ref([])

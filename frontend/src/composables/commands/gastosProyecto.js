@@ -1,4 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
+import { parseCommandArgs } from '../parseCommandArgs.js';
 
 const { register } = useCommandRegistry();
 
@@ -6,16 +7,28 @@ register({
   name: '/gastos_proyecto',
   category: 'Gastos',
   description: 'Muestra gastos del proyecto activo o del especificado.',
-  usage: '/gastos_proyecto [id_proyecto]',
+  usage: '/gastos_proyecto [--id=&lt;id_proyecto&gt;]',
   async autocomplete(args, cmdStore) {
-    try {
-      const res = await fetch('/api/proyecto', { credentials: 'include' });
-      const data = await res.json();
-      if (data.proyectos) {
-        cmdStore.showAutocomplete(data.proyectos.map((p) => p.id));
+    const idArg = args.find(a => a.startsWith('--id='))
+    if (idArg) {
+      const val = idArg.slice('--id='.length)
+      try {
+        const res = await fetch('/api/proyecto', { credentials: 'include' });
+        const data = await res.json();
+        if (data.proyectos) {
+          const prefix = val.toLowerCase()
+          const filtered = data.proyectos.filter(p => p.id.toLowerCase().includes(prefix))
+          if (val && filtered.length === 1 && filtered[0].id === val) {
+            cmdStore.hideAutocomplete()
+          } else {
+            cmdStore.showAutocomplete(filtered.map(p => ({ display: p.id, value: `--id=${p.id}` })));
+          }
+        }
+      } catch (err) {
+        console.error('Error en autocomplete de /gastos_proyecto:', err);
       }
-    } catch (err) {
-      console.error('Error en autocomplete de /gastos_proyecto:', err);
+    } else {
+      cmdStore.showAutocomplete(['--id='])
     }
   },
   async execute(args, { chatStore }) {
@@ -24,7 +37,8 @@ register({
       throw new Error('Primero debe iniciar una sesión de chat.');
     }
 
-    let proyectoId = args[0];
+    const { params } = parseCommandArgs(args, { id: { required: false } })
+    let proyectoId = params.id;
 
     if (!proyectoId) {
       try {
@@ -37,7 +51,7 @@ register({
     }
 
     if (!proyectoId) {
-      throw new Error('No hay proyecto seleccionado. Especifique un id de proyecto o use /proyecto_set primero.');
+      throw new Error('No hay proyecto seleccionado. Especifique un id de proyecto o use /chat_set_proyecto primero.');
     }
 
     try {

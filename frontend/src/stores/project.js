@@ -14,6 +14,10 @@ export const useProjectStore = defineStore('project', () => {
       const data = await res.json()
       projects.value = data.proyectos || []
       pinnedProjectId.value = data.pinnedProjectId || null
+      if (selectedProject.value) {
+        const updated = projects.value.find(p => p.id === selectedProject.value.id)
+        if (updated) selectedProject.value = updated
+      }
     } catch (err) {
       console.error('Error al cargar proyectos:', err)
     }

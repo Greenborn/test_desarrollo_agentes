@@ -12,12 +12,25 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value?.workspaceId || 1
   }
 
+  function forceLogout() {
+    user.value = null
+    loading.value = false
+    error.value = ''
+  }
+
+  function setWorkspaceId(id) {
+    if (user.value) {
+      user.value = { ...user.value, workspaceId: id }
+    }
+  }
+
   async function checkSession() {
     try {
       const res = await fetch(`${API}/auth/me`, { credentials: 'include' })
       const data = await res.json()
       user.value = data
-    } catch {
+    } catch (err) {
+      console.error('Error en checkSession:', err)
       user.value = null
     } finally {
       loading.value = false
@@ -53,12 +66,12 @@ export const useAuthStore = defineStore('auth', () => {
         method: 'POST',
         credentials: 'include',
       })
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error('Error en logout:', err)
     }
     user.value = null
     loading.value = false
   }
 
-  return { user, loading, error, getWorkspaceId, login, logout, checkSession }
+  return { user, loading, error, getWorkspaceId, forceLogout, setWorkspaceId, login, logout, checkSession }
 })

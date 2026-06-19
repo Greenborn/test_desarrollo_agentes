@@ -429,7 +429,7 @@ export default {
       wsMessage.value = 'Deteniendo procesos y cambiando espacio de trabajo...'
       const result = await wsStore.selectWorkspace(newId)
       if (result.success) {
-        auth.user = { ...auth.user, workspaceId: newId }
+        auth.setWorkspaceId(newId)
         chatStore.stopAllExecutions()
         await wsStore.loadWorkspaces()
         await reloadSettings()
@@ -479,7 +479,7 @@ export default {
       if (result.success) {
         workspaces.value = workspaces.value.filter(w => w.id !== ws.id)
         selectedWId.value = 1
-        auth.user = { ...auth.user, workspaceId: 1 }
+        auth.setWorkspaceId(1)
         await wsStore.selectWorkspace(1)
         chatStore.stopAllExecutions()
         await wsStore.loadWorkspaces()

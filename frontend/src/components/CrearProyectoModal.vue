@@ -53,12 +53,12 @@ export default {
             body: JSON.stringify({ sessionId, proyectoId: proyectoId.value, cwd: cmdStore.currentDir || undefined }),
           })
         }
-        chatStore.messages.push({
+        chatStore.pushMessage({
           role: 'command',
-          content: `/proyecto_set ${proyectoId.value}`,
+          content: `/chat_set_proyecto --id=${proyectoId.value}`,
           _key: 'cmd-' + Date.now(),
         })
-        chatStore.messages.push({
+        chatStore.pushMessage({
           role: 'result',
           content: `Proyecto "${proyectoId.value}" creado y asignado.`,
           _key: 'res-' + Date.now(),

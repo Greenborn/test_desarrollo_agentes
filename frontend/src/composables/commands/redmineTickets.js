@@ -1,4 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
+import { parseCommandArgs } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
@@ -6,16 +7,28 @@ register({
   name: '/redmine_tickets',
   category: 'Utilidades',
   description: 'Obtiene la lista de tickets de Redmine para un proyecto importado.',
-  usage: '/redmine_tickets <id_proyecto>',
+  usage: '/redmine_tickets --id=&lt;id_proyecto&gt;',
   async autocomplete(args, cmdStore) {
-    try {
-      const res = await fetch('/api/proyecto', { credentials: 'include' })
-      const data = await res.json()
-      if (data.proyectos) {
-        cmdStore.showAutocomplete(data.proyectos.map((p) => p.id))
+    const idArg = args.find(a => a.startsWith('--id='))
+    if (idArg) {
+      const val = idArg.slice('--id='.length)
+      try {
+        const res = await fetch('/api/proyecto', { credentials: 'include' })
+        const data = await res.json()
+        if (data.proyectos) {
+          const prefix = val.toLowerCase()
+          const filtered = data.proyectos.filter(p => p.id.toLowerCase().includes(prefix))
+          if (val && filtered.length === 1 && filtered[0].id === val) {
+            cmdStore.hideAutocomplete()
+          } else {
+            cmdStore.showAutocomplete(filtered.map(p => ({ display: p.id, value: `--id=${p.id}` })))
+          }
+        }
+      } catch (err) {
+        console.error('Error en autocomplete de /redmine_tickets:', err)
       }
-    } catch (err) {
-      console.error('Error en autocomplete de /redmine_tickets:', err)
+    } else {
+      cmdStore.showAutocomplete(['--id='])
     }
   },
   async execute(args, { chatStore }) {
@@ -24,10 +37,11 @@ register({
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
 
-    const proyectoId = args[0]
-    if (!proyectoId) {
-      throw new Error('Debe especificar el ID del proyecto. Use Tab para ver las opciones disponibles.')
+    const { params, errors } = parseCommandArgs(args, { id: { required: true } })
+    if (errors.length > 0) {
+      throw new Error(errors.join('. '))
     }
+    const proyectoId = params.id
 
     try {
       const res = await fetch(`/api/redmine/proyectos/${encodeURIComponent(proyectoId)}/tickets`, { credentials: 'include' })

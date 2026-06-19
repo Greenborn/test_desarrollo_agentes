@@ -6,7 +6,7 @@ register({
   name: '/git',
   category: 'Git',
   description: 'Ejecuta un comando de Git en el directorio de la sesión y muestra el resultado.',
-  usage: '/git <comando git>',
+  usage: '/git <comando>',
   async execute(args, { cmdStore, chatStore }) {
     const command = args.join(' ');
     if (!command) {

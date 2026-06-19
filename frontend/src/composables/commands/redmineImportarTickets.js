@@ -1,4 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
+import { parseCommandArgs } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
@@ -6,20 +7,29 @@ register({
   name: '/redmine_importar_tickets',
   category: 'Utilidades',
   description: 'Importa todos los tickets de Redmine de un proyecto o de todos los proyectos a la base de datos local.',
-  usage: '/redmine_importar_tickets [id_proyecto|--all]',
+  usage: '/redmine_importar_tickets [--id=&lt;id_proyecto&gt;|--all]',
   async autocomplete(args, cmdStore) {
-    try {
-      const res = await fetch('/api/proyecto', { credentials: 'include' })
-      const data = await res.json()
-      if (data.proyectos) {
-        if (args.length > 0 && args[0].startsWith('--')) {
-          cmdStore.showAutocomplete(['--all'])
-        } else {
-          cmdStore.showAutocomplete(['--all', ...data.proyectos.map((p) => p.id)])
+    const idArg = args.find(a => a.startsWith('--id='))
+    const allArg = args.find(a => a.startsWith('--all'))
+    if (idArg) {
+      const val = idArg.slice('--id='.length)
+      try {
+        const res = await fetch('/api/proyecto', { credentials: 'include' })
+        const data = await res.json()
+        if (data.proyectos) {
+          const prefix = val.toLowerCase()
+          const filtered = data.proyectos.filter(p => p.id.toLowerCase().includes(prefix))
+          if (val && filtered.length === 1 && filtered[0].id === val) {
+            cmdStore.hideAutocomplete()
+          } else {
+            cmdStore.showAutocomplete(filtered.map(p => ({ display: p.id, value: `--id=${p.id}` })))
+          }
         }
+      } catch (err) {
+        console.error('Error en autocomplete de /redmine_importar_tickets:', err)
       }
-    } catch (err) {
-      console.error('Error en autocomplete de /redmine_importar_tickets:', err)
+    } else {
+      cmdStore.showAutocomplete(allArg ? ['--id='] : ['--all', '--id='])
     }
   },
   async execute(args, { chatStore }) {
@@ -28,11 +38,15 @@ register({
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
 
-    const isAll = args.includes('--all')
-    const proyectoId = isAll ? null : args[0]
+    const { params, errors } = parseCommandArgs(args, { id: { required: false }, all: { required: false } })
+    if (errors.length > 0) {
+      throw new Error(errors.join('. '))
+    }
+    const isAll = params.all === 'true'
+    const proyectoId = isAll ? null : params.id
 
     if (!isAll && !proyectoId) {
-      throw new Error('Debe especificar el ID del proyecto o usar --all. Use Tab para ver las opciones disponibles.')
+      throw new Error('Debe especificar --id=&lt;id_proyecto&gt; o --all. Use Tab para ver las opciones disponibles.')
     }
 
     try {

@@ -182,7 +182,7 @@ export default {
       } else if (ocStore.ocSessionId) {
         if (ocStreaming.value) {
           ocStore.messageQueue.push(raw)
-          chat.messages.push({
+          chat.pushMessage({
             role: 'opencode_info',
             content: JSON.stringify({ type: 'queued', message: `⏳ Mensaje encolado: "${raw.slice(0, 80)}${raw.length > 80 ? '...' : ''}"` }),
             _key: 'queue-' + Date.now(),
@@ -197,7 +197,7 @@ export default {
 
     async function sendToOpencode(prompt) {
       if (!ocStore.selectedProvider) {
-        chat.messages.push({
+        chat.pushMessage({
           role: 'opencode_info',
           content: JSON.stringify({ type: 'info', message: 'No hay sesión OpenCode configurada. Ejecutá /opencode primero.' }),
           _key: 'info-' + Date.now(),
@@ -228,9 +228,9 @@ export default {
       }
       ocStreaming.value = false
       if (chat.activeSessionId) {
-        chat.sessionStatus[chat.activeSessionId] = 'idle'
+        chat.setSessionStatus(chat.activeSessionId, 'idle')
       }
-      chat.messages.push({
+      chat.pushMessage({
         role: 'opencode_info',
         content: JSON.stringify({ type: 'info', message: '⏹ Tarea detenida por el usuario.' }),
         _key: 'abort-' + Date.now(),
@@ -263,7 +263,7 @@ export default {
       ocChunk.value = ''
       ocThinking.value = ''
       _streamSessionId.value = sessionId
-      if (sessionId) chat.sessionStatus[sessionId] = 'executing'
+      if (sessionId) chat.setSessionStatus(sessionId, 'executing')
 
       await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
         onChunk(content) {
@@ -274,7 +274,7 @@ export default {
         },
         onControl(control) {
           if (_isActiveSession(sessionId)) {
-            chat.messages.push({
+            chat.pushMessage({
               role: 'opencode_control',
               content: JSON.stringify(control),
               controlData: control,
@@ -284,10 +284,10 @@ export default {
         },
         onDone(json, fullText) {
           ocStreaming.value = false
-          if (sessionId) chat.sessionStatus[sessionId] = 'idle'
+          if (sessionId) chat.setSessionStatus(sessionId, 'idle')
           if (_isActiveSession(sessionId)) {
             const content = json.fullResponse || fullText || '(sin respuesta)'
-            chat.messages.push({
+            chat.pushMessage({
               role: 'opencode_result',
               content,
               _key: 'result-' + Date.now(),
@@ -302,7 +302,7 @@ export default {
               sendToOpencode(next)
               return
             }
-            chat.messages.push({
+            chat.pushMessage({
               role: 'opencode_control',
               controlData: {
                 controlId: 'followup-' + Date.now(),
@@ -323,9 +323,9 @@ export default {
         },
         onError(msg) {
           ocStreaming.value = false
-          if (sessionId) chat.sessionStatus[sessionId] = 'error'
+          if (sessionId) chat.setSessionStatus(sessionId, 'error')
           if (_isActiveSession(sessionId)) {
-            chat.messages.push({
+            chat.pushMessage({
               role: 'opencode_result',
               content: `[Error: ${msg}]`,
               _key: 'error-' + Date.now(),
@@ -340,7 +340,7 @@ export default {
       ocChunk.value = ''
       ocThinking.value = ''
       _streamSessionId.value = sessionId
-      if (sessionId) chat.sessionStatus[sessionId] = 'executing'
+      if (sessionId) chat.setSessionStatus(sessionId, 'executing')
 
       const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
       streamMsg._key = 'stream-' + Date.now()
@@ -354,7 +354,7 @@ export default {
         },
         onControl(control) {
           if (_isActiveSession(sessionId)) {
-            chat.messages.push({
+            chat.pushMessage({
               role: 'opencode_control',
               content: JSON.stringify(control),
               controlData: control,
@@ -423,7 +423,7 @@ export default {
             }
 
             ocStreaming.value = false
-            if (sessionId) chat.sessionStatus[sessionId] = 'idle'
+            if (sessionId) chat.setSessionStatus(sessionId, 'idle')
 
             if (_isActiveSession(sessionId)) {
               const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
@@ -444,7 +444,7 @@ export default {
           } catch (err) {
             console.error('Error al refinar mensaje de commit:', err.message)
             ocStreaming.value = false
-            if (sessionId) chat.sessionStatus[sessionId] = 'idle'
+            if (sessionId) chat.setSessionStatus(sessionId, 'idle')
             if (_isActiveSession(sessionId)) {
               const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
               if (idx >= 0) {
@@ -465,7 +465,7 @@ export default {
         },
         onError(msg) {
           ocStreaming.value = false
-          if (sessionId) chat.sessionStatus[sessionId] = 'error'
+          if (sessionId) chat.setSessionStatus(sessionId, 'error')
           if (_isActiveSession(sessionId)) {
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (idx >= 0) {
@@ -486,17 +486,17 @@ export default {
       funcionalidades: 'Funcionalidades',
     }
 
-    async function opencodeStreamPromptDocUpdate(sessionId, prompt, provider, model, thinking, mode, proyectoId, tipo) {
+    async function opencodeStreamPromptDocUpdate(sessionId, prompt, provider, model, thinking, mode, temperature, proyectoId, tipo) {
       ocStreaming.value = true
       ocChunk.value = ''
       ocThinking.value = ''
       _streamSessionId.value = sessionId
-      if (sessionId) chat.sessionStatus[sessionId] = 'executing'
+      if (sessionId) chat.setSessionStatus(sessionId, 'executing')
 
       const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
       streamMsg._key = 'stream-' + Date.now()
 
-      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, {
+      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
         onChunk(content) {
           if (_isActiveSession(sessionId)) ocChunk.value += content
         },
@@ -505,7 +505,7 @@ export default {
         },
         onControl(control) {
           if (_isActiveSession(sessionId)) {
-            chat.messages.push({
+            chat.pushMessage({
               role: 'opencode_control',
               content: JSON.stringify(control),
               controlData: control,
@@ -515,7 +515,7 @@ export default {
         },
         async onDone(json, fullText) {
           ocStreaming.value = false
-          if (sessionId) chat.sessionStatus[sessionId] = 'idle'
+          if (sessionId) chat.setSessionStatus(sessionId, 'idle')
           if (_isActiveSession(sessionId)) {
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
@@ -537,14 +537,14 @@ export default {
                 const errData = await res.json()
                 throw new Error(errData.error || 'Error al guardar documentación')
               }
-              chat.messages.push({
+              chat.pushMessage({
                 role: 'result',
                 content: `Documentación de ${label} actualizada correctamente para el proyecto "${proyectoId}".`,
                 _key: 'result-' + Date.now(),
               })
             } catch (err) {
               console.error('Error al guardar documentación:', err.message)
-              chat.messages.push({
+              chat.pushMessage({
                 role: 'result',
                 content: 'Error al guardar documentación: ' + err.message,
                 _key: 'result-' + Date.now(),
@@ -554,7 +554,7 @@ export default {
         },
         onError(msg) {
           ocStreaming.value = false
-          if (sessionId) chat.sessionStatus[sessionId] = 'error'
+          if (sessionId) chat.setSessionStatus(sessionId, 'error')
           if (_isActiveSession(sessionId)) {
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (idx >= 0) {
@@ -580,13 +580,15 @@ export default {
         await handleDocumentacionUpdate(controlId, value, controlMsg)
       } else if (stepType === 'ticket_descripcion') {
         if (controlType === 'followup' || controlType === 'opencode_form') {
-          const { model, thinking, mode, prompt } = value
+          const { model, thinking, mode, temperature, prompt } = value
           if (!prompt) return
           ocStore.selectedModel = model || ocStore.selectedModel
           ocStore.selectedThinking = thinking || ocStore.selectedThinking
           ocStore.selectedMode = mode || ocStore.selectedMode
+          ocStore.selectedTemperature = temperature || ocStore.selectedTemperature
           descripcionData.mode = ocStore.selectedMode
-          await opencodeStreamDescripcionFollowup(chat.activeSessionId, prompt, controlMsg.controlData.ticket)
+          await opencodeStreamDescripcionFollowup(chat.activeSessionId, prompt, controlMsg.controlData.ticket, temperature || descripcionData.temperature || ocStore.selectedTemperature || '')
+          return
         } else if (value === null) {
           const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
           if (idx >= 0) {
@@ -595,8 +597,8 @@ export default {
           return
         } else {
           await handleTicketDescripcion(controlId, value, controlMsg)
+          return
         }
-        // Let generic replacement run below
       } else if (stepType === 'repo_crear_rama') {
         await handleRepoCrearRama(controlId, value, controlMsg)
         return
@@ -819,8 +821,8 @@ export default {
     let ocSetupData = { provider: '', model: '', thinking: '', mode: '', prompt: '' }
     let commitSetupData = { provider: '', model: '', thinking: '', mode: '', temperature: '' }
     let commitData = { prompt: '', provider: '', model: '', thinking: '', mode: '', temperature: '' }
-    let docUpdateData = { provider: '', model: '', thinking: '', mode: '' }
-    let descripcionData = { provider: '', model: '', thinking: '', mode: 'Plan' }
+    let docUpdateData = { provider: '', model: '', thinking: '', mode: '', temperature: '' }
+    let descripcionData = { provider: '', model: '', thinking: '', mode: 'Plan', temperature: '' }
     const descripcionUserInput = ref('')
     let repoCrearRamaData = { proyectoId: '', ticketRedmineId: '', baseBranch: '', repoAcronimo: '' }
 
@@ -834,7 +836,7 @@ export default {
         await ocStore.select('provider', value)
         ocStore.selectedProvider = value
         const models = ocStore.getModelsForProvider(value)
-        chat.messages.push({
+        chat.pushMessage({
           role: 'opencode_control',
           controlData: {
             controlId: 'model-' + Date.now(),
@@ -852,7 +854,7 @@ export default {
         await ocStore.select('model', value)
         ocStore.selectedModel = value
         if (ocStore.modelSupportsReasoning(docUpdateData.provider, value)) {
-          chat.messages.push({
+          chat.pushMessage({
             role: 'opencode_control',
             controlData: {
               controlId: 'thinking-' + Date.now(),
@@ -894,7 +896,7 @@ export default {
             const defaultPrompt = 'Analiza el proyecto actual y documenta la información correspondiente a ' + (DOC_LABELS[tipo] || tipo) + '. Proporciona una descripción detallada que permita a otros agentes de IA entender su propósito y alcance.'
             const prompt = settingsKeys[promptKey] || defaultPrompt
 
-            chat.messages.push({
+            chat.pushMessage({
               role: 'opencode_info',
               content: '📋 Prompt a enviar a OpenCode:\n\n```\n' + prompt + '\n```',
               _key: 'preview-' + Date.now(),
@@ -907,13 +909,14 @@ export default {
               docUpdateData.model,
               docUpdateData.thinking,
               docUpdateData.mode,
+              docUpdateData.temperature || ocStore.selectedTemperature || '',
               docUpdateProyectoId.value,
               tipo,
             )
           }
 
           if (docUpdateType.value === 'all') {
-            chat.messages.push({
+            chat.pushMessage({
               role: 'result',
               content: 'Documentación completada para todos los tipos.',
               _key: 'result-' + Date.now(),
@@ -921,7 +924,7 @@ export default {
           }
         } catch (err) {
           console.error('Error al obtener prompt de documentación:', err.message)
-          chat.messages.push({
+          chat.pushMessage({
             role: 'result',
             content: 'Error al obtener prompt de documentación: ' + err.message,
             _key: 'result-' + Date.now(),
@@ -938,7 +941,7 @@ export default {
         await ocStore.select('provider', value)
         ocStore.selectedProvider = value
         const models = ocStore.getModelsForProvider(value)
-        chat.messages.push({
+        chat.pushMessage({
           role: 'opencode_control',
           controlData: {
             controlId: 'model-' + Date.now(),
@@ -958,7 +961,7 @@ export default {
         await ocStore.select('model', value)
         ocStore.selectedModel = value
         if (ocStore.modelSupportsReasoning(descripcionData.provider, value)) {
-          chat.messages.push({
+          chat.pushMessage({
             role: 'opencode_control',
             controlData: {
               controlId: 'thinking-' + Date.now(),
@@ -981,7 +984,7 @@ export default {
         descripcionData.thinking = value
         await ocStore.select('thinking', value)
         ocStore.selectedThinking = value
-        chat.messages.push({
+        chat.pushMessage({
           role: 'opencode_control',
           controlData: {
             controlId: 'descripcion-input-' + Date.now(),
@@ -1010,7 +1013,7 @@ export default {
             .replace(/{assigned_to}/g, ticket.assigned_to_name || '')
             .replace(/{user_input}/g, descripcionUserInput.value)
 
-          chat.messages.push({
+          chat.pushMessage({
             role: 'opencode_info',
             content: '📤 Prompt enviado a OpenCode:\n\n' + prompt,
             _key: 'prompt-' + Date.now(),
@@ -1023,11 +1026,12 @@ export default {
             descripcionData.model,
             descripcionData.thinking,
             descripcionData.mode,
+            descripcionData.temperature || ocStore.selectedTemperature || '',
             ticket,
           )
         } catch (err) {
           console.error('Error al obtener prompt de descripción:', err.message)
-          chat.messages.push({
+          chat.pushMessage({
             role: 'result',
             content: 'Error al obtener prompt de descripción: ' + err.message,
             _key: 'err-' + Date.now(),
@@ -1080,7 +1084,7 @@ export default {
             label: `#${t.redmine_id} — ${t.subject || ''}`,
             value: String(t.redmine_id),
           }))
-          chat.messages.push({
+          chat.pushMessage({
             role: 'opencode_control',
             controlData: {
               controlId: 'repo-ticket-' + Date.now(),
@@ -1204,7 +1208,7 @@ export default {
         const branchOptions = (branchData.branches || []).map(b => ({ label: b, value: b }))
         const preselect = branchData.current && branchData.branches.includes(branchData.current) ? branchData.current : 'DEV'
 
-        chat.messages.push({
+        chat.pushMessage({
           role: 'opencode_control',
           controlData: {
             controlId: 'repo-branch-' + Date.now(),
@@ -1223,7 +1227,7 @@ export default {
         })
       } catch (err) {
         console.error('Error al obtener ramas:', err.message)
-        chat.messages.push({
+        chat.pushMessage({
           role: 'result',
           content: 'Error al listar ramas Git: ' + err.message,
           _key: 'err-' + Date.now(),
@@ -1231,17 +1235,17 @@ export default {
       }
     }
 
-    async function opencodeStreamDescripcion(sessionId, prompt, provider, model, thinking, mode, ticket) {
+    async function opencodeStreamDescripcion(sessionId, prompt, provider, model, thinking, mode, temperature, ticket) {
       ocStreaming.value = true
       ocChunk.value = ''
       ocThinking.value = ''
       _streamSessionId.value = sessionId
-      if (sessionId) chat.sessionStatus[sessionId] = 'executing'
+      if (sessionId) chat.setSessionStatus(sessionId, 'executing')
 
       const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
       streamMsg._key = 'stream-' + Date.now()
 
-      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, {
+      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
         onChunk(content) {
           if (_isActiveSession(sessionId)) ocChunk.value += content
         },
@@ -1250,7 +1254,7 @@ export default {
         },
         onControl(control) {
           if (_isActiveSession(sessionId)) {
-            chat.messages.push({
+            chat.pushMessage({
               role: 'opencode_control',
               content: JSON.stringify(control),
               controlData: control,
@@ -1260,7 +1264,7 @@ export default {
         },
         onDone(json, fullText) {
           ocStreaming.value = false
-          if (sessionId) chat.sessionStatus[sessionId] = 'idle'
+          if (sessionId) chat.setSessionStatus(sessionId, 'idle')
           if (_isActiveSession(sessionId)) {
             const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
@@ -1269,7 +1273,7 @@ export default {
               chat.messages[idx].role = 'opencode_result'
               chat.messages[idx].content = fullResponse
             }
-            chat.messages.push({
+            chat.pushMessage({
               role: 'opencode_control',
               controlData: {
                 controlId: 'descripcion-result-' + Date.now(),
@@ -1280,7 +1284,7 @@ export default {
               },
               _key: 'control-' + Date.now(),
             })
-            chat.messages.push({
+            chat.pushMessage({
               role: 'opencode_control',
               controlData: {
                 controlId: 'followup-' + Date.now(),
@@ -1301,9 +1305,8 @@ export default {
         },
         onError(msg) {
           ocStreaming.value = false
-          if (sessionId) chat.sessionStatus[sessionId] = 'error'
+          if (sessionId) chat.setSessionStatus(sessionId, 'error')
           if (_isActiveSession(sessionId)) {
-            const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (idx >= 0) {
               chat.messages[idx].content = '[Error: ' + msg + ']'
@@ -1314,21 +1317,21 @@ export default {
       })
     }
 
-    async function opencodeStreamDescripcionFollowup(sessionId, userPrompt, ticket) {
+    async function opencodeStreamDescripcionFollowup(sessionId, userPrompt, ticket, temperature) {
       ocStreaming.value = true
       ocChunk.value = ''
       ocThinking.value = ''
       _streamSessionId.value = sessionId
-      if (sessionId) chat.sessionStatus[sessionId] = 'executing'
+      if (sessionId) chat.setSessionStatus(sessionId, 'executing')
 
       if (_isActiveSession(sessionId)) {
-        chat.messages.push({
+        chat.pushMessage({
           role: 'user',
           content: userPrompt,
           _key: 'user-' + Date.now(),
         })
 
-        chat.messages.push({
+        chat.pushMessage({
           role: 'opencode_info',
           content: '📤 Mensaje enviado a OpenCode:\n\n' + userPrompt,
           _key: 'prompt-' + Date.now(),
@@ -1338,7 +1341,7 @@ export default {
       const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
       streamMsg._key = 'stream-' + Date.now()
 
-      await ocStore.streamPrompt(sessionId, userPrompt, descripcionData.provider, ocStore.selectedModel || descripcionData.model, ocStore.selectedThinking || descripcionData.thinking, ocStore.selectedMode || descripcionData.mode, {
+      await ocStore.streamPrompt(sessionId, userPrompt, descripcionData.provider, ocStore.selectedModel || descripcionData.model, ocStore.selectedThinking || descripcionData.thinking, ocStore.selectedMode || descripcionData.mode, temperature, {
         onChunk(content) {
           if (_isActiveSession(sessionId)) ocChunk.value += content
         },
@@ -1347,7 +1350,7 @@ export default {
         },
         onControl(control) {
           if (_isActiveSession(sessionId)) {
-            chat.messages.push({
+            chat.pushMessage({
               role: 'opencode_control',
               content: JSON.stringify(control),
               controlData: control,
@@ -1357,7 +1360,7 @@ export default {
         },
         onDone(json, fullText) {
           ocStreaming.value = false
-          if (sessionId) chat.sessionStatus[sessionId] = 'idle'
+          if (sessionId) chat.setSessionStatus(sessionId, 'idle')
           if (_isActiveSession(sessionId)) {
             const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
             // Demote the previous descripcion_result to a plain result (no buttons)
@@ -1388,7 +1391,7 @@ export default {
               }
             }
             // Add new followup control to continue the conversation
-            chat.messages.push({
+            chat.pushMessage({
               role: 'opencode_control',
               controlData: {
                 controlId: 'followup-' + Date.now(),
@@ -1409,7 +1412,7 @@ export default {
         },
         onError(msg) {
           ocStreaming.value = false
-          if (sessionId) chat.sessionStatus[sessionId] = 'error'
+          if (sessionId) chat.setSessionStatus(sessionId, 'error')
           if (_isActiveSession(sessionId)) {
             const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (streamIdx >= 0) {
@@ -1426,7 +1429,7 @@ export default {
       ocChunk.value = ''
       ocThinking.value = ''
       const sid = chat.activeSessionId
-      if (sid) chat.sessionStatus[sid] = 'executing'
+      if (sid) chat.setSessionStatus(sid, 'executing')
       _streamSessionId.value = sid
 
       const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
@@ -1481,7 +1484,7 @@ export default {
         }
 
         ocStreaming.value = false
-        if (sid) chat.sessionStatus[sid] = 'idle'
+        if (sid) chat.setSessionStatus(sid, 'idle')
 
         if (_isActiveSession(sid)) {
           const ticket = controlMsg?.controlData?.ticket || {}
@@ -1513,7 +1516,7 @@ export default {
       } catch (err) {
         console.error('Error al refinar descripción:', err.message)
         ocStreaming.value = false
-        if (sid) chat.sessionStatus[sid] = 'error'
+        if (sid) chat.setSessionStatus(sid, 'error')
         const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
         if (streamIdx >= 0 && _isActiveSession(sid)) {
           chat.messages[streamIdx].content = '[Error: ' + err.message + ']'
@@ -1530,7 +1533,7 @@ export default {
         const res = await fetch(`/api/tickets/session/${sid}`, { credentials: 'include' })
         const data = await res.json()
         if (!data.idTicketRedmine || !data.ticket) {
-          chat.messages.push({
+          chat.pushMessage({
             role: 'result',
             content: 'Error: No hay ticket asignado a esta sesión.',
             _key: 'err-' + Date.now(),
@@ -1541,7 +1544,7 @@ export default {
         const ocStore = useOpencodeStore()
         const startData = await ocStore.start()
         if (!startData) {
-          chat.messages.push({
+          chat.pushMessage({
             role: 'result',
             content: 'Error al iniciar OpenCode.',
             _key: 'err-' + Date.now(),
@@ -1551,7 +1554,7 @@ export default {
 
         const providerList = ocStore.getAvailableProviders()
         if (providerList.length === 0) {
-          chat.messages.push({
+          chat.pushMessage({
             role: 'result',
             content: 'No se encontraron proveedores de OpenCode.',
             _key: 'err-' + Date.now(),
@@ -1560,7 +1563,7 @@ export default {
         }
 
         const preselectProvider = ocStore.savedProvider || providerList[0].value
-        chat.messages.push({
+        chat.pushMessage({
           role: 'opencode_control',
           controlData: {
             controlId: 'provider-' + Date.now(),
@@ -1577,7 +1580,7 @@ export default {
         })
       } catch (err) {
         console.error('Error al reiniciar:', err.message)
-        chat.messages.push({
+        chat.pushMessage({
           role: 'result',
           content: 'Error al reiniciar el proceso: ' + err.message,
           _key: 'err-' + Date.now(),
@@ -1596,7 +1599,7 @@ export default {
       _streamSessionId.value = sid
 
       if (_isActiveSession(sid)) {
-        chat.messages.push({
+        chat.pushMessage({
           role: 'opencode_stream',
           content: '',
           streaming: true,
@@ -1621,7 +1624,7 @@ export default {
           .replace(/{user_input}/g, descripcionUserInput.value)
 
         if (_isActiveSession(sid)) {
-          chat.messages.push({
+          chat.pushMessage({
             role: 'opencode_info',
             content: '📤 Prompt enviado a OpenCode:\n\n' + prompt,
             _key: 'prompt-' + Date.now(),
@@ -1631,9 +1634,9 @@ export default {
         ocStreaming.value = true
         ocChunk.value = ''
         ocThinking.value = ''
-        if (sid) chat.sessionStatus[sid] = 'executing'
+        if (sid) chat.setSessionStatus(sid, 'executing')
 
-        await ocStore.streamPrompt(sid, prompt, descripcionData.provider, descripcionData.model, descripcionData.thinking, descripcionData.mode, {
+        await ocStore.streamPrompt(sid, prompt, descripcionData.provider, descripcionData.model, descripcionData.thinking, descripcionData.mode, descripcionData.temperature || ocStore.selectedTemperature || '', {
           onChunk(content) {
             if (_isActiveSession(sid)) ocChunk.value += content
           },
@@ -1642,7 +1645,7 @@ export default {
           },
           onControl(control) {
             if (_isActiveSession(sid)) {
-              chat.messages.push({
+              chat.pushMessage({
                 role: 'opencode_control',
                 content: JSON.stringify(control),
                 controlData: control,
@@ -1652,7 +1655,7 @@ export default {
           },
           onDone(json, fullText) {
             ocStreaming.value = false
-            if (sid) chat.sessionStatus[sid] = 'idle'
+            if (sid) chat.setSessionStatus(sid, 'idle')
             if (_isActiveSession(sid)) {
               const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
               const idx = chat.messages.findIndex((m) => m._key === newStreamKey)
@@ -1678,7 +1681,7 @@ export default {
           },
           onError(msg) {
             ocStreaming.value = false
-            if (sid) chat.sessionStatus[sid] = 'error'
+            if (sid) chat.setSessionStatus(sid, 'error')
             if (_isActiveSession(sid)) {
               const idx = chat.messages.findIndex((m) => m._key === newStreamKey)
               if (idx >= 0) {
@@ -1693,7 +1696,7 @@ export default {
         })
       } catch (err) {
         console.error('Error al reintentar:', err.message)
-        if (sid) chat.sessionStatus[sid] = 'error'
+        if (sid) chat.setSessionStatus(sid, 'error')
         if (oldIdx >= 0 && _isActiveSession(sid)) {
           chat.messages[oldIdx].controlData.loading = false
         }
@@ -1708,7 +1711,7 @@ export default {
         await ocStore.select('provider', value)
         ocStore.selectedProvider = value
         const models = ocStore.getModelsForProvider(value)
-        chat.messages.push({
+        chat.pushMessage({
           role: 'opencode_control',
             controlData: {
               controlId: 'opencode-form-' + Date.now(),
@@ -1762,7 +1765,7 @@ export default {
         await ocStore.select('provider', value)
         ocStore.selectedProvider = value
         const models = ocStore.getModelsForProvider(value)
-        chat.messages.push({
+        chat.pushMessage({
           role: 'opencode_control',
           controlData: {
             controlId: 'gc-form-' + Date.now(),
@@ -1948,7 +1951,7 @@ export default {
 
     async function addMessage(role, content, extra) {
       const msg = { role, content, _key: 'msg-' + Date.now() + '-' + Math.random(), ...extra }
-      chat.messages.push(msg)
+      chat.pushMessage(msg)
       return msg
     }
 

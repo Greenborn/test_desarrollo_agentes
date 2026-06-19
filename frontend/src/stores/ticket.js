@@ -10,6 +10,10 @@ export const useTicketStore = defineStore('ticket', () => {
       const res = await fetch('/api/tickets', { credentials: 'include' })
       const data = await res.json()
       tickets.value = data.tickets || []
+      if (selectedTicket.value) {
+        const updated = tickets.value.find(t => t.redmine_id === selectedTicket.value.redmine_id)
+        if (updated) selectedTicket.value = updated
+      }
     } catch (err) {
       console.error('Error al cargar tickets:', err)
     }

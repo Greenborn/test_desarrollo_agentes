@@ -96,7 +96,12 @@ register({
       cmdStore.hideAutocomplete();
       return;
     }
-    const prefix = resolutionArg.slice('--resolucion='.length).toLowerCase();
+    const val = resolutionArg.slice('--resolucion='.length);
+    if (val && resolutions.find(r => r.id === val)) {
+      cmdStore.hideAutocomplete();
+      return;
+    }
+    const prefix = val.toLowerCase();
     const filtered = prefix
       ? resolutions.filter(r => r.id.toLowerCase().includes(prefix))
       : resolutions;

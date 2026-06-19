@@ -55,26 +55,27 @@ register({
   usage: '/iniciar_navegador [--navegador=chrome|firefox] [--resolution=ID] [--url=URL]',
   async autocomplete(args, cmdStore) {
     const hasResolution = args.find(a => a.startsWith('--resolution='))
-    const hasNavegador = args.find(a => a.startsWith('--navegador='))
     const hasUrl = args.find(a => a.startsWith('--url='))
-    const positionalNavegador = args.find(a => a === 'chrome' || a === 'firefox')
 
     const navegadorArg = args.find(a => a.startsWith('--navegador='))
     if (navegadorArg) {
       const val = navegadorArg.slice('--navegador='.length)
-      if (!val) {
+      if (val === 'chrome' || val === 'firefox') {
+        // flag completo, seguir para sugerir flags restantes
+      } else if (!val) {
         cmdStore.showAutocomplete([
           { display: 'chrome', value: '--navegador=chrome' },
           { display: 'firefox', value: '--navegador=firefox' },
         ])
         return
+      } else {
+        const prefix = val.toLowerCase()
+        const filtered = ['chrome', 'firefox'].filter(b => b.includes(prefix))
+        cmdStore.showAutocomplete(
+          filtered.map(b => ({ display: b, value: `--navegador=${b}` }))
+        )
+        return
       }
-      const prefix = val.toLowerCase()
-      const filtered = ['chrome', 'firefox'].filter(b => b.includes(prefix))
-      cmdStore.showAutocomplete(
-        filtered.map(b => ({ display: b, value: `--navegador=${b}` }))
-      )
-      return
     }
 
     const resolutionArg = args.find(a => a.startsWith('--resolution='))
@@ -84,21 +85,32 @@ register({
         cmdStore.hideAutocomplete()
         return
       }
-      const prefix = resolutionArg.slice('--resolution='.length).toLowerCase()
-      const filtered = prefix
-        ? resolutions.filter(r => r.id.toLowerCase().includes(prefix))
-        : resolutions
-      cmdStore.showAutocomplete(
-        filtered.map(r => ({
-          display: `${r.id} — ${r.width}x${r.height}`,
-          value: `--resolution=${r.id}`,
-        }))
-      )
-      return
+      const val = resolutionArg.slice('--resolution='.length)
+      if (val && resolutions.find(r => r.id === val)) {
+        // flag completo, seguir para sugerir flags restantes
+      } else if (!val) {
+        cmdStore.showAutocomplete(
+          resolutions.map(r => ({
+            display: `${r.id} — ${r.width}x${r.height}`,
+            value: `--resolution=${r.id}`,
+          }))
+        )
+        return
+      } else {
+        const prefix = val.toLowerCase()
+        const filtered = resolutions.filter(r => r.id.toLowerCase().includes(prefix))
+        cmdStore.showAutocomplete(
+          filtered.map(r => ({
+            display: `${r.id} — ${r.width}x${r.height}`,
+            value: `--resolution=${r.id}`,
+          }))
+        )
+        return
+      }
     }
 
     const suggestions = []
-    if (!hasNavegador && !positionalNavegador) suggestions.push('--navegador=')
+    if (!args.find(a => a.startsWith('--navegador='))) suggestions.push('--navegador=')
     if (!hasResolution) suggestions.push('--resolution=')
     if (!hasUrl) suggestions.push('--url=')
     cmdStore.showAutocomplete(suggestions)
