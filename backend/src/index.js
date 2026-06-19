@@ -20,6 +20,7 @@ import ticketsRoutes from './routes/tickets.routes.js';
 import workspacesRoutes from './routes/workspaces.routes.js';
 import despliegueRoutes from './routes/despliegue.routes.js';
 import opencode from './services/opencode.js';
+import * as devInstanceManager from './services/devInstanceManager.js';
 import db from './config/db.js';
 
 const PORT = process.env.PORT;
@@ -167,12 +168,14 @@ async function start() {
 start();
 
 process.on('exit', () => {
+  devInstanceManager.stopAll();
   opencode.stopAllServers();
   if (pwProcess) pwProcess.kill();
   if (docProcess) docProcess.kill();
   if (gastosProcess) gastosProcess.kill();
 });
 process.on('SIGTERM', () => {
+  devInstanceManager.stopAll();
   opencode.stopAllServers();
   if (pwProcess) pwProcess.kill();
   if (docProcess) docProcess.kill();
@@ -180,6 +183,7 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 process.on('SIGINT', () => {
+  devInstanceManager.stopAll();
   opencode.stopAllServers();
   if (pwProcess) pwProcess.kill();
   if (docProcess) docProcess.kill();

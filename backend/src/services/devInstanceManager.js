@@ -91,12 +91,14 @@ export async function startDevInstance(projectRoot, deployConfig) {
         cwd: fullPath,
         stdio: ['ignore', 'pipe', 'pipe'],
         env: { ...process.env },
+        detached: true,
       });
     } else {
       proc = spawn('npm', ['run', 'dev'], {
         cwd: fullPath,
         stdio: ['ignore', 'pipe', 'pipe'],
         env: { ...process.env },
+        detached: true,
       });
     }
 
@@ -190,7 +192,13 @@ export async function stopAll() {
   await closeAllBrowserSessions();
   for (const [key, entry] of instances) {
     if (entry.process) {
-      entry.process.kill();
+      try {
+        process.kill(-entry.process.pid, 'SIGTERM');
+      } catch (err) {
+        if (err.code !== 'ESRCH') {
+          console.log(`[dev] Error al matar proceso ${entry.name}:`, err.message);
+        }
+      }
       entry.process = null;
     }
     entry.status = 'stopped';
