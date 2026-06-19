@@ -247,4 +247,18 @@ router.get('/estado-instancia-dev', async (req, res) => {
   }
 });
 
+router.get('/logs', async (req, res) => {
+  try {
+    const { name } = req.query;
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'Se requiere el parámetro name.' });
+    }
+    const logs = devInstanceManager.getLogs(name);
+    res.json({ success: true, name, logs });
+  } catch (err) {
+    console.log('Error en GET /api/despliegue/logs:', err);
+    res.status(500).json({ success: false, error: 'Error al obtener logs.' });
+  }
+});
+
 export default router;

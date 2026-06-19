@@ -443,6 +443,13 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Devuelve el estado actual de cada proceso de desarrollo gestionado por el servidor.
 - **Respuesta 200:** `{ success: true, processes: [{ name: string, type: "backend"|"frontend", status: "running"|"stopped"|"error" }] }`
 
+### `GET /api/despliegue/logs`
+- **Auth:** Requerida
+- **Query:** `name` (string, requerido) — nombre del subproyecto (ej: `backend`, `admin_frontend`)
+- **Descripción:** Devuelve el buffer de logs en tiempo real del proceso especificado (últimas 200 líneas).
+- **Respuesta 200:** `{ success: true, name: string, logs: string[] }`
+- **Respuesta 400:** `{ success: false, error: "Se requiere el parámetro name." }`
+
 ---
 
 ## Notas
