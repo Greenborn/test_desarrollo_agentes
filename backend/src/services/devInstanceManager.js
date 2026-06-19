@@ -4,6 +4,8 @@ import fs from 'fs';
 
 const instances = new Map();
 const browserSessions = [];
+let lastFrontendPorts = [];
+let lastResolution = null;
 const PW_URL = `http://localhost:${process.env.SERVICIO_PLAYWRIGHT_PORT || 4098}`;
 
 function getSubprojects(deployConfig) {
@@ -194,14 +196,29 @@ export async function stopAll() {
     entry.status = 'stopped';
   }
   instances.clear();
+  lastFrontendPorts = [];
+  lastResolution = null;
+}
+
+export function setFrontendPorts(ports) {
+  lastFrontendPorts = ports;
+}
+
+export function setResolution(res) {
+  lastResolution = res;
 }
 
 export function getStatus() {
-  const arr = [];
+  const processes = [];
   for (const [key, entry] of instances) {
-    arr.push({ name: entry.name, type: entry.type, status: entry.status });
+    processes.push({ name: entry.name, type: entry.type, status: entry.status });
   }
-  return arr;
+  return {
+    processes,
+    frontendPorts: lastFrontendPorts,
+    browserSessions: browserSessions.map(bs => ({ name: bs.name, url: bs.url, idSession: bs.idSession })),
+    resolution: lastResolution,
+  };
 }
 
 export function getLogs(name) {

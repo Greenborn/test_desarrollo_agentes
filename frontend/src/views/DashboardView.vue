@@ -15,6 +15,7 @@
       <div class="panel-resize-handle" @mousedown.prevent="startResize">
         <div class="panel-resize-handle-bar"></div>
       </div>
+      <DevInstancePanel />
     </div>
     <AppModal />
   </div>
@@ -29,6 +30,7 @@ import ChatWindow from '../components/ChatWindow.vue'
 import ProjectDetail from '../components/ProjectDetail.vue'
 import TicketDetail from '../components/TicketDetail.vue'
 import AppModal from '../components/AppModal.vue'
+import DevInstancePanel from '../components/DevInstancePanel.vue'
 import { useAuthStore } from '../stores/auth.js'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
@@ -37,7 +39,7 @@ import { useTicketStore } from '../stores/ticket.js'
 import { useUiStore } from '../stores/ui.js'
 
 export default {
-  components: { Topbar, SidebarChat, ChatWindow, ProjectDetail, TicketDetail, AppModal },
+  components: { Topbar, SidebarChat, ChatWindow, ProjectDetail, TicketDetail, AppModal, DevInstancePanel },
   setup() {
     const auth = useAuthStore()
     const chat = useChatStore()

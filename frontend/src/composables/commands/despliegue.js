@@ -1,4 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
+import { useUiStore } from '../../stores/ui.js';
 
 const { register } = useCommandRegistry();
 
@@ -159,6 +160,9 @@ register({
       lines.push(`\n🖥️ Resolución: ${resolution.id} — ${resolution.width}x${resolution.height}`);
     }
 
+    const uiStore = useUiStore();
+    if (uiStore.panelCollapsed) uiStore.togglePanel();
+
     return lines.join('\n');
   },
 });
@@ -207,8 +211,19 @@ register({
     const lines = data.processes.map((p) => {
       const icon = p.status === 'running' ? '🟢' : p.status === 'error' ? '🔴' : '⚫';
       const typeLabel = p.type === 'backend' ? 'nodemon' : 'npm run dev';
-      return `${icon} ${p.name} (${typeLabel}) — ${p.status}`;
+      let line = `${icon} ${p.name} (${typeLabel}) — ${p.status}`;
+      if (p.status === 'running') {
+        const fe = (data.frontendPorts || []).find(f => f.name === p.name);
+        if (fe) line += ` → ${fe.url}`;
+        const bs = (data.browserSessions || []).find(b => b.name === p.name);
+        if (bs) line += ` 🖥️ (${bs.idSession.slice(0, 8)}…)`;
+      }
+      return line;
     });
+
+    if (data.resolution) {
+      lines.push(`\n🖥️ Resolución: ${data.resolution.id} — ${data.resolution.width}x${data.resolution.height}`);
+    }
 
     return lines.join('\n');
   },

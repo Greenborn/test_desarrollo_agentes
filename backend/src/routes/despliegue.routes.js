@@ -217,6 +217,9 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
       }
     }
 
+    devInstanceManager.setFrontendPorts(frontendPorts);
+    devInstanceManager.setResolution(resolution);
+
     res.json({ success: true, results, frontendPorts, browserSessions });
   } catch (err) {
     console.log('Error en POST /api/despliegue/iniciar-instancia-dev:', err);
@@ -236,8 +239,8 @@ router.post('/detener-instancia-dev', async (req, res) => {
 
 router.get('/estado-instancia-dev', async (req, res) => {
   try {
-    const processes = devInstanceManager.getStatus();
-    res.json({ success: true, processes });
+    const status = devInstanceManager.getStatus();
+    res.json({ success: true, ...status });
   } catch (err) {
     console.log('Error en GET /api/despliegue/estado-instancia-dev:', err);
     res.status(500).json({ success: false, error: 'Error al obtener estado de la instancia de desarrollo.' });
