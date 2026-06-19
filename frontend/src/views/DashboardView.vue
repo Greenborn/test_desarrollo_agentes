@@ -7,14 +7,21 @@
       <ProjectDetail v-else-if="selectedProject" class="flex-grow-1" />
       <ChatWindow v-else class="flex-grow-1" />
     </div>
-    <div class="bottom-panel" :class="{ collapsed: panelCollapsed }">
+    <div
+      class="bottom-panel"
+      :class="{ collapsed: panelCollapsed, transitioning: isTransitioning }"
+      :style="{ height: panelCollapsed ? '0' : panelHeight + 'vh' }"
+    >
+      <div class="panel-resize-handle" @mousedown.prevent="startResize">
+        <div class="panel-resize-handle-bar"></div>
+      </div>
     </div>
     <AppModal />
   </div>
 </template>
 
 <script>
-import { onMounted, watch } from 'vue'
+import { onMounted, watch, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import Topbar from '../components/Topbar.vue'
 import SidebarChat from '../components/SidebarChat.vue'
@@ -38,9 +45,38 @@ export default {
     const projectStore = useProjectStore()
     const ticketStore = useTicketStore()
     const ui = useUiStore()
-    const { panelCollapsed } = storeToRefs(ui)
+    const { panelCollapsed, panelHeight } = storeToRefs(ui)
     const { selectedProject } = storeToRefs(projectStore)
     const { selectedTicket } = storeToRefs(ticketStore)
+
+    const isTransitioning = ref(false)
+    let transitionTimer = null
+
+    function startResize(e) {
+      isTransitioning.value = false
+      const startY = e.clientY
+      const startHeight = panelHeight.value
+
+      function onMouseMove(e) {
+        const deltaY = e.clientY - startY
+        const vhChange = (deltaY / window.innerHeight) * 100
+        const newHeight = Math.max(5, Math.round(startHeight - vhChange))
+        panelHeight.value = newHeight
+      }
+
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        ui.saveLayoutPrefs()
+      }
+
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = 'row-resize'
+      document.body.style.userSelect = 'none'
+    }
 
     function load() {
       if (auth.user) {
@@ -62,21 +98,58 @@ export default {
     watch(() => auth.user, load)
     onMounted(load)
 
-    return { selectedProject, selectedTicket, panelCollapsed }
+    watch(panelCollapsed, () => {
+      if (transitionTimer) clearTimeout(transitionTimer)
+      isTransitioning.value = true
+      transitionTimer = setTimeout(() => {
+        isTransitioning.value = false
+        transitionTimer = null
+      }, 300)
+    })
+
+    return { selectedProject, selectedTicket, panelCollapsed, panelHeight, isTransitioning, startResize }
   },
 }
 </script>
 
 <style scoped>
 .bottom-panel {
-  height: 30vh;
+  position: relative;
   overflow: hidden;
-  transition: height 0.25s ease;
   background: #1a1a2e;
   border-top: 1px solid #374151;
 }
+.bottom-panel.transitioning {
+  transition: height 0.25s ease;
+}
 .bottom-panel.collapsed {
-  height: 0;
+  height: 0 !important;
   border: none;
+}
+.panel-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 7px;
+  cursor: row-resize;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.panel-resize-handle:hover {
+  background: rgba(117, 170, 219, 0.08);
+}
+.panel-resize-handle-bar {
+  width: 36px;
+  height: 3px;
+  background: #374151;
+  border-radius: 2px;
+  pointer-events: none;
+  transition: background 0.15s;
+}
+.panel-resize-handle:hover .panel-resize-handle-bar {
+  background: #75AADB;
 }
 </style>
