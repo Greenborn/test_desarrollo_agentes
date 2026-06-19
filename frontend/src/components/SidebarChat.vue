@@ -9,11 +9,11 @@
     <div class="d-flex flex-column flex-grow-1" style="min-height: 0;">
       <button
         class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
-        @click="toggleSection('chats')"
+        @click="ui.toggleSection('chats')"
       >
-        {{ expandedSections.chats ? '▼' : '▶' }} Chats
+        {{ sectionChats ? '▼' : '▶' }} Chats
       </button>
-      <div v-show="expandedSections.chats" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
+      <div v-show="sectionChats" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
         <div class="list-group list-group-flush" style="min-height: 0;">
           <button
             v-for="s in filteredSessions"
@@ -36,11 +36,11 @@
       </div>
       <button
         class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
-        @click="toggleSection('projects')"
+        @click="ui.toggleSection('projects')"
       >
-        {{ expandedSections.projects ? '▼' : '▶' }} Proyectos
+        {{ sectionProjects ? '▼' : '▶' }} Proyectos
       </button>
-      <div v-show="expandedSections.projects" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
+      <div v-show="sectionProjects" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
         <div class="list-group list-group-flush" style="min-height: 0;">
           <button
             v-for="p in filteredProjects"
@@ -64,11 +64,11 @@
       </div>
       <button
         class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
-        @click="toggleSection('tickets')"
+        @click="ui.toggleSection('tickets')"
       >
-        {{ expandedSections.tickets ? '▼' : '▶' }} Tickets
+        {{ sectionTickets ? '▼' : '▶' }} Tickets
       </button>
-      <div v-show="expandedSections.tickets" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
+      <div v-show="sectionTickets" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
         <div class="list-group list-group-flush" style="min-height: 0;">
         <button
           v-for="t in filteredTickets"
@@ -92,7 +92,7 @@
 </template>
 
 <script>
-import { computed, watch, reactive } from 'vue'
+import { computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
@@ -108,19 +108,9 @@ export default {
     const projectStore = useProjectStore()
     const ticketStore = useTicketStore()
     const { sessions, activeSessionId, creating, sessionStatus } = storeToRefs(chat)
-    const { sidebarCollapsed, omnifilter } = storeToRefs(ui)
+    const { sidebarCollapsed, omnifilter, sectionChats, sectionProjects, sectionTickets } = storeToRefs(ui)
     const { projects, selectedProject, pinnedProjectId } = storeToRefs(projectStore)
     const { tickets, selectedTicket } = storeToRefs(ticketStore)
-
-    const expandedSections = reactive({
-      chats: true,
-      projects: true,
-      tickets: false,
-    })
-
-    function toggleSection(name) {
-      expandedSections[name] = !expandedSections[name]
-    }
 
     function sessionTooltip(s) {
       const lines = []
@@ -212,14 +202,13 @@ export default {
 
     watch(omnifilter, (val) => {
       if (val) {
-        expandedSections.chats = true
-        expandedSections.projects = true
-        expandedSections.tickets = true
+        ui.expandAllSections()
       }
     })
 
     return {
       chat,
+      ui,
       filteredSessions,
       activeSessionId,
       creating,
@@ -231,10 +220,11 @@ export default {
       filteredTickets,
       selectedTicket,
       ticketStore,
-      expandedSections,
+      sectionChats,
+      sectionProjects,
+      sectionTickets,
       sessionTooltip,
       getSessionStatus,
-      toggleSection,
       createSession,
       selectSession,
       selectProject,

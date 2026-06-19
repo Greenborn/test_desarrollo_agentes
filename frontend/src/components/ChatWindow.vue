@@ -762,6 +762,57 @@ export default {
           }
         }
         return
+      } else if (controlType === 'ticket_create') {
+        if (value === null) {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Creación cancelada.',
+              _key: 'result-' + Date.now(),
+            }
+          }
+          return
+        }
+        try {
+          const res = await fetch(`/api/tickets/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(value),
+          })
+          const data = await res.json()
+          if (data.success) {
+            const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: `✓ Ticket #${data.ticket.redmine_id} creado correctamente en el proyecto "${data.ticket.proyecto_id}".`,
+                _key: 'result-' + Date.now(),
+              }
+            }
+          } else {
+            const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: `Error: ${data.error || 'Error al crear ticket'}`,
+                _key: 'err-' + Date.now(),
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error al crear ticket:', err)
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Error de conexión al crear el ticket.',
+              _key: 'err-' + Date.now(),
+            }
+          }
+        }
+        return
       } else if (controlType === 'followup') {
         const { model, thinking, temperature, prompt } = value
         if (!prompt) return

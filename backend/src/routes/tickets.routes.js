@@ -296,6 +296,159 @@ router.get('/statuses/:ticketId', async (req, res) => {
   }
 });
 
+router.get('/project-members/:projectId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const wsId = req.session.workspaceId || 1;
+    const proyecto = await db('proyectos')
+      .select('redmine_id')
+      .where({ id: req.params.projectId, workspace_id: wsId })
+      .first();
+
+    if (!proyecto) {
+      return res.json({ users: [] });
+    }
+
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
+    if (!token || !url) {
+      return res.json({ users: [] });
+    }
+
+    const baseUrl = url.replace(/\/+$/, '');
+
+    const membersRes = await fetch(`${baseUrl}/projects/${proyecto.redmine_id}/memberships.json`, {
+      headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+    });
+
+    if (!membersRes.ok) {
+      console.log(`Error HTTP ${membersRes.status} al obtener memberships del proyecto ${req.params.projectId}`);
+      return res.json({ users: [] });
+    }
+
+    const membersData = await membersRes.json();
+    const memberships = membersData.memberships || [];
+
+    const users = memberships
+      .filter(m => m.user)
+      .map(m => ({
+        id: m.user.id,
+        name: m.user.name,
+      }));
+
+    res.json({ users });
+  } catch (err) {
+    console.log('Error al obtener miembros del proyecto:', err.message);
+    res.json({ users: [] });
+  }
+});
+
+router.post('/create', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { subject, description, project_id, status_name, priority_name, priority_id, assigned_to_name, assigned_to_id, done_ratio } = req.body;
+
+  if (!subject || !subject.trim()) {
+    return res.status(400).json({ error: 'El asunto es requerido.' });
+  }
+
+  if (!project_id) {
+    return res.status(400).json({ error: 'El proyecto es requerido.' });
+  }
+
+  if (done_ratio !== undefined && (done_ratio < 0 || done_ratio > 100)) {
+    return res.status(400).json({ error: 'El porcentaje de avance debe estar entre 0 y 100.' });
+  }
+
+  try {
+    const wsId = req.session.workspaceId || 1;
+
+    const proyecto = await db('proyectos')
+      .select('redmine_id')
+      .where({ id: project_id, workspace_id: wsId })
+      .first();
+
+    if (!proyecto) {
+      return res.status(400).json({ error: 'Proyecto no encontrado.' });
+    }
+
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
+
+    if (!token || !url) {
+      return res.status(400).json({ error: 'Redmine no configurado. Configure la URL y el token en Settings.' });
+    }
+
+    const baseUrl = url.replace(/\/+$/, '');
+
+    const redminePayload = {
+      project_id: proyecto.redmine_id,
+      subject: subject.trim(),
+    };
+
+    if (description) redminePayload.description = description;
+    if (status_id != null) redminePayload.status_id = status_id;
+    if (priority_id != null) redminePayload.priority_id = priority_id;
+    if (assigned_to_id != null) redminePayload.assigned_to_id = assigned_to_id;
+    if (done_ratio !== undefined) redminePayload.done_ratio = done_ratio;
+    if (status_name) redminePayload.status_id = status_name;
+
+    const redmineRes = await fetch(baseUrl + '/issues.json', {
+      method: 'POST',
+      headers: {
+        'X-Redmine-API-Key': token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ issue: redminePayload }),
+    });
+
+    if (!redmineRes.ok) {
+      const errText = await redmineRes.text();
+      console.log('Error al crear ticket en Redmine:', errText);
+      return res.status(500).json({ error: 'Error al crear ticket en Redmine: ' + (errText.slice(0, 300)) });
+    }
+
+    const redmineData = await redmineRes.json();
+    const redmineId = redmineData.issue?.id;
+
+    if (!redmineId) {
+      return res.status(500).json({ error: 'No se pudo obtener el ID del ticket creado en Redmine.' });
+    }
+
+    const createdIssue = redmineData.issue;
+
+    const insertData = {
+      workspace_id: wsId,
+      proyecto_id: project_id,
+      redmine_id: redmineId,
+      subject: createdIssue.subject || subject.trim(),
+      description: createdIssue.description || description || null,
+      status_name: createdIssue.status?.name || status_name || null,
+      tracker_name: createdIssue.tracker?.name || null,
+      priority_id: createdIssue.priority?.id || priority_id || null,
+      priority_name: createdIssue.priority?.name || priority_name || null,
+      assigned_to_name: createdIssue.assigned_to?.name || assigned_to_name || null,
+      author_name: createdIssue.author?.name || null,
+      start_date: createdIssue.start_date || null,
+      due_date: createdIssue.due_date || null,
+      estimated_hours: createdIssue.estimated_hours || null,
+      done_ratio: createdIssue.done_ratio ?? done_ratio ?? null,
+      redmine_created_on: createdIssue.created_on || null,
+      redmine_updated_on: createdIssue.updated_on || null,
+    };
+
+    const [insertedId] = await db('tickets').insert(insertData);
+
+    const created = await db('tickets').where({ id: insertedId }).first();
+
+    res.json({ success: true, ticket: created });
+  } catch (err) {
+    console.log('Error al crear ticket:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.put('/session/:sessionId', async (req, res) => {
   if (!authGuard(req, res)) return;
 

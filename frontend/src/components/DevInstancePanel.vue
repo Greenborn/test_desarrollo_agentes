@@ -1,55 +1,81 @@
 <template>
   <div class="dev-instance-panel h-100 d-flex flex-column">
-    <div class="d-flex align-items-center justify-content-between px-3 pt-2 pb-1" style="min-height: 36px;">
-      <h6 class="mb-0 text-light small">
-        <span v-if="hasProcesses">🖥️ Instancia de Desarrollo</span>
-        <span v-else class="text-muted">🖥️ Instancia de Desarrollo</span>
-      </h6>
-      <button v-if="hasProcesses" class="btn btn-sm btn-outline-danger py-0 px-2" @click="detener" :disabled="deteniendo" style="font-size: 0.75rem;">
+    <!-- Tab bar -->
+    <div class="tab-bar d-flex align-items-center px-3 pt-2 pb-0 flex-shrink-0">
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'instancias' }"
+        @click="activeTab = 'instancias'"
+      >
+        Instancias de Desarrollo
+      </button>
+      <button
+        class="tab-btn ms-3"
+        :class="{ active: activeTab === 'repositorio' }"
+        @click="activeTab = 'repositorio'"
+      >
+        Repositorio
+      </button>
+      <button
+        v-if="activeTab === 'instancias' && hasProcesses"
+        class="btn btn-sm btn-outline-danger py-0 px-2 ms-auto"
+        @click="detener"
+        :disabled="deteniendo"
+        style="font-size: 0.75rem;"
+      >
         {{ deteniendo ? 'Deteniendo…' : '🛑 Detener' }}
       </button>
     </div>
 
-    <div v-if="!hasProcesses" class="flex-grow-1 d-flex align-items-center justify-content-center text-muted small">
-      <span v-if="errorMsg">{{ errorMsg }}</span>
-      <span v-else>No hay instancia de desarrollo activa. Use /despliegue_iniciar_instancia para iniciarla.</span>
-    </div>
+    <!-- Tab: Instancias de Desarrollo -->
+    <template v-if="activeTab === 'instancias'">
+      <div v-if="!hasProcesses" class="flex-grow-1 d-flex align-items-center justify-content-center text-muted small">
+        <span v-if="errorMsg">{{ errorMsg }}</span>
+        <span v-else>No hay instancia de desarrollo activa. Use /despliegue_iniciar_instancia para iniciarla.</span>
+      </div>
+      <div v-else class="d-flex flex-grow-1" style="min-height: 0;">
+        <div class="left-panel d-flex flex-column flex-shrink-0 overflow-y-auto px-2 py-1">
+          <button
+            v-for="p in state.processes"
+            :key="p.name"
+            class="process-btn d-flex align-items-center gap-1 w-100 text-start px-2 py-1 mb-1"
+            :class="{ selected: selectedProcess === p.name }"
+            @click="toggleProcess(p.name)"
+          >
+            <span class="status-dot" :class="p.status"></span>
+            <span class="small fw-semibold" :class="p.status === 'running' ? 'text-light' : 'text-muted'">{{ p.name }}</span>
+            <span class="badge ms-auto" :class="p.status === 'running' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'" style="font-size: 0.6rem;">{{ typeLabel(p.type) }}</span>
+          </button>
 
-    <div v-else class="d-flex flex-grow-1" style="min-height: 0;">
-      <div class="left-panel d-flex flex-column flex-shrink-0 overflow-y-auto px-2 py-1">
-        <button
-          v-for="p in state.processes"
-          :key="p.name"
-          class="process-btn d-flex align-items-center gap-1 w-100 text-start px-2 py-1 mb-1"
-          :class="{ selected: selectedProcess === p.name }"
-          @click="toggleProcess(p.name)"
-        >
-          <span class="status-dot" :class="p.status"></span>
-          <span class="small fw-semibold" :class="p.status === 'running' ? 'text-light' : 'text-muted'">{{ p.name }}</span>
-          <span class="badge ms-auto" :class="p.status === 'running' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'" style="font-size: 0.6rem;">{{ typeLabel(p.type) }}</span>
-        </button>
+          <div v-if="state.resolution" class="mt-auto pt-1 small text-secondary px-2" style="font-size: 0.65rem;">
+            🖥️ {{ state.resolution.id }} — {{ state.resolution.width }}x{{ state.resolution.height }}
+          </div>
+        </div>
 
-        <div v-if="state.resolution" class="mt-auto pt-1 small text-secondary px-2" style="font-size: 0.65rem;">
-          🖥️ {{ state.resolution.id }} — {{ state.resolution.width }}x{{ state.resolution.height }}
+        <div class="right-panel d-flex flex-column flex-grow-1 overflow-hidden border-start border-secondary">
+          <div class="log-header d-flex align-items-center px-2 py-1 small text-secondary">
+            <span v-if="selectedProcess">[{{ selectedProcess }}]</span>
+            <span v-else>[todos los procesos]</span>
+            <span class="ms-auto text-muted" style="font-size: 0.6rem;">{{ displayedLines }} líneas</span>
+          </div>
+          <pre ref="logContainerRef" class="log-output flex-grow-1 mb-0 p-2">{{ displayText }}</pre>
         </div>
       </div>
+    </template>
 
-      <div class="right-panel d-flex flex-column flex-grow-1 overflow-hidden border-start border-secondary">
-        <div class="log-header d-flex align-items-center px-2 py-1 small text-secondary">
-          <span v-if="selectedProcess">[{{ selectedProcess }}]</span>
-          <span v-else>[todos los procesos]</span>
-          <span class="ms-auto text-muted" style="font-size: 0.6rem;">{{ displayedLines }} líneas</span>
-        </div>
-        <pre ref="logContainerRef" class="log-output flex-grow-1 mb-0 p-2">{{ displayText }}</pre>
-      </div>
-    </div>
+    <!-- Tab: Repositorio -->
+    <template v-if="activeTab === 'repositorio'">
+      <RepoView class="flex-grow-1" />
+    </template>
   </div>
 </template>
 
 <script>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import RepoView from './RepoView.vue'
 
 export default {
+  components: { RepoView },
   setup() {
     const state = reactive({
       processes: [],
@@ -58,6 +84,7 @@ export default {
       resolution: null,
     })
 
+    const activeTab = ref('instancias')
     const selectedProcess = ref(null)
     const logsMap = reactive({})
     const deteniendo = ref(false)
@@ -181,6 +208,7 @@ export default {
 
     return {
       state,
+      activeTab,
       selectedProcess,
       deteniendo,
       errorMsg,
@@ -199,6 +227,27 @@ export default {
 <style scoped>
 .dev-instance-panel {
   background: #1a1a2e;
+}
+.tab-bar {
+  border-bottom: 1px solid #374151;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover {
+  color: #cbd5e1;
+}
+.tab-btn.active {
+  color: #75AADB;
+  border-bottom-color: #75AADB;
 }
 .left-panel {
   width: auto;

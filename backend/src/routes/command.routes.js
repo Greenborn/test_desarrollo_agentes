@@ -360,6 +360,89 @@ router.post('/git-list-branches', async (req, res) => {
   }
 });
 
+router.post('/git-log-graph', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { sessionId, maxCount = 100 } = req.body;
+    let cwd = process.cwd();
+    if (sessionId) {
+      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+      if (session && session.cwd) cwd = session.cwd;
+    }
+    try {
+      const stdout = execSync(`git log --graph --oneline --all --decorate -${maxCount}`, { cwd, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
+      res.json({ success: true, graph: stdout, error: null });
+    } catch (err) {
+      res.json({ success: false, graph: '', error: err.stderr || err.message });
+    }
+  } catch (err) {
+    console.log('Error en /git-log-graph:', err.message);
+    res.status(500).json({ success: false, graph: '', error: err.message });
+  }
+});
+
+router.post('/git-log-structured', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { sessionId, maxCount = 100 } = req.body;
+    let cwd = process.cwd();
+    if (sessionId) {
+      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+      if (session && session.cwd) cwd = session.cwd;
+    }
+
+    const logStdout = execSync(
+      `git log --all --format="%H|%h|%s|%an|%ad|%P|%D" --date=short -${maxCount} --topo-order`,
+      { cwd, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
+    );
+
+    const commits = [];
+    for (const line of logStdout.trim().split('\n')) {
+      if (!line) continue;
+      const parts = line.split('|');
+      const [hash, shortHash, message, author, date, parentHashes, refs] = parts;
+      const parents = parentHashes ? parentHashes.trim().split(/\s+/) : [];
+      const refNames = refs ? refs.split(', ').map(r => r.trim()).filter(Boolean) : [];
+      const branches = [];
+      const tags = [];
+      let isHead = false;
+      for (const ref of refNames) {
+        if (ref === 'HEAD') { isHead = true; continue; }
+        if (ref.startsWith('tag: ')) { tags.push(ref.replace('tag: ', '')); continue; }
+        if (ref.startsWith('HEAD -> ')) { isHead = true; branches.push(ref.replace('HEAD -> ', '')); continue; }
+        branches.push(ref);
+      }
+      commits.push({ hash, shortHash, message, author, date, parents, branches, tags, isHead });
+    }
+
+    let branchList = [];
+    try {
+      const branchStdout = execSync('git branch --list', { cwd, encoding: 'utf-8' });
+      branchList = branchStdout.split('\n').filter(Boolean).map(line => {
+        const isCurrent = line.startsWith('*');
+        return { name: line.replace(/^\*\s*/, '').trim(), isCurrent };
+      });
+    } catch (e) { /* ignore */ }
+
+    let tagCommits = [];
+    try {
+      const tagStdout = execSync(
+        'git for-each-ref refs/tags --format="%(refname:short)|%(objectname)"',
+        { cwd, encoding: 'utf-8' }
+      );
+      tagCommits = tagStdout.split('\n').filter(Boolean).map(line => {
+        const [name, commitHash] = line.split('|');
+        return { name, commitHash };
+      });
+    } catch (e) { /* ignore */ }
+
+    res.json({ success: true, commits, branches: branchList, tags: tagCommits, error: null });
+  } catch (err) {
+    console.log('Error en /git-log-structured:', err.message);
+    res.status(500).json({ success: false, commits: [], branches: [], tags: [], error: err.message });
+  }
+});
+
 router.post('/execute', async (req, res) => {
   if (!authGuard(req, res)) return;
   const { command, sessionId } = req.body;
