@@ -34,34 +34,7 @@
           </button>
         </div>
       </div>
-      <button
-        class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
-        @click="ui.toggleSection('projects')"
-      >
-        {{ sectionProjects ? '▼' : '▶' }} Proyectos
-      </button>
-      <div v-show="sectionProjects" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
-        <div class="list-group list-group-flush" style="min-height: 0;">
-          <button
-            v-for="p in filteredProjects"
-            :key="p.id"
-            class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
-            :class="{
-              active: selectedProject && selectedProject.id === p.id,
-              'pinned-project': p.id === pinnedProjectId,
-            }"
-            @click="selectProject(p)"
-          >
-            <span
-              class="pin-btn"
-              :class="{ pinned: p.id === pinnedProjectId }"
-              @click.stop="projectStore.togglePin(p.id)"
-              title="Fijar proyecto"
-            >📌</span>
-            <span class="text-truncate ms-1">{{ p.id }} — {{ p.descripcion }}</span>
-          </button>
-        </div>
-      </div>
+
     </div>
   </div>
 </template>
@@ -72,19 +45,14 @@ import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 import { useUiStore } from '../stores/ui.js'
-import { useProjectStore } from '../stores/project.js'
-import { useTicketStore } from '../stores/ticket.js'
 
 export default {
   setup() {
     const chat = useChatStore()
     const cmd = useCommandStore()
     const ui = useUiStore()
-    const projectStore = useProjectStore()
-    const ticketStore = useTicketStore()
     const { sessions, activeSessionId, creating, sessionStatus } = storeToRefs(chat)
-    const { sidebarCollapsed, omnifilter, sectionChats, sectionProjects } = storeToRefs(ui)
-    const { projects, selectedProject, pinnedProjectId } = storeToRefs(projectStore)
+    const { sidebarCollapsed, omnifilter, sectionChats } = storeToRefs(ui)
 
     function sessionTooltip(s) {
       const lines = []
@@ -107,15 +75,9 @@ export default {
     }
 
     function selectSession(id) {
-      projectStore.clearSelection()
-      ticketStore.clearSelection()
       const s = chat.sessions.find((s) => s.id === id)
       if (s && s.cwd) cmd.currentDir = s.cwd
       chat.loadMessages(id)
-    }
-
-    function selectProject(p) {
-      projectStore.selectProject(p)
     }
 
     function ticketPriorityClass(priorityId) {
@@ -141,17 +103,9 @@ export default {
       })
     })
 
-    const filteredProjects = computed(() => {
-      const filter = omnifilter.value.toLowerCase()
-      if (!filter) return projects.value
-      return projects.value.filter((p) => {
-        return p.id && p.id.toLowerCase().includes(filter)
-      })
-    })
-
     watch(omnifilter, (val) => {
-      if (val) {
-        ui.expandAllSections()
+      if (val && !sectionChats.value) {
+        ui.toggleSection('chats')
       }
     })
 
@@ -162,17 +116,11 @@ export default {
       activeSessionId,
       creating,
       sidebarCollapsed,
-      filteredProjects,
-      selectedProject,
-      pinnedProjectId,
-      projectStore,
       sectionChats,
-      sectionProjects,
       sessionTooltip,
       getSessionStatus,
       createSession,
       selectSession,
-      selectProject,
       ticketPriorityClass,
     }
   },
@@ -242,20 +190,6 @@ export default {
   background-color: #1a2744;
   color: #75AADB;
 }
-.pin-btn {
-  cursor: pointer;
-  opacity: 0.3;
-  font-size: 0.75rem;
-  transition: opacity 0.15s ease;
-  line-height: 1;
-  flex-shrink: 0;
-}
-.pin-btn.pinned {
-  opacity: 1;
-}
-.pin-btn:hover {
-  opacity: 1;
-}
 .status-led {
   display: inline-block;
   width: 8px;
@@ -283,10 +217,6 @@ export default {
   color: #60a5fa;
   margin-right: 4px;
   flex-shrink: 0;
-}
-.pinned-project {
-  background-color: #1a3344 !important;
-  border-left: 3px solid #75AADB !important;
 }
 .ticket-priority-low {
   border-left: 3px solid var(--priority-low-color, #6b7280) !important;

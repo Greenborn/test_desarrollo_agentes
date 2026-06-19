@@ -10,7 +10,7 @@
     <div
       class="bottom-panel"
       :class="{ collapsed: panelCollapsed, transitioning: isTransitioning }"
-      :style="{ height: panelCollapsed ? '0' : panelHeight + 'vh' }"
+      :style="{ height: panelCollapsed ? '0' : panelHeight + 'px' }"
     >
       <div class="panel-resize-handle" @mousedown.prevent="startResize">
         <div class="panel-resize-handle-bar"></div>
@@ -58,8 +58,7 @@ export default {
       isTransitioning.value = false
 
       function onMouseMove(e) {
-        const vh = Math.max(5, ((window.innerHeight - e.clientY) / window.innerHeight) * 100)
-        panelHeight.value = vh
+        panelHeight.value = Math.max(60, window.innerHeight - e.clientY)
       }
 
       function onMouseUp() {
