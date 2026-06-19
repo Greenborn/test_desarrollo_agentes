@@ -2030,6 +2030,7 @@ export default {
       activeSessionId,
       messages,
       streaming,
+      executing,
       currentChunk,
       currentThinking,
       ocStreaming,

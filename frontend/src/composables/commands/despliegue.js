@@ -2,6 +2,32 @@ import { useCommandRegistry } from '../useCommandRegistry.js';
 
 const { register } = useCommandRegistry();
 
+async function fetchResolutions() {
+  try {
+    const res = await fetch('/api/settings', { credentials: 'include' });
+    const data = await res.json();
+    return data.screen_resolutions || [];
+  } catch {
+    return [];
+  }
+}
+
+async function fetchDefaultResolution(resolutions) {
+  try {
+    const res = await fetch('/api/command/setting/default_resolution', { credentials: 'include' });
+    const data = await res.json();
+    if (data.value) return resolutions.find(r => r.id === data.value) || null;
+  } catch {}
+  return null;
+}
+
+function parseResolutionArg(args) {
+  for (const arg of args) {
+    if (arg.startsWith('--resolucion=')) return arg.slice('--resolucion='.length);
+  }
+  return null;
+}
+
 register({
   name: '/despliegue_upd_config',
   category: 'Despliegue',
@@ -57,18 +83,56 @@ register({
   name: '/iniciar_instancia_dev',
   category: 'Despliegue',
   description: 'Instala dependencias (npm ci) e inicia los procesos de desarrollo (nodemon para backend, npm run dev para frontend) según la configuración de despliegue.',
-  usage: '/iniciar_instancia_dev',
+  usage: '/iniciar_instancia_dev [--resolucion=ID]',
+  async autocomplete(args, cmdStore) {
+    const resolutionArg = args.find(a => a.startsWith('--resolucion='));
+    if (!resolutionArg) {
+      cmdStore.showAutocomplete(['--resolucion=']);
+      return;
+    }
+    const resolutions = await fetchResolutions();
+    if (!resolutions.length) {
+      cmdStore.hideAutocomplete();
+      return;
+    }
+    const prefix = resolutionArg.slice('--resolucion='.length).toLowerCase();
+    const filtered = prefix
+      ? resolutions.filter(r => r.id.toLowerCase().includes(prefix))
+      : resolutions;
+    cmdStore.showAutocomplete(
+      filtered.map(r => ({
+        display: `${r.id} — ${r.width}x${r.height}`,
+        value: `--resolucion=${r.id}`,
+      }))
+    );
+  },
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId;
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.');
     }
 
+    const resolutions = await fetchResolutions();
+    let resolution = null;
+    const resIdArg = parseResolutionArg(args);
+    if (resIdArg) {
+      resolution = resolutions.find(r => r.id === resIdArg);
+      if (!resolution) {
+        const avail = resolutions.map(r => r.id).join(', ');
+        throw new Error(`Resolución no válida: "${resIdArg}". Disponibles: ${avail || '(ninguna configurada)'}`);
+      }
+    } else {
+      resolution = await fetchDefaultResolution(resolutions);
+    }
+
+    const body = { sessionId };
+    if (resolution) body.resolution = resolution;
+
     const res = await fetch('/api/despliegue/iniciar-instancia-dev', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ sessionId }),
+      body: JSON.stringify(body),
     });
 
     const data = await res.json();
@@ -76,11 +140,24 @@ register({
       throw new Error(data.error || 'Error al iniciar instancia de desarrollo.');
     }
 
+    const resLabel = resolution ? ` (${resolution.width}x${resolution.height})` : '';
+
     const lines = data.results.map((r) => {
       const icon = r.status === 'running' ? '✅' : r.status === 'error' ? '❌' : '⚠️';
       const typeLabel = r.type === 'backend' ? 'nodemon' : 'npm run dev';
-      return `${icon} ${r.name} (${typeLabel}) — ${r.status}${r.error ? ': ' + r.error : ''}`;
+      let line = `${icon} ${r.name} (${typeLabel}) — ${r.status}${r.error ? ': ' + r.error : ''}`;
+      if (r.status === 'running') {
+        const fe = (data.frontendPorts || []).find(f => f.name === r.name);
+        if (fe) line += ` → ${fe.url}`;
+        const bs = (data.browserSessions || []).find(b => b.name === r.name);
+        if (bs) line += ` 🖥️${resLabel} (sesión: ${bs.idSession.slice(0, 8)}…)`;
+      }
+      return line;
     });
+
+    if (resolution) {
+      lines.push(`\n🖥️ Resolución: ${resolution.id} — ${resolution.width}x${resolution.height}`);
+    }
 
     return lines.join('\n');
   },

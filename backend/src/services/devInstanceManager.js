@@ -3,6 +3,8 @@ import path from 'path';
 import fs from 'fs';
 
 const instances = new Map();
+const browserSessions = [];
+const PW_URL = `http://localhost:${process.env.SERVICIO_PLAYWRIGHT_PORT || 4098}`;
 
 function getSubprojects(deployConfig) {
   const installEntries = deployConfig.install || [];
@@ -54,7 +56,7 @@ function runNpmCi(dir) {
 }
 
 export async function startDevInstance(projectRoot, deployConfig) {
-  stopAll();
+  await stopAll();
 
   const subprojects = getSubprojects(deployConfig);
   if (subprojects.length === 0) {
@@ -103,10 +105,13 @@ export async function startDevInstance(projectRoot, deployConfig) {
       process: proc,
       status: 'running',
       logs: [],
+      detectedPort: null,
+      detectedUrl: null,
     };
 
     const MAX_LOG_LINES = 200;
     const tag = `[dev:${sub.cwd}]`;
+    const urlRegex = /https?:\/\/localhost:\d+/g;
 
     proc.stdout.on('data', (data) => {
       const text = data.toString().trim();
@@ -114,6 +119,13 @@ export async function startDevInstance(projectRoot, deployConfig) {
         console.log(tag, text);
         entry.logs.push(text);
         if (entry.logs.length > MAX_LOG_LINES) entry.logs.splice(0, entry.logs.length - MAX_LOG_LINES);
+        if (sub.type === 'frontend' && !entry.detectedUrl) {
+          const match = text.match(urlRegex);
+          if (match) {
+            entry.detectedUrl = match[0];
+            entry.detectedPort = parseInt(new URL(match[0]).port, 10);
+          }
+        }
       }
     });
 
@@ -123,6 +135,13 @@ export async function startDevInstance(projectRoot, deployConfig) {
         console.log(tag, text);
         entry.logs.push(text);
         if (entry.logs.length > MAX_LOG_LINES) entry.logs.splice(0, entry.logs.length - MAX_LOG_LINES);
+        if (sub.type === 'frontend' && !entry.detectedUrl) {
+          const match = text.match(urlRegex);
+          if (match) {
+            entry.detectedUrl = match[0];
+            entry.detectedPort = parseInt(new URL(match[0]).port, 10);
+          }
+        }
       }
     });
 
@@ -145,7 +164,28 @@ export async function startDevInstance(projectRoot, deployConfig) {
   return results;
 }
 
-export function stopAll() {
+export function registerBrowserSession({ name, url, idSession }) {
+  browserSessions.push({ name, url, idSession });
+}
+
+async function closeAllBrowserSessions() {
+  for (const bs of browserSessions) {
+    try {
+      await fetch(`${PW_URL}/api/command`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comando: 'close', parametros: { id_session: bs.idSession } }),
+      });
+      console.log(`[dev] Navegador cerrado para ${bs.name} (${bs.idSession.slice(0, 8)}…)`);
+    } catch (err) {
+      console.log(`[dev] Error al cerrar navegador para ${bs.name}:`, err.message);
+    }
+  }
+  browserSessions.length = 0;
+}
+
+export async function stopAll() {
+  await closeAllBrowserSessions();
   for (const [key, entry] of instances) {
     if (entry.process) {
       entry.process.kill();
@@ -167,4 +207,20 @@ export function getStatus() {
 export function getLogs(name) {
   const entry = instances.get(name);
   return entry ? entry.logs.slice() : [];
+}
+
+export async function waitForFrontendPorts(timeout = 20000) {
+  const start = Date.now();
+
+  while (Date.now() - start < timeout) {
+    const allDetected = Array.from(instances.values())
+      .filter(e => e.type === 'frontend')
+      .every(e => e.detectedPort);
+    if (allDetected) break;
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  return Array.from(instances.values())
+    .filter(e => e.type === 'frontend' && e.detectedPort)
+    .map(e => ({ name: e.name, port: e.detectedPort, url: e.detectedUrl }));
 }

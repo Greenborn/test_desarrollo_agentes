@@ -12,6 +12,19 @@ async function fetchResolutions() {
   }
 }
 
+async function fetchDefaultResolution(resolutions) {
+  try {
+    const res = await fetch('/api/command/setting/default_resolution', { credentials: 'include' });
+    const data = await res.json();
+    if (data.value) {
+      return resolutions.find(r => r.id === data.value) || null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 function parseArgs(args) {
   let navegador = 'chrome';
   let url = '';
@@ -38,7 +51,7 @@ function parseArgs(args) {
 register({
   name: '/iniciar_navegador',
   category: 'Navegador',
-  description: 'Inicia una sesión de navegador web (chrome o firefox). Opcional: --resolution=ID y URL.',
+  description: 'Inicia una sesión de navegador web (chrome o firefox). Usa --resolution=ID o la resolución por defecto del usuario.',
   usage: '/iniciar_navegador [--navegador=chrome|firefox] [--resolution=ID] [--url=URL]',
   async autocomplete(args, cmdStore) {
     const hasResolution = args.find(a => a.startsWith('--resolution='))
@@ -98,14 +111,16 @@ register({
       throw new Error(`Navegador no soportado: "${navegador}". Usa chrome o firefox.`)
     }
 
+    const resolutions = await fetchResolutions()
     let resolution = null
     if (resolutionId) {
-      const resolutions = await fetchResolutions()
       resolution = resolutions.find(r => r.id === resolutionId)
       if (!resolution) {
         const avail = resolutions.map(r => r.id).join(', ')
         throw new Error(`Resolución no válida: "${resolutionId}". Resoluciones disponibles: ${avail || '(ninguna configurada)'}`)
       }
+    } else {
+      resolution = await fetchDefaultResolution(resolutions)
     }
 
     try {

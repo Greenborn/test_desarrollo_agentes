@@ -4,7 +4,9 @@ import path from 'path';
 import db from '../config/db.js';
 import sessionAuth from '../middlewares/sessionAuth.js';
 import * as devInstanceManager from '../services/devInstanceManager.js';
+import playwrightManager from '../services/playwrightManager.js';
 
+const PW_PORT = process.env.SERVICIO_PLAYWRIGHT_PORT || 4098;
 const router = express.Router();
 
 router.use(sessionAuth);
@@ -109,7 +111,7 @@ router.get('/config', async (req, res) => {
 
 router.post('/iniciar-instancia-dev', async (req, res) => {
   try {
-    const { sessionId } = req.body;
+    const { sessionId, resolution: customResolution } = req.body;
 
     if (!sessionId) {
       return res.status(400).json({ success: false, error: 'Se requiere sessionId.' });
@@ -153,7 +155,69 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
 
     const results = await devInstanceManager.startDevInstance(projectRoot, deployConfig);
 
-    res.json({ success: true, results });
+    const frontendPorts = await devInstanceManager.waitForFrontendPorts(20000);
+
+    const browserSessions = [];
+
+    if (frontendPorts.length > 0) {
+      try {
+        await playwrightManager.ensureRunning();
+
+        let resolution = null;
+        if (customResolution && customResolution.width && customResolution.height) {
+          resolution = customResolution;
+        } else {
+          try {
+            const defaultResRow = await db('user_settings')
+              .select('value')
+              .where({ user_id: req.session.userId, key: 'default_resolution' })
+              .first();
+            if (defaultResRow && defaultResRow.value) {
+              const wsId = req.session.workspaceId || 1;
+              const screenResRow = await db('settings')
+                .select('setting_value')
+                .where({ workspace_id: wsId, setting_key: 'screen_resolutions' })
+                .first();
+              if (screenResRow && screenResRow.setting_value) {
+                const resolutions = JSON.parse(screenResRow.setting_value);
+                const match = resolutions.find(r => r.id === defaultResRow.value);
+                if (match && match.width && match.height) {
+                  resolution = { id: match.id, width: match.width, height: match.height };
+                }
+              }
+            }
+          } catch (err) {
+            console.log('[despliegue] Error al obtener resolución por defecto:', err.message);
+          }
+        }
+
+        for (const fe of frontendPorts) {
+          try {
+            const parametros = { navegador: 'chrome', url: fe.url };
+            if (resolution) parametros.resolution = resolution;
+
+            const pwRes = await fetch(`http://localhost:${PW_PORT}/api/command`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ comando: 'start', parametros }),
+            });
+            const pwData = await pwRes.json();
+            if (pwData.id_session) {
+              browserSessions.push({ name: fe.name, url: fe.url, idSession: pwData.id_session });
+              devInstanceManager.registerBrowserSession({ name: fe.name, url: fe.url, idSession: pwData.id_session });
+            } else if (pwData.error) {
+              console.log(`[despliegue] Error al abrir navegador para ${fe.name}: ${pwData.error}`);
+            }
+          } catch (err) {
+            console.log(`[despliegue] Error al conectar con playwright para ${fe.name}:`, err.message);
+          }
+        }
+      } catch (err) {
+        console.log('[despliegue] Error al iniciar servicio playwright:', err.message);
+      }
+    }
+
+    res.json({ success: true, results, frontendPorts, browserSessions });
   } catch (err) {
     console.log('Error en POST /api/despliegue/iniciar-instancia-dev:', err);
     res.status(500).json({ success: false, error: 'Error al iniciar instancia de desarrollo.' });
@@ -162,7 +226,7 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
 
 router.post('/detener-instancia-dev', async (req, res) => {
   try {
-    devInstanceManager.stopAll();
+    await devInstanceManager.stopAll();
     res.json({ success: true });
   } catch (err) {
     console.log('Error en POST /api/despliegue/detener-instancia-dev:', err);

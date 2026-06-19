@@ -34,9 +34,22 @@ async function startSession(navegador, headless, resolution) {
 
   const headlessMode = headless !== undefined ? !!headless : defaultHeadless;
 
+  const launchArgs = [];
+  if (resolution && resolution.width && resolution.height) {
+    if (navegador === 'chrome') {
+      launchArgs.push(`--window-size=${resolution.width},${resolution.height}`);
+    } else if (navegador === 'firefox') {
+      launchArgs.push(`--width=${resolution.width}`);
+      launchArgs.push(`--height=${resolution.height}`);
+    }
+  }
+
   let browser;
   try {
-    browser = await browserType.launch({ headless: headlessMode });
+    browser = await browserType.launch({
+      headless: headlessMode,
+      args: launchArgs.length > 0 ? launchArgs : undefined,
+    });
   } catch (err) {
     console.log('Error al lanzar navegador:', err.message);
     throw new Error(`No se pudo iniciar ${navegador}: ${err.message}`);
