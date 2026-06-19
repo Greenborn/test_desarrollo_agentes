@@ -49,10 +49,10 @@ function parseArgs(args) {
 }
 
 register({
-  name: '/iniciar_navegador',
+  name: '/navegador_iniciar',
   category: 'Navegador',
   description: 'Inicia una sesión de navegador web (chrome o firefox). Usa --resolution=ID o la resolución por defecto del usuario.',
-  usage: '/iniciar_navegador [--navegador=chrome|firefox] [--resolution=ID] [--url=URL]',
+  usage: '/navegador_iniciar [--navegador=chrome|firefox] [--resolution=ID] [--url=URL]',
   async autocomplete(args, cmdStore) {
     const hasResolution = args.find(a => a.startsWith('--resolution='))
     const hasUrl = args.find(a => a.startsWith('--url='))
@@ -181,7 +181,7 @@ register({
         _key: 'result-' + Date.now(),
       })
     } catch (err) {
-      console.error('Error en /iniciar_navegador:', err.message)
+      console.error('Error en /navegador_iniciar:', err.message)
       throw err
     }
   },

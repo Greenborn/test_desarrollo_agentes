@@ -4,10 +4,10 @@ import { parseCommandArgs } from '../parseCommandArgs.js';
 const { register } = useCommandRegistry();
 
 register({
-  name: '/documentacion_all',
+  name: '/dev_documento_listar',
   category: 'Desarrollo',
   description: 'Obtiene toda la documentación de un proyecto y la pega en el chat. Si no se especifica proyecto, usa el de la sesión actual.',
-  usage: '/documentacion_all [--id=&lt;id_proyecto&gt;]',
+  usage: '/dev_documento_listar [--id=&lt;id_proyecto&gt;]',
   async autocomplete(args, cmdStore) {
     const idArg = args.find(a => a.startsWith('--id='))
     if (idArg) {
@@ -25,7 +25,7 @@ register({
           }
         }
       } catch (err) {
-        console.error('Error en autocomplete de /documentacion_all:', err);
+        console.error('Error en autocomplete de /dev_documento_listar:', err);
       }
     } else {
       cmdStore.showAutocomplete(['--id='])
@@ -79,7 +79,7 @@ register({
 
       return lines.join('\n') || '(sin documentación para este proyecto)';
     } catch (err) {
-      console.error('Error en /documentacion_all:', err.message);
+      console.error('Error en /dev_documento_listar:', err.message);
       throw err;
     }
   },

@@ -199,7 +199,7 @@ export default {
       if (!ocStore.selectedProvider) {
         chat.pushMessage({
           role: 'opencode_info',
-          content: JSON.stringify({ type: 'info', message: 'No hay sesión OpenCode configurada. Ejecutá /opencode primero.' }),
+          content: JSON.stringify({ type: 'info', message: 'No hay sesión OpenCode configurada. Ejecutá /dev_opencode_iniciar primero.' }),
           _key: 'info-' + Date.now(),
         })
         return

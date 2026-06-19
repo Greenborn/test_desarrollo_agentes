@@ -4,10 +4,10 @@ import { parseCommandArgs } from '../parseCommandArgs.js'
 const { register } = useCommandRegistry()
 
 register({
-  name: '/redmine_proyectos',
+  name: '/redmine_listar_proyectos',
   category: 'Utilidades',
   description: 'Lista proyectos Redmine. Con --import importa todos a la base de datos local.',
-  usage: '/redmine_proyectos [--import]',
+  usage: '/redmine_listar_proyectos [--import]',
   autocomplete(args, cmdStore) {
     if (!args.find(a => a.startsWith('--import'))) {
       cmdStore.showAutocomplete(['--import'])
@@ -80,7 +80,7 @@ register({
         }
       }
     } catch (err) {
-      console.error('Error en /redmine_proyectos:', err.message)
+      console.error('Error en /redmine_listar_proyectos:', err.message)
       throw new Error('Error de conexión al procesar proyectos Redmine.')
     }
   },

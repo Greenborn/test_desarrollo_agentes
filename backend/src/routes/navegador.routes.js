@@ -77,7 +77,7 @@ router.post('/finish', async (req, res) => {
   const { id_session, sessionId } = req.body;
 
   if (!id_session) {
-    const errorMsg = 'No hay sesión de navegador activa. Usá /iniciar_navegador primero.';
+    const errorMsg = 'No hay sesión de navegador activa. Usá /navegador_iniciar primero.';
     await saveToChat(sessionId, 'result', errorMsg);
     return res.status(400).json({ error: errorMsg });
   }

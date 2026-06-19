@@ -182,7 +182,136 @@ if (navegadorArg) {
 | `||` como fallback de parámetros | Asigna valor por defecto silenciosamente |
 | Parámetros posicionales sin flag | Inconsistentes y difíciles de recordar |
 
-## 8. Comandos ligados a la sesión de chat
+## 8. Comandos que referencian directamente a Redmine
+
+Todo comando que realice operaciones directas contra la API de Redmine (test de conexión, listar proyectos, obtener/importar tickets) **debe comenzar con `/redmine_`**.
+
+### Estructura
+
+```
+/redmine_[verbo]_[sustantivo]
+```
+
+| Parte | Descripción | Ejemplos |
+|---|---|---|
+| `verbo` | Acción a realizar | `test`, `listar`, `importar` |
+| `sustantivo` | Entidad de Redmine | `conexion`, `proyectos`, `tickets` |
+
+### Ejemplos
+
+| Nombre | Verbo | Sustantivo | Significado |
+|---|---|---|---|
+| `/redmine_test_conexion` | `test` | `conexion` | Probar conexión a Redmine |
+| `/redmine_listar_proyectos` | `listar` | `proyectos` | Listar proyectos de Redmine |
+| `/redmine_listar_tickets` | `listar` | `tickets` | Listar tickets de un proyecto Redmine |
+| `/redmine_importar_tickets` | `importar` | `tickets` | Importar tickets de Redmine a DB local |
+
+### Excepciones
+
+Los comandos de sesión de chat que operan sobre tickets de Redmine **quedan excluidos** de esta regla, ya que pertenecen a la convención `/chat_[verbo]_[objeto]`:
+
+- `/chat_set_ticket` — asigna ticket a la sesión (comando de sesión, no de Redmine directo)
+- `/chat_get_ticket` — muestra ticket de la sesión (comando de sesión)
+- `/chat_edit_ticket` — edita ticket de la sesión (comando de sesión)
+
+## 9. Comandos del navegador (Playwright)
+
+Todo comando que controle directamente el navegador web (iniciar, navegar, configurar, finalizar) **debe comenzar con `/navegador_`**.
+
+### Estructura
+
+```
+/navegador_[verbo]_[sustantivo]
+```
+
+| Parte | Descripción | Ejemplos |
+|---|---|---|
+| `verbo` | Acción a realizar | `iniciar`, `ir`, `configurar`, `finalizar` |
+| `sustantivo` | Entidad del navegador | `url`, `headless` |
+
+### Ejemplos
+
+| Nombre | Verbo | Sustantivo | Significado |
+|---|---|---|---|
+| `/navegador_iniciar` | `iniciar` | *(implícito)* | Iniciar sesión de navegador |
+| `/navegador_ir_url` | `ir` | `url` | Navegar a una URL |
+| `/navegador_configurar_headless` | `configurar` | `headless` | Cambiar modo headless |
+| `/navegador_finalizar` | `finalizar` | *(implícito)* | Finalizar sesión de navegador |
+
+### Excepciones
+
+Los comandos de resolución de pantalla **quedan excluidos** por ser una categoría independiente:
+
+- `/resoluciones_get_all` — muestra resoluciones configuradas
+- `/resolucion_default` — muestra resolución por defecto
+
+## 10. Comandos de despliegue
+
+Todo comando que gestione la configuración e instancias de desarrollo **debe comenzar con `/despliegue_`**.
+
+### Estructura
+
+```
+/despliegue_[verbo]_[sustantivo]
+```
+
+### Ejemplos
+
+| Nombre | Verbo | Sustantivo | Significado |
+|---|---|---|---|
+| `/despliegue_actualizar_config` | `actualizar` | `config` | Cargar configuración desde deploy.json |
+| `/despliegue_mostrar_config` | `mostrar` | `config` | Mostrar configuración guardada |
+| `/despliegue_iniciar_instancia` | `iniciar` | `instancia` | Iniciar procesos de desarrollo |
+| `/despliegue_detener_instancia` | `detener` | `instancia` | Detener procesos de desarrollo |
+| `/despliegue_ver_estado` | `ver` | `estado` | Ver estado de procesos |
+
+## 11. Comandos de desarrollo (OpenCode y utilidades dev)
+
+Todo comando que forme parte del ecosistema de desarrollo (funcionalidades, documentación, OpenCode, git) **debe comenzar con `/dev_`**.
+
+### Estructura
+
+```
+/dev_[cosa]_[verbo]_[sustantivo]
+```
+
+| Parte | Descripción | Ejemplos |
+|---|---|---|
+| `cosa` | Subcategoría | `funcionalidad`, `documento`, `opencode`, `git` |
+| `verbo` | Acción | `crear`, `listar`, `actualizar`, `iniciar`, `finalizar`, `generar` |
+| `sustantivo` | Opcional, entidad | `commit`, `rama` |
+
+### Ejemplos
+
+| Nombre | Cosa | Verbo | Sustantivo | Significado |
+|---|---|---|---|---|
+| `/dev_funcionalidad_crear` | funcionalidad | crear | — | Wizard nueva funcionalidad |
+| `/dev_funcionalidad_listar` | funcionalidad | listar | — | Listar funcionalidades |
+| `/dev_documento_listar` | documento | listar | — | Obtener documentación del proyecto |
+| `/dev_documento_actualizar` | documento | actualizar | — | Actualizar documentación con OpenCode |
+| `/dev_opencode_iniciar` | opencode | iniciar | — | Iniciar sesión OpenCode |
+| `/dev_opencode_finalizar` | opencode | finalizar | — | Finalizar sesión OpenCode |
+| `/dev_opencode_generar_commit` | opencode | generar | commit | Generar mensaje de commit |
+| `/dev_git_crear_rama` | git | crear | rama | Crear rama desde proyecto y ticket |
+
+## 12. Comandos de gastos
+
+Todo comando que consulte registros de gastos de tokens **debe comenzar con `/gastos_`**.
+
+### Estructura
+
+```
+/gastos_[verbo]_[sustantivo]
+```
+
+### Ejemplos
+
+| Nombre | Verbo | Sustantivo | Significado |
+|---|---|---|---|
+| `/gastos_listar` | listar | — | Mostrar todos los gastos |
+| `/gastos_listar_proyecto` | listar | proyecto | Mostrar gastos de un proyecto |
+
+## 13. Comandos ligados a la sesión de chat
 
 Todo comando que opere sobre datos o contexto de la sesión de chat activa (sesiones, tickets, proyectos, etc.) **debe comenzar con `/chat_`**.
 
@@ -212,7 +341,7 @@ Todo comando que opere sobre datos o contexto de la sesión de chat activa (sesi
 - Los comandos de sistema (`/help`, `/history`) son globales
 - Los comandos passthrough (`/git`) son puertas a herramientas externas
 
-## 9. Excepción: comandos passthrough
+## 14. Excepción: comandos passthrough
 
 Algunos comandos actúan como **puerta de enlace** a herramientas externas con sintaxis propia (ej: `/git`). Estos comandos **no pueden** encapsular su sintaxis en `--nombre=valor` porque los argumentos son impredecibles y pueden incluir subcomandos, flags propios, etc.
 

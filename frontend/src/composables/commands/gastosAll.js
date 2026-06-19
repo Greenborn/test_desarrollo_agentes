@@ -3,10 +3,10 @@ import { useCommandRegistry } from '../useCommandRegistry.js';
 const { register } = useCommandRegistry();
 
 register({
-  name: '/gastos_all',
+  name: '/gastos_listar',
   category: 'Gastos',
   description: 'Muestra todos los registros de gastos de tokens.',
-  usage: '/gastos_all',
+  usage: '/gastos_listar',
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId;
     if (!sessionId) {
@@ -39,7 +39,7 @@ register({
 
       return lines.join('\n\n');
     } catch (err) {
-      console.error('Error en /gastos_all:', err.message);
+      console.error('Error en /gastos_listar:', err.message);
       throw err;
     }
   },

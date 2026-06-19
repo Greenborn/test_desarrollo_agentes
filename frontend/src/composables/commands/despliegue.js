@@ -30,10 +30,10 @@ function parseResolutionArg(args) {
 }
 
 register({
-  name: '/despliegue_upd_config',
+  name: '/despliegue_actualizar_config',
   category: 'Despliegue',
   description: 'Lee deploy.json del directorio del proyecto y guarda la configuración de despliegue en la base de datos.',
-  usage: '/despliegue_upd_config',
+  usage: '/despliegue_actualizar_config',
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId;
     if (!sessionId) {
@@ -57,10 +57,10 @@ register({
 });
 
 register({
-  name: '/despliegue_show_config',
+  name: '/despliegue_mostrar_config',
   category: 'Despliegue',
   description: 'Muestra la configuración de despliegue guardada para el proyecto actual.',
-  usage: '/despliegue_show_config',
+  usage: '/despliegue_mostrar_config',
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId;
     if (!sessionId) {
@@ -81,10 +81,10 @@ register({
 });
 
 register({
-  name: '/iniciar_instancia_dev',
+  name: '/despliegue_iniciar_instancia',
   category: 'Despliegue',
   description: 'Instala dependencias (npm ci) e inicia los procesos de desarrollo (nodemon para backend, npm run dev para frontend) según la configuración de despliegue.',
-  usage: '/iniciar_instancia_dev [--resolucion=ID]',
+  usage: '/despliegue_iniciar_instancia [--resolucion=ID]',
   async autocomplete(args, cmdStore) {
     const resolutionArg = args.find(a => a.startsWith('--resolucion='));
     if (!resolutionArg) {
@@ -173,10 +173,10 @@ register({
 });
 
 register({
-  name: '/instancia_dev_detener',
+  name: '/despliegue_detener_instancia',
   category: 'Despliegue',
-  description: 'Detiene todos los procesos de desarrollo iniciados con /iniciar_instancia_dev.',
-  usage: '/instancia_dev_detener',
+  description: 'Detiene todos los procesos de desarrollo iniciados con /despliegue_iniciar_instancia.',
+  usage: '/despliegue_detener_instancia',
   async execute(args, { chatStore }) {
     const res = await fetch('/api/despliegue/detener-instancia-dev', {
       method: 'POST',
@@ -195,10 +195,10 @@ register({
 });
 
 register({
-  name: '/instancia_dev_estado',
+  name: '/despliegue_ver_estado',
   category: 'Despliegue',
   description: 'Muestra el estado actual de los procesos de desarrollo.',
-  usage: '/instancia_dev_estado',
+  usage: '/despliegue_ver_estado',
   async execute(args, { chatStore }) {
     const res = await fetch('/api/despliegue/estado-instancia-dev', {
       credentials: 'include',
@@ -210,7 +210,7 @@ register({
     }
 
     if (!data.processes || data.processes.length === 0) {
-      return '(No hay procesos de desarrollo activos. Use /iniciar_instancia_dev para iniciarlos.)';
+      return '(No hay procesos de desarrollo activos. Use /despliegue_iniciar_instancia para iniciarlos.)';
     }
 
     const lines = data.processes.map((p) => {

@@ -249,7 +249,7 @@
 
         <div v-if="matches('resoluciones pantalla resolucion')" class="border-top border-secondary pt-3">
           <label class="form-label mb-2 fw-bold">Resoluciones de Pantalla</label>
-          <div class="small text-muted mb-2">Usadas por /iniciar_navegador --resolution=ID</div>
+          <div class="small text-muted mb-2">Usadas por /navegador_iniciar --resolution=ID</div>
           <div v-for="(res, i) in resolutionsEdit" :key="i" class="d-flex gap-2 mb-1 align-items-center">
             <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 130px;" placeholder="id" v-model="resolutionsEdit[i].id" />
             <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 90px;" placeholder="ancho" v-model.number="resolutionsEdit[i].width" min="1" />

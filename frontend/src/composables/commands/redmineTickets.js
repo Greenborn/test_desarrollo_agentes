@@ -4,10 +4,10 @@ import { parseCommandArgs } from '../parseCommandArgs.js'
 const { register } = useCommandRegistry()
 
 register({
-  name: '/redmine_tickets',
+  name: '/redmine_listar_tickets',
   category: 'Utilidades',
   description: 'Obtiene la lista de tickets de Redmine para un proyecto importado.',
-  usage: '/redmine_tickets --id=&lt;id_proyecto&gt;',
+  usage: '/redmine_listar_tickets --id=&lt;id_proyecto&gt;',
   async autocomplete(args, cmdStore) {
     const idArg = args.find(a => a.startsWith('--id='))
     if (idArg) {
@@ -25,7 +25,7 @@ register({
           }
         }
       } catch (err) {
-        console.error('Error en autocomplete de /redmine_tickets:', err)
+        console.error('Error en autocomplete de /redmine_listar_tickets:', err)
       }
     } else {
       cmdStore.showAutocomplete(['--id='])
@@ -65,7 +65,7 @@ register({
 
       return header + tableHeader + rows
     } catch (err) {
-      console.error('Error en /redmine_tickets:', err.message)
+      console.error('Error en /redmine_listar_tickets:', err.message)
       throw new Error('Error de conexión al obtener tickets de Redmine.')
     }
   },

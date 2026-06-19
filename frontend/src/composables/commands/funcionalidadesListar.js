@@ -4,10 +4,10 @@ import { parseCommandArgs } from '../parseCommandArgs.js'
 const { register } = useCommandRegistry()
 
 register({
-  name: '/funcionalidades_listar',
+  name: '/dev_funcionalidad_listar',
   category: 'Desarrollo',
   description: 'Lista las funcionalidades del proyecto vinculado a la sesión o del especificado.',
-  usage: '/funcionalidades_listar [--id=&lt;id_proyecto&gt;]',
+  usage: '/dev_funcionalidad_listar [--id=&lt;id_proyecto&gt;]',
   async autocomplete(args, cmdStore) {
     const idArg = args.find(a => a.startsWith('--id='))
     if (idArg) {
@@ -25,7 +25,7 @@ register({
           }
         }
       } catch (err) {
-        console.error('Error en autocomplete de /funcionalidades_listar:', err)
+        console.error('Error en autocomplete de /dev_funcionalidad_listar:', err)
       }
     } else {
       cmdStore.showAutocomplete(['--id='])
@@ -74,7 +74,7 @@ register({
         controlData: listData,
       }
     } catch (err) {
-      console.error('Error en /funcionalidades_listar:', err)
+      console.error('Error en /dev_funcionalidad_listar:', err)
       throw err
     }
   },

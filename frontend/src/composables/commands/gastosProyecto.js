@@ -4,10 +4,10 @@ import { parseCommandArgs } from '../parseCommandArgs.js';
 const { register } = useCommandRegistry();
 
 register({
-  name: '/gastos_proyecto',
+  name: '/gastos_listar_proyecto',
   category: 'Gastos',
   description: 'Muestra gastos del proyecto activo o del especificado.',
-  usage: '/gastos_proyecto [--id=&lt;id_proyecto&gt;]',
+  usage: '/gastos_listar_proyecto [--id=&lt;id_proyecto&gt;]',
   async autocomplete(args, cmdStore) {
     const idArg = args.find(a => a.startsWith('--id='))
     if (idArg) {
@@ -25,7 +25,7 @@ register({
           }
         }
       } catch (err) {
-        console.error('Error en autocomplete de /gastos_proyecto:', err);
+        console.error('Error en autocomplete de /gastos_listar_proyecto:', err);
       }
     } else {
       cmdStore.showAutocomplete(['--id='])
@@ -80,7 +80,7 @@ register({
 
       return lines.join('\n\n');
     } catch (err) {
-      console.error('Error en /gastos_proyecto:', err.message);
+      console.error('Error en /gastos_listar_proyecto:', err.message);
       throw err;
     }
   },

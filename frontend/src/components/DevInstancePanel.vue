@@ -12,7 +12,7 @@
 
     <div v-if="!hasProcesses" class="flex-grow-1 d-flex align-items-center justify-content-center text-muted small">
       <span v-if="errorMsg">{{ errorMsg }}</span>
-      <span v-else>No hay instancia de desarrollo activa. Use /iniciar_instancia_dev para iniciarla.</span>
+      <span v-else>No hay instancia de desarrollo activa. Use /despliegue_iniciar_instancia para iniciarla.</span>
     </div>
 
     <div v-else class="d-flex flex-grow-1" style="min-height: 0;">

@@ -3,10 +3,10 @@ import { useCommandRegistry } from '../useCommandRegistry.js'
 const { register } = useCommandRegistry()
 
 register({
-  name: '/redmine_test',
+  name: '/redmine_test_conexion',
   category: 'Utilidades',
   description: 'Prueba la conexión a la instancia de Redmine configurada.',
-  usage: '/redmine_test',
+  usage: '/redmine_test_conexion',
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId
     if (!sessionId) {
@@ -22,7 +22,7 @@ register({
       const data = await res.json()
       return data.message
     } catch (err) {
-      console.error('Error en /redmine_test:', err.message)
+      console.error('Error en /redmine_test_conexion:', err.message)
       throw new Error('Error de conexión al intentar probar Redmine.')
     }
   },

@@ -91,7 +91,7 @@ router.get('/config', async (req, res) => {
     if (!proyecto || !proyecto.despliegue_config) {
       return res.status(404).json({
         success: false,
-        error: 'No hay configuración de despliegue guardada. Use /despliegue_upd_config para cargarla.',
+        error: 'No hay configuración de despliegue guardada. Use /despliegue_actualizar_config para cargarla.',
       });
     }
 
@@ -137,7 +137,7 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
     if (!proyecto || !proyecto.despliegue_config) {
       return res.status(400).json({
         success: false,
-        error: 'No hay configuración de despliegue guardada. Use /despliegue_upd_config para cargarla.',
+        error: 'No hay configuración de despliegue guardada. Use /despliegue_actualizar_config para cargarla.',
       });
     }
 

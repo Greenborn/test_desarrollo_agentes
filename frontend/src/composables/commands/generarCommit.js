@@ -4,22 +4,22 @@ import { useOpencodeStore } from '../../stores/opencode.js'
 const { register } = useCommandRegistry()
 
 register({
-  name: '/generar_commit',
-  category: 'OpenCode',
+  name: '/dev_opencode_generar_commit',
+  category: 'Desarrollo',
   description: 'Genera un mensaje de commit de los cambios realizados usando OpenCode. Seleccioná proveedor, modelo y modo para obtener una propuesta de commit.',
-  usage: '/generar_commit',
+  usage: '/dev_opencode_generar_commit',
   async execute(args, { cmdStore, chatStore }) {
     const ocStore = useOpencodeStore()
     const sessionId = chatStore.activeSessionId
     if (!sessionId) {
-      console.error('Error en /generar_commit: no hay sesión de chat activa')
+      console.error('Error en /dev_opencode_generar_commit: no hay sesión de chat activa')
       return
     }
 
     if (ocStore.ocSessionId) {
       chatStore.messages.push({
         role: 'opencode_info',
-        content: JSON.stringify({ type: 'info', message: 'OpenCode ya está activo en esta sesión. Finalizalo con /opencode_fin antes de generar un commit.' }),
+        content: JSON.stringify({ type: 'info', message: 'OpenCode ya está activo en esta sesión. Finalizalo con /dev_opencode_finalizar antes de generar un commit.' }),
         _key: 'info-' + Date.now(),
       })
       return
@@ -30,7 +30,7 @@ register({
 
     const providerList = ocStore.getAvailableProviders()
     if (providerList.length === 0) {
-      console.error('Error en /generar_commit: no se encontraron proveedores')
+      console.error('Error en /dev_opencode_generar_commit: no se encontraron proveedores')
       return
     }
 

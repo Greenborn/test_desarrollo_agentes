@@ -5,10 +5,10 @@ import FuncionalidadWizard from '../../components/FuncionalidadWizard.vue';
 const { register } = useCommandRegistry();
 
 register({
-  name: '/nueva_funcionalidad',
+  name: '/dev_funcionalidad_crear',
   category: 'Desarrollo',
   description: 'Inicia el wizard para relevar y desarrollar una nueva funcionalidad',
-  usage: '/nueva_funcionalidad',
+  usage: '/dev_funcionalidad_crear',
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId;
     if (!sessionId) {

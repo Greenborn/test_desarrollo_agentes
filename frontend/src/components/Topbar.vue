@@ -171,21 +171,21 @@ export default {
     })
 
     register({
-      name: '/opencode',
-      category: 'OpenCode',
+      name: '/dev_opencode_iniciar',
+      category: 'Desarrollo',
       description: 'Inicia una sesión con OpenCode: seleccionar proveedor, modelo, modo y enviar prompt.',
-      usage: '/opencode',
+      usage: '/dev_opencode_iniciar',
       async execute(args, { cmdStore, chatStore }) {
         const sessionId = chatStore.activeSessionId
         if (!sessionId) {
-          console.error('Error en /opencode: no hay sesión de chat activa')
+          console.error('Error en /dev_opencode_iniciar: no hay sesión de chat activa')
           return
         }
 
         if (ocStore.ocSessionId) {
           chatStore.messages.push({
             role: 'opencode_info',
-            content: JSON.stringify({ type: 'info', message: 'OpenCode ya está activo en esta sesión. Escribí tu mensaje directamente o usá /opencode_fin para terminar la sesión.' }),
+            content: JSON.stringify({ type: 'info', message: 'OpenCode ya está activo en esta sesión. Escribí tu mensaje directamente o usá /dev_opencode_finalizar para terminar la sesión.' }),
             _key: 'info-' + Date.now(),
           })
           return
@@ -196,7 +196,7 @@ export default {
 
         const providerList = ocStore.getAvailableProviders()
         if (providerList.length === 0) {
-          console.error('Error en /opencode: no se encontraron proveedores')
+          console.error('Error en /dev_opencode_iniciar: no se encontraron proveedores')
           return
         }
 
@@ -228,10 +228,10 @@ export default {
     }
 
     register({
-      name: '/navegador_go_to',
+      name: '/navegador_ir_url',
       category: 'Navegador',
       description: 'Navega a una URL en la sesión de navegador activa.',
-      usage: '/navegador_go_to --url=&lt;url&gt;',
+      usage: '/navegador_ir_url --url=&lt;url&gt;',
       async autocomplete(args, cmdStore) {
         const urlArg = args.find(a => a.startsWith('--url='))
         if (urlArg) {
@@ -245,7 +245,7 @@ export default {
       async execute(args, { cmdStore, chatStore }) {
         const { params, errors } = parseCommandArgs(args, { url: { required: true } })
         if (errors.length > 0) {
-          console.error('Error en /navegador_go_to:', errors.join('. '))
+          console.error('Error en /navegador_ir_url:', errors.join('. '))
           return
         }
         const url = params.url
@@ -254,22 +254,22 @@ export default {
           const res = await navegadorFetch('go_to_url', { id_session: navegadorSessionId.value, url }, sessionId)
           const data = await res.json()
           if (data.error) {
-            console.error('Error en /navegador_go_to:', data.error)
+            console.error('Error en /navegador_ir_url:', data.error)
           } else {
             if (data.id_session) navegadorSessionId.value = data.id_session
             if (sessionId) chatStore.loadMessages(sessionId)
           }
         } catch (err) {
-          console.error('Error en /navegador_go_to:', err)
+          console.error('Error en /navegador_ir_url:', err)
         }
       },
     })
 
     register({
-      name: '/navegador_set_headless',
+      name: '/navegador_configurar_headless',
       category: 'Navegador',
       description: 'Cambia el modo headless del navegador (0 = visible, 1 = headless). Si hay sesión activa, la reinicia.',
-      usage: '/navegador_set_headless --mode=&lt;0|1&gt;',
+      usage: '/navegador_configurar_headless --mode=&lt;0|1&gt;',
       autocomplete(args, cmdStore) {
         const modeArg = args.find(a => a.startsWith('--mode='))
         if (modeArg) {
@@ -287,12 +287,12 @@ export default {
       async execute(args, { cmdStore, chatStore }) {
         const { params, errors } = parseCommandArgs(args, { mode: { required: true } })
         if (errors.length > 0) {
-          console.error('Error en /navegador_set_headless:', errors.join('. '))
+          console.error('Error en /navegador_configurar_headless:', errors.join('. '))
           return
         }
         const val = params.mode
         if (val !== '0' && val !== '1') {
-          console.error('Error en /navegador_set_headless: use --mode=0 (visible) o --mode=1 (headless)')
+          console.error('Error en /navegador_configurar_headless: use --mode=0 (visible) o --mode=1 (headless)')
           return
         }
         const sessionId = chatStore.activeSessionId
@@ -300,28 +300,28 @@ export default {
           const res = await navegadorFetch('set_headless', { headless: val }, sessionId)
           const data = await res.json()
           if (data.error) {
-            console.error('Error en /navegador_set_headless:', data.error)
+            console.error('Error en /navegador_configurar_headless:', data.error)
           } else {
             if (data.id_session) navegadorSessionId.value = data.id_session
             if (sessionId) chatStore.loadMessages(sessionId)
           }
         } catch (err) {
-          console.error('Error en /navegador_set_headless:', err)
+          console.error('Error en /navegador_configurar_headless:', err)
         }
       },
     })
 
     register({
-      name: '/navegador_fin',
+      name: '/navegador_finalizar',
       category: 'Navegador',
       description: 'Finaliza la sesión de navegador activa. Si no hay sesión iniciada, muestra error.',
-      usage: '/navegador_fin',
+      usage: '/navegador_finalizar',
       async execute(args, { cmdStore, chatStore }) {
         const sessionId = chatStore.activeSessionId
         if (!navegadorSessionId.value) {
-          console.error('Error en /navegador_fin: no hay sesión de navegador activa')
+          console.error('Error en /navegador_finalizar: no hay sesión de navegador activa')
           if (sessionId) {
-            chatStore.messages.push({ role: 'result', content: 'Error: No hay sesión de navegador activa. Usá /iniciar_navegador primero.', _key: 'err-' + Date.now() })
+            chatStore.messages.push({ role: 'result', content: 'Error: No hay sesión de navegador activa. Usá /navegador_iniciar primero.', _key: 'err-' + Date.now() })
           }
           return
         }
@@ -334,21 +334,21 @@ export default {
           })
           const data = await res.json()
           if (data.error) {
-            console.error('Error en /navegador_fin:', data.error)
+            console.error('Error en /navegador_finalizar:', data.error)
           }
           navegadorSessionId.value = null
           if (sessionId) chatStore.loadMessages(sessionId)
         } catch (err) {
-          console.error('Error en /navegador_fin:', err)
+          console.error('Error en /navegador_finalizar:', err)
         }
       },
     })
 
     register({
-      name: '/opencode_fin',
-      category: 'OpenCode',
+      name: '/dev_opencode_finalizar',
+      category: 'Desarrollo',
       description: 'Finaliza la sesión OpenCode activa.',
-      usage: '/opencode_fin',
+      usage: '/dev_opencode_finalizar',
       async execute(args, { cmdStore, chatStore }) {
         try {
           await fetch('/api/opencode/finish', {
@@ -358,7 +358,7 @@ export default {
             body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, directory: cmdStore.currentDir || undefined }),
           })
         } catch (err) {
-          console.error('Error en /opencode_fin:', err)
+          console.error('Error en /dev_opencode_finalizar:', err)
         }
         ocStore.finish()
         if (chatStore.activeSessionId) {

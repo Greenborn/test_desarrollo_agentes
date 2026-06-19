@@ -144,7 +144,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `redmine_parent_id` | VARCHAR(255) | nullable — ID del proyecto padre en Redmine |
 | `redmine_parent_name` | VARCHAR(255) | nullable — nombre del proyecto padre |
 | `url_github` | VARCHAR(500) | nullable — URL del repositorio GitHub |
-| `despliegue_config` | TEXT | nullable — JSON con configuración de despliegue cargada desde `deploy.json` vía `/despliegue_upd_config` |
+| `despliegue_config` | TEXT | nullable — JSON con configuración de despliegue cargada desde `deploy.json` vía `/despliegue_actualizar_config` |
 
 ---
 

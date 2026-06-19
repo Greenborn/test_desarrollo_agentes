@@ -6,10 +6,10 @@ const { register } = useCommandRegistry();
 const DOC_TYPES = ['base_datos', 'subproyectos', 'endpoints', 'web_sockets', 'funcionalidades', 'all'];
 
 register({
-  name: '/documentacion_update',
+  name: '/dev_documento_actualizar',
   category: 'Desarrollo',
   description: 'Actualiza la documentación del proyecto usando OpenCode para el tipo indicado.',
-  usage: '/documentacion_update --tipo=&lt;tipo&gt;',
+  usage: '/dev_documento_actualizar --tipo=&lt;tipo&gt;',
   async autocomplete(args, cmdStore) {
     const tipoArg = args.find(a => a.startsWith('--tipo='))
     if (tipoArg) {

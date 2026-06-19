@@ -3,10 +3,10 @@ import { useCommandRegistry } from '../useCommandRegistry.js'
 const { register } = useCommandRegistry()
 
 register({
-  name: '/repo:crear_rama',
-  category: 'Git',
+  name: '/dev_git_crear_rama',
+  category: 'Desarrollo',
   description: 'Crea una rama Git a partir del proyecto y ticket de la sesión, usando una rama base seleccionable. Requiere que el directorio de trabajo sea un repositorio Git.',
-  usage: '/repo:crear_rama',
+  usage: '/dev_git_crear_rama',
   async execute(args, { chatStore }) {
     const sessionId = chatStore.activeSessionId
     if (!sessionId) {

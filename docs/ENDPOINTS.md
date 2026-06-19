@@ -423,7 +423,7 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Obtiene la configuración de despliegue guardada para el proyecto vinculado a la sesión de chat.
 - **Respuesta 200:** `{ success: true, config: <objeto JSON> }`
 - **Respuesta 400:** `{ success: false, error: "La sesión de chat no está vinculada a un proyecto. Use /chat_set_proyecto para seleccionar un proyecto." }`
-- **Respuesta 404:** `{ success: false, error: "No hay configuración de despliegue guardada. Use /despliegue_upd_config para cargarla." }`
+- **Respuesta 404:** `{ success: false, error: "No hay configuración de despliegue guardada. Use /despliegue_actualizar_config para cargarla." }`
 
 ### `POST /api/despliegue/iniciar-instancia-dev`
 - **Auth:** Requerida
@@ -435,7 +435,7 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 ### `POST /api/despliegue/detener-instancia-dev`
 - **Auth:** Requerida
 - **Body:** ninguno
-- **Descripción:** Detiene todos los procesos de desarrollo activos iniciados con `/iniciar_instancia_dev`.
+- **Descripción:** Detiene todos los procesos de desarrollo activos iniciados con `/despliegue_iniciar_instancia`.
 - **Respuesta 200:** `{ success: true }`
 
 ### `GET /api/despliegue/estado-instancia-dev`

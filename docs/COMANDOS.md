@@ -29,23 +29,13 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 
 ---
 
-## OpenCode
-
-| Comando | Descripción | Uso |
-|---|---|---|
-| `/opencode` | Inicia una sesión OpenCode: seleccionar proveedor, modelo, modo y enviar prompt. Después de cada respuesta se puede seguir enviando mensajes. | `/opencode` |
-| `/generar_commit` | Genera un mensaje de commit de los cambios realizados usando OpenCode. Seleccioná proveedor, modelo y modo para obtener una propuesta de commit en modo planificación. | `/generar_commit` |
-| `/opencode_fin` | Finaliza la sesión OpenCode activa | `/opencode_fin` |
-
----
-
 ## Utilidades
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/redmine_test` | Prueba la conexión a la instancia de Redmine configurada | `/redmine_test` |
-| `/redmine_proyectos` | Lista proyectos Redmine. Con `--import` importa todos a la base de datos local | `/redmine_proyectos [--import]` |
-| `/redmine_tickets` | Obtiene la lista de tickets de Redmine para un proyecto importado. Usa Tab para autocompletar con los proyectos disponibles | `/redmine_tickets --id=<id_proyecto>` |
+| `/redmine_test_conexion` | Prueba la conexión a la instancia de Redmine configurada | `/redmine_test_conexion` |
+| `/redmine_listar_proyectos` | Lista proyectos Redmine. Con `--import` importa todos a la base de datos local | `/redmine_listar_proyectos [--import]` |
+| `/redmine_listar_tickets` | Obtiene la lista de tickets de Redmine para un proyecto importado. Usa Tab para autocompletar con los proyectos disponibles | `/redmine_listar_tickets --id=<id_proyecto>` |
 | `/redmine_importar_tickets` | Importa todos los tickets de Redmine de un proyecto o de todos los proyectos a la base de datos local. Usa Tab para autocompletar | `/redmine_importar_tickets [--id=<id_proyecto> \| --all]` |
 
 ---
@@ -54,12 +44,12 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/iniciar_navegador` | Abre un navegador (chrome/firefox). Usa Tab para autocompletar cada flag | `/iniciar_navegador [--navegador=chrome\|firefox] [--resolution=ID] [--url=URL]` |
+| `/navegador_iniciar` | Abre un navegador (chrome/firefox). Usa Tab para autocompletar cada flag | `/navegador_iniciar [--navegador=chrome\|firefox] [--resolution=ID] [--url=URL]` |
+| `/navegador_ir_url` | Navega a una URL en la sesión de navegador activa | `/navegador_ir_url --url=<url>` |
+| `/navegador_configurar_headless` | Cambia el modo headless (0 = visible, 1 = headless). Si hay sesión activa, la reinicia | `/navegador_configurar_headless --mode=<0\|1>` |
+| `/navegador_finalizar` | Finaliza la sesión de navegador activa | `/navegador_finalizar` |
 | `/resoluciones_get_all` | Muestra las resoluciones de pantalla configuradas con selector interactivo para establecer una por defecto | `/resoluciones_get_all` |
 | `/resolucion_default` | Muestra la resolución de pantalla por defecto configurada | `/resolucion_default` |
-| `/navegador_go_to` | Navega a una URL en la sesión de navegador activa | `/navegador_go_to --url=<url>` |
-| `/navegador_set_headless` | Cambia el modo headless (0 = visible, 1 = headless). Si hay sesión activa, la reinicia | `/navegador_set_headless --mode=<0\|1>` |
-| `/navegador_fin` | Finaliza la sesión de navegador activa | `/navegador_fin` |
 
 ---
 
@@ -81,8 +71,8 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/gastos_all` | Muestra todos los registros de gastos de tokens | `/gastos_all` |
-| `/gastos_proyecto` | Muestra gastos del proyecto activo o del especificado | `/gastos_proyecto [--id=<id_proyecto>]` |
+| `/gastos_listar` | Muestra todos los registros de gastos de tokens | `/gastos_listar` |
+| `/gastos_listar_proyecto` | Muestra gastos del proyecto activo o del especificado | `/gastos_listar_proyecto [--id=<id_proyecto>]` |
 
 ---
 
@@ -90,10 +80,14 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/nueva_funcionalidad` | Inicia el wizard para relevar y desarrollar una nueva funcionalidad. Requiere un proyecto asignado con `/chat_set_proyecto` | `/nueva_funcionalidad` |
-| `/funcionalidades_listar` | Lista funcionalidades del proyecto de la sesión o del especificado | `/funcionalidades_listar [--id=<id_proyecto>]` |
-| `/documentacion_all` | Obtiene toda la documentación de un proyecto. Si no se especifica, usa el de la sesión actual | `/documentacion_all [--id=<id_proyecto>]` |
-| `/documentacion_update` | Actualiza la documentación del proyecto usando OpenCode para el tipo indicado | `/documentacion_update --tipo=<tipo>` |
+| `/dev_funcionalidad_crear` | Inicia el wizard para relevar y desarrollar una nueva funcionalidad. Requiere un proyecto asignado con `/chat_set_proyecto` | `/dev_funcionalidad_crear` |
+| `/dev_funcionalidad_listar` | Lista funcionalidades del proyecto de la sesión o del especificado | `/dev_funcionalidad_listar [--id=<id_proyecto>]` |
+| `/dev_documento_listar` | Obtiene toda la documentación de un proyecto. Si no se especifica, usa el de la sesión actual | `/dev_documento_listar [--id=<id_proyecto>]` |
+| `/dev_documento_actualizar` | Actualiza la documentación del proyecto usando OpenCode para el tipo indicado | `/dev_documento_actualizar --tipo=<tipo>` |
+| `/dev_opencode_iniciar` | Inicia una sesión OpenCode: seleccionar proveedor, modelo, modo y enviar prompt. Después de cada respuesta se puede seguir enviando mensajes. | `/dev_opencode_iniciar` |
+| `/dev_opencode_generar_commit` | Genera un mensaje de commit de los cambios realizados usando OpenCode. Seleccioná proveedor, modelo y modo para obtener una propuesta de commit en modo planificación. | `/dev_opencode_generar_commit` |
+| `/dev_opencode_finalizar` | Finaliza la sesión OpenCode activa | `/dev_opencode_finalizar` |
+| `/dev_git_crear_rama` | Crea una rama Git a partir del proyecto y ticket de la sesión | `/dev_git_crear_rama` |
 
 ---
 
@@ -102,7 +96,6 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | Comando | Descripción | Uso |
 |---|---|---|
 | `/git` | Ejecuta un comando de Git en el directorio de la sesión activa | `/git <comando>` |
-| `/repo:crear_rama` | Crea una rama Git a partir del proyecto y ticket de la sesión | `/repo:crear_rama` |
 
 ---
 
@@ -110,11 +103,11 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/despliegue_upd_config` | Lee `deploy.json` del directorio del proyecto y guarda la configuración de despliegue en la base de datos | `/despliegue_upd_config` |
-| `/despliegue_show_config` | Muestra la configuración de despliegue guardada para el proyecto actual como JSON formateado | `/despliegue_show_config` |
-| `/iniciar_instancia_dev` | Lee la configuración de despliegue, ejecuta `npm ci` en paralelo en cada subproyecto e inicia los procesos de desarrollo | `/iniciar_instancia_dev [--resolucion=ID]` |
-| `/instancia_dev_detener` | Detiene todos los procesos de desarrollo iniciados con `/iniciar_instancia_dev` | `/instancia_dev_detener` |
-| `/instancia_dev_estado` | Muestra el estado (running/stopped/error) de cada proceso de desarrollo | `/instancia_dev_estado` |
+| `/despliegue_actualizar_config` | Lee `deploy.json` del directorio del proyecto y guarda la configuración de despliegue en la base de datos | `/despliegue_actualizar_config` |
+| `/despliegue_mostrar_config` | Muestra la configuración de despliegue guardada para el proyecto actual como JSON formateado | `/despliegue_mostrar_config` |
+| `/despliegue_iniciar_instancia` | Lee la configuración de despliegue, ejecuta `npm ci` en paralelo en cada subproyecto e inicia los procesos de desarrollo | `/despliegue_iniciar_instancia [--resolucion=ID]` |
+| `/despliegue_detener_instancia` | Detiene todos los procesos de desarrollo iniciados con `/despliegue_iniciar_instancia` | `/despliegue_detener_instancia` |
+| `/despliegue_ver_estado` | Muestra el estado (running/stopped/error) de cada proceso de desarrollo | `/despliegue_ver_estado` |
 
 ---
 
