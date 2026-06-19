@@ -1,46 +1,41 @@
 <template>
   <div
-    class="d-flex flex-column h-100 bg-dark sidebar-chat"
-    :class="{ collapsed: sidebarCollapsed }"
+    class="sidebar-chat d-flex flex-column h-100 bg-dark"
+    :class="{ collapsed: sidebarCollapsed, transitioning: sidebarTransitioning }"
+    :style="sidebarCollapsed ? {} : { width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px' }"
   >
     <button class="btn btn-sm mb-2 flex-shrink-0 btn-argentina" @click="createSession" :disabled="creating">
       {{ creating ? 'Creando...' : '＋ Nuevo chat' }}
     </button>
-    <div class="d-flex flex-column flex-grow-1" style="min-height: 0;">
-      <button
-        class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
-        @click="ui.toggleSection('chats')"
-      >
-        {{ sectionChats ? '▼' : '▶' }} Chats
-      </button>
-      <div v-show="sectionChats" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
-        <div class="list-group list-group-flush" style="min-height: 0;">
-          <button
-            v-for="s in filteredSessions"
-            :key="s.id"
-            class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
-            :class="[{ active: s.id === activeSessionId }, ticketPriorityClass(s.priority_id)]"
-            :title="sessionTooltip(s)"
-            @click="selectSession(s.id)"
-          >
-            <span class="status-led" :class="getSessionStatus(s.id)"></span>
-            <span v-if="s.id_ticket_redmine" class="ticket-badge">#{{ s.id_ticket_redmine }}</span>
-            <span class="text-truncate">{{ s.title }}</span>
-            <span
-              class="delete-btn"
-              @click.stop="chat.deleteSession(s.id)"
-              title="Eliminar conversación"
-            >&times;</span>
-          </button>
-        </div>
+    <div class="overflow-y-auto flex-grow-1" style="min-height: 0;">
+      <div class="list-group list-group-flush" style="min-height: 0;">
+        <button
+          v-for="s in filteredSessions"
+          :key="s.id"
+          class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
+          :class="[{ active: s.id === activeSessionId }, ticketPriorityClass(s.priority_id)]"
+          :title="sessionTooltip(s)"
+          @click="selectSession(s.id)"
+        >
+          <span class="status-led" :class="getSessionStatus(s.id)"></span>
+          <span v-if="s.id_ticket_redmine" class="ticket-badge">#{{ s.id_ticket_redmine }}</span>
+          <span class="text-truncate">{{ s.title }}</span>
+          <span
+            class="delete-btn"
+            @click.stop="chat.deleteSession(s.id)"
+            title="Eliminar conversación"
+          >&times;</span>
+        </button>
       </div>
-
+    </div>
+    <div class="sidebar-resize-handle" @mousedown.prevent="onResizeStart">
+      <div class="sidebar-resize-handle-bar"></div>
     </div>
   </div>
 </template>
 
 <script>
-import { computed, watch } from 'vue'
+import { computed, watch, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
@@ -52,7 +47,19 @@ export default {
     const cmd = useCommandStore()
     const ui = useUiStore()
     const { sessions, activeSessionId, creating, sessionStatus } = storeToRefs(chat)
-    const { sidebarCollapsed, omnifilter, sectionChats } = storeToRefs(ui)
+    const { sidebarCollapsed, sidebarWidth, omnifilter } = storeToRefs(ui)
+
+    const sidebarTransitioning = ref(false)
+    let transitionTimer = null
+
+    const filteredSessions = computed(() => {
+      const filter = omnifilter.value.toLowerCase()
+      if (!filter) return sessions.value
+      return sessions.value.filter((s) => {
+        const fields = [s.title, s.proyecto_descripcion, s.proyecto_id, s.cwd]
+        return fields.some((f) => f && f.toLowerCase().includes(filter))
+      })
+    })
 
     function sessionTooltip(s) {
       const lines = []
@@ -94,34 +101,50 @@ export default {
       return sessionStatus.value[id] || 'idle'
     }
 
-    const filteredSessions = computed(() => {
-      const filter = omnifilter.value.toLowerCase()
-      if (!filter) return sessions.value
-      return sessions.value.filter((s) => {
-        const fields = [s.title, s.proyecto_descripcion, s.proyecto_id, s.cwd]
-        return fields.some((f) => f && f.toLowerCase().includes(filter))
-      })
-    })
+    function onResizeStart(e) {
+      sidebarTransitioning.value = false
 
-    watch(omnifilter, (val) => {
-      if (val && !sectionChats.value) {
-        ui.toggleSection('chats')
+      function onMouseMove(e) {
+        sidebarWidth.value = Math.max(window.innerWidth * 0.05, Math.min(600, e.clientX))
       }
+
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        ui.saveLayoutPrefs()
+      }
+
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    watch(sidebarCollapsed, () => {
+      if (transitionTimer) clearTimeout(transitionTimer)
+      sidebarTransitioning.value = true
+      transitionTimer = setTimeout(() => {
+        sidebarTransitioning.value = false
+        transitionTimer = null
+      }, 300)
     })
 
     return {
       chat,
-      ui,
       filteredSessions,
       activeSessionId,
       creating,
       sidebarCollapsed,
-      sectionChats,
+      sidebarWidth,
+      sidebarTransitioning,
       sessionTooltip,
       getSessionStatus,
       createSession,
       selectSession,
       ticketPriorityClass,
+      onResizeStart,
     }
   },
 }
@@ -129,19 +152,46 @@ export default {
 
 <style scoped>
 .sidebar-chat {
-  width: 220px;
-  min-width: 220px;
+  position: relative;
   padding: 8px;
   border-right: 1px solid #374151;
+
+}
+.sidebar-chat.transitioning {
   transition: width 0.25s ease, min-width 0.25s ease, padding 0.25s ease, border 0.25s ease;
-  overflow: hidden;
 }
 .sidebar-chat.collapsed {
-  width: 0;
-  min-width: 0;
+  width: 0 !important;
+  min-width: 0 !important;
   padding: 0;
   border: none;
   overflow: hidden;
+}
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -6px;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar-resize-handle:hover {
+  background: rgba(117, 170, 219, 0.08);
+}
+.sidebar-resize-handle-bar {
+  width: 3px;
+  height: 36px;
+  background: #374151;
+  border-radius: 2px;
+  pointer-events: none;
+  transition: background 0.15s;
+}
+.sidebar-resize-handle:hover .sidebar-resize-handle-bar {
+  background: #75AADB;
 }
 .list-group-item {
   color: #e0e0e0;
@@ -180,15 +230,6 @@ export default {
 }
 .btn-argentina:disabled {
   opacity: 0.6;
-}
-.btn-outline-argentina {
-  background-color: transparent;
-  color: #75AADB;
-  border: 1px solid #75AADB;
-}
-.btn-outline-argentina:hover {
-  background-color: #1a2744;
-  color: #75AADB;
 }
 .status-led {
   display: inline-block;

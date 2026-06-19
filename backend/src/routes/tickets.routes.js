@@ -347,7 +347,7 @@ router.get('/project-members/:projectId', async (req, res) => {
 router.post('/create', async (req, res) => {
   if (!authGuard(req, res)) return;
 
-  const { subject, description, project_id, status_name, priority_name, priority_id, assigned_to_name, assigned_to_id, done_ratio } = req.body;
+  const { subject, description, project_id, status_name, status_id, priority_name, priority_id, assigned_to_name, assigned_to_id, done_ratio } = req.body;
 
   if (!subject || !subject.trim()) {
     return res.status(400).json({ error: 'El asunto es requerido.' });
@@ -392,7 +392,6 @@ router.post('/create', async (req, res) => {
     if (priority_id != null) redminePayload.priority_id = priority_id;
     if (assigned_to_id != null) redminePayload.assigned_to_id = assigned_to_id;
     if (done_ratio !== undefined) redminePayload.done_ratio = done_ratio;
-    if (status_name) redminePayload.status_id = status_name;
 
     const redmineRes = await fetch(baseUrl + '/issues.json', {
       method: 'POST',
@@ -434,8 +433,8 @@ router.post('/create', async (req, res) => {
       due_date: createdIssue.due_date || null,
       estimated_hours: createdIssue.estimated_hours || null,
       done_ratio: createdIssue.done_ratio ?? done_ratio ?? null,
-      redmine_created_on: createdIssue.created_on || null,
-      redmine_updated_on: createdIssue.updated_on || null,
+      redmine_created_on: createdIssue.created_on ? createdIssue.created_on.replace('Z', '') : null,
+      redmine_updated_on: createdIssue.updated_on ? createdIssue.updated_on.replace('Z', '') : null,
     };
 
     const [insertedId] = await db('tickets').insert(insertData);
