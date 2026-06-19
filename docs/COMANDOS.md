@@ -99,6 +99,18 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 
 ---
 
+## Plantillas
+
+| Comando | Descripción | Uso |
+|---|---|---|
+| `/plantilla_crear` | Abre el editor modal para crear una nueva plantilla Markdown | `/plantilla_crear` |
+| `/plantilla_listar` | Lista todas las plantillas disponibles con su slug y fecha de actualización | `/plantilla_listar` |
+| `/plantilla_ver` | Muestra el contenido completo de una plantilla renderizado en el chat | `/plantilla_ver --slug=<slug>` |
+| `/plantilla_editar` | Abre el editor modal con los datos de una plantilla existente para modificarlos | `/plantilla_editar --slug=<slug>` |
+| `/plantilla_eliminar` | Elimina una plantilla de forma permanente | `/plantilla_eliminar --slug=<slug>` |
+
+---
+
 ## Despliegue
 
 | Comando | Descripción | Uso |

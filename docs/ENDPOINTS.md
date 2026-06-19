@@ -407,6 +407,44 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ---
 
+## Plantillas (`/api/templates`)
+
+### `GET /api/templates`
+- **Auth:** Requerida
+- **Descripción:** Lista todas las plantillas (id, slug, created_at, updated_at) ordenadas por slug ascendente
+- **Respuesta 200:** `[{ id, slug, created_at, updated_at }]`
+
+### `GET /api/templates/:slug`
+- **Auth:** Requerida
+- **Descripción:** Obtiene una plantilla completa por slug
+- **Respuesta 200:** `{ id, slug, content, created_at, updated_at }`
+- **Respuesta 404:** `{ error: "Plantilla no encontrada" }`
+
+### `POST /api/templates`
+- **Auth:** Requerida
+- **Body:** `{ slug: string, content: string }`
+- **Descripción:** Crea una nueva plantilla. El slug solo puede contener letras, números, guiones y guiones bajos. El contenido máximo es 10.000 caracteres.
+- **Respuesta 201:** `{ success: true, id: number }`
+- **Respuesta 400:** `{ error: "..." }` (slug requerido, slug inválido, contenido requerido, contenido excede 10KB)
+- **Respuesta 409:** `{ error: "Ya existe una plantilla con ese slug" }`
+
+### `PUT /api/templates/:slug`
+- **Auth:** Requerida
+- **Body:** `{ slug?: string, content?: string }`
+- **Descripción:** Actualiza una plantilla existente. Se puede cambiar el slug y/o el contenido. Al menos un campo es requerido.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 400:** `{ error: "..." }` (slug inválido, contenido excede 10KB, sin campos)
+- **Respuesta 404:** `{ error: "Plantilla no encontrada" }`
+- **Respuesta 409:** `{ error: "Ya existe otra plantilla con ese slug" }`
+
+### `DELETE /api/templates/:slug`
+- **Auth:** Requerida
+- **Descripción:** Elimina una plantilla por slug
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 404:** `{ error: "Plantilla no encontrada" }`
+
+---
+
 ## Despliegue (`/api/despliegue`)
 
 ### `POST /api/despliegue/upd-config`

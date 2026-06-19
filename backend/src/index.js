@@ -19,6 +19,7 @@ import redmineRoutes from './routes/redmine.routes.js';
 import ticketsRoutes from './routes/tickets.routes.js';
 import workspacesRoutes from './routes/workspaces.routes.js';
 import despliegueRoutes from './routes/despliegue.routes.js';
+import templatesRoutes from './routes/templates.routes.js';
 import opencode from './services/opencode.js';
 import * as devInstanceManager from './services/devInstanceManager.js';
 import db from './config/db.js';
@@ -47,6 +48,7 @@ app.use('/api/redmine', redmineRoutes);
 app.use('/api/tickets', ticketsRoutes);
 app.use('/api/workspaces', workspacesRoutes);
 app.use('/api/despliegue', despliegueRoutes);
+app.use('/api/templates', templatesRoutes);
 
 let pwProcess = null;
 let docProcess = null;

@@ -161,7 +161,19 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
-## 10. `tickets`
+## 10. `templates`
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `slug` | VARCHAR(100) | NOT NULL, UNIQUE |
+| `content` | TEXT | NOT NULL |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+---
+
+## 11. `tickets`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -228,6 +240,9 @@ proyectos
 
 tickets
  └─ chat_sessions.id_ticket_redmine (FK lógica)
+
+templates
+ (tabla independiente, sin FK)
 
 chat_sessions
  ├─ gastos_tokens_usados.id_chat_session (FK)

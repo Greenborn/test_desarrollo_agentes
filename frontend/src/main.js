@@ -28,6 +28,7 @@ import './composables/commands/generarCommit.js'
 import './composables/commands/despliegue.js'
 import './composables/commands/resolucionesGetAll.js'
 import './composables/commands/resolucionDefault.js'
+import './composables/commands/templates.js'
 
 const app = createApp(App)
 const pinia = createPinia()
