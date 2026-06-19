@@ -76,6 +76,24 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function _saveCommandMessages(sid, cmdRaw, cmdResult) {
+    if (!sid || !cmdRaw.startsWith('/')) return
+    try {
+      const toSave = [{ role: 'command', content: cmdRaw }]
+      if (cmdResult !== undefined && cmdResult !== null) {
+        toSave.push({ role: 'result', content: String(cmdResult) })
+      }
+      await fetch(`${API}/chat/sessions/${sid}/save-messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ messages: toSave }),
+      })
+    } catch (err) {
+      console.error('Error al guardar mensajes de comando:', err)
+    }
+  }
+
   async function runCommand(raw, executeFn) {
     const sid = activeSessionId.value
     executingCount.value++
@@ -104,6 +122,7 @@ export const useChatStore = defineStore('chat', () => {
             messages.value.splice(idx, 1)
           }
         }
+        await _saveCommandMessages(sid, raw, result)
       }
       _decSessionCount(sid)
       if (sid && !_sessionCmdCount.value[sid] && sessionStatus.value[sid] !== 'error') {
@@ -111,11 +130,13 @@ export const useChatStore = defineStore('chat', () => {
       }
     } catch (err) {
       console.error('Error ejecutando comando:', err)
+      const errorResult = 'Error: ' + (err.message || 'Error desconocido')
       if (Number(activeSessionId.value) === Number(sid)) {
         const idx = messages.value.findIndex(m => m._key === loadingKey)
         if (idx >= 0) {
-          messages.value[idx] = { role: 'result', content: 'Error: ' + (err.message || 'Error desconocido'), _key: 'err-' + Date.now() }
+          messages.value[idx] = { role: 'result', content: errorResult, _key: 'err-' + Date.now() }
         }
+        await _saveCommandMessages(sid, raw, errorResult)
       }
       _decSessionCount(sid)
       if (sid) sessionStatus.value[sid] = 'error'

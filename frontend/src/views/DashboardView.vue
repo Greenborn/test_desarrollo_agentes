@@ -1,7 +1,7 @@
 <template>
   <div class="d-flex flex-column vh-100">
     <Topbar />
-    <div class="d-flex flex-grow-1 overflow-hidden">
+    <div class="d-flex flex-grow-1 overflow-hidden" style="height: 0; min-height: 0;">
       <SidebarChat />
       <TicketDetail v-if="selectedTicket" class="flex-grow-1" />
       <ProjectDetail v-else-if="selectedProject" class="flex-grow-1" />

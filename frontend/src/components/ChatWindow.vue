@@ -1829,7 +1829,6 @@ export default {
             thinkingValue: ocStore.savedThinking || '',
             temperatureOptions: ocStore.temperatureOptions,
             temperatureValue: ocStore.savedTemperature || '0.7',
-            modeValue: ocStore.savedMode || 'Plan',
           },
           _key: 'control-' + Date.now(),
         })
@@ -1940,6 +1939,42 @@ export default {
 
         let resultLines = ['✓ Commit realizado correctamente.', '', 'Mensaje: ' + commitMsg]
 
+        const pushRes = await fetch('/api/command/git', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ command: 'push', sessionId }),
+        })
+        const pushData = await pushRes.json()
+
+        if (pushData.success) {
+          resultLines.push('', '✓ Push realizado correctamente.')
+        } else if (/(no tiene una rama upstream|no upstream|push\.autoSetupRemote)/i.test(pushData.stderr || '')) {
+          const branchRes = await fetch('/api/command/git', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: 'rev-parse --abbrev-ref HEAD', sessionId }),
+          })
+          const branchData = await branchRes.json()
+          const branch = branchData.success ? branchData.stdout.trim() : 'HEAD'
+
+          const pushUpstreamRes = await fetch('/api/command/git', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: `push --set-upstream origin ${branch}`, sessionId }),
+          })
+          const pushUpstreamData = await pushUpstreamRes.json()
+          if (pushUpstreamData.success) {
+            resultLines.push('', '✓ Push realizado correctamente (upstream configurado).')
+          } else {
+            resultLines.push('', '✗ Error al hacer push: ' + (pushUpstreamData.stderr || '').trim())
+          }
+        } else if (pushData.stderr) {
+          resultLines.push('', '⚠ Push: ' + pushData.stderr.trim())
+        }
+
         if (addComment && idTicket) {
           try {
             const proyectoId = session?.proyecto_id || null
@@ -2025,12 +2060,11 @@ export default {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ command: raw, sessionId: chat.activeSessionId }),
+          body: JSON.stringify({ command: raw }),
         })
         const data = await res.json()
         if (data.success) {
-          await chat.loadMessages(chat.activeSessionId)
-          return null
+          return data.result
         }
         throw new Error(data.result || 'Error al ejecutar comando')
       })

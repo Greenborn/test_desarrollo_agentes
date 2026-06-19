@@ -4,6 +4,17 @@
     :class="{ collapsed: sidebarCollapsed, transitioning: sidebarTransitioning }"
     :style="sidebarCollapsed ? {} : { width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px' }"
   >
+    <!-- Tab bar -->
+    <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'chats' }"
+        @click="activeTab = 'chats'"
+      >
+        Chats
+      </button>
+    </div>
+    <template v-if="activeTab === 'chats'">
     <button class="btn btn-sm mb-2 flex-shrink-0 btn-argentina" @click="createSession" :disabled="creating">
       {{ creating ? 'Creando...' : '＋ Nuevo chat' }}
     </button>
@@ -28,6 +39,7 @@
         </button>
       </div>
     </div>
+    </template>
     <div class="sidebar-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-resize-handle-bar"></div>
     </div>
@@ -50,6 +62,7 @@ export default {
     const { sidebarCollapsed, sidebarWidth, omnifilter } = storeToRefs(ui)
 
     const sidebarTransitioning = ref(false)
+    const activeTab = ref('chats')
     let transitionTimer = null
 
     const filteredSessions = computed(() => {
@@ -134,6 +147,7 @@ export default {
     return {
       chat,
       filteredSessions,
+      activeTab,
       activeSessionId,
       creating,
       sidebarCollapsed,
@@ -151,6 +165,27 @@ export default {
 </script>
 
 <style scoped>
+.tab-bar {
+  border-bottom: 1px solid #374151;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover {
+  color: #cbd5e1;
+}
+.tab-btn.active {
+  color: #75AADB;
+  border-bottom-color: #75AADB;
+}
 .sidebar-chat {
   position: relative;
   padding: 8px;

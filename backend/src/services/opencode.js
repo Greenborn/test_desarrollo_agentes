@@ -1,7 +1,14 @@
 import { spawn } from 'child_process';
 
 const servers = {};
-let nextPort = 4200;
+if (!process.env.OPENCODE_PORT) {
+  throw new Error('OPENCODE_PORT no está definido en el archivo .env');
+}
+const parsedPort = parseInt(process.env.OPENCODE_PORT, 10);
+if (isNaN(parsedPort) || parsedPort <= 0) {
+  throw new Error(`OPENCODE_PORT debe ser un número de puerto válido, recibido: ${process.env.OPENCODE_PORT}`);
+}
+let nextPort = parsedPort;
 
 class OpenCodeServer {
   constructor(directory, port, locale) {
@@ -66,7 +73,9 @@ class OpenCodeServer {
       try {
         const res = await fetch(`${this.baseUrl()}/global/health`);
         if (res.ok) { this.ready = true; return; }
-      } catch {}
+      } catch (healthErr) {
+        console.log(`[opencode ${this.port}] health check falló:`, healthErr.message);
+      }
       await new Promise((r) => setTimeout(r, 300));
     }
   }
@@ -149,7 +158,9 @@ class OpenCodeServer {
           if (event.type === 'session.status' && event.properties?.status?.type === 'idle') {
             done = true;
           }
-        } catch {}
+        } catch (parseErr) {
+          console.log(`[opencode ${this.port}] error parseando evento SSE:`, parseErr.message);
+        }
       }
     }
     reader.cancel();
@@ -200,15 +211,9 @@ function stopAllServers() {
   }
 }
 
-async function getModels(locale) {
-  const firstKey = Object.keys(servers)[0];
-  if (firstKey) return servers[firstKey].api('/config/providers');
-  const fallback = new OpenCodeServer(process.cwd(), nextPort++, locale);
-  await fallback.start();
-  await fallback.waitForReady();
-  const data = await fallback.api('/config/providers');
-  fallback.stop();
-  return data;
+async function getModels(directory, locale) {
+  const server = await getOrStartServer(directory, locale);
+  return server.api('/config/providers');
 }
 
 async function abortSessionInDir(directory, ocSessionId) {
@@ -222,7 +227,9 @@ async function abortSession(ocSessionId) {
     try {
       await servers[dir].abortSession(ocSessionId);
       return;
-    } catch {}
+    } catch (abortErr) {
+      console.log(`[opencode] abortSession falló en ${dir}:`, abortErr.message);
+    }
   }
 }
 

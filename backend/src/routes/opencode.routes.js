@@ -19,7 +19,8 @@ async function getUserSetting(userId, key) {
   try {
     const row = await db('user_settings').where({ user_id: userId, key }).first();
     return row ? row.value : null;
-  } catch {
+  } catch (dbErr) {
+    console.log('Error al obtener user_setting:', dbErr.message);
     return null;
   }
 }
@@ -62,7 +63,7 @@ router.get('/start', async (req, res) => {
     const wsId = req.session.workspaceId || 1;
     const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
-    const providerData = await opencode.getModels(locale);
+    const providerData = await opencode.getModels(process.cwd(), locale);
     const savedProvider = await getUserSetting(req.session.userId, 'opencode_last_provider');
     const savedModel = await getUserSetting(req.session.userId, 'opencode_last_model');
     const savedThinking = await getUserSetting(req.session.userId, 'opencode_last_thinking');
@@ -302,7 +303,9 @@ router.post('/send', async (req, res) => {
       console.log('Error en opencode streamSession:', msgErr.message);
       try {
         res.write(`data: ${JSON.stringify({ type: 'error', content: msgErr.message })}\n\n`);
-      } catch {}
+      } catch (writeErr) {
+        console.log('Error al escribir error en stream SSE:', writeErr.message);
+      }
       if (sessionId) {
         try {
           await saveLongMessage(sessionId, 'opencode_result', JSON.stringify({ error: msgErr.message }));
@@ -323,7 +326,9 @@ router.post('/send', async (req, res) => {
       try {
         res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
         res.end();
-      } catch {}
+      } catch (writeErr) {
+        console.log('Error al escribir error en respuesta SSE:', writeErr.message);
+      }
     }
   }
 });
@@ -373,7 +378,9 @@ router.post('/finish', async (req, res) => {
     if (!directory) return res.status(400).json({ error: 'directory requerido' });
 
     if (ocSessionId) {
-      try { await opencode.abortSessionInDir(directory, ocSessionId); } catch {}
+      try { await opencode.abortSessionInDir(directory, ocSessionId); } catch (abortErr) {
+        console.log('Error al abortar sesión OpenCode en /finish:', abortErr.message);
+      }
     }
     opencode.stopServer(directory);
 

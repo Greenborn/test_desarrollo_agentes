@@ -156,6 +156,28 @@ router.post('/sessions/:id/messages', async (req, res) => {
   }
 });
 
+router.post('/sessions/:id/save-messages', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const { messages } = req.body;
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: 'Se requiere un array messages no vacío' });
+  }
+  try {
+    const inserts = messages.map(m => ({
+      session_id: req.params.id,
+      role: m.role,
+      content: m.content,
+      thinking: m.thinking || null,
+    }));
+    await db('chat_messages').insert(inserts);
+    await db('chat_sessions').where({ id: req.params.id }).update({ updated_at: db.fn.now() });
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al guardar mensajes:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.delete('/sessions/:sessionId/messages/:messageId', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {

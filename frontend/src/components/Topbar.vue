@@ -97,10 +97,11 @@ export default {
           const data = await res.json()
           if (data.success) {
             cmdStore.currentDir = data.result
+            return data.result
           } else {
             console.error('Error en /cd:', data.result)
+            return data.result
           }
-          if (sessionId) chatStore.loadMessages(sessionId)
         } catch (err) {
           console.error('Error en /cd:', err)
         }
@@ -124,17 +125,19 @@ export default {
       async execute(args, { cmdStore, chatStore }) {
         const { params } = parseCommandArgs(args, { dir: { required: false } })
         const dir = params.dir || ''
-        const sessionId = chatStore.activeSessionId
         try {
           const res = await fetch('/api/command/execute', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ command: `/ls ${dir}`.trimEnd(), sessionId }),
+            body: JSON.stringify({ command: `/ls ${dir}`.trimEnd(), sessionId: chatStore.activeSessionId }),
           })
           const data = await res.json()
-          if (!data.success) console.error('Error en /ls:', data.result)
-          if (sessionId) chatStore.loadMessages(sessionId)
+          if (!data.success) {
+            console.error('Error en /ls:', data.result)
+            return data.result
+          }
+          return data.result
         } catch (err) {
           console.error('Error en /ls:', err)
         }
@@ -157,13 +160,14 @@ export default {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ command: '/history', sessionId }),
+            body: JSON.stringify({ command: '/history' }),
           })
           const data = await res.json()
           if (!data.success) {
             console.error('Error en /history:', data.result)
+            return data.result
           }
-          chatStore.loadMessages(sessionId)
+          return data.result
         } catch (err) {
           console.error('Error en /history:', err)
         }
@@ -249,16 +253,15 @@ export default {
           return
         }
         const url = params.url
-        const sessionId = chatStore.activeSessionId
         try {
-          const res = await navegadorFetch('go_to_url', { id_session: navegadorSessionId.value, url }, sessionId)
+          const res = await navegadorFetch('go_to_url', { id_session: navegadorSessionId.value, url }, chatStore.activeSessionId)
           const data = await res.json()
           if (data.error) {
             console.error('Error en /navegador_ir_url:', data.error)
-          } else {
-            if (data.id_session) navegadorSessionId.value = data.id_session
-            if (sessionId) chatStore.loadMessages(sessionId)
+            return `Error: ${data.error}`
           }
+          if (data.id_session) navegadorSessionId.value = data.id_session
+          return `Navegando a: ${url}`
         } catch (err) {
           console.error('Error en /navegador_ir_url:', err)
         }
@@ -295,16 +298,15 @@ export default {
           console.error('Error en /navegador_configurar_headless: use --mode=0 (visible) o --mode=1 (headless)')
           return
         }
-        const sessionId = chatStore.activeSessionId
         try {
-          const res = await navegadorFetch('set_headless', { headless: val }, sessionId)
+          const res = await navegadorFetch('set_headless', { headless: val }, chatStore.activeSessionId)
           const data = await res.json()
           if (data.error) {
             console.error('Error en /navegador_configurar_headless:', data.error)
-          } else {
-            if (data.id_session) navegadorSessionId.value = data.id_session
-            if (sessionId) chatStore.loadMessages(sessionId)
+            return `Error: ${data.error}`
           }
+          if (data.id_session) navegadorSessionId.value = data.id_session
+          return `Headless ${val === '1' ? 'activado' : 'desactivado'}`
         } catch (err) {
           console.error('Error en /navegador_configurar_headless:', err)
         }
@@ -317,27 +319,24 @@ export default {
       description: 'Finaliza la sesión de navegador activa. Si no hay sesión iniciada, muestra error.',
       usage: '/navegador_finalizar',
       async execute(args, { cmdStore, chatStore }) {
-        const sessionId = chatStore.activeSessionId
         if (!navegadorSessionId.value) {
           console.error('Error en /navegador_finalizar: no hay sesión de navegador activa')
-          if (sessionId) {
-            chatStore.messages.push({ role: 'result', content: 'Error: No hay sesión de navegador activa. Usá /navegador_iniciar primero.', _key: 'err-' + Date.now() })
-          }
-          return
+          return 'Error: No hay sesión de navegador activa. Usá /navegador_iniciar primero.'
         }
         try {
           const res = await fetch('/api/navegador/finish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ id_session: navegadorSessionId.value, sessionId }),
+            body: JSON.stringify({ id_session: navegadorSessionId.value, sessionId: chatStore.activeSessionId }),
           })
           const data = await res.json()
           if (data.error) {
             console.error('Error en /navegador_finalizar:', data.error)
+            return `Error: ${data.error}`
           }
           navegadorSessionId.value = null
-          if (sessionId) chatStore.loadMessages(sessionId)
+          return 'Sesión de navegador finalizada.'
         } catch (err) {
           console.error('Error en /navegador_finalizar:', err)
         }
@@ -361,9 +360,7 @@ export default {
           console.error('Error en /dev_opencode_finalizar:', err)
         }
         ocStore.finish()
-        if (chatStore.activeSessionId) {
-          chatStore.loadMessages(chatStore.activeSessionId)
-        }
+        return 'Sesión OpenCode finalizada.'
       },
     })
 
@@ -415,24 +412,10 @@ export default {
             body: JSON.stringify({ sessionId, proyectoId, cwd: cmdStore.currentDir || undefined }),
           })
           const data = await res.json()
-          chatStore.messages.push({
-            role: 'command',
-            content: `/chat_set_proyecto --id=${proyectoId}`,
-            _key: 'cmd-' + Date.now(),
-          })
           if (data.success) {
-            chatStore.messages.push({
-              role: 'result',
-              content: `Proyecto "${proyectoId}" seleccionado.`,
-              _key: 'res-' + Date.now(),
-            })
-          } else {
-            chatStore.messages.push({
-              role: 'result',
-              content: `Error: ${data.error}`,
-              _key: 'err-' + Date.now(),
-            })
+            return `Proyecto "${proyectoId}" seleccionado.`
           }
+          return `Error: ${data.error}`
         } catch (err) {
           console.error('Error en /chat_set_proyecto:', err)
         }
@@ -453,16 +436,7 @@ export default {
         try {
           const res = await fetch(`/api/proyecto/session/${sessionId}`, { credentials: 'include' })
           const data = await res.json()
-          chatStore.messages.push({
-            role: 'command',
-            content: '/chat_get_proyecto',
-            _key: 'cmd-' + Date.now(),
-          })
-          chatStore.messages.push({
-            role: 'result',
-            content: data.proyectoId ? `Proyecto actual: ${data.proyectoId}` : 'No hay proyecto asignado a esta sesión.',
-            _key: 'res-' + Date.now(),
-          })
+          return data.proyectoId ? `Proyecto actual: ${data.proyectoId}` : 'No hay proyecto asignado a esta sesión.'
         } catch (err) {
           console.error('Error en /chat_get_proyecto:', err)
         }
@@ -488,45 +462,15 @@ export default {
         const session = chatStore.sessions.find(s => s.id === sessionId)
         const proyectoId = session?.proyecto_id
         if (!proyectoId) {
-          chatStore.messages.push({
-            role: 'command',
-            content: '/chat_set_repositorio',
-            _key: 'cmd-' + Date.now(),
-          })
-          chatStore.messages.push({
-            role: 'result',
-            content: 'No hay proyecto asignado a esta sesión. Use /chat_set_proyecto primero.',
-            _key: 'res-' + Date.now(),
-          })
-          return
+          return 'No hay proyecto asignado a esta sesión. Use /chat_set_proyecto primero.'
         }
         const urlArg = args.find(a => a.startsWith('--url='))
         if (!urlArg) {
-          chatStore.messages.push({
-            role: 'command',
-            content: '/chat_set_repositorio',
-            _key: 'cmd-' + Date.now(),
-          })
-          chatStore.messages.push({
-            role: 'result',
-            content: 'Uso: /chat_set_repositorio --url=<url>',
-            _key: 'res-' + Date.now(),
-          })
-          return
+          return 'Uso: /chat_set_repositorio --url=<url>'
         }
         const url_github = urlArg.slice('--url='.length)
         if (!url_github) {
-          chatStore.messages.push({
-            role: 'command',
-            content: '/chat_set_repositorio ' + args.join(' '),
-            _key: 'cmd-' + Date.now(),
-          })
-          chatStore.messages.push({
-            role: 'result',
-            content: 'La URL no puede estar vacía.',
-            _key: 'res-' + Date.now(),
-          })
-          return
+          return 'La URL no puede estar vacía.'
         }
         try {
           const res = await fetch('/api/proyecto/repositorio', {
@@ -536,24 +480,10 @@ export default {
             body: JSON.stringify({ proyectoId, url_github }),
           })
           const data = await res.json()
-          chatStore.messages.push({
-            role: 'command',
-            content: `/chat_set_repositorio --url=${url_github}`,
-            _key: 'cmd-' + Date.now(),
-          })
           if (data.success) {
-            chatStore.messages.push({
-              role: 'result',
-              content: `URL de repositorio configurada para "${proyectoId}": ${url_github}`,
-              _key: 'res-' + Date.now(),
-            })
-          } else {
-            chatStore.messages.push({
-              role: 'result',
-              content: `Error: ${data.error}`,
-              _key: 'err-' + Date.now(),
-            })
+            return `URL de repositorio configurada para "${proyectoId}": ${url_github}`
           }
+          return `Error: ${data.error}`
         } catch (err) {
           console.error('Error en /chat_set_repositorio:', err)
         }
@@ -574,39 +504,15 @@ export default {
         const session = chatStore.sessions.find(s => s.id === sessionId)
         const proyectoId = session?.proyecto_id
         if (!proyectoId) {
-          chatStore.messages.push({
-            role: 'command',
-            content: '/chat_get_repositorio_url',
-            _key: 'cmd-' + Date.now(),
-          })
-          chatStore.messages.push({
-            role: 'result',
-            content: 'No hay proyecto asignado a esta sesión. Use /chat_set_proyecto primero.',
-            _key: 'res-' + Date.now(),
-          })
-          return
+          return 'No hay proyecto asignado a esta sesión. Use /chat_set_proyecto primero.'
         }
         try {
           const res = await fetch(`/api/proyecto/repositorio/${encodeURIComponent(proyectoId)}`, { credentials: 'include' })
           const data = await res.json()
-          chatStore.messages.push({
-            role: 'command',
-            content: '/chat_get_repositorio_url',
-            _key: 'cmd-' + Date.now(),
-          })
           if (data.url_github) {
-            chatStore.messages.push({
-              role: 'result',
-              content: `URL del repositorio de "${proyectoId}": ${data.url_github}`,
-              _key: 'res-' + Date.now(),
-            })
-          } else {
-            chatStore.messages.push({
-              role: 'result',
-              content: `No hay URL de repositorio configurada para "${proyectoId}".`,
-              _key: 'res-' + Date.now(),
-            })
+            return `URL del repositorio de "${proyectoId}": ${data.url_github}`
           }
+          return `No hay URL de repositorio configurada para "${proyectoId}".`
         } catch (err) {
           console.error('Error en /chat_get_repositorio_url:', err)
         }

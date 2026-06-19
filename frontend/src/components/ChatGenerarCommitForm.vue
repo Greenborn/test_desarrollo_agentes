@@ -20,23 +20,6 @@
           <option v-for="t in temperatureOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
         </select>
       </div>
-      <div style="min-width: 140px; flex: 1;">
-        <label class="small text-light-emphasis mb-1">Modo</label>
-        <div class="btn-group btn-group-sm w-100" role="group">
-          <button
-            type="button"
-            class="btn btn-sm font-monospace"
-            :class="selectedMode === 'Plan' ? 'btn-warning' : 'btn-outline-secondary'"
-            @click="selectedMode = 'Plan'"
-          >Plan</button>
-          <button
-            type="button"
-            class="btn btn-sm font-monospace"
-            :class="selectedMode === 'Build' ? 'btn-success' : 'btn-outline-secondary'"
-            @click="selectedMode = 'Build'"
-          >Build</button>
-        </div>
-      </div>
     </div>
     <button class="btn btn-sm btn-success align-self-end" :disabled="!selectedModel" @click="confirm">
       Generar Commit
@@ -55,14 +38,12 @@ export default {
     thinkingValue: { type: String, default: '' },
     temperatureOptions: { type: Array, default: () => [] },
     temperatureValue: { type: String, default: '' },
-    modeValue: { type: String, default: 'Plan' },
   },
   emits: ['confirm'],
   setup(props, { emit }) {
     const selectedModel = ref(props.modelValue || '')
     const selectedThinking = ref(props.thinkingValue || '')
     const selectedTemperature = ref(props.temperatureValue || '')
-    const selectedMode = ref(props.modeValue || 'Plan')
 
     const showThinking = computed(() => {
       if (!selectedModel.value) return false
@@ -81,12 +62,12 @@ export default {
       emit('confirm', {
         model: selectedModel.value,
         thinking: showThinking.value ? selectedThinking.value : '',
-        mode: selectedMode.value,
+        mode: 'Plan',
         temperature: selectedTemperature.value,
       })
     }
 
-    return { selectedModel, selectedThinking, selectedTemperature, selectedMode, showThinking, onModelChange, confirm }
+    return { selectedModel, selectedThinking, selectedTemperature, showThinking, onModelChange, confirm }
   },
 }
 </script>

@@ -147,12 +147,11 @@ export default {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ command: raw, sessionId }),
+          body: JSON.stringify({ command: raw }),
         })
         const data = await res.json()
         if (data.success) {
-          await chatStore.loadMessages(sessionId)
-          return null
+          return data.result
         }
         throw new Error(data.result || 'Error al ejecutar comando')
       })
