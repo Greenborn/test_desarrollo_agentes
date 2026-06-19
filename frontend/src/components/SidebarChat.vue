@@ -62,31 +62,6 @@
           </button>
         </div>
       </div>
-      <button
-        class="btn btn-sm w-100 text-start mb-1 flex-shrink-0 btn-outline-argentina"
-        @click="ui.toggleSection('tickets')"
-      >
-        {{ sectionTickets ? '▼' : '▶' }} Tickets
-      </button>
-      <div v-show="sectionTickets" class="overflow-y-auto flex-grow-1" style="min-height: 0;">
-        <div class="list-group list-group-flush" style="min-height: 0;">
-        <button
-          v-for="t in filteredTickets"
-          :key="t.id"
-          class="list-group-item list-group-item-action py-2 px-2 small"
-          :class="[
-            ticketPriorityClass(t.priority_id),
-            {
-              active: selectedTicket && selectedTicket.id === t.id,
-              'pinned-project': t.proyecto_id === pinnedProjectId,
-            },
-          ]"
-          @click="selectTicket(t)"
-        >
-          <span class="text-truncate">#{{ t.redmine_id }} — {{ t.subject }}</span>
-        </button>
-      </div>
-    </div>
     </div>
   </div>
 </template>
@@ -108,9 +83,8 @@ export default {
     const projectStore = useProjectStore()
     const ticketStore = useTicketStore()
     const { sessions, activeSessionId, creating, sessionStatus } = storeToRefs(chat)
-    const { sidebarCollapsed, omnifilter, sectionChats, sectionProjects, sectionTickets } = storeToRefs(ui)
+    const { sidebarCollapsed, omnifilter, sectionChats, sectionProjects } = storeToRefs(ui)
     const { projects, selectedProject, pinnedProjectId } = storeToRefs(projectStore)
-    const { tickets, selectedTicket } = storeToRefs(ticketStore)
 
     function sessionTooltip(s) {
       const lines = []
@@ -141,13 +115,7 @@ export default {
     }
 
     function selectProject(p) {
-      ticketStore.clearSelection()
       projectStore.selectProject(p)
-    }
-
-    function selectTicket(t) {
-      projectStore.clearSelection()
-      ticketStore.selectTicket(t)
     }
 
     function ticketPriorityClass(priorityId) {
@@ -181,25 +149,6 @@ export default {
       })
     })
 
-    const filteredTickets = computed(() => {
-      const filter = omnifilter.value.toLowerCase()
-      let list = tickets.value
-      if (filter) {
-        list = list.filter((t) => {
-          const fields = [String(t.redmine_id), t.subject, t.proyecto_id]
-          return fields.some((f) => f && f.toLowerCase().includes(filter))
-        })
-      }
-      if (pinnedProjectId.value) {
-        list = [...list].sort((a, b) => {
-          const aPinned = a.proyecto_id === pinnedProjectId.value ? 0 : 1
-          const bPinned = b.proyecto_id === pinnedProjectId.value ? 0 : 1
-          return aPinned - bPinned
-        })
-      }
-      return list
-    })
-
     watch(omnifilter, (val) => {
       if (val) {
         ui.expandAllSections()
@@ -217,18 +166,13 @@ export default {
       selectedProject,
       pinnedProjectId,
       projectStore,
-      filteredTickets,
-      selectedTicket,
-      ticketStore,
       sectionChats,
       sectionProjects,
-      sectionTickets,
       sessionTooltip,
       getSessionStatus,
       createSession,
       selectSession,
       selectProject,
-      selectTicket,
       ticketPriorityClass,
     }
   },

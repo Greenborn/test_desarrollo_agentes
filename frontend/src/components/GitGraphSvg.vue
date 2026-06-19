@@ -1,7 +1,7 @@
 <template>
   <svg
     v-if="commits.length > 0"
-    :viewBox="`0 0 ${svgWidth} ${svgHeight}`"
+    :viewBox="viewBoxValue"
     class="git-graph-svg d-block"
     xmlns="http://www.w3.org/2000/svg"
   >
@@ -115,6 +115,7 @@ const COLORS = [
 export default {
   props: {
     commits: { type: Array, default: () => [] },
+    zoom: { type: Number, default: 100 },
   },
   setup(props) {
     const commitsData = computed(() => props.commits)
@@ -223,6 +224,10 @@ export default {
     const totalRows = computed(() => laneInfo.value.rows.length)
     const svgWidth = computed(() => graphRight.value + 540)
     const svgHeight = computed(() => PAD_TOP + totalRows.value * ROW_H + 12)
+    const viewBoxValue = computed(() => {
+      const z = (props.zoom || 100) / 100
+      return `0 0 ${Math.round(svgWidth.value / z)} ${Math.round(svgHeight.value / z)}`
+    })
 
     function laneCenter(idx) {
       return PAD_LEFT + idx * LANE_W + LANE_W / 2
@@ -235,6 +240,7 @@ export default {
       totalRows,
       svgWidth,
       svgHeight,
+      viewBoxValue,
       laneCenter,
     }
   },

@@ -56,14 +56,10 @@ export default {
 
     function startResize(e) {
       isTransitioning.value = false
-      const startY = e.clientY
-      const startHeight = panelHeight.value
 
       function onMouseMove(e) {
-        const deltaY = e.clientY - startY
-        const vhChange = (deltaY / window.innerHeight) * 100
-        const newHeight = Math.max(5, Math.round(startHeight - vhChange))
-        panelHeight.value = newHeight
+        const vh = Math.max(5, ((window.innerHeight - e.clientY) / window.innerHeight) * 100)
+        panelHeight.value = vh
       }
 
       function onMouseUp() {
@@ -120,6 +116,7 @@ export default {
   overflow: hidden;
   background: #1a1a2e;
   border-top: 1px solid #374151;
+  contain: layout style;
 }
 .bottom-panel.transitioning {
   transition: height 0.25s ease;

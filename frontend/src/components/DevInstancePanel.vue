@@ -17,6 +17,13 @@
         Repositorio
       </button>
       <button
+        class="tab-btn ms-3"
+        :class="{ active: activeTab === 'tickets' }"
+        @click="activeTab = 'tickets'"
+      >
+        Tickets
+      </button>
+      <button
         v-if="activeTab === 'instancias' && hasProcesses"
         class="btn btn-sm btn-outline-danger py-0 px-2 ms-auto"
         @click="detener"
@@ -67,15 +74,21 @@
     <template v-if="activeTab === 'repositorio'">
       <RepoView class="flex-grow-1" />
     </template>
+
+    <!-- Tab: Tickets -->
+    <template v-if="activeTab === 'tickets'">
+      <TicketPanel class="flex-grow-1" />
+    </template>
   </div>
 </template>
 
 <script>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import RepoView from './RepoView.vue'
+import TicketPanel from './TicketPanel.vue'
 
 export default {
-  components: { RepoView },
+  components: { RepoView, TicketPanel },
   setup() {
     const state = reactive({
       processes: [],

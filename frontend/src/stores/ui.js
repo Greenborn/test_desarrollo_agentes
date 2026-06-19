@@ -8,7 +8,6 @@ export const useUiStore = defineStore('ui', () => {
   const omnifilter = ref('')
   const sectionChats = ref(true)
   const sectionProjects = ref(true)
-  const sectionTickets = ref(false)
 
   function toggleSidebar() {
     sidebarCollapsed.value = !sidebarCollapsed.value
@@ -31,14 +30,12 @@ export const useUiStore = defineStore('ui', () => {
   function toggleSection(name) {
     if (name === 'chats') sectionChats.value = !sectionChats.value
     else if (name === 'projects') sectionProjects.value = !sectionProjects.value
-    else if (name === 'tickets') sectionTickets.value = !sectionTickets.value
     saveLayoutPrefs()
   }
 
   function expandAllSections() {
     sectionChats.value = true
     sectionProjects.value = true
-    sectionTickets.value = true
   }
 
   async function saveLayoutPrefs() {
@@ -74,12 +71,6 @@ export const useUiStore = defineStore('ui', () => {
           credentials: 'include',
           body: JSON.stringify({ key: 'section_projects', value: String(sectionProjects.value) }),
         }),
-        fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'section_tickets', value: String(sectionTickets.value) }),
-        }),
       ])
     } catch (err) {
       console.error('Error saving layout preferences:', err)
@@ -88,20 +79,18 @@ export const useUiStore = defineStore('ui', () => {
 
   async function loadLayoutPrefs() {
     try {
-      const [sidebarRes, panelRes, heightRes, chatsRes, projectsRes, ticketsRes] = await Promise.all([
+      const [sidebarRes, panelRes, heightRes, chatsRes, projectsRes] = await Promise.all([
         fetch('/api/command/setting/sidebar_collapsed', { credentials: 'include' }),
         fetch('/api/command/setting/panel_collapsed', { credentials: 'include' }),
         fetch('/api/command/setting/panel_height', { credentials: 'include' }),
         fetch('/api/command/setting/section_chats', { credentials: 'include' }),
         fetch('/api/command/setting/section_projects', { credentials: 'include' }),
-        fetch('/api/command/setting/section_tickets', { credentials: 'include' }),
       ])
       const sidebarData = await sidebarRes.json()
       const panelData = await panelRes.json()
       const heightData = await heightRes.json()
       const chatsData = await chatsRes.json()
       const projectsData = await projectsRes.json()
-      const ticketsData = await ticketsRes.json()
       if (sidebarData.value !== null) {
         sidebarCollapsed.value = sidebarData.value === 'true'
       }
@@ -109,7 +98,7 @@ export const useUiStore = defineStore('ui', () => {
         panelCollapsed.value = panelData.value === 'true'
       }
       if (heightData.value !== null) {
-        panelHeight.value = Math.max(5, parseInt(heightData.value, 10) || 30)
+        panelHeight.value = Math.max(5, parseFloat(heightData.value) || 30)
       }
       if (chatsData.value !== null) {
         sectionChats.value = chatsData.value === 'true'
@@ -117,13 +106,10 @@ export const useUiStore = defineStore('ui', () => {
       if (projectsData.value !== null) {
         sectionProjects.value = projectsData.value === 'true'
       }
-      if (ticketsData.value !== null) {
-        sectionTickets.value = ticketsData.value === 'true'
-      }
     } catch (err) {
       console.error('Error loading layout preferences:', err)
     }
   }
 
-  return { sidebarCollapsed, panelCollapsed, panelHeight, sectionChats, sectionProjects, sectionTickets, omnifilter, toggleSidebar, togglePanel, toggleSection, expandAllSections, setPanelHeight, setOmnifilter, saveLayoutPrefs, loadLayoutPrefs }
+  return { sidebarCollapsed, panelCollapsed, panelHeight, sectionChats, sectionProjects, omnifilter, toggleSidebar, togglePanel, toggleSection, expandAllSections, setPanelHeight, setOmnifilter, saveLayoutPrefs, loadLayoutPrefs }
 })

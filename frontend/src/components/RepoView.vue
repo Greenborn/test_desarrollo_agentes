@@ -25,8 +25,29 @@
           <span class="text-success">●</span> {{ currentBranch || '—' }}
         </span>
         <span class="ms-2 text-secondary" style="font-size: 0.65rem;">{{ repoPath }}</span>
+        <div class="zoom-controls d-flex align-items-center ms-auto gap-1">
+          <button
+            class="btn btn-sm btn-outline-secondary py-0 px-1"
+            @click="zoomOut"
+            :disabled="zoom <= 50"
+            style="font-size: 0.7rem; line-height: 1.4;"
+          >−</button>
+          <span class="small text-secondary px-1" style="font-size: 0.65rem; min-width: 32px; text-align: center;">{{ zoom }}%</span>
+          <button
+            class="btn btn-sm btn-outline-secondary py-0 px-1"
+            @click="zoomIn"
+            :disabled="zoom >= 200"
+            style="font-size: 0.7rem; line-height: 1.4;"
+          >+</button>
+          <button
+            class="btn btn-sm btn-outline-secondary py-0 px-1"
+            @click="resetZoom"
+            :disabled="zoom === 100"
+            style="font-size: 0.65rem; line-height: 1.4;"
+          >⟲</button>
+        </div>
         <button
-          class="btn btn-sm btn-outline-secondary py-0 px-2 ms-auto"
+          class="btn btn-sm btn-outline-secondary py-0 px-2 ms-2"
           @click="refresh"
           :disabled="loading"
           style="font-size: 0.7rem;"
@@ -36,7 +57,7 @@
       </div>
       <div class="d-flex flex-grow-1" style="min-height: 0;">
         <div class="git-graph-panel flex-grow-1 overflow-auto">
-          <GitGraphSvg :commits="structuredCommits" />
+          <GitGraphSvg :commits="structuredCommits" :zoom="zoom" />
         </div>
         <div class="git-branches-panel flex-shrink-0 overflow-y-auto px-3 py-2 border-start border-secondary" style="width: 170px;">
           <div class="small text-secondary mb-2" style="font-size: 0.7rem;">Ramas</div>
@@ -85,6 +106,7 @@ export default {
     const branches = ref([])
     const tags = ref([])
     const structuredCommits = ref([])
+    const zoom = ref(100)
 
     async function fetchRepoData() {
       const sessionId = activeSessionId.value
@@ -141,6 +163,48 @@ export default {
       }
     }
 
+    async function loadZoom() {
+      try {
+        const res = await fetch('/api/command/setting/git_graph_zoom', { credentials: 'include' })
+        const data = await res.json()
+        if (data.value !== null && data.value !== undefined) {
+          zoom.value = parseInt(data.value, 10) || 100
+        }
+      } catch (err) {
+        console.error('Error al cargar zoom:', err)
+      }
+    }
+
+    async function saveZoom(val) {
+      try {
+        await fetch('/api/command/setting', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ key: 'git_graph_zoom', value: String(val) }),
+        })
+      } catch (err) {
+        console.error('Error al guardar zoom:', err)
+      }
+    }
+
+    function zoomIn() {
+      const val = Math.min(200, zoom.value + 10)
+      zoom.value = val
+      saveZoom(val)
+    }
+
+    function zoomOut() {
+      const val = Math.max(50, zoom.value - 10)
+      zoom.value = val
+      saveZoom(val)
+    }
+
+    function resetZoom() {
+      zoom.value = 100
+      saveZoom(100)
+    }
+
     function refresh() {
       fetchRepoData()
     }
@@ -153,6 +217,7 @@ export default {
 
     onMounted(() => {
       fetchRepoData()
+      loadZoom()
     })
 
     return {
@@ -165,6 +230,10 @@ export default {
       tags,
       structuredCommits,
       activeSessionId,
+      zoom,
+      zoomIn,
+      zoomOut,
+      resetZoom,
       refresh,
     }
   },
