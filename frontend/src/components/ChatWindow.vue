@@ -2032,6 +2032,18 @@ export default {
             _key: 'err-' + Date.now(),
           }
         }
+      } finally {
+        try {
+          await fetch('/api/opencode/finish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, directory: cmdStore.currentDir || undefined }),
+          })
+        } catch (finishErr) {
+          console.error('Error al finalizar sesión OpenCode tras commit:', finishErr.message)
+        }
+        ocStore.finish()
       }
     }
 
@@ -2080,7 +2092,7 @@ export default {
       }
     }
 
-    watch(() => chat.messages.length, scrollToBottom)
+    watch(chat.messages, scrollToBottom, { deep: true })
     watch([currentChunk, ocChunk], scrollToBottom)
 
     watch(activeSessionId, () => {

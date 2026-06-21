@@ -17,12 +17,17 @@ register({
     }
 
     if (ocStore.ocSessionId) {
-      chatStore.messages.push({
-        role: 'opencode_info',
-        content: JSON.stringify({ type: 'info', message: 'OpenCode ya está activo en esta sesión. Finalizalo con /dev_opencode_finalizar antes de generar un commit.' }),
-        _key: 'info-' + Date.now(),
-      })
-      return
+      try {
+        await fetch('/api/opencode/finish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, directory: cmdStore.currentDir || undefined }),
+        })
+      } catch (err) {
+        console.error('Error al cerrar sesión OpenCode previa en /dev_opencode_generar_commit:', err)
+      }
+      ocStore.finish()
     }
 
     const data = await ocStore.start()
