@@ -79,6 +79,7 @@ import { useCommandStore } from '../stores/command.js'
 import { useModalStore } from '../stores/modal.js'
 import { useOpencodeStore } from '../stores/opencode.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
+import { useProjectVariables } from '../composables/useProjectVariables.js'
 import ChatMessage from './ChatMessage.vue'
 import HelpContent from './HelpModal.vue'
 import FuncionalidadWizard from './FuncionalidadWizard.vue'
@@ -91,6 +92,7 @@ export default {
     const modal = useModalStore()
     const ocStore = useOpencodeStore()
     const { find } = useCommandRegistry()
+    const { getVariables, interpolate } = useProjectVariables()
     const { activeSessionId, messages, streaming, executing, currentChunk, currentThinking, sessions } = storeToRefs(chat)
     const input = ref('')
     const messagesContainer = ref(null)
@@ -100,6 +102,26 @@ export default {
     const _streamSessionId = ref(null)
     const ticketInfo = ref(null)
     const chatZoom = ref(100)
+    async function _getProyectoId() {
+      const sid = chat.activeSessionId
+      if (!sid) return null
+      try {
+        const res = await fetch(`/api/proyecto/session/${sid}`, { credentials: 'include' })
+        const data = await res.json()
+        return data.proyectoId || null
+      } catch (err) {
+        console.error('Error al obtener proyecto de sesión:', err.message)
+        return null
+      }
+    }
+
+    async function resolveInput(text) {
+      if (!text || !text.includes('{{')) return text
+      const proyectoId = await _getProyectoId()
+      if (!proyectoId) return text
+      const variables = await getVariables(proyectoId)
+      return interpolate(text, variables)
+    }
 
     async function loadZoom() {
       try {
@@ -172,10 +194,12 @@ export default {
     const docUpdateType = ref('')
     const ctxMenu = reactive({ show: false, x: 0, y: 0, msg: null })
 
-    function send() {
-      const raw = input.value.trim()
+    async function send() {
+      let raw = input.value.trim()
       if (!raw || !chat.activeSessionId) return
       input.value = ''
+
+      raw = await resolveInput(raw)
 
       if (raw.startsWith('/')) {
         executeCommand(raw)
@@ -456,6 +480,7 @@ export default {
                     controlType: 'commit_result',
                     message: finalMessage,
                     loading: false,
+                    modo_envio: 'encolar',
                   },
                   _key: 'control-' + Date.now(),
                 }
@@ -476,6 +501,7 @@ export default {
                     controlType: 'commit_result',
                     message: fallbackMessage,
                     loading: false,
+                    modo_envio: 'encolar',
                   },
                   _key: 'control-' + Date.now(),
                 }
@@ -706,7 +732,7 @@ export default {
         } else if (value.action === 'retry') {
           await regenerateCommit(controlId, controlMsg)
         } else if (value.action === 'confirm') {
-          await executeCommit(controlId, controlMsg, value.message, value.addComment)
+          await executeCommit(controlId, controlMsg, value.message, value.addComment, value.modo_envio)
         }
         return
       } else if (stepType === 'resolution_set_default') {
@@ -898,8 +924,9 @@ export default {
         }
         return
       } else if (controlType === 'followup') {
-        const { model, thinking, temperature, prompt } = value
+        let { model, thinking, temperature, prompt } = value
         if (!prompt) return
+        prompt = await resolveInput(prompt)
         ocStore.selectedModel = model || ocStore.selectedModel
         ocStore.selectedThinking = thinking || ocStore.selectedThinking
         ocStore.selectedTemperature = temperature || ocStore.selectedTemperature
@@ -913,8 +940,9 @@ export default {
           ocStore.selectedTemperature,
         )
       } else if (controlType === 'opencode_form') {
-        const { model, thinking, mode, temperature, prompt } = value
+        let { model, thinking, mode, temperature, prompt } = value
         if (!prompt) return
+        prompt = await resolveInput(prompt)
         ocStore.selectedModel = model || ocStore.selectedModel
         ocStore.selectedThinking = thinking || ocStore.selectedThinking
         ocStore.selectedMode = mode || ocStore.selectedMode
@@ -1947,12 +1975,11 @@ export default {
           _key: 'control-' + Date.now(),
         })
       } else if (subStepType === 'form') {
-        const { model, thinking = '', mode = 'Plan', temperature = '0.7', modo_envio = 'encolar' } = value || {}
+        const { model, thinking = '', mode = 'Plan', temperature = '0.7' } = value || {}
         commitSetupData.model = model
         commitSetupData.thinking = thinking
         commitSetupData.mode = mode
         commitSetupData.temperature = temperature
-        commitData.modo_envio = modo_envio
         await ocStore.select('model', model)
         await ocStore.select('thinking', thinking || '')
         await ocStore.select('mode', mode)
@@ -1962,7 +1989,19 @@ export default {
         ocStore.selectedMode = mode
         ocStore.selectedTemperature = temperature || ''
 
-        const prompt = 'Analizá los cambios realizados en el proyecto actual (revisando el diff de Git) y generá un mensaje de commit descriptivo. El mensaje debe ser conciso (máximo 300 caracteres) y reflejar claramente las modificaciones aplicadas al código. Debes comenzar en modo planificación mostrando primero la propuesta de commit. IMPORTANTE: Devuelve ÚNICAMENTE el mensaje de commit, sin explicaciones, análisis ni ningún otro texto adicional.'
+        let prompt
+        try {
+          const tmplRes = await fetch('/api/templates/commit-prompt', { credentials: 'include' })
+          if (tmplRes.ok) {
+            const tmplData = await tmplRes.json()
+            prompt = tmplData.content
+          } else {
+            prompt = 'Analizá los cambios realizados en el proyecto actual (revisando el diff de Git) y generá un mensaje de commit descriptivo. El mensaje debe ser conciso (máximo 300 caracteres) y reflejar claramente las modificaciones aplicadas al código. Debes comenzar en modo planificación mostrando primero la propuesta de commit. IMPORTANTE: Devuelve ÚNICAMENTE el mensaje de commit, sin explicaciones, análisis ni ningún otro texto adicional.'
+          }
+        } catch (err) {
+          console.error('Error al cargar plantilla commit-prompt:', err)
+          prompt = 'Analizá los cambios realizados en el proyecto actual (revisando el diff de Git) y generá un mensaje de commit descriptivo. El mensaje debe ser conciso (máximo 300 caracteres) y reflejar claramente las modificaciones aplicadas al código. Debes comenzar en modo planificación mostrando primero la propuesta de commit. IMPORTANTE: Devuelve ÚNICAMENTE el mensaje de commit, sin explicaciones, análisis ni ningún otro texto adicional.'
+        }
 
         commitData.prompt = prompt
         commitData.provider = commitSetupData.provider
@@ -1999,7 +2038,7 @@ export default {
       )
     }
 
-    async function executeCommit(controlId, controlMsg, message, addComment) {
+    async function executeCommit(controlId, controlMsg, message, addComment, modo_envio) {
       const sessionId = chat.activeSessionId
       const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
       if (idx >= 0) {
@@ -2091,7 +2130,7 @@ export default {
         }
 
         if (addComment && idTicket) {
-          const modoEnvio = commitData.modo_envio || 'encolar'
+          const modoEnvio = modo_envio || 'encolar'
           if (modoEnvio === 'enviar') {
             try {
               const proyectoId = session?.proyecto_id || null
@@ -2229,7 +2268,7 @@ export default {
       }
     }
 
-    watch(chat.messages, scrollToBottom, { deep: true })
+    watch(messages, scrollToBottom, { deep: true })
     watch([currentChunk, ocChunk], scrollToBottom)
 
     watch(activeSessionId, () => {

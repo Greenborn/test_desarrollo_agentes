@@ -1,0 +1,30 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+
+export const useRedmineCommentsStore = defineStore('redmineComments', () => {
+  const comments = ref([])
+  const loading = ref(false)
+  const activeTicketId = ref(null)
+
+  async function loadComments(ticketRedmineId) {
+    activeTicketId.value = ticketRedmineId
+    loading.value = true
+    try {
+      const res = await fetch(`/api/redmine/comments?ticket_redmine_id=${ticketRedmineId}&estado=todos`, { credentials: 'include' })
+      const data = await res.json()
+      comments.value = data.comentarios || []
+    } catch (err) {
+      console.error('Error al cargar comentarios Redmine:', err)
+      comments.value = []
+    } finally {
+      loading.value = false
+    }
+  }
+
+  function clearComments() {
+    comments.value = []
+    activeTicketId.value = null
+  }
+
+  return { comments, loading, activeTicketId, loadComments, clearComments }
+})

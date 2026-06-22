@@ -267,6 +267,24 @@
           </div>
           <button class="btn btn-sm btn-argentina" @click="saveResolutions">Guardar Resoluciones</button>
         </div>
+
+        <div v-if="matches('ambientes entorno dev tst prd')" class="border-top border-secondary pt-3">
+          <label class="form-label mb-2 fw-bold">Ambientes</label>
+          <div class="small text-muted mb-2">Ambientes de trabajo con rama y descripción</div>
+          <div v-for="(env, i) in environmentsList" :key="env.id || i" class="d-flex gap-2 mb-1 align-items-center">
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 80px;" placeholder="nombre" v-model="environmentsList[i].name" />
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 100px;" placeholder="rama" v-model="environmentsList[i].branch" />
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" style="flex: 1;" placeholder="descripción" v-model="environmentsList[i].description" />
+            <button class="btn btn-sm btn-outline-argentina" @click="saveEnvironment(i)" title="Guardar">✓</button>
+            <button class="btn btn-sm btn-outline-danger" @click="deleteEnvironment(i)" title="Eliminar" v-if="environmentsList[i].id">✕</button>
+          </div>
+          <div class="d-flex gap-2 mt-2 align-items-center">
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 80px;" placeholder="nombre" v-model="newEnvName" />
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 100px;" placeholder="rama" v-model="newEnvBranch" />
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" style="flex: 1;" placeholder="descripción" v-model="newEnvDescription" />
+            <button class="btn btn-sm btn-outline-argentina" @click="addEnvironment">+ Agregar</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -322,6 +340,10 @@ export default {
     const newResId = ref('')
     const newResWidth = ref(1920)
     const newResHeight = ref(1080)
+    const environmentsList = ref([])
+    const newEnvName = ref('')
+    const newEnvBranch = ref('')
+    const newEnvDescription = ref('')
     const selectedWId = ref(1)
     const wsMessage = ref('')
 
@@ -353,6 +375,7 @@ export default {
         selectedWId.value = 1
       }
       await settings.load()
+      await loadEnvironments()
     })
 
     watch(() => settings.systemPrompt, (val) => {
@@ -410,6 +433,7 @@ export default {
     async function reloadSettings() {
       settings.clearFeedback()
       await settings.load()
+      await loadEnvironments()
     }
 
     async function onWorkspaceChange() {
@@ -592,6 +616,101 @@ export default {
       settings.save('screen_resolutions', JSON.stringify(valid))
     }
 
+    async function loadEnvironments() {
+      try {
+        const res = await fetch('/api/environments', { credentials: 'include' })
+        const data = await res.json()
+        environmentsList.value = data.environments || []
+      } catch (err) {
+        console.error('Error al cargar ambientes:', err.message)
+      }
+    }
+
+    async function saveEnvironment(index) {
+      const env = environmentsList.value[index]
+      if (!env.name || !env.branch) {
+        wsMessage.value = 'Nombre y rama son requeridos'
+        setTimeout(() => { wsMessage.value = '' }, 3000)
+        return
+      }
+      try {
+        const res = await fetch(`/api/environments/${env.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ name: env.name, branch: env.branch, description: env.description }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          wsMessage.value = 'Ambiente actualizado.'
+        } else {
+          wsMessage.value = data.error || 'Error al actualizar ambiente'
+        }
+      } catch (err) {
+        console.error('Error al guardar ambiente:', err.message)
+        wsMessage.value = 'Error al guardar ambiente'
+      }
+      setTimeout(() => { wsMessage.value = '' }, 3000)
+    }
+
+    async function addEnvironment() {
+      if (!newEnvName.value.trim() || !newEnvBranch.value.trim()) {
+        wsMessage.value = 'Nombre y rama son requeridos'
+        setTimeout(() => { wsMessage.value = '' }, 3000)
+        return
+      }
+      try {
+        const res = await fetch('/api/environments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            name: newEnvName.value.trim(),
+            branch: newEnvBranch.value.trim(),
+            description: newEnvDescription.value.trim() || null,
+          }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          environmentsList.value.push(data.environment)
+          newEnvName.value = ''
+          newEnvBranch.value = ''
+          newEnvDescription.value = ''
+          wsMessage.value = 'Ambiente creado.'
+        } else {
+          wsMessage.value = data.error || 'Error al crear ambiente'
+        }
+      } catch (err) {
+        console.error('Error al crear ambiente:', err.message)
+        wsMessage.value = 'Error al crear ambiente'
+      }
+      setTimeout(() => { wsMessage.value = '' }, 3000)
+    }
+
+    async function deleteEnvironment(index) {
+      const env = environmentsList.value[index]
+      if (!env.id) return
+      const confirmed = confirm(`¿Eliminar ambiente "${env.name}"?`)
+      if (!confirmed) return
+      try {
+        const res = await fetch(`/api/environments/${env.id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+        const data = await res.json()
+        if (data.success) {
+          environmentsList.value.splice(index, 1)
+          wsMessage.value = 'Ambiente eliminado.'
+        } else {
+          wsMessage.value = data.error || 'Error al eliminar ambiente'
+        }
+      } catch (err) {
+        console.error('Error al eliminar ambiente:', err.message)
+        wsMessage.value = 'Error al eliminar ambiente'
+      }
+      setTimeout(() => { wsMessage.value = '' }, 3000)
+    }
+
     return {
       keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput,
       docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput, refinarPromptInput,
@@ -601,9 +720,11 @@ export default {
       priorityColorUrgentInput, priorityColorImmediateInput,
       settings, workspaces, selectedWId, wsMessage,
       resolutionsEdit, newResId, newResWidth, newResHeight,
+      environmentsList, newEnvName, newEnvBranch, newEnvDescription,
       saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
       saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveRepoAcronimo,
       saveLocale, savePriorityColor, addResolution, removeResolution, resetResolutions, saveResolutions, matches,
+      saveEnvironment, addEnvironment, deleteEnvironment,
       onWorkspaceChange, promptCreate, promptRename, confirmDelete,
     }
   },

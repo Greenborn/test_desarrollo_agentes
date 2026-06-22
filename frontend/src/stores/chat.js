@@ -240,6 +240,16 @@ export const useChatStore = defineStore('chat', () => {
         const errData = await res.json()
         sessionStatus.value[sessionId] = 'error'
         delete _streamingSessions.value[sessionId]
+        if (res.status === 404) {
+          if (Number(activeSessionId.value) === Number(sessionId)) {
+            activeSessionId.value = null
+            messages.value = []
+          }
+          delete _sessionStreamCache.value[sessionId]
+          delete pendingNotifications.value[sessionId]
+          await loadSessions()
+          return
+        }
         if (Number(activeSessionId.value) === Number(sessionId)) {
           currentChunk.value = `\n\n[Error: ${errData.error || res.statusText}]`
         }

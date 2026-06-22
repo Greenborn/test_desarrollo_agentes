@@ -311,6 +311,29 @@ Todo comando que consulte registros de gastos de tokens **debe comenzar con `/ga
 | `/gastos_listar` | listar | — | Mostrar todos los gastos |
 | `/gastos_listar_proyecto` | listar | proyecto | Mostrar gastos de un proyecto |
 
+## 12b. Comandos de ambientes
+
+Todo comando que liste o gestione ambientes de trabajo (DEV, TST, PRD, etc.) **debe comenzar con `/ambientes_`**.
+
+### Estructura
+
+```
+/ambientes_[verbo]
+```
+
+| Parte | Descripción | Ejemplos |
+|---|---|---|
+| `verbo` | Acción a realizar | `listar` |
+
+### Ejemplos
+
+| Nombre | Verbo | Significado |
+|---|---|---|
+| `/ambientes_listar` | `listar` | Listar ambientes configurados |
+| `/ambientes_merge` | `merge` | Hacer merge a la rama de un ambiente |
+
+---
+
 ## 13. Comandos ligados a la sesión de chat
 
 Todo comando que opere sobre datos o contexto de la sesión de chat activa (sesiones, tickets, proyectos, etc.) **debe comenzar con `/chat_`**.

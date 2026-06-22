@@ -178,8 +178,12 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `id` | INTEGER | PK, AUTO_INCREMENT |
 | `slug` | VARCHAR(100) | NOT NULL, UNIQUE |
 | `content` | TEXT | NOT NULL |
+| `is_protected` | BOOLEAN | NOT NULL, DEFAULT `false` |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+**Seed `004_default_templates.js`:**
+- `slug='commit-prompt', content=(prompt de commit), is_protected=true`
 
 ---
 
@@ -198,7 +202,22 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
-## 12. `tickets`
+## 12. `project_variables`
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `proyecto_id` | VARCHAR(255) | NOT NULL, FK → `proyectos(id)` ON DELETE CASCADE |
+| `key` | VARCHAR(255) | NOT NULL — nombre de la variable |
+| `value` | TEXT | NOT NULL, DEFAULT `''` |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+**UNIQUE compuesto:** `(proyecto_id, key)` — cada variable se identifica por proyecto + nombre.
+
+---
+
+## 13. `tickets`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -225,6 +244,29 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
+## 14. `workspace_environments`
+
+| Columna | Tipo | Restricciones |
+|---------|------|---------------|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` — FK lógica → `workspaces(id)` |
+| `name` | VARCHAR(100) | NOT NULL — nombre del ambiente (ej: DEV, TST, PRD) |
+| `branch` | VARCHAR(255) | NOT NULL — rama Git asociada al ambiente |
+| `description` | TEXT | nullable — descripción del ambiente |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+**UNIQUE compuesto:** `(workspace_id, name)` — cada workspace tiene sus propios ambientes.
+
+**Seed (`005_default_environments.js`):**
+| name | branch | description |
+|------|--------|-------------|
+| DEV | DEV | Desarrollo |
+| TST | TST | Testing |
+| PRD | PRD | Producción |
+
+---
+
 ## Relaciones (Foreign Keys)
 
 | Origen | Columna | Destino | Columna | ON DELETE |
@@ -238,6 +280,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `gastos_tokens_usados` | `id_chat_session` | `chat_sessions` | `id` | CASCADE |
 | `gastos_tokens_usados` | `id_proyecto` | `proyectos` | `id` | CASCADE |
 | `tickets` | `proyecto_id` | `proyectos` | `id` | CASCADE |
+| `project_variables` | `proyecto_id` | `proyectos` | `id` | CASCADE |
 | `redmine_comentarios` | `session_id` | `chat_sessions` | `id` | CASCADE |
 
 ---
@@ -249,7 +292,9 @@ workspaces
  ├─ settings.workspace_id (FK lógica)
  ├─ chat_sessions.workspace_id (FK lógica)
  ├─ proyectos.workspace_id (FK lógica)
- └─ tickets.workspace_id (FK lógica)
+ ├─ tickets.workspace_id (FK lógica)
+ ├─ redmine_comentarios.workspace_id (FK lógica)
+ └─ workspace_environments.workspace_id (FK lógica)
 
 users
  ├─ chat_sessions (user_id)
@@ -262,7 +307,8 @@ proyectos
  ├─ chat_sessions.proyecto_id (FK lógica)
  ├─ funcionalidades.proyecto_id (FK lógica)
  ├─ gastos_tokens_usados.id_proyecto (FK)
- └─ tickets.proyecto_id (FK)
+ ├─ tickets.proyecto_id (FK)
+ └─ project_variables.proyecto_id (FK)
 
 tickets
  └─ chat_sessions.id_ticket_redmine (FK lógica)

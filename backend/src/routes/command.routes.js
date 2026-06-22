@@ -536,4 +536,175 @@ router.post('/execute', async (req, res) => {
   }
 });
 
+router.post('/git-merge', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { sessionId, ambienteName, mensaje, comentar } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'sessionId es requerido' });
+    }
+    if (!ambienteName) {
+      return res.status(400).json({ success: false, error: 'ambienteName es requerido' });
+    }
+
+    const wsId = req.session.workspaceId || 1;
+
+    const env = await db('workspace_environments')
+      .where({ workspace_id: wsId, name: ambienteName })
+      .first();
+    if (!env) {
+      return res.status(400).json({ success: false, error: `Ambiente "${ambienteName}" no encontrado` });
+    }
+
+    const session = await db('chat_sessions').where({ id: sessionId }).select('cwd', 'id_ticket_redmine').first();
+    if (!session) {
+      return res.status(400).json({ success: false, error: 'Sesión de chat no encontrada' });
+    }
+    const cwd = session.cwd || process.cwd();
+
+    try {
+      execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf-8' });
+    } catch (e) {
+      return res.status(400).json({ success: false, error: 'El directorio no es un repositorio Git.' });
+    }
+
+    try {
+      const status = execSync('git status --porcelain', { cwd, encoding: 'utf-8' }).trim();
+      if (status) {
+        return res.status(400).json({ success: false, error: 'Hay cambios sin confirmar. Confirme o descarte los cambios antes de continuar.' });
+      }
+    } catch (e) {
+      return res.status(400).json({ success: false, error: 'Error al verificar el estado de Git: ' + (e.stderr || e.message) });
+    }
+
+    let sourceBranch;
+    try {
+      sourceBranch = execSync('git branch --show-current', { cwd, encoding: 'utf-8' }).trim();
+      if (!sourceBranch) {
+        return res.status(400).json({ success: false, error: 'No se pudo determinar la rama actual.' });
+      }
+    } catch (e) {
+      return res.status(400).json({ success: false, error: 'Error al obtener la rama actual: ' + (e.stderr || e.message) });
+    }
+
+    const targetBranch = env.branch;
+
+    if (sourceBranch === targetBranch) {
+      return res.status(400).json({ success: false, error: `Ya está en la rama "${targetBranch}". No se puede hacer merge de sí misma.` });
+    }
+
+    try {
+      execSync('git fetch origin', { cwd, encoding: 'utf-8' });
+    } catch (e) {
+      console.log('[git-merge] fetch warning:', e.stderr || e.message);
+    }
+
+    let mergeOutput = '';
+    let hasConflicts = false;
+    let checkoutOutput = '';
+
+    try {
+      checkoutOutput = execSync(`git checkout "${targetBranch}"`, { cwd, encoding: 'utf-8' });
+    } catch (e) {
+      return res.status(400).json({ success: false, error: 'Error al hacer checkout: ' + (e.stderr || e.message) });
+    }
+
+    try {
+      mergeOutput = execSync(`git merge "${sourceBranch}" -m "${(mensaje || 'Merge').replace(/"/g, '\\"')}"`, { cwd, encoding: 'utf-8' });
+    } catch (e) {
+      const stderr = e.stderr || '';
+      const stdout = e.stdout || '';
+      if (stderr.includes('CONFLICT') || stdout.includes('CONFLICT') || stderr.includes('merge conflict') || stdout.includes('Automatic merge failed')) {
+        hasConflicts = true;
+        mergeOutput = stdout + '\n' + stderr;
+      } else {
+        return res.status(500).json({ success: false, error: 'Error en merge: ' + (stderr || e.message) });
+      }
+    }
+
+    if (hasConflicts) {
+      return res.json({
+        success: true,
+        hasConflicts: true,
+        mergeOutput: mergeOutput.trim(),
+        checkoutOutput: checkoutOutput.trim(),
+        targetBranch,
+        sourceBranch,
+        instruction: 'El merge tiene conflictos. Resuélvalos manualmente con git add + git commit, o cancele con git merge --abort.',
+      });
+    }
+
+    let pushOutput = '';
+    let pushError = '';
+    try {
+      pushOutput = execSync(`git push origin "${targetBranch}"`, { cwd, encoding: 'utf-8' });
+    } catch (e) {
+      pushError = e.stderr || e.message;
+      console.log('[git-merge] push warning:', pushError);
+    }
+
+    let redmineComment = null;
+    const ticketId = session.id_ticket_redmine;
+
+    if (ticketId && comentar) {
+      const commentText = mensaje || `Se actualiza ambiente ${ambienteName}`;
+      try {
+        if (comentar === 'enviar') {
+          const { getRedmineToken, getRedmineUrl } = await import('../services/redmine.js');
+          const token = await getRedmineToken(wsId);
+          const url = await getRedmineUrl(wsId);
+          if (token && url) {
+            const baseUrl = url.replace(/\/+$/, '');
+            const rmRes = await fetch(`${baseUrl}/issues/${ticketId}.json`, {
+              method: 'PUT',
+              headers: {
+                'X-Redmine-API-Key': token,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ issue: { notes: commentText } }),
+            });
+            if (rmRes.ok) {
+              redmineComment = { action: 'enviado', ticketId };
+            } else {
+              const errText = await rmRes.text();
+              console.log('[git-merge] error al enviar comentario Redmine:', errText.slice(0, 300));
+              redmineComment = { action: 'error', ticketId, error: errText.slice(0, 300) };
+            }
+          } else {
+            redmineComment = { action: 'error', ticketId, error: 'Redmine no configurado' };
+          }
+        } else if (comentar === 'encolar') {
+          const [insertedId] = await db('redmine_comentarios').insert({
+            session_id: sessionId,
+            ticket_redmine_id: ticketId,
+            comentario: commentText,
+            workspace_id: wsId,
+            estado: 'pendiente',
+          });
+          redmineComment = { action: 'encolado', ticketId, commentId: insertedId };
+        }
+      } catch (err) {
+        console.log('[git-merge] error en comentario Redmine:', err.message);
+        redmineComment = { action: 'error', ticketId, error: err.message };
+      }
+    }
+
+    const response = {
+      success: true,
+      hasConflicts: false,
+      mergeOutput: mergeOutput.trim(),
+      pushOutput: pushOutput.trim() || null,
+      targetBranch,
+      sourceBranch,
+    };
+    if (pushError) response.pushError = pushError.trim();
+    if (redmineComment) response.redmineComment = redmineComment;
+
+    res.json(response);
+  } catch (err) {
+    console.log('Error en git-merge:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;

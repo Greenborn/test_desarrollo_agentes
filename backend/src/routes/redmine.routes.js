@@ -524,11 +524,17 @@ router.get('/comments', async (req, res) => {
 
   try {
     const wsId = req.session.workspaceId || 1;
-    const estado = req.query.estado || 'pendiente';
+    const query = db('redmine_comentarios').where({ workspace_id: wsId });
 
-    const comentarios = await db('redmine_comentarios')
-      .where({ workspace_id: wsId, estado })
-      .orderBy('created_at', 'asc');
+    if (req.query.estado && req.query.estado !== 'todos') {
+      query.where({ estado: req.query.estado });
+    }
+
+    if (req.query.ticket_redmine_id) {
+      query.where({ ticket_redmine_id: parseInt(req.query.ticket_redmine_id, 10) });
+    }
+
+    const comentarios = await query.orderBy('created_at', 'asc');
 
     res.json({ success: true, comentarios });
   } catch (err) {

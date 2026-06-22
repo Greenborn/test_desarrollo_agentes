@@ -8,6 +8,13 @@
       <input type="checkbox" v-model="addComment" class="form-check-input" style="cursor: pointer;" />
       Agregar comentario al ticket
     </label>
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <label class="small text-light-emphasis mb-0" style="color: #9ca3af; font-size: 0.8rem;">Modo envío:</label>
+      <select v-model="modoEnvio" class="form-select form-select-sm bg-dark text-light border-secondary font-monospace" style="width: auto;">
+        <option value="encolar">Encolar</option>
+        <option value="enviar">Enviar</option>
+      </select>
+    </div>
     <div class="d-flex gap-2">
       <button class="btn btn-sm btn-success" @click="confirmar">
         Confirmar
@@ -29,13 +36,15 @@ export default {
   props: {
     message: { type: String, required: true },
     loading: { type: Boolean, default: false },
+    modoEnvioInicial: { type: String, default: 'encolar' },
   },
   emits: ['confirm'],
   setup(props, { emit }) {
     const addComment = ref(true)
+    const modoEnvio = ref(props.modoEnvioInicial || 'encolar')
 
     function confirmar() {
-      emit('confirm', { action: 'confirm', message: props.message, addComment: addComment.value })
+      emit('confirm', { action: 'confirm', message: props.message, addComment: addComment.value, modo_envio: modoEnvio.value })
     }
 
     function reintentar() {
@@ -46,7 +55,7 @@ export default {
       emit('confirm', null)
     }
 
-    return { addComment, confirmar, reintentar, cancelar }
+    return { addComment, modoEnvio, confirmar, reintentar, cancelar }
   },
 }
 </script>

@@ -98,6 +98,14 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 - **Body:** `{ command: string }`
 - **Respuesta:** `{ success: true }`
 
+### `POST /api/command/git-merge`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number, ambienteName: string, mensaje?: string, comentar?: "enviar"|"encolar" }`
+- **Descripción:** Ejecuta el flujo completo de merge a rama de ambiente: verifica que no haya cambios pendientes, obtiene la rama destino desde la tabla `workspace_environments`, hace checkout a la rama destino, ejecuta `git merge` con el mensaje indicado, hace `git push` si el merge es exitoso, y opcionalmente envía o encola un comentario en Redmine si hay un ticket asignado a la sesión.
+- **Respuesta 200 (éxito):** `{ success: true, hasConflicts: false, mergeOutput, pushOutput, targetBranch, sourceBranch, redmineComment?: { action, ticketId } }`
+- **Respuesta 200 (conflictos):** `{ success: true, hasConflicts: true, mergeOutput, checkoutOutput, targetBranch, sourceBranch, instruction }`
+- **Respuesta 400 (error):** `{ success: false, error: "..." }` (cambios pendientes, no es repositorio, ambiente no encontrado, etc.)
+
 ### `POST /api/command/execute`
 - **Auth:** Requerida
 - **Body:** `{ command: string, sessionId?: number }`
@@ -219,6 +227,40 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 - **Descripción:** Fija o quita el proyecto pineado para el usuario. Si `proyectoId` es `null` o se omite, quita el pin.
 - **Almacenamiento:** `user_settings` con key `pinned_project`
 - **Respuesta:** `{ success: true }`
+
+### `GET /api/proyecto/:id/variables`
+- **Auth:** Requerida
+- **Params:** `id` — slug del proyecto
+- **Workspace:** Valida que el proyecto pertenezca al workspace de la sesión
+- **Descripción:** Lista todas las variables del proyecto (clave-valor) ordenadas por nombre ascendente.
+- **Respuesta 200:** `{ variables: [{ key: string, value: string }] }`
+- **Respuesta 404:** `{ error: "Proyecto no encontrado" }`
+
+### `POST /api/proyecto/:id/variables`
+- **Auth:** Requerida
+- **Params:** `id` — slug del proyecto
+- **Body:** `{ key: string, value: string }`
+- **Descripción:** Crea una nueva variable en el proyecto.
+- **Respuesta 201:** `{ success: true }`
+- **Respuesta 400:** `{ error: "key es requerido" }` o `{ error: "value es requerido" }`
+- **Respuesta 404:** `{ error: "Proyecto no encontrado" }`
+- **Respuesta 409:** `{ error: "La variable \"...\" ya existe en este proyecto" }`
+
+### `PUT /api/proyecto/:id/variables/:key`
+- **Auth:** Requerida
+- **Params:** `id` — slug del proyecto, `key` — nombre de la variable
+- **Body:** `{ value: string }`
+- **Descripción:** Actualiza el valor de una variable existente.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 400:** `{ error: "value es requerido" }`
+- **Respuesta 404:** `{ error: "Variable \"...\" no encontrada" }` o `{ error: "Proyecto no encontrado" }`
+
+### `DELETE /api/proyecto/:id/variables/:key`
+- **Auth:** Requerida
+- **Params:** `id` — slug del proyecto, `key` — nombre de la variable
+- **Descripción:** Elimina una variable del proyecto.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 404:** `{ error: "Variable \"...\" no encontrada" }` o `{ error: "Proyecto no encontrado" }`
 
 ---
 
@@ -428,12 +470,46 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ---
 
+## Ambientes (`/api/environments`)
+
+### `GET /api/environments`
+- **Auth:** Requerida
+- **Workspace:** Filtra por `workspace_id` de la sesión
+- **Descripción:** Lista los ambientes configurados (DEV, TST, PRD, etc.) con su rama y descripción
+- **Respuesta 200:** `{ environments: [{ id, name, branch, description, created_at, updated_at }] }`
+
+### `POST /api/environments`
+- **Auth:** Requerida
+- **Workspace:** Asigna `workspace_id` de la sesión
+- **Body:** `{ name: string, branch: string, description?: string }`
+- **Descripción:** Crea un nuevo ambiente. El nombre y la rama son obligatorios. `(workspace_id, name)` debe ser único.
+- **Respuesta 201:** `{ success: true, environment: { id, name, branch, description, ... } }`
+- **Respuesta 400:** `{ error: "El nombre es requerido" }` o `{ error: "La rama es requerida" }`
+- **Respuesta 409:** `{ error: 'Ya existe un ambiente con el nombre "..."' }`
+
+### `PUT /api/environments/:id`
+- **Auth:** Requerida
+- **Body:** `{ name?: string, branch?: string, description?: string }`
+- **Descripción:** Actualiza los campos de un ambiente existente. Al menos un campo debe enviarse.
+- **Respuesta 200:** `{ success: true, environment: { id, name, branch, description, ... } }`
+- **Respuesta 400:** `{ error: "El nombre no puede estar vacío" }` o `{ error: "La rama no puede estar vacía" }`
+- **Respuesta 404:** `{ error: "Ambiente no encontrado" }`
+- **Respuesta 409:** `{ error: 'Ya existe otro ambiente con el nombre "..."' }`
+
+### `DELETE /api/environments/:id`
+- **Auth:** Requerida
+- **Descripción:** Elimina un ambiente permanentemente.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 404:** `{ error: "Ambiente no encontrado" }`
+
+---
+
 ## Plantillas (`/api/templates`)
 
 ### `GET /api/templates`
 - **Auth:** Requerida
-- **Descripción:** Lista todas las plantillas (id, slug, created_at, updated_at) ordenadas por slug ascendente
-- **Respuesta 200:** `[{ id, slug, created_at, updated_at }]`
+- **Descripción:** Lista todas las plantillas (id, slug, is_protected, created_at, updated_at) ordenadas por slug ascendente
+- **Respuesta 200:** `[{ id, slug, is_protected, created_at, updated_at }]`
 
 ### `GET /api/templates/:slug`
 - **Auth:** Requerida
@@ -452,16 +528,18 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 ### `PUT /api/templates/:slug`
 - **Auth:** Requerida
 - **Body:** `{ slug?: string, content?: string }`
-- **Descripción:** Actualiza una plantilla existente. Se puede cambiar el slug y/o el contenido. Al menos un campo es requerido.
+- **Descripción:** Actualiza una plantilla existente. Se puede cambiar el slug y/o el contenido. Al menos un campo es requerido. Las plantillas protegidas (`is_protected=true`) no pueden modificarse.
 - **Respuesta 200:** `{ success: true }`
 - **Respuesta 400:** `{ error: "..." }` (slug inválido, contenido excede 10KB, sin campos)
+- **Respuesta 403:** `{ error: "No se puede modificar una plantilla protegida del sistema" }`
 - **Respuesta 404:** `{ error: "Plantilla no encontrada" }`
 - **Respuesta 409:** `{ error: "Ya existe otra plantilla con ese slug" }`
 
 ### `DELETE /api/templates/:slug`
 - **Auth:** Requerida
-- **Descripción:** Elimina una plantilla por slug
+- **Descripción:** Elimina una plantilla por slug. Las plantillas protegidas (`is_protected=true`) no pueden eliminarse.
 - **Respuesta 200:** `{ success: true }`
+- **Respuesta 403:** `{ error: "No se puede eliminar una plantilla protegida del sistema" }`
 - **Respuesta 404:** `{ error: "Plantilla no encontrada" }`
 
 ---

@@ -32,7 +32,8 @@ register({
 
     const lines = templatesStore.list.map((t) => {
       const fecha = new Date(t.updated_at || t.created_at).toLocaleDateString('es-ES');
-      return `- **${t.slug}** (actualizado: ${fecha})`;
+      const icon = t.is_protected ? '🔒' : '';
+      return `- ${icon} **${t.slug}** (actualizado: ${fecha})`;
     });
 
     return lines.join('\n');

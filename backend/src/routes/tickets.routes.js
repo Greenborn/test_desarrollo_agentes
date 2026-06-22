@@ -17,8 +17,14 @@ router.get('/', async (req, res) => {
 
   try {
     const wsId = req.session.workspaceId || 1;
+    const filter = { workspace_id: wsId };
+
+    if (req.query.proyecto_id) {
+      filter.proyecto_id = req.query.proyecto_id;
+    }
+
     const tickets = await db('tickets')
-      .where({ workspace_id: wsId })
+      .where(filter)
       .select('*')
       .orderBy('redmine_updated_on', 'desc');
 

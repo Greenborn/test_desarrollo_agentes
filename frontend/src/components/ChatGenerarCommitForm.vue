@@ -20,13 +20,7 @@
           <option v-for="t in temperatureOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
         </select>
       </div>
-      <div style="min-width: 130px; flex: 1;">
-        <label class="small text-light-emphasis mb-1">Modo envío</label>
-        <select v-model="modoEnvio" class="form-select form-select-sm bg-dark text-light border-secondary font-monospace">
-          <option value="encolar">Encolar</option>
-          <option value="enviar">Enviar</option>
-        </select>
-      </div>
+
     </div>
     <button class="btn btn-sm btn-success align-self-end" :disabled="!selectedModel" @click="confirm">
       Generar Commit
@@ -51,7 +45,6 @@ export default {
     const selectedModel = ref(props.modelValue || '')
     const selectedThinking = ref(props.thinkingValue || '')
     const selectedTemperature = ref(props.temperatureValue || '')
-    const modoEnvio = ref('encolar')
 
     const showThinking = computed(() => {
       if (!selectedModel.value) return false
@@ -72,11 +65,10 @@ export default {
         thinking: showThinking.value ? selectedThinking.value : '',
         mode: 'Plan',
         temperature: selectedTemperature.value,
-        modo_envio: modoEnvio.value,
       })
     }
 
-    return { selectedModel, selectedThinking, selectedTemperature, modoEnvio, showThinking, onModelChange, confirm }
+    return { selectedModel, selectedThinking, selectedTemperature, showThinking, onModelChange, confirm }
   },
 }
 </script>

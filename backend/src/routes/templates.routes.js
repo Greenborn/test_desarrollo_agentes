@@ -15,7 +15,7 @@ function authGuard(req, res) {
 router.get('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const rows = await db('templates').select('id', 'slug', 'created_at', 'updated_at').orderBy('slug', 'asc');
+    const rows = await db('templates').select('id', 'slug', 'is_protected', 'created_at', 'updated_at').orderBy('slug', 'asc');
     res.json(rows);
   } catch (err) {
     console.log('Error al obtener plantillas:', err.message);
@@ -84,6 +84,10 @@ router.put('/:slug', async (req, res) => {
       res.status(404).json({ error: 'Plantilla no encontrada' });
       return;
     }
+    if (existing.is_protected) {
+      res.status(403).json({ error: 'No se puede modificar una plantilla protegida del sistema' });
+      return;
+    }
 
     const { slug: newSlug, content } = req.body;
     const updateData = {};
@@ -138,11 +142,16 @@ router.put('/:slug', async (req, res) => {
 router.delete('/:slug', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const deleted = await db('templates').where({ slug: req.params.slug }).del();
-    if (!deleted) {
+    const existing = await db('templates').where({ slug: req.params.slug }).first();
+    if (!existing) {
       res.status(404).json({ error: 'Plantilla no encontrada' });
       return;
     }
+    if (existing.is_protected) {
+      res.status(403).json({ error: 'No se puede eliminar una plantilla protegida del sistema' });
+      return;
+    }
+    await db('templates').where({ slug: req.params.slug }).del();
     res.json({ success: true });
   } catch (err) {
     console.log('Error al eliminar plantilla:', err.message);

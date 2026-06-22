@@ -80,6 +80,10 @@ router.post('/sessions/:id/messages', async (req, res) => {
   const { message } = req.body;
 
   try {
+    const session = await db('chat_sessions').where({ id: sessionId, user_id: req.session.userId }).first();
+    if (!session) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
     await db('chat_messages').insert({ session_id: sessionId, role: 'user', content: message });
     await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
 
@@ -163,6 +167,10 @@ router.post('/sessions/:id/save-messages', async (req, res) => {
     return res.status(400).json({ error: 'Se requiere un array messages no vacío' });
   }
   try {
+    const session = await db('chat_sessions').where({ id: req.params.id, user_id: req.session.userId }).first();
+    if (!session) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
     const inserts = messages.map(m => ({
       session_id: req.params.id,
       role: m.role,

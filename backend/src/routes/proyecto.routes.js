@@ -141,4 +141,116 @@ router.get('/proyecto/repositorio/:proyectoId', async (req, res) => {
   }
 });
 
+// ─── Project Variables CRUD ────────────────────────────────────────────────
+
+router.get('/proyecto/:id/variables', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const wsId = req.session.workspaceId || 1;
+    const proyecto = await db('proyectos')
+      .select('id')
+      .where({ id: req.params.id, workspace_id: wsId })
+      .first();
+    if (!proyecto) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+    const variables = await db('project_variables')
+      .select('key', 'value')
+      .where({ proyecto_id: req.params.id })
+      .orderBy('key');
+    res.json({ variables });
+  } catch (err) {
+    console.log('Error al listar variables:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/proyecto/:id/variables', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const { key, value } = req.body;
+  if (!key) {
+    return res.status(400).json({ error: 'key es requerido' });
+  }
+  if (value === undefined || value === null) {
+    return res.status(400).json({ error: 'value es requerido' });
+  }
+  try {
+    const wsId = req.session.workspaceId || 1;
+    const proyecto = await db('proyectos')
+      .select('id')
+      .where({ id: req.params.id, workspace_id: wsId })
+      .first();
+    if (!proyecto) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+    const existing = await db('project_variables')
+      .where({ proyecto_id: req.params.id, key })
+      .first();
+    if (existing) {
+      return res.status(409).json({ error: `La variable "${key}" ya existe en este proyecto` });
+    }
+    await db('project_variables').insert({
+      proyecto_id: req.params.id,
+      key,
+      value: String(value),
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al crear variable:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/proyecto/:id/variables/:key', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const { value } = req.body;
+  if (value === undefined || value === null) {
+    return res.status(400).json({ error: 'value es requerido' });
+  }
+  try {
+    const wsId = req.session.workspaceId || 1;
+    const proyecto = await db('proyectos')
+      .select('id')
+      .where({ id: req.params.id, workspace_id: wsId })
+      .first();
+    if (!proyecto) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+    const updated = await db('project_variables')
+      .where({ proyecto_id: req.params.id, key: req.params.key })
+      .update({ value: String(value), updated_at: db.fn.now() });
+    if (!updated) {
+      return res.status(404).json({ error: `Variable "${req.params.key}" no encontrada` });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al actualizar variable:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/proyecto/:id/variables/:key', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const wsId = req.session.workspaceId || 1;
+    const proyecto = await db('proyectos')
+      .select('id')
+      .where({ id: req.params.id, workspace_id: wsId })
+      .first();
+    if (!proyecto) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+    const deleted = await db('project_variables')
+      .where({ proyecto_id: req.params.id, key: req.params.key })
+      .delete();
+    if (!deleted) {
+      return res.status(404).json({ error: `Variable "${req.params.key}" no encontrada` });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al eliminar variable:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

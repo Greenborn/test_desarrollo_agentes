@@ -65,6 +65,14 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/chat_set_ticket` | Asigna un ticket de Redmine a la sesión actual. Autocompletado filtrado por el proyecto de la sesión | `/chat_set_ticket --id=<id_ticket_redmine>` |
 | `/chat_get_ticket` | Muestra el ticket de Redmine asignado a la sesión actual, incluyendo su descripción. Con `--comments` muestra también los comentarios. Los adjuntos se listan al final: las imágenes se muestran inline y los archivos se pueden descargar mediante enlace | `/chat_get_ticket [--comments]` |
 | `/chat_edit_ticket` | Abre un editor inline para modificar los datos del ticket de Redmine asignado a la sesión actual (asunto, descripción, estado, prioridad, asignado, + nuevo comentario). Con `--mode=descripcion` abre un asistente con OpenCode para redactar una descripción del ticket usando IA. | `/chat_edit_ticket [--mode=descripcion]` |
+| `/proyecto_var_listar` | Lista las variables definidas para un proyecto. Sin `--id` usa el proyecto de la sesión actual | `/proyecto_var_listar [--id=proyecto]` |
+| `/proyecto_var_crear` | Crea una nueva variable en un proyecto. Sin `--id` usa el proyecto de la sesión actual | `/proyecto_var_crear --key=nombre --value=valor [--id=proyecto]` |
+| `/proyecto_var_actualizar` | Actualiza el valor de una variable existente en un proyecto. Sin `--id` usa el proyecto de la sesión actual | `/proyecto_var_actualizar --key=nombre --value=valor [--id=proyecto]` |
+| `/proyecto_var_eliminar` | Elimina una variable de un proyecto. Sin `--id` usa el proyecto de la sesión actual | `/proyecto_var_eliminar --key=nombre [--id=proyecto]` |
+
+### Interpolación de variables
+
+Las variables de proyecto pueden usarse en cualquier campo de texto del chat (mensajes, prompts de OpenCode, etc.) mediante la sintaxis `{{nombre_variable}}`. Al enviar el texto, el sistema resuelve automáticamente las variables reemplazando `{{nombre}}` por su valor, siempre que la sesión tenga un proyecto asignado.
 
 ---
 
@@ -107,10 +115,10 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | Comando | Descripción | Uso |
 |---|---|---|
 | `/plantilla_crear` | Abre el editor modal para crear una nueva plantilla Markdown | `/plantilla_crear` |
-| `/plantilla_listar` | Lista todas las plantillas disponibles con su slug y fecha de actualización | `/plantilla_listar` |
+| `/plantilla_listar` | Lista todas las plantillas disponibles con su slug, fecha de actualización e indicador 🔒 si es protegida del sistema | `/plantilla_listar` |
 | `/plantilla_ver` | Muestra el contenido completo de una plantilla renderizado en el chat | `/plantilla_ver --slug=<slug>` |
-| `/plantilla_editar` | Abre el editor modal con los datos de una plantilla existente para modificarlos | `/plantilla_editar --slug=<slug>` |
-| `/plantilla_eliminar` | Elimina una plantilla de forma permanente | `/plantilla_eliminar --slug=<slug>` |
+| `/plantilla_editar` | Abre el editor modal con los datos de una plantilla existente para modificarlos. Las plantillas protegidas (🔒) no pueden editarse | `/plantilla_editar --slug=<slug>` |
+| `/plantilla_eliminar` | Elimina una plantilla de forma permanente. Las plantillas protegidas (🔒) no pueden eliminarse | `/plantilla_eliminar --slug=<slug>` |
 
 ---
 
@@ -123,6 +131,17 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/despliegue_iniciar_instancia` | Lee la configuración de despliegue, ejecuta `npm ci` en paralelo en cada subproyecto e inicia los procesos de desarrollo | `/despliegue_iniciar_instancia [--resolucion=ID]` |
 | `/despliegue_detener_instancia` | Detiene todos los procesos de desarrollo iniciados con `/despliegue_iniciar_instancia` | `/despliegue_detener_instancia` |
 | `/despliegue_ver_estado` | Muestra el estado (running/stopped/error) de cada proceso de desarrollo | `/despliegue_ver_estado` |
+
+---
+
+---
+
+## Ambientes
+
+| Comando | Descripción | Uso |
+|---|---|---|
+| `/ambientes_listar` | Lista los ambientes configurados (DEV, TST, PRD, etc.) con su rama y descripción | `/ambientes_listar` |
+| `/ambientes_merge` | Hace merge de la rama actual a la rama del ambiente destino, hace push y opcionalmente notifica a Redmine. Requiere que no haya cambios pendientes. Si hay conflictos, el usuario debe resolverlos manualmente | `/ambientes_merge --ambiente=<nombre> [--mensaje=<texto>] [--comentar=<enviar|encolar>]` |
 
 ---
 

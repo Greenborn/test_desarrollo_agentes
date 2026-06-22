@@ -33,6 +33,7 @@
         style="min-height: 400px; resize: vertical;"
         placeholder="# Título de la plantilla&#10;&#10;Contenido en Markdown..."
         maxlength="10000"
+        :disabled="isProtected"
       ></textarea>
 
       <div
@@ -46,11 +47,15 @@
       <small class="text-muted">{{ contentValue.length }} / 10000 caracteres</small>
     </div>
 
+    <div v-if="isProtected" class="alert alert-warning py-1 px-2 mb-2 small">
+      Esta es una plantilla protegida del sistema y no puede modificarse.
+    </div>
+
     <div v-if="saveError" class="alert alert-danger py-1 px-2 mb-2 small">{{ saveError }}</div>
 
     <div class="d-flex gap-2 justify-content-end">
       <button class="btn btn-sm btn-secondary" @click="emit('close')">Cancelar</button>
-      <button class="btn btn-sm btn-success" @click="save" :disabled="!slugValue.trim() || !contentValue.trim() || saving">
+      <button class="btn btn-sm btn-success" @click="save" :disabled="!slugValue.trim() || !contentValue.trim() || saving || isProtected">
         {{ initialSlug ? 'Actualizar' : 'Crear plantilla' }}
       </button>
     </div>
@@ -77,6 +82,7 @@ export default {
     const tab = ref('editor')
     const saving = ref(false)
     const saveError = ref('')
+    const isProtected = ref(false)
 
     onMounted(async () => {
       if (props.initialSlug) {
@@ -85,6 +91,7 @@ export default {
           if (tmpl) {
             slugValue.value = tmpl.slug
             contentValue.value = tmpl.content
+            isProtected.value = !!tmpl.is_protected
           }
         } catch (err) {
           saveError.value = err.message || 'Error al cargar plantilla'
@@ -122,7 +129,7 @@ export default {
       }
     }
 
-    return { slugValue, contentValue, tab, saving, saveError, save, emit }
+    return { slugValue, contentValue, tab, saving, saveError, isProtected, save, emit }
   },
 }
 </script>

@@ -32,6 +32,12 @@ import './composables/commands/resolucionDefault.js'
 import './composables/commands/templates.js'
 import './composables/commands/redmineComentariosListar.js'
 import './composables/commands/redmineComentariosEnviar.js'
+import './composables/commands/proyectoVarListar.js'
+import './composables/commands/proyectoVarCrear.js'
+import './composables/commands/proyectoVarActualizar.js'
+import './composables/commands/proyectoVarEliminar.js'
+import './composables/commands/ambientesListar.js'
+import './composables/commands/ambientesMerge.js'
 
 const app = createApp(App)
 const pinia = createPinia()

@@ -45,6 +45,17 @@ router.post('/', async (req, res) => {
       await db('settings').insert(copies).onConflict(['workspace_id', 'setting_key']).ignore();
     }
 
+    const defaultEnvironments = await db('workspace_environments').where({ workspace_id: 1 });
+    if (defaultEnvironments.length > 0) {
+      const envCopies = defaultEnvironments.map(e => ({
+        workspace_id: insertId,
+        name: e.name,
+        branch: e.branch,
+        description: e.description,
+      }));
+      await db('workspace_environments').insert(envCopies);
+    }
+
     const workspace = await db('workspaces').where({ id: insertId }).first();
     res.status(201).json({ success: true, workspace });
   } catch (err) {
@@ -89,6 +100,7 @@ router.delete('/:id', async (req, res) => {
     await db('tickets').where({ workspace_id: req.params.id }).del();
     await db('proyectos').where({ workspace_id: req.params.id }).del();
     await db('settings').where({ workspace_id: req.params.id }).del();
+    await db('workspace_environments').where({ workspace_id: req.params.id }).del();
     await db('workspaces').where({ id: req.params.id }).del();
 
     res.json({ success: true });

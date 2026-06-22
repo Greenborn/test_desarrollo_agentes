@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "ESNext"
+  },
+  "include": [
+    "backend/src/**/*.js",
+    "frontend/src/**/*.js",
+    "frontend/src/**/*.vue",
+    "playwright/src/**/*.js",
+    "api_gastos/src/**/*.js",
+    "api_documental/src/**/*.js"
+  ]
+}
