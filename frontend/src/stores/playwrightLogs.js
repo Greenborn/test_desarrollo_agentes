@@ -4,7 +4,8 @@ import { ref } from 'vue'
 export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
   const networkLogs = ref([])
   const consoleLogs = ref([])
-  const loading = ref({ network: false, console: false })
+  const events = ref([])
+  const loading = ref({ network: false, console: false, events: false })
 
   async function fetchNetworkLogs(chatSessionId) {
     if (!chatSessionId) {
@@ -57,6 +58,39 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
     }
   }
 
+  async function fetchEvents(chatSessionId) {
+    if (!chatSessionId) {
+      events.value = []
+      return
+    }
+    loading.value.events = true
+    try {
+      const res = await fetch(`/api/playwright-logs/events?chat_session_id=${chatSessionId}`, { credentials: 'include' })
+      if (res.ok) {
+        events.value = await res.json()
+      }
+    } catch (err) {
+      console.error('Error fetching events:', err.message)
+    } finally {
+      loading.value.events = false
+    }
+  }
+
+  async function clearEvents(chatSessionId) {
+    if (!chatSessionId) return
+    try {
+      const res = await fetch(`/api/playwright-logs/events?chat_session_id=${chatSessionId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (res.ok) {
+        events.value = []
+      }
+    } catch (err) {
+      console.error('Error clearing events:', err.message)
+    }
+  }
+
   async function clearConsoleLogs(chatSessionId) {
     if (!chatSessionId) return
     try {
@@ -75,10 +109,13 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
   return {
     networkLogs,
     consoleLogs,
+    events,
     loading,
     fetchNetworkLogs,
     fetchConsoleLogs,
+    fetchEvents,
     clearNetworkLogs,
     clearConsoleLogs,
+    clearEvents,
   }
 })

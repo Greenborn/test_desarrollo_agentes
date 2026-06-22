@@ -286,7 +286,38 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
-## 16. `playwright_console_logs`
+## 16. `playwright_events`
+
+| Columna | Tipo | Restricciones |
+|---------|------|---------------|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `chat_session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
+| `playwright_session_id` | VARCHAR(36) | NOT NULL — UUID de la sesión del navegador en Playwright |
+| `event_type` | VARCHAR(50) | NOT NULL — `click`, `dblclick`, `input`, `change`, `submit`, `keydown`, `scroll`, `focus`, `blur` |
+| `selector` | TEXT | nullable — selector CSS del elemento donde ocurrió el evento |
+| `tag_name` | VARCHAR(50) | nullable — tag del elemento (`input`, `button`, `select`, etc.) |
+| `text_content` | TEXT | nullable — texto del elemento (truncado a 1000 chars) |
+| `value` | TEXT | nullable — valor del input/select/textarea (truncado a 1000 chars) |
+| `url` | TEXT | nullable — URL de la página donde ocurrió el evento |
+| `x` | INTEGER | nullable — coordenada X del click (pageX) |
+| `y` | INTEGER | nullable — coordenada Y del click (pageY) |
+| `key` | VARCHAR(50) | nullable — tecla presionada (event.key) |
+| `key_code` | TEXT | nullable — código de tecla (event.code) |
+| `alt_key` | BOOLEAN | nullable — tecla Alt presionada |
+| `ctrl_key` | BOOLEAN | nullable — tecla Ctrl presionada |
+| `shift_key` | BOOLEAN | nullable — tecla Shift presionada |
+| `meta_key` | BOOLEAN | nullable — tecla Meta presionada |
+| `scroll_x` | INTEGER | nullable — posición horizontal del scroll |
+| `scroll_y` | INTEGER | nullable — posición vertical del scroll |
+| `target_rect` | TEXT | nullable — JSON con `{ x, y, width, height }` del bounding rect del elemento |
+| `metadata` | TEXT | nullable — JSON con datos extra del evento |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+**Índices:** `chat_session_id`, `playwright_session_id`
+
+---
+
+## 17. `playwright_console_logs`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -316,6 +347,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `project_variables` | `proyecto_id` | `proyectos` | `id` | CASCADE |
 | `redmine_comentarios` | `session_id` | `chat_sessions` | `id` | CASCADE |
 | `playwright_network_logs` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
+| `playwright_events` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 | `playwright_console_logs` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 
 ---

@@ -50,6 +50,8 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/navegador_configurar_headless` | Cambia el modo headless (0 = visible, 1 = headless). Si hay sesión activa, la reinicia | `/navegador_configurar_headless --mode=<0\|1>` |
 | `/navegador_finalizar` | Finaliza la sesión de navegador activa | `/navegador_finalizar` |
 | `/navegador_extraer_formularios` | Extrae todos los controles de formulario de la página actual del navegador y los devuelve como JSON | `/navegador_extraer_formularios` |
+| `/navegador_eventos_iniciar` | Inicia la grabación de eventos de usuario en el navegador activo (clicks, inputs, keydown, scroll, focus, blur, submit, change). Requiere sesión de navegador activa. Los eventos se guardan en la tabla `playwright_events` asociados a la sesión de chat | `/navegador_eventos_iniciar` |
+| `/navegador_eventos_detener` | Pausa la grabación de eventos. Los listeners permanecen pero no registran nuevos eventos hasta volver a iniciar | `/navegador_eventos_detener` |
 | `/resoluciones_get_all` | Muestra las resoluciones de pantalla configuradas con selector interactivo para establecer una por defecto | `/resoluciones_get_all` |
 | `/resolucion_default` | Muestra la resolución de pantalla por defecto configurada | `/resolucion_default` |
 

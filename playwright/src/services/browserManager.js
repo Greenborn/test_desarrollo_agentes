@@ -30,6 +30,469 @@ function getDefaultHeadless() {
   return defaultHeadless;
 }
 
+function setupEventRecording(page, sessionId, chatSessionId) {
+  if (!chatSessionId) return;
+
+  page.exposeFunction('__pwRecordEvent', async (eventData) => {
+    try {
+      if (!db) return;
+      await db('playwright_events').insert({
+        chat_session_id: chatSessionId,
+        playwright_session_id: sessionId,
+        event_type: eventData.type,
+        selector: eventData.selector || null,
+        tag_name: eventData.tagName || null,
+        text_content: eventData.textContent ? eventData.textContent.substring(0, 1000) : null,
+        value: eventData.value ? eventData.value.substring(0, 1000) : null,
+        url: eventData.url || null,
+        x: eventData.x != null ? eventData.x : null,
+        y: eventData.y != null ? eventData.y : null,
+        key: eventData.key || null,
+        key_code: eventData.code || null,
+        alt_key: eventData.altKey != null ? eventData.altKey : null,
+        ctrl_key: eventData.ctrlKey != null ? eventData.ctrlKey : null,
+        shift_key: eventData.shiftKey != null ? eventData.shiftKey : null,
+        meta_key: eventData.metaKey != null ? eventData.metaKey : null,
+        scroll_x: eventData.scrollX != null ? eventData.scrollX : null,
+        scroll_y: eventData.scrollY != null ? eventData.scrollY : null,
+        target_rect: eventData.targetRect ? JSON.stringify(eventData.targetRect) : null,
+        metadata: eventData.metadata ? JSON.stringify(eventData.metadata) : null,
+      });
+    } catch (err) {
+      console.log(`[browserManager] Error al guardar evento:`, err.message);
+    }
+  });
+
+  async function injectListeners() {
+    try {
+      await page.evaluate(() => {
+        if (window.__pwEventListenersInjected) return;
+        window.__pwEventListenersInjected = true;
+
+        function getSelector(el) {
+          if (!el || el === document || el === window) return '';
+          try {
+            if (el.id) return '#' + CSS.escape(el.id);
+            if (el.getAttribute && el.getAttribute('data-testid')) {
+              return '[data-testid="' + CSS.escape(el.getAttribute('data-testid')) + '"]';
+            }
+            if (el.getAttribute && el.getAttribute('data-test-id')) {
+              return '[data-test-id="' + CSS.escape(el.getAttribute('data-test-id')) + '"]';
+            }
+            if (el.name && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA')) {
+              const form = el.closest('form');
+              if (form && form.id) {
+                return '#' + CSS.escape(form.id) + ' ' + el.tagName.toLowerCase() + '[name="' + CSS.escape(el.name) + '"]';
+              }
+              return el.tagName.toLowerCase() + '[name="' + CSS.escape(el.name) + '"]';
+            }
+            let path = [];
+            let current = el;
+            while (current && current !== document && current !== document.body) {
+              let segment = current.tagName.toLowerCase();
+              if (current.id) {
+                segment = '#' + CSS.escape(current.id);
+                path.unshift(segment);
+                break;
+              }
+              const parent = current.parentElement;
+              if (parent) {
+                const siblings = Array.from(parent.children).filter(c => c.tagName === current.tagName);
+                if (siblings.length > 1) {
+                  segment += ':nth-child(' + (Array.from(parent.children).indexOf(current) + 1) + ')';
+                }
+              }
+              if (current.classList && current.classList.length > 0) {
+                const classes = Array.from(current.classList).slice(0, 2).map(c => '.' + CSS.escape(c)).join('');
+                segment += classes;
+              }
+              path.unshift(segment);
+              current = current.parentElement;
+            }
+            return path.join(' > ');
+          } catch (e) {
+            return el.tagName ? el.tagName.toLowerCase() : '';
+          }
+        }
+
+        function getLabel(el) {
+          try {
+            let text = '';
+            if (el.textContent) text = el.textContent.trim().substring(0, 100);
+            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+              const label = el.closest('label');
+              if (label) text = label.textContent.trim().substring(0, 100);
+              if (!text && el.placeholder) text = el.placeholder;
+              if (!text && el.id) {
+                const labelById = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
+                if (labelById) text = labelById.textContent.trim().substring(0, 100);
+              }
+            }
+            if (el.tagName === 'SELECT') {
+              const label = el.closest('label');
+              if (label) text = label.textContent.trim().substring(0, 100);
+              if (!text && el.id) {
+                const labelById = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
+                if (labelById) text = labelById.textContent.trim().substring(0, 100);
+              }
+              if (!text) text = 'Select';
+            }
+            if (el.tagName === 'BUTTON' || el.tagName === 'A') {
+              if (!text) text = el.textContent.trim().substring(0, 100);
+            }
+            return text;
+          } catch (e) {
+            return '';
+          }
+        }
+
+        let inputDebounceTimers = {};
+        let scrollDebounceTimer = null;
+
+        window.__pwRecording = true;
+
+        document.addEventListener('click', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            const rect = el.getBoundingClientRect();
+            window.__pwRecordEvent({
+              type: 'click',
+              selector: getSelector(el),
+              tagName: el.tagName.toLowerCase(),
+              textContent: getLabel(el),
+              value: el.value || null,
+              url: window.location.href,
+              x: Math.round(e.pageX),
+              y: Math.round(e.pageY),
+              targetRect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+              altKey: e.altKey,
+              ctrlKey: e.ctrlKey,
+              shiftKey: e.shiftKey,
+              metaKey: e.metaKey,
+            });
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('dblclick', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            const rect = el.getBoundingClientRect();
+            window.__pwRecordEvent({
+              type: 'dblclick',
+              selector: getSelector(el),
+              tagName: el.tagName.toLowerCase(),
+              textContent: getLabel(el),
+              url: window.location.href,
+              x: Math.round(e.pageX),
+              y: Math.round(e.pageY),
+              targetRect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+            });
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('change', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') {
+              let val = el.value;
+              if (el.type === 'checkbox' || el.type === 'radio') val = el.checked;
+              window.__pwRecordEvent({
+                type: 'change',
+                selector: getSelector(el),
+                tagName: el.tagName.toLowerCase(),
+                textContent: getLabel(el),
+                value: String(val),
+                url: window.location.href,
+              });
+            }
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('submit', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            window.__pwRecordEvent({
+              type: 'submit',
+              selector: el.id ? '#' + CSS.escape(el.id) : el.tagName.toLowerCase(),
+              tagName: 'form',
+              textContent: el.id || el.name || '',
+              url: window.location.href,
+            });
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('input', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
+            if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file') return;
+
+            const key = getSelector(el) || el.name || el.id || Math.random();
+            if (inputDebounceTimers[key]) clearTimeout(inputDebounceTimers[key]);
+            inputDebounceTimers[key] = setTimeout(function () {
+              window.__pwRecordEvent({
+                type: 'input',
+                selector: getSelector(el),
+                tagName: el.tagName.toLowerCase(),
+                textContent: getLabel(el),
+                value: el.value ? el.value.substring(0, 500) : null,
+                url: window.location.href,
+                metadata: { inputType: el.type || 'text' },
+              });
+              delete inputDebounceTimers[key];
+            }, 300);
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('keydown', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            window.__pwRecordEvent({
+              type: 'keydown',
+              selector: getSelector(el),
+              tagName: el.tagName.toLowerCase(),
+              textContent: getLabel(el),
+              key: e.key,
+              code: e.code,
+              altKey: e.altKey,
+              ctrlKey: e.ctrlKey,
+              shiftKey: e.shiftKey,
+              metaKey: e.metaKey,
+              url: window.location.href,
+            });
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('scroll', function () {
+          if (!window.__pwRecording) return;
+          if (scrollDebounceTimer) clearTimeout(scrollDebounceTimer);
+          scrollDebounceTimer = setTimeout(function () {
+            window.__pwRecordEvent({
+              type: 'scroll',
+              scrollX: Math.round(window.scrollX),
+              scrollY: Math.round(window.scrollY),
+              url: window.location.href,
+            });
+          }, 300);
+        }, true);
+
+        document.addEventListener('focusin', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            window.__pwRecordEvent({
+              type: 'focus',
+              selector: getSelector(el),
+              tagName: el.tagName.toLowerCase(),
+              textContent: getLabel(el),
+              url: window.location.href,
+            });
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('focusout', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            window.__pwRecordEvent({
+              type: 'blur',
+              selector: getSelector(el),
+              tagName: el.tagName.toLowerCase(),
+              textContent: getLabel(el),
+              url: window.location.href,
+            });
+          } catch (e) {}
+        }, true);
+      });
+
+      // Also register for future navigations
+      page.addInitScript(() => {
+        if (window.__pwEventListenersInjected) return;
+
+        function getSelector(el) {
+          if (!el || el === document || el === window) return '';
+          try {
+            if (el.id) return '#' + CSS.escape(el.id);
+            if (el.getAttribute && el.getAttribute('data-testid')) {
+              return '[data-testid="' + CSS.escape(el.getAttribute('data-testid')) + '"]';
+            }
+            if (el.getAttribute && el.getAttribute('data-test-id')) {
+              return '[data-test-id="' + CSS.escape(el.getAttribute('data-test-id')) + '"]';
+            }
+            if (el.name && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA')) {
+              const form = el.closest('form');
+              if (form && form.id) {
+                return '#' + CSS.escape(form.id) + ' ' + el.tagName.toLowerCase() + '[name="' + CSS.escape(el.name) + '"]';
+              }
+              return el.tagName.toLowerCase() + '[name="' + CSS.escape(el.name) + '"]';
+            }
+            let path = [];
+            let current = el;
+            while (current && current !== document && current !== document.body) {
+              let segment = current.tagName.toLowerCase();
+              if (current.id) {
+                segment = '#' + CSS.escape(current.id);
+                path.unshift(segment);
+                break;
+              }
+              const parent = current.parentElement;
+              if (parent) {
+                const siblings = Array.from(parent.children).filter(c => c.tagName === current.tagName);
+                if (siblings.length > 1) {
+                  segment += ':nth-child(' + (Array.from(parent.children).indexOf(current) + 1) + ')';
+                }
+              }
+              if (current.classList && current.classList.length > 0) {
+                const classes = Array.from(current.classList).slice(0, 2).map(c => '.' + CSS.escape(c)).join('');
+                segment += classes;
+              }
+              path.unshift(segment);
+              current = current.parentElement;
+            }
+            return path.join(' > ');
+          } catch (e) {
+            return el.tagName ? el.tagName.toLowerCase() : '';
+          }
+        }
+
+        function getLabel(el) {
+          try {
+            let text = '';
+            if (el.textContent) text = el.textContent.trim().substring(0, 100);
+            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+              const label = el.closest('label');
+              if (label) text = label.textContent.trim().substring(0, 100);
+              if (!text && el.placeholder) text = el.placeholder;
+              if (!text && el.id) {
+                const labelById = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
+                if (labelById) text = labelById.textContent.trim().substring(0, 100);
+              }
+            }
+            if (el.tagName === 'SELECT') {
+              const label = el.closest('label');
+              if (label) text = label.textContent.trim().substring(0, 100);
+              if (!text && el.id) {
+                const labelById = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
+                if (labelById) text = labelById.textContent.trim().substring(0, 100);
+              }
+              if (!text) text = 'Select';
+            }
+            if (el.tagName === 'BUTTON' || el.tagName === 'A') {
+              if (!text) text = el.textContent.trim().substring(0, 100);
+            }
+            return text;
+          } catch (e) {
+            return '';
+          }
+        }
+
+        window.__pwEventListenersInjected = true;
+        let inputDebounceTimers = {};
+        let scrollDebounceTimer = null;
+        window.__pwRecording = true;
+
+        document.addEventListener('click', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target; const rect = el.getBoundingClientRect();
+            window.__pwRecordEvent({ type: 'click', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), value: el.value || null, url: window.location.href, x: Math.round(e.pageX), y: Math.round(e.pageY), targetRect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) }, altKey: e.altKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, metaKey: e.metaKey });
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('dblclick', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target; const rect = el.getBoundingClientRect();
+            window.__pwRecordEvent({ type: 'dblclick', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), url: window.location.href, x: Math.round(e.pageX), y: Math.round(e.pageY), targetRect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) } });
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('change', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') {
+              let val = el.value; if (el.type === 'checkbox' || el.type === 'radio') val = el.checked;
+              window.__pwRecordEvent({ type: 'change', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), value: String(val), url: window.location.href });
+            }
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('submit', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            window.__pwRecordEvent({ type: 'submit', selector: el.id ? '#' + CSS.escape(el.id) : el.tagName.toLowerCase(), tagName: 'form', textContent: el.id || el.name || '', url: window.location.href });
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('input', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
+            if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file') return;
+            const key = getSelector(el) || el.name || el.id || Math.random();
+            if (inputDebounceTimers[key]) clearTimeout(inputDebounceTimers[key]);
+            inputDebounceTimers[key] = setTimeout(function () {
+              window.__pwRecordEvent({ type: 'input', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), value: el.value ? el.value.substring(0, 500) : null, url: window.location.href, metadata: { inputType: el.type || 'text' } });
+              delete inputDebounceTimers[key];
+            }, 300);
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('keydown', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            window.__pwRecordEvent({ type: 'keydown', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), key: e.key, code: e.code, altKey: e.altKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, metaKey: e.metaKey, url: window.location.href });
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('scroll', function () {
+          if (!window.__pwRecording) return;
+          if (scrollDebounceTimer) clearTimeout(scrollDebounceTimer);
+          scrollDebounceTimer = setTimeout(function () {
+            window.__pwRecordEvent({ type: 'scroll', scrollX: Math.round(window.scrollX), scrollY: Math.round(window.scrollY), url: window.location.href });
+          }, 300);
+        }, true);
+
+        document.addEventListener('focusin', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            window.__pwRecordEvent({ type: 'focus', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), url: window.location.href });
+          } catch (e) {}
+        }, true);
+
+        document.addEventListener('focusout', function (e) {
+          if (!window.__pwRecording) return;
+          try {
+            const el = e.target;
+            window.__pwRecordEvent({ type: 'blur', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), url: window.location.href });
+          } catch (e) {}
+        }, true);
+      });
+    } catch (err) {
+      console.log(`[browserManager] Error al inyectar event listeners:`, err.message);
+    }
+  }
+
+  injectListeners();
+}
+
+function stopEventRecording(page) {
+  if (page && !page.isClosed()) {
+    page.evaluate(() => { window.__pwRecording = false; }).catch(() => {});
+  }
+}
+
 function setupPageListeners(page, sessionId, chatSessionId) {
   page.on('response', async (response) => {
     const req = response.request();
@@ -303,6 +766,8 @@ export default {
   startSession,
   goToUrl,
   extractFormControls,
+  setupEventRecording,
+  stopEventRecording,
   getSession,
   getActiveSession,
   closeSession,

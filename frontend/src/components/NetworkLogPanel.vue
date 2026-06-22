@@ -2,7 +2,7 @@
   <div class="network-panel d-flex flex-column h-100" style="min-height: 0;">
     <div class="log-header d-flex align-items-center px-3 py-1 flex-shrink-0">
       <span class="fw-semibold small" style="color: #e6edf3;">Actividad de Red del Navegador</span>
-      <span class="badge bg-secondary-subtle text-secondary ms-2" style="font-size: 0.6rem;">{{ networkLogs.length }} peticiones</span>
+      <span class="badge bg-secondary-subtle text-secondary ms-2" style="font-size: 0.6rem;">{{ filteredLogs.length }} / {{ networkLogs.length }} peticiones</span>
       <span v-if="!activeSessionId" class="small text-muted ms-2">(sin sesión activa)</span>
       <button
         class="btn btn-sm btn-outline-danger py-0 px-2 ms-auto"
@@ -10,6 +10,45 @@
         :disabled="!activeSessionId || clearing"
         @click="clearLogs"
       >Limpiar</button>
+    </div>
+    <div class="filter-bar d-flex align-items-center gap-1 px-3 py-1 flex-shrink-0 flex-wrap">
+      <button
+        class="filter-chip"
+        :class="{ active: rangeFilter === 'all' && !specificCodes }"
+        @click="setRangeFilter('all')"
+      >All</button>
+      <button
+        class="filter-chip"
+        :class="{ active: rangeFilter === '2xx' && !specificCodes }"
+        @click="setRangeFilter('2xx')"
+      >2xx</button>
+      <button
+        class="filter-chip"
+        :class="{ active: rangeFilter === '3xx' && !specificCodes }"
+        @click="setRangeFilter('3xx')"
+      >3xx</button>
+      <button
+        class="filter-chip"
+        :class="{ active: rangeFilter === '4xx' && !specificCodes }"
+        @click="setRangeFilter('4xx')"
+      >4xx</button>
+      <button
+        class="filter-chip"
+        :class="{ active: rangeFilter === '5xx' && !specificCodes }"
+        @click="setRangeFilter('5xx')"
+      >5xx</button>
+      <button
+        class="filter-chip"
+        :class="{ active: rangeFilter === 'err' && !specificCodes }"
+        @click="setRangeFilter('err')"
+      >ERR</button>
+      <input
+        v-model="specificCodes"
+        type="text"
+        class="form-control form-control-sm"
+        placeholder="Códigos exactos (ej: 200,404)"
+        style="width: 160px; background: #0d1117; border-color: #374151; color: #e0e0e0; font-size: 0.65rem; height: 22px;"
+      />
     </div>
     <div class="overflow-y-auto flex-grow-1" ref="containerRef">
       <div v-if="!activeSessionId" class="d-flex align-items-center justify-content-center h-100 text-muted small">
@@ -21,9 +60,12 @@
       <div v-else-if="loading && networkLogs.length === 0" class="d-flex align-items-center justify-content-center h-100 text-muted small">
         Cargando...
       </div>
+      <div v-else-if="filteredLogs.length === 0 && !loading" class="d-flex align-items-center justify-content-center h-100 text-muted small">
+        No hay peticiones que coincidan con el filtro.
+      </div>
       <div v-else class="p-2">
         <div
-          v-for="(log, i) in networkLogs"
+          v-for="(log, i) in filteredLogs"
           :key="log.id || i"
           class="network-entry rounded"
           :class="{ expanded: expandedId === log.id, failed: log.status_code === null }"
@@ -77,6 +119,31 @@ export default {
     const activeSessionId = computed(() => chatStore.activeSessionId)
     const networkLogs = computed(() => logsStore.networkLogs)
     const loading = computed(() => logsStore.loading.network)
+
+    const rangeFilter = ref('all')
+    const specificCodes = ref('')
+
+    const filteredLogs = computed(() => {
+      const codes = specificCodes.value.trim()
+      if (codes) {
+        const validCodes = codes.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n))
+        if (validCodes.length > 0) {
+          return networkLogs.value.filter(log => validCodes.includes(log.status_code))
+        }
+      }
+      if (rangeFilter.value === 'all') return networkLogs.value
+      if (rangeFilter.value === 'err') return networkLogs.value.filter(log => log.status_code === null)
+      const [min, max] = rangeFilter.value.split('x')[0] === '' ? [0, 99] : [
+        parseInt(rangeFilter.value.split('x')[0], 10) * 100,
+        (parseInt(rangeFilter.value.split('x')[0], 10) + 1) * 100
+      ]
+      return networkLogs.value.filter(log => log.status_code !== null && log.status_code >= min && log.status_code < max)
+    })
+
+    function setRangeFilter(range) {
+      specificCodes.value = ''
+      rangeFilter.value = rangeFilter.value === range ? 'all' : range
+    }
 
     function methodClass(method) {
       const map = {
@@ -155,6 +222,10 @@ export default {
       activeSessionId,
       networkLogs,
       loading,
+      rangeFilter,
+      specificCodes,
+      filteredLogs,
+      setRangeFilter,
       methodClass,
       statusClass,
       isExpanded,
@@ -184,6 +255,29 @@ export default {
 }
 .network-entry.expanded {
   background: rgba(117, 170, 219, 0.08);
+}
+.filter-bar {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+}
+.filter-chip {
+  background: none;
+  border: 1px solid #374151;
+  color: #6b7280;
+  font-size: 0.6rem;
+  padding: 1px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-chip:hover {
+  color: #cbd5e1;
+  border-color: #6b7280;
+}
+.filter-chip.active {
+  color: #e6edf3;
+  border-color: #75AADB;
+  background: rgba(117, 170, 219, 0.15);
 }
 .network-entry.failed {
   border-left: 2px solid #ef4444;

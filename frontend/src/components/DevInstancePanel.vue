@@ -39,6 +39,13 @@
       </button>
       <button
         class="tab-btn ms-3"
+        :class="{ active: activeTab === 'events' }"
+        @click="activeTab = 'events'"
+      >
+        Eventos del Navegador
+      </button>
+      <button
+        class="tab-btn ms-3"
         :class="{ active: activeTab === 'network_logs' }"
         @click="activeTab = 'network_logs'"
       >
@@ -141,6 +148,11 @@
       <ConsoleLogPanel class="flex-grow-1" />
     </template>
 
+    <!-- Tab: Eventos del Navegador -->
+    <template v-if="activeTab === 'events'">
+      <BrowserEventPanel class="flex-grow-1" />
+    </template>
+
     <!-- Tab: Actividad de Red -->
     <template v-if="activeTab === 'network_logs'">
       <NetworkLogPanel class="flex-grow-1" />
@@ -155,10 +167,11 @@ import RepoView from './RepoView.vue'
 import TicketPanel from './TicketPanel.vue'
 import ConsoleLogPanel from './ConsoleLogPanel.vue'
 import NetworkLogPanel from './NetworkLogPanel.vue'
+import BrowserEventPanel from './BrowserEventPanel.vue'
 import { useProjectStore } from '../stores/project.js'
 
 export default {
-  components: { RepoView, TicketPanel, ConsoleLogPanel, NetworkLogPanel },
+  components: { RepoView, TicketPanel, ConsoleLogPanel, NetworkLogPanel, BrowserEventPanel },
   setup() {
     const state = reactive({
       processes: [],

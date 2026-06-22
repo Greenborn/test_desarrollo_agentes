@@ -100,6 +100,57 @@ router.post('/command', async (req, res) => {
       }
     }
 
+    if (comando === 'start_event_recording') {
+      let idSession = parametros?.id_session;
+      if (!idSession) {
+        const active = browserManager.getActiveSession();
+        if (active) idSession = active.id;
+      }
+      if (!idSession) {
+        return res.status(400).json({
+          error: 'No hay sesión activa. Usá "start" primero o pasá "id_session"',
+        });
+      }
+
+      const session = browserManager.getSession(idSession);
+      if (!session) {
+        return res.status(404).json({ error: `Sesión no encontrada: "${idSession}"` });
+      }
+
+      try {
+        const chatSessionId = parametros?.chat_session_id || session.chatSessionId;
+        browserManager.setupEventRecording(session.page, idSession, chatSessionId);
+        return res.json({ success: true, id_session: idSession, recording: true });
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+
+    if (comando === 'stop_event_recording') {
+      let idSession = parametros?.id_session;
+      if (!idSession) {
+        const active = browserManager.getActiveSession();
+        if (active) idSession = active.id;
+      }
+      if (!idSession) {
+        return res.status(400).json({
+          error: 'No hay sesión activa. Usá "start" primero o pasá "id_session"',
+        });
+      }
+
+      const session = browserManager.getSession(idSession);
+      if (!session) {
+        return res.status(404).json({ error: `Sesión no encontrada: "${idSession}"` });
+      }
+
+      try {
+        browserManager.stopEventRecording(session.page);
+        return res.json({ success: true, id_session: idSession, recording: false });
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+
     if (comando === 'close') {
       const idSession = parametros?.id_session;
       if (!idSession) {

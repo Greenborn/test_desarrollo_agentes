@@ -1,7 +1,7 @@
 import { Router } from 'express';
+import playwrightManager from '../services/playwrightManager.js';
 
 const router = Router();
-const PW_URL = `http://localhost:${process.env.SERVICIO_PLAYWRIGHT_PORT || 4098}`;
 
 function authGuard(req, res) {
   if (!req.session?.userId) {
@@ -46,9 +46,12 @@ router.post('/command', async (req, res) => {
 
     await saveToChat(sessionId, 'command', `[navegador] ${comando}`);
 
-    const pwParametros = comando === 'start' ? { ...parametros, chat_session_id: sessionId } : parametros;
+    const pwParametros = (comando === 'start' || comando === 'start_event_recording') ? { ...parametros, chat_session_id: sessionId } : parametros;
 
-    const pwRes = await fetch(`${PW_URL}/api/command`, {
+    await playwrightManager.ensureRunning();
+    playwrightManager.startKeepAlive();
+
+    const pwRes = await fetch(`${playwrightManager.baseUrl()}/api/command`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ comando, parametros: pwParametros }),
@@ -87,7 +90,9 @@ router.post('/finish', async (req, res) => {
   try {
     await saveToChat(sessionId, 'command', '[navegador] finish');
 
-    const pwRes = await fetch(`${PW_URL}/api/command`, {
+    await playwrightManager.ensureRunning();
+
+    const pwRes = await fetch(`${playwrightManager.baseUrl()}/api/command`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ comando: 'close', parametros: { id_session } }),

@@ -70,6 +70,45 @@ router.delete('/network', async (req, res) => {
   }
 });
 
+router.get('/events', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const chatSessionId = req.query.chat_session_id;
+  if (!chatSessionId) {
+    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  }
+
+  try {
+    const logs = await db('playwright_events')
+      .where({ chat_session_id: parseInt(chatSessionId) })
+      .orderBy('created_at', 'desc')
+      .limit(500);
+    res.json(logs);
+  } catch (err) {
+    console.log('Error al obtener eventos:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/events', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const chatSessionId = req.query.chat_session_id;
+  if (!chatSessionId) {
+    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  }
+
+  try {
+    await db('playwright_events')
+      .where({ chat_session_id: parseInt(chatSessionId) })
+      .del();
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al limpiar eventos:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/console', async (req, res) => {
   if (!authGuard(req, res)) return;
 

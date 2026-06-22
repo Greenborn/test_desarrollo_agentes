@@ -137,6 +137,7 @@ Cuando se provee `chat_session_id`, el servicio registra automáticamente en BD:
 |---|---|
 | `playwright_network_logs` | Peticiones de red (`document`, `xhr`, `fetch`) con metod, URL, status code, headers y body truncado |
 | `playwright_console_logs` | Mensajes de consola del navegador con tipo (`log`, `warn`, `error`, etc.), texto y ubicación |
+| `playwright_events` | Eventos de usuario del navegador capturados con `start_event_recording` (clicks, inputs, keydown, scroll, etc.) |
 
 ---
 
@@ -316,6 +317,8 @@ COMANDOS DISPONIBLES:
 - set_headless             → cambia modo headless (0=visible, 1=headless)
 - close                    → cierra una sesión de navegador
 - extract_form_controls    → extrae todos los controles de formulario de la página actual
+- start_event_recording    → inicia grabación de eventos de usuario (click, input, keydown, scroll, etc.)
+- stop_event_recording     → pausa la grabación de eventos (se puede reanudar)
 
 USO:
   { "comando": "start",                    "parametros": { "navegador": "chrome"|"firefox", "headless": true|false, "chat_session_id": 123 } }
@@ -323,12 +326,22 @@ USO:
   { "comando": "set_headless",             "parametros": { "headless": "0"|"1" } }
   { "comando": "close",                    "parametros": { "id_session": "uuid" } }
   { "comando": "extract_form_controls",    "parametros": { "id_session": "uuid" } }
+  { "comando": "start_event_recording",    "parametros": { "id_session": "uuid", "chat_session_id": 123 } }
+  { "comando": "stop_event_recording",     "parametros": { "id_session": "uuid" } }
 
 LOGS DE RED Y CONSOLA:
   Al iniciar una sesión con `start`, el servicio captura automáticamente:
   - Peticiones de red (solo tipo `document`, `xhr`, `fetch`) → tabla `playwright_network_logs`
   - Mensajes de consola del navegador (`console.log`, `warn`, `error`, etc.) → tabla `playwright_console_logs`
   Ambos se almacenan en la base de datos asociados al `chat_session_id` provisto.
+
+GRABACIÓN DE EVENTOS:
+  Al ejecutar `start_event_recording`, el servicio inyecta un script via `page.addInitScript()` que
+  registra listeners en el documento para capturar eventos del usuario:
+  - click, dblclick, input (debounced 300ms), change, submit, keydown, scroll (debounced 300ms), focus, blur
+  - Cada evento genera un registro en la tabla `playwright_events` asociado al `chat_session_id`
+  - `stop_event_recording` solo desactiva el flag `window.__pwRecording = false` (no destruye listeners)
+  - Se puede reanudar con `start_event_recording` sin necesidad de reinyectar el script
 
 ERRORES:
   - 400: parámetros faltantes o comando desconocido

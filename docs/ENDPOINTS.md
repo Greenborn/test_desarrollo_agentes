@@ -616,6 +616,18 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Elimina todos los console logs registrados para la sesión de chat.
 - **Respuesta 200:** `{ success: true }`
 
+### `GET /api/playwright-logs/events`
+- **Auth:** Requerida
+- **Query:** `chat_session_id` (number, requerido)
+- **Descripción:** Obtiene las últimas 500 entradas de eventos de usuario registradas para la sesión de chat, ordenadas por fecha descendente.
+- **Respuesta 200:** `[{ id, chat_session_id, playwright_session_id, event_type, selector, tag_name, text_content, value, url, x, y, key, key_code, alt_key, ctrl_key, shift_key, meta_key, scroll_x, scroll_y, target_rect, metadata, created_at }]`
+
+### `DELETE /api/playwright-logs/events`
+- **Auth:** Requerida
+- **Query:** `chat_session_id` (number, requerido)
+- **Descripción:** Elimina todos los eventos de usuario registrados para la sesión de chat.
+- **Respuesta 200:** `{ success: true }`
+
 ---
 
 ## Notas

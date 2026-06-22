@@ -265,6 +265,16 @@ Todo comando que gestione la configuración e instancias de desarrollo **debe co
 | `/despliegue_detener_instancia` | `detener` | `instancia` | Detener procesos de desarrollo |
 | `/despliegue_ver_estado` | `ver` | `estado` | Ver estado de procesos |
 
+### Comportamiento ante falta de configuración
+
+Si `/despliegue_iniciar_instancia` no encuentra configuración guardada, **no debe fallar**. Debe ejecutar automáticamente `/despliegue_actualizar_config` (leer `deploy.json` del proyecto y guardar la configuración) y luego continuar con el inicio de la instancia.
+
+### Gestión de estado centralizado (Pinia)
+
+Todos los comandos de gestión de instancias (`/despliegue_iniciar_instancia`, `/despliegue_detener_instancia`, `/despliegue_ver_estado`) deben centralizar el estado de la instancia de desarrollo en un store de Pinia.
+
+Los componentes que dependan del estado de la instancia (Playwright, indicadores de procesos, estado del navegador, etc.) deben consumir ese mismo store, de modo que los cambios se reflejen reactivamente en todos los componentes sin lógica de actualización dispersa ni recargas manuales.
+
 ## 11. Comandos de desarrollo (OpenCode y utilidades dev)
 
 Todo comando que forme parte del ecosistema de desarrollo (funcionalidades, documentación, OpenCode, git) **debe comenzar con `/dev_`**.
@@ -375,3 +385,24 @@ Algunos comandos actúan como **puerta de enlace** a herramientas externas con s
 3. **Deben tener `usage` con `<comando>`** (formato tradicional) en vez de `--param=`
 4. **No deben expandirse** — si se necesita una nueva función, crear un comando específico (ej: `/git_log` en vez de extender `/git`)
 5. **El número de comandos passthrough debe ser mínimo** — idealmente 1 o 2 en todo el sistema
+
+---
+
+## 15. Actualización de componentes al cambiar de rama
+
+Todo comando que implique un cambio de rama Git (crear, checkout, merge, etc.) **debe actualizar todos los componentes visuales** que muestren o consuman la rama actual.
+
+### Comandos afectados
+
+| Comando | Acción |
+|---|---|
+| `/dev_git_crear_rama` | Crea y cambia a una nueva rama |
+| `/dev_git_ir_rama_ticket` | Hace checkout a la rama del ticket |
+| `/ambientes_merge` | Hace merge a la rama destino (el checkout implícito debe reflejarse) |
+
+### Reglas
+
+1. **Después de ejecutar** cualquier comando que cambie la rama activa, los componentes que muestren la rama (ej: Topbar, indicadores de estado) deben reflejar el nuevo valor.
+2. **Mecanismo:** usar el store o evento correspondiente para actualizar el estado, no recargar la página.
+3. **Validación:** antes del cambio de rama validar que no haya cambios sin comitear. Si los hay, informar al usuario y abortar (salvo que el comando documente explícitamente otro comportamiento).
+4. **Comandos passthrough `/git`:** al ser una puerta genérica a Git, no pueden actualizar componentes automáticamente. Después de ejecutar un `/git checkout`, `/git branch`, `/git merge`, etc., se debe refrescar la rama actual consultando el directorio de trabajo.

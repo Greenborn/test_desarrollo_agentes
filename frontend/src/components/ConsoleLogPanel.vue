@@ -2,7 +2,7 @@
   <div class="console-panel d-flex flex-column h-100" style="min-height: 0;">
     <div class="log-header d-flex align-items-center px-3 py-1 flex-shrink-0">
       <span class="fw-semibold small" style="color: #e6edf3;">Console Log del Navegador</span>
-      <span class="badge bg-secondary-subtle text-secondary ms-2" style="font-size: 0.6rem;">{{ consoleLogs.length }} logs</span>
+      <span class="badge bg-secondary-subtle text-secondary ms-2" style="font-size: 0.6rem;">{{ filteredLogs.length }} / {{ consoleLogs.length }} logs</span>
       <span v-if="!activeSessionId" class="small text-muted ms-2">(sin sesión activa)</span>
       <button
         class="btn btn-sm btn-outline-danger py-0 px-2 ms-auto"
@@ -10,6 +10,20 @@
         :disabled="!activeSessionId || clearing"
         @click="clearLogs"
       >Limpiar</button>
+    </div>
+    <div class="filter-bar d-flex align-items-center gap-1 px-3 py-1 flex-shrink-0">
+      <button
+        class="filter-chip"
+        :class="{ active: typeFilters.size === ALL_TYPES.length }"
+        @click="setAllTypes"
+      >All</button>
+      <button
+        v-for="t in ALL_TYPES"
+        :key="t"
+        class="filter-chip"
+        :class="{ active: typeFilters.has(t) }"
+        @click="toggleTypeFilter(t)"
+      >{{ t }}</button>
     </div>
     <div class="overflow-y-auto flex-grow-1" ref="containerRef">
       <div v-if="!activeSessionId" class="d-flex align-items-center justify-content-center h-100 text-muted small">
@@ -21,9 +35,12 @@
       <div v-else-if="loading && consoleLogs.length === 0" class="d-flex align-items-center justify-content-center h-100 text-muted small">
         Cargando...
       </div>
+      <div v-else-if="filteredLogs.length === 0" class="d-flex align-items-center justify-content-center h-100 text-muted small">
+        No hay logs que coincidan con el filtro.
+      </div>
       <div v-else class="p-2">
         <div
-          v-for="(log, i) in consoleLogs"
+          v-for="(log, i) in filteredLogs"
           :key="log.id || i"
           class="console-entry d-flex align-items-start gap-2 px-2 py-1 rounded"
           :class="{ expanded: expandedId === log.id }"
@@ -58,6 +75,30 @@ export default {
     const activeSessionId = computed(() => chatStore.activeSessionId)
     const consoleLogs = computed(() => logsStore.consoleLogs)
     const loading = computed(() => logsStore.loading.console)
+
+    const ALL_TYPES = ['log', 'warn', 'error', 'info', 'debug']
+    const typeFilters = ref(new Set(ALL_TYPES))
+
+    const filteredLogs = computed(() => {
+      if (typeFilters.value.size === 0 || typeFilters.value.size === ALL_TYPES.length) {
+        return consoleLogs.value
+      }
+      return consoleLogs.value.filter(log => typeFilters.value.has(log.type))
+    })
+
+    function toggleTypeFilter(type) {
+      const next = new Set(typeFilters.value)
+      if (next.has(type)) {
+        next.delete(type)
+      } else {
+        next.add(type)
+      }
+      typeFilters.value = next
+    }
+
+    function setAllTypes() {
+      typeFilters.value = new Set(ALL_TYPES)
+    }
 
     function typeClass(type) {
       const map = {
@@ -117,6 +158,11 @@ export default {
       activeSessionId,
       consoleLogs,
       loading,
+      ALL_TYPES,
+      typeFilters,
+      filteredLogs,
+      toggleTypeFilter,
+      setAllTypes,
       typeClass,
       isExpanded,
       toggleExpand,
@@ -169,6 +215,29 @@ export default {
 .console-time {
   font-size: 0.6rem;
   color: #4a5568;
+}
+.filter-bar {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+}
+.filter-chip {
+  background: none;
+  border: 1px solid #374151;
+  color: #6b7280;
+  font-size: 0.6rem;
+  padding: 1px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-chip:hover {
+  color: #cbd5e1;
+  border-color: #6b7280;
+}
+.filter-chip.active {
+  color: #e6edf3;
+  border-color: #75AADB;
+  background: rgba(117, 170, 219, 0.15);
 }
 .bg-purple-subtle {
   background-color: rgba(168, 85, 247, 0.15) !important;
