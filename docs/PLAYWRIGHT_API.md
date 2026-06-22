@@ -101,8 +101,9 @@ Inicia una nueva sesión de navegador. Lanza el navegador especificado, crea un 
 #### Parámetros
 
 | Campo | Tipo | Requerido | Descripción |
-|---|---|---|---|
+|---|---|---|---|---|
 | `navegador` | `string` | Sí | Identificador del navegador: `"chrome"` o `"firefox"` |
+| `chat_session_id` | `integer` | No | ID de la sesión de chat asociada. Se usa para relacionar los logs de red y console.log almacenados en BD con la sesión de chat que inició el navegador |
 
 #### Ejemplo
 
@@ -127,6 +128,15 @@ curl -X POST http://localhost:4098/api/command \
 | Falta `navegador` | 400 | `Parámetro "navegador" es requerido` |
 | Navegador no soportado | 500 | `Navegador no soportado: "edge". Soporta: chrome, firefox` |
 | No se pudo iniciar | 500 | `No se pudo iniciar chrome: ...` |
+
+#### Logs automáticos
+
+Cuando se provee `chat_session_id`, el servicio registra automáticamente en BD:
+
+| Tabla | Contenido |
+|---|---|
+| `playwright_network_logs` | Peticiones de red (`document`, `xhr`, `fetch`) con metod, URL, status code, headers y body truncado |
+| `playwright_console_logs` | Mensajes de consola del navegador con tipo (`log`, `warn`, `error`, etc.), texto y ubicación |
 
 ---
 
@@ -182,15 +192,19 @@ curl -X POST http://localhost:4098/api/command \
 ## 6. Gestión de sesiones
 
 - Las sesiones se almacenan en memoria (Map) dentro del proceso.
-- Cada sesión contiene: instancia del navegador, contexto y página de Playwright.
+- Cada sesión contiene: instancia del navegador, contexto, página de Playwright y `chat_session_id` (si se proveyó).
+- Los logs de red y consola se escriben directamente a la base de datos MariaDB en tiempo real mediante Knex.
+- Solo se registran peticiones de tipo `document`, `xhr` y `fetch` (se omiten imágenes, CSS, fuentes, etc.).
+- Los cuerpos de respuesta se truncan a 10.000 caracteres.
 - Al reiniciar el servicio, todas las sesiones se pierden.
 - No hay límite de sesiones simultáneas (sujeto a recursos del sistema).
 
 ### Funciones internas (exportadas por `browserManager.js`)
 
 | Función | Descripción |
-|---|---|
-| `startSession(navegador)` | Lanza navegador, crea sesión, retorna UUID |
+|---|---|---|
+| `setDb(knexInstance)` | Inyecta instancia Knex para escritura de logs en BD |
+| `startSession(navegador, headless, resolution, chatSessionId)` | Lanza navegador, crea sesión, retorna UUID |
 | `goToUrl(idSession, url)` | Navega a URL en la sesión |
 | `getSession(idSession)` | Retorna datos de la sesión o `null` |
 | `closeSession(idSession)` | Cierra navegador y elimina sesión |
@@ -228,7 +242,7 @@ playwright/
 - **JavaScript puro** (ESM, no TypeScript)
 - Parámetros requeridos validados explícitamente — prohibido `||` como fallback silencioso
 - Errores registrados con `console.log` — prohibido `catch {}` vacío
-- Sin dependencias externas más allá de express, dotenv y playwright
+- Dependencias externas: express, dotenv, playwright, knex y mysql2
 
 ---
 
@@ -242,10 +256,16 @@ COMANDOS DISPONIBLES:
 - close         → cierra una sesión de navegador
 
 USO:
-  { "comando": "start",        "parametros": { "navegador": "chrome"|"firefox", "headless": true|false } }
+  { "comando": "start",        "parametros": { "navegador": "chrome"|"firefox", "headless": true|false, "chat_session_id": 123 } }
   { "comando": "go_to_url",    "parametros": { "id_session": "uuid", "url": "https://..." } }
   { "comando": "set_headless", "parametros": { "headless": "0"|"1" } }
   { "comando": "close",        "parametros": { "id_session": "uuid" } }
+
+LOGS DE RED Y CONSOLA:
+  Al iniciar una sesión con `start`, el servicio captura automáticamente:
+  - Peticiones de red (solo tipo `document`, `xhr`, `fetch`) → tabla `playwright_network_logs`
+  - Mensajes de consola del navegador (`console.log`, `warn`, `error`, etc.) → tabla `playwright_console_logs`
+  Ambos se almacenan en la base de datos asociados al `chat_session_id` provisto.
 
 ERRORES:
   - 400: parámetros faltantes o comando desconocido

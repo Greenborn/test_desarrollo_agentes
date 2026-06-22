@@ -31,6 +31,20 @@
         Proyectos
       </button>
       <button
+        class="tab-btn ms-3"
+        :class="{ active: activeTab === 'console_logs' }"
+        @click="activeTab = 'console_logs'"
+      >
+        Console Log Navegador
+      </button>
+      <button
+        class="tab-btn ms-3"
+        :class="{ active: activeTab === 'network_logs' }"
+        @click="activeTab = 'network_logs'"
+      >
+        Actividad de Red
+      </button>
+      <button
         v-if="activeTab === 'instancias' && hasProcesses"
         class="btn btn-sm btn-outline-danger py-0 px-2 ms-auto"
         @click="detener"
@@ -121,6 +135,16 @@
         </div>
       </div>
     </template>
+
+    <!-- Tab: Console Log Navegador -->
+    <template v-if="activeTab === 'console_logs'">
+      <ConsoleLogPanel class="flex-grow-1" />
+    </template>
+
+    <!-- Tab: Actividad de Red -->
+    <template v-if="activeTab === 'network_logs'">
+      <NetworkLogPanel class="flex-grow-1" />
+    </template>
   </div>
 </template>
 
@@ -129,10 +153,12 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } 
 import { storeToRefs } from 'pinia'
 import RepoView from './RepoView.vue'
 import TicketPanel from './TicketPanel.vue'
+import ConsoleLogPanel from './ConsoleLogPanel.vue'
+import NetworkLogPanel from './NetworkLogPanel.vue'
 import { useProjectStore } from '../stores/project.js'
 
 export default {
-  components: { RepoView, TicketPanel },
+  components: { RepoView, TicketPanel, ConsoleLogPanel, NetworkLogPanel },
   setup() {
     const state = reactive({
       processes: [],

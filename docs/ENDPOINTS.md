@@ -274,7 +274,7 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 - **Comandos:**
   | comando | parametros | Respuesta |
   |---|---|---|
-  | `start` | `{ navegador: "chromium"|"firefox", headless?, url?, resolution?: { width, height } }` | `{ id_session, headless, url, resolution }` |
+  | `start` | `{ navegador: "chromium"|"firefox", headless?, url?, resolution?: { width, height }, chat_session_id?: number }` | `{ id_session, headless, url, resolution, chat_session_id }` |
   | `go_to_url` | `{ id_session?, url }` | `{ success: true, id_session }` |
   | `set_headless` | `{ headless: boolean\|"0"\|"1" }` | `{ success: true, reiniciado, id_session?, headless }` |
   | `close` | `{ id_session }` | `{ success: true }` |
@@ -586,6 +586,34 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Devuelve el buffer de logs en tiempo real del proceso especificado (últimas 200 líneas).
 - **Respuesta 200:** `{ success: true, name: string, logs: string[] }`
 - **Respuesta 400:** `{ success: false, error: "Se requiere el parámetro name." }`
+
+---
+
+## Playwright Logs (`/api/playwright-logs`)
+
+### `GET /api/playwright-logs/network`
+- **Auth:** Requerida
+- **Query:** `chat_session_id` (number, requerido)
+- **Descripción:** Obtiene las últimas 500 peticiones de red (tipo `document`, `xhr`, `fetch`) registradas para la sesión de chat, ordenadas por fecha descendente.
+- **Respuesta 200:** `[{ id, chat_session_id, playwright_session_id, method, url, status_code, request_headers, response_headers, resource_type, response_body, error, created_at }]`
+
+### `GET /api/playwright-logs/console`
+- **Auth:** Requerida
+- **Query:** `chat_session_id` (number, requerido)
+- **Descripción:** Obtiene las últimas 500 entradas de console log registradas para la sesión de chat, ordenadas por fecha descendente.
+- **Respuesta 200:** `[{ id, chat_session_id, playwright_session_id, type, text, location, created_at }]`
+
+### `DELETE /api/playwright-logs/network`
+- **Auth:** Requerida
+- **Query:** `chat_session_id` (number, requerido)
+- **Descripción:** Elimina todas las peticiones de red registradas para la sesión de chat.
+- **Respuesta 200:** `{ success: true }`
+
+### `DELETE /api/playwright-logs/console`
+- **Auth:** Requerida
+- **Query:** `chat_session_id` (number, requerido)
+- **Descripción:** Elimina todos los console logs registrados para la sesión de chat.
+- **Respuesta 200:** `{ success: true }`
 
 ---
 

@@ -3,6 +3,14 @@ import crypto from 'crypto';
 
 const sessions = new Map();
 let defaultHeadless = false;
+let db = null;
+
+const ALLOWED_RESOURCE_TYPES = ['document', 'xhr', 'fetch'];
+const MAX_BODY_LENGTH = 10000;
+
+function setDb(knexInstance) {
+  db = knexInstance;
+}
 
 function generateId() {
   return crypto.randomUUID();
@@ -22,7 +30,79 @@ function getDefaultHeadless() {
   return defaultHeadless;
 }
 
-async function startSession(navegador, headless, resolution) {
+function setupPageListeners(page, sessionId, chatSessionId) {
+  page.on('response', async (response) => {
+    const req = response.request();
+    const resourceType = req.resourceType();
+    if (!ALLOWED_RESOURCE_TYPES.includes(resourceType)) return;
+
+    let body = null;
+    try {
+      const buf = await response.body();
+      body = buf.toString('utf-8').substring(0, MAX_BODY_LENGTH);
+    } catch {
+      body = null;
+    }
+
+    try {
+      if (!db) return;
+      await db('playwright_network_logs').insert({
+        chat_session_id: chatSessionId,
+        playwright_session_id: sessionId,
+        method: req.method(),
+        url: req.url(),
+        status_code: response.status(),
+        request_headers: JSON.stringify(req.headers()),
+        response_headers: JSON.stringify(response.headers()),
+        resource_type: resourceType,
+        response_body: body,
+      });
+    } catch (err) {
+      console.log(`[browserManager] Error al guardar network log:`, err.message);
+    }
+  });
+
+  page.on('requestfailed', async (request) => {
+    const resourceType = request.resourceType();
+    if (!ALLOWED_RESOURCE_TYPES.includes(resourceType)) return;
+
+    try {
+      if (!db) return;
+      await db('playwright_network_logs').insert({
+        chat_session_id: chatSessionId,
+        playwright_session_id: sessionId,
+        method: request.method(),
+        url: request.url(),
+        status_code: null,
+        request_headers: JSON.stringify(request.headers()),
+        resource_type: resourceType,
+        error: request.failure()?.errorText || 'Unknown error',
+      });
+    } catch (err) {
+      console.log(`[browserManager] Error al guardar request failed:`, err.message);
+    }
+  });
+
+  page.on('console', async (msg) => {
+    try {
+      if (!db) return;
+      const location = msg.location();
+      const locationStr = location ? `${location.url}:${location.lineNumber}:${location.columnNumber}` : null;
+
+      await db('playwright_console_logs').insert({
+        chat_session_id: chatSessionId,
+        playwright_session_id: sessionId,
+        type: msg.type(),
+        text: msg.text(),
+        location: locationStr,
+      });
+    } catch (err) {
+      console.log(`[browserManager] Error al guardar console log:`, err.message);
+    }
+  });
+}
+
+async function startSession(navegador, headless, resolution, chatSessionId) {
   if (!navegador) {
     throw new Error('Parámetro "navegador" es requerido');
   }
@@ -63,10 +143,14 @@ async function startSession(navegador, headless, resolution) {
   const page = await context.newPage();
 
   const id = generateId();
-  sessions.set(id, { browser, context, page, navegador, headless: headlessMode, resolution: resolution || null });
+  const safeChatSessionId = chatSessionId || null;
+  sessions.set(id, { browser, context, page, navegador, headless: headlessMode, resolution: resolution || null, chatSessionId: safeChatSessionId });
+
+  setupPageListeners(page, id, safeChatSessionId);
 
   const resInfo = resolution ? `, resolución: ${resolution.width}x${resolution.height}` : '';
-  console.log(`Sesión ${id} iniciada con ${navegador} (headless: ${headlessMode}${resInfo})`);
+  const chatInfo = safeChatSessionId ? `, chat_session: ${safeChatSessionId}` : '';
+  console.log(`Sesión ${id} iniciada con ${navegador} (headless: ${headlessMode}${resInfo}${chatInfo})`);
   return id;
 }
 
@@ -118,6 +202,7 @@ function closeAllSessions() {
 }
 
 export default {
+  setDb,
   startSession,
   goToUrl,
   getSession,

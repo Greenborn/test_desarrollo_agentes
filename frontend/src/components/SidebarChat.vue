@@ -25,7 +25,10 @@
           <span class="status-led" :class="getSessionStatus(s.id)"></span>
           <span v-if="pendingNotifications[s.id]" class="notification-dot" title="Novedades pendientes"></span>
           <span v-if="s.id_ticket_redmine" class="ticket-badge">#{{ s.id_ticket_redmine }}</span>
-          <span class="text-truncate">{{ s.title }}</span>
+          <div class="d-flex flex-column flex-grow-1 min-width-0">
+            <span class="text-truncate">{{ s.title }}</span>
+            <span class="text-muted" style="font-size: 0.6rem; line-height: 1.2;">{{ formatDate(s.updated_at) }}</span>
+          </div>
           <span
             class="delete-btn"
             @click.stop="chat.deleteSession(s.id)"
@@ -67,6 +70,12 @@ export default {
         return fields.some((f) => f && f.toLowerCase().includes(filter))
       })
     })
+
+    function formatDate(dateStr) {
+      if (!dateStr) return ''
+      const d = new Date(dateStr)
+      return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+    }
 
     function sessionTooltip(s) {
       const lines = []
@@ -148,6 +157,7 @@ export default {
       sidebarWidth,
       sidebarTransitioning,
       sessionTooltip,
+      formatDate,
       getSessionStatus,
       createSession,
       selectSession,

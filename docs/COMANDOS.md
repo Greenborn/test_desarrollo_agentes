@@ -97,6 +97,7 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 | `/dev_opencode_generar_commit` | Genera un mensaje de commit de los cambios realizados usando OpenCode. Seleccioná proveedor, modelo, modo y modalidad de envío (encolar/enviar) para obtener una propuesta de commit. | `/dev_opencode_generar_commit` |
 | `/dev_opencode_finalizar` | Finaliza la sesión OpenCode activa | `/dev_opencode_finalizar` |
 | `/dev_git_crear_rama` | Crea una rama Git a partir del proyecto y ticket de la sesión | `/dev_git_crear_rama` |
+| `/dev_git_ir_rama_ticket` | Cambia a la rama Git asociada al ticket de la sesión actual. Valida que no haya cambios sin comitear, que la sesión tenga ticket asignado y que la rama exista | `/dev_git_ir_rama_ticket` |
 | `/dev_redmine_comentarios_listar` | Lista todos los comentarios de Redmine pendientes de envío | `/dev_redmine_comentarios_listar` |
 | `/dev_redmine_comentarios_enviar` | Agrupa los comentarios pendientes, muestra vista previa editable y permite enviarlos a Redmine | `/dev_redmine_comentarios_enviar` |
 

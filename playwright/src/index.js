@@ -1,11 +1,37 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import express from 'express';
+import knex from 'knex';
 import commandRoutes from './routes/command.routes.js';
+import browserManager from './services/browserManager.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+dotenv.config({ path: path.resolve(__dirname, '../../backend/.env') });
 
 const PORT = process.env.SERVICIO_PLAYWRIGHT_PORT;
 if (!PORT) {
   console.log('SERVICIO_PLAYWRIGHT_PORT no está definido en .env');
   process.exit(1);
+}
+
+let db = null;
+try {
+  db = knex({
+    client: 'mysql2',
+    connection: {
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT, 10) || 3306,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+    },
+    pool: { min: 0, max: 5 },
+  });
+  browserManager.setDb(db);
+} catch (err) {
+  console.log('[playwright] No se pudo conectar a la base de datos, los logs de red/consola no se guardarán:', err.message);
 }
 
 const app = express();

@@ -13,7 +13,7 @@
         <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomIn" :disabled="chatZoom >= 200" title="Acercar">+</button>
       </div>
     </div>
-    <div class="flex-grow-1 overflow-y-auto p-3" ref="messagesContainer" :style="{ fontSize: chatZoom + '%' }">
+    <div class="flex-grow-1 overflow-y-auto p-3" ref="messagesContainer" style="min-height: 0;" :style="{ fontSize: chatZoom + '%' }">
       <div v-if="!activeSessionId" class="text-center text-muted mt-5">
         <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
       </div>
@@ -2266,6 +2266,11 @@ export default {
       if (messagesContainer.value) {
         messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
       }
+      setTimeout(() => {
+        if (messagesContainer.value) {
+          messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+        }
+      }, 100)
     }
 
     watch(messages, scrollToBottom, { deep: true })
@@ -2273,6 +2278,7 @@ export default {
 
     watch(activeSessionId, () => {
       loadTicketInfo()
+      scrollToBottom()
     })
 
     watch(

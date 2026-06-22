@@ -267,6 +267,39 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
+## 15. `playwright_network_logs`
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `chat_session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
+| `playwright_session_id` | VARCHAR(36) | NOT NULL — UUID de la sesión del navegador en Playwright |
+| `method` | VARCHAR(10) | NOT NULL — GET, POST, etc. |
+| `url` | TEXT | NOT NULL |
+| `status_code` | INTEGER | nullable — código HTTP de respuesta |
+| `request_headers` | TEXT | nullable — JSON con headers de la petición |
+| `response_headers` | TEXT | nullable — JSON con headers de la respuesta |
+| `resource_type` | VARCHAR(50) | nullable — `document`, `xhr`, `fetch` |
+| `response_body` | TEXT | nullable — cuerpo de respuesta truncado a 10K chars |
+| `error` | TEXT | nullable — texto de error para peticiones fallidas |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+---
+
+## 16. `playwright_console_logs`
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `chat_session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
+| `playwright_session_id` | VARCHAR(36) | NOT NULL — UUID de la sesión del navegador en Playwright |
+| `type` | VARCHAR(20) | NOT NULL — `log`, `warn`, `error`, `info`, `debug` |
+| `text` | TEXT | NOT NULL |
+| `location` | TEXT | nullable — URL:línea:columna donde se ejecutó el console |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+---
+
 ## Relaciones (Foreign Keys)
 
 | Origen | Columna | Destino | Columna | ON DELETE |
@@ -282,6 +315,8 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `tickets` | `proyecto_id` | `proyectos` | `id` | CASCADE |
 | `project_variables` | `proyecto_id` | `proyectos` | `id` | CASCADE |
 | `redmine_comentarios` | `session_id` | `chat_sessions` | `id` | CASCADE |
+| `playwright_network_logs` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
+| `playwright_console_logs` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 
 ---
 

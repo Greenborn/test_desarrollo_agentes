@@ -46,10 +46,12 @@ router.post('/command', async (req, res) => {
 
     await saveToChat(sessionId, 'command', `[navegador] ${comando}`);
 
+    const pwParametros = comando === 'start' ? { ...parametros, chat_session_id: sessionId } : parametros;
+
     const pwRes = await fetch(`${PW_URL}/api/command`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comando, parametros }),
+      body: JSON.stringify({ comando, parametros: pwParametros }),
     });
     const data = await pwRes.json();
 

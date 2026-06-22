@@ -191,16 +191,16 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
           }
         }
 
-        for (const fe of frontendPorts) {
-          try {
-            const parametros = { navegador: 'chrome', url: fe.url };
-            if (resolution) parametros.resolution = resolution;
+          for (const fe of frontendPorts) {
+            try {
+              const parametros = { navegador: 'chrome', url: fe.url, chat_session_id: sessionId };
+              if (resolution) parametros.resolution = resolution;
 
-            const pwRes = await fetch(`http://localhost:${PW_PORT}/api/command`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ comando: 'start', parametros }),
-            });
+              const pwRes = await fetch(`http://localhost:${PW_PORT}/api/command`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ comando: 'start', parametros }),
+              });
             const pwData = await pwRes.json();
             if (pwData.id_session) {
               browserSessions.push({ name: fe.name, url: fe.url, idSession: pwData.id_session });

@@ -25,11 +25,12 @@ router.post('/command', async (req, res) => {
         const headless = parametros?.headless;
         const url = parametros?.url;
         const resolution = parametros?.resolution;
-        const idSession = await browserManager.startSession(navegador, headless, resolution);
+        const chatSessionId = parametros?.chat_session_id;
+        const idSession = await browserManager.startSession(navegador, headless, resolution, chatSessionId);
         if (url) {
           await browserManager.goToUrl(idSession, url);
         }
-        return res.json({ id_session: idSession, headless: !!headless, url: url || null, resolution: resolution || null });
+        return res.json({ id_session: idSession, headless: !!headless, url: url || null, resolution: resolution || null, chat_session_id: chatSessionId || null });
       } catch (err) {
         return res.status(500).json({ error: err.message });
       }
@@ -70,9 +71,9 @@ router.post('/command', async (req, res) => {
       // If there's an active session, restart it with the new headless mode
       const active = browserManager.getActiveSession();
       if (active) {
-        const { id, navegador } = active;
+        const { id, navegador, chatSessionId } = active;
         await browserManager.closeSession(id);
-        const newId = await browserManager.startSession(navegador, value);
+        const newId = await browserManager.startSession(navegador, value, null, chatSessionId);
         return res.json({ success: true, reiniciado: true, id_session: newId, headless: value });
       }
 
