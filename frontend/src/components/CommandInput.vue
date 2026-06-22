@@ -1,5 +1,5 @@
 <template>
-  <div class="position-relative flex-grow-1 mx-3">
+  <div ref="rootEl" class="position-relative flex-grow-1 mx-3">
     <div class="input-group input-group-sm">
       <span class="input-group-text bg-dark text-success border-secondary font-monospace" :title="currentDir || '/'">
         {{ (currentDir || '/') }} $
@@ -60,6 +60,7 @@ export default {
     const buffer = ref('')
     const inputEl = ref(null)
     const autocompleteList = ref(null)
+    const rootEl = ref(null)
     const historyIdx = ref(-1)
     let debounceTimer = null
 
@@ -226,6 +227,12 @@ export default {
       cmdStore.hideAutocomplete()
     }
 
+    function onClickOutside(event) {
+      if (autocompleteVisible.value && rootEl.value && !rootEl.value.contains(event.target)) {
+        cmdStore.hideAutocomplete()
+      }
+    }
+
     function onInput() {
       cmdStore.hideAutocomplete()
     }
@@ -247,10 +254,12 @@ export default {
 
     onMounted(() => {
       cmdStore.loadHistory(chatStore.activeSessionId)
+      document.addEventListener('mousedown', onClickOutside)
     })
 
     onUnmounted(() => {
       clearOmnifilterDebounce()
+      document.removeEventListener('mousedown', onClickOutside)
     })
 
     watch(activeSessionId, (newId) => {
@@ -258,7 +267,7 @@ export default {
     })
 
     return {
-      buffer, inputEl, autocompleteList, autocompleteOptions,
+      buffer, inputEl, autocompleteList, rootEl, autocompleteOptions,
       autocompleteVisible, arrowIndex, currentDir,
       handleEnter, handleTab, handleUp, handleDown,
       hideAutocomplete, pickAutocomplete, onInput, onKeyup,

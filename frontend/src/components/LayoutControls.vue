@@ -22,6 +22,17 @@
         <div class="part bottom" :class="{ filled: !panelCollapsed }"></div>
       </div>
     </button>
+    <button
+      class="layout-btn"
+      :class="{ active: !rightPanelCollapsed }"
+      @click="toggleRightPanel"
+      title="Toggle right panel"
+    >
+      <div class="layout-icon split-h">
+        <div class="part left"></div>
+        <div class="part right" :class="{ filled: !rightPanelCollapsed }"></div>
+      </div>
+    </button>
   </div>
 </template>
 
@@ -33,7 +44,7 @@ import { useUiStore } from '../stores/ui.js'
 export default {
   setup() {
     const ui = useUiStore()
-    const { sidebarCollapsed, panelCollapsed } = storeToRefs(ui)
+    const { sidebarCollapsed, panelCollapsed, rightPanelCollapsed } = storeToRefs(ui)
 
     onMounted(() => {
       ui.loadLayoutPrefs()
@@ -42,8 +53,10 @@ export default {
     return {
       sidebarCollapsed,
       panelCollapsed,
+      rightPanelCollapsed,
       toggleSidebar: ui.toggleSidebar,
       togglePanel: ui.togglePanel,
+      toggleRightPanel: ui.toggleRightPanel,
     }
   },
 }

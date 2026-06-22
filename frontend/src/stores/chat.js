@@ -7,14 +7,24 @@ export const useChatStore = defineStore('chat', () => {
   const sessions = ref([])
   const activeSessionId = ref(null)
   const messages = ref([])
-  const streaming = ref(false)
   const creating = ref(false)
   const executingCount = ref(0)
-  const executing = computed(() => executingCount.value > 0)
   const _sessionCmdCount = ref({})
+  const _streamingSessions = ref({})
   const sessionStatus = ref({})
   const currentChunk = ref('')
   const currentThinking = ref('')
+  const pendingNotifications = ref({})
+  const _sessionStreamCache = ref({})
+
+  const streaming = computed(() => {
+    const sid = activeSessionId.value
+    return sid ? !!_streamingSessions.value[sid] : false
+  })
+  const executing = computed(() => {
+    const sid = activeSessionId.value
+    return sid ? (_sessionCmdCount.value[sid] || 0) > 0 : false
+  })
 
   async function loadSessions() {
     try {
@@ -109,6 +119,7 @@ export const useChatStore = defineStore('chat', () => {
 
     try {
       const result = await executeFn(loadingIdx)
+      await _saveCommandMessages(sid, raw, result)
       if (Number(activeSessionId.value) === Number(sid)) {
         const idx = messages.value.findIndex(m => m._key === loadingKey)
         if (idx >= 0) {
@@ -122,7 +133,8 @@ export const useChatStore = defineStore('chat', () => {
             messages.value.splice(idx, 1)
           }
         }
-        await _saveCommandMessages(sid, raw, result)
+      } else if (sid) {
+        pendingNotifications.value[sid] = Date.now()
       }
       _decSessionCount(sid)
       if (sid && !_sessionCmdCount.value[sid] && sessionStatus.value[sid] !== 'error') {
@@ -131,12 +143,14 @@ export const useChatStore = defineStore('chat', () => {
     } catch (err) {
       console.error('Error ejecutando comando:', err)
       const errorResult = 'Error: ' + (err.message || 'Error desconocido')
+      await _saveCommandMessages(sid, raw, errorResult)
       if (Number(activeSessionId.value) === Number(sid)) {
         const idx = messages.value.findIndex(m => m._key === loadingKey)
         if (idx >= 0) {
           messages.value[idx] = { role: 'result', content: errorResult, _key: 'err-' + Date.now() }
         }
-        await _saveCommandMessages(sid, raw, errorResult)
+      } else if (sid) {
+        pendingNotifications.value[sid] = Date.now()
       }
       _decSessionCount(sid)
       if (sid) sessionStatus.value[sid] = 'error'
@@ -145,11 +159,38 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function _saveMessageToDb(sessionId, msg) {
+    if (!sessionId) return
+    try {
+      await fetch(`${API}/chat/sessions/${sessionId}/save-messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ messages: [msg] }),
+      })
+    } catch (err) {
+      console.error('Error al guardar mensaje en BD:', err)
+    }
+  }
+
+  function clearPendingNotification(sessionId) {
+    if (sessionId) {
+      delete pendingNotifications.value[sessionId]
+    }
+  }
+
   async function loadMessages(sessionId) {
     activeSessionId.value = sessionId
     messages.value = []
-    currentChunk.value = ''
-    currentThinking.value = ''
+    clearPendingNotification(sessionId)
+    const cache = _sessionStreamCache.value[sessionId]
+    if (cache && _streamingSessions.value[sessionId]) {
+      currentChunk.value = cache.chunk || ''
+      currentThinking.value = cache.thinking || ''
+    } else {
+      currentChunk.value = ''
+      currentThinking.value = ''
+    }
     try {
       const res = await fetch(`${API}/chat/sessions/${sessionId}/messages`, { credentials: 'include' })
       const data = await res.json()
@@ -158,7 +199,15 @@ export const useChatStore = defineStore('chat', () => {
         return
       }
       if (Number(data.sessionId) === Number(activeSessionId.value)) {
-        messages.value = data.messages
+        messages.value = data.messages.map(m => {
+          if (m.role === 'opencode_control' && !m.controlData && typeof m.content === 'string') {
+            try {
+              const parsed = JSON.parse(m.content)
+              m.controlData = parsed
+            } catch {}
+          }
+          return m
+        })
       }
     } catch (err) {
       console.error('Error al cargar mensajes:', err)
@@ -167,10 +216,17 @@ export const useChatStore = defineStore('chat', () => {
 
   async function sendMessage(sessionId, message) {
     messages.value.push({ role: 'user', content: message })
-    streaming.value = true
+    _streamingSessions.value[sessionId] = true
     currentChunk.value = ''
     currentThinking.value = ''
     sessionStatus.value[sessionId] = 'executing'
+
+    if (!_sessionStreamCache.value[sessionId]) {
+      _sessionStreamCache.value[sessionId] = { chunk: '', thinking: '' }
+    }
+    const cache = _sessionStreamCache.value[sessionId]
+    cache.chunk = ''
+    cache.thinking = ''
 
     try {
       const res = await fetch(`${API}/chat/sessions/${sessionId}/messages`, {
@@ -183,7 +239,7 @@ export const useChatStore = defineStore('chat', () => {
       if (!res.ok) {
         const errData = await res.json()
         sessionStatus.value[sessionId] = 'error'
-        streaming.value = false
+        delete _streamingSessions.value[sessionId]
         if (Number(activeSessionId.value) === Number(sessionId)) {
           currentChunk.value = `\n\n[Error: ${errData.error || res.statusText}]`
         }
@@ -211,12 +267,14 @@ export const useChatStore = defineStore('chat', () => {
             const json = JSON.parse(trimmed.slice(6))
             const isActive = Number(activeSessionId.value) === Number(sessionId)
             if (json.type === 'thinking') {
+              cache.thinking += json.content
               if (isActive) currentThinking.value += json.content
             } else if (json.type === 'response') {
+              cache.chunk += json.content
               if (isActive) currentChunk.value += json.content
             } else if (json.type === 'done') {
               sessionStatus.value[sessionId] = 'idle'
-              streaming.value = false
+              delete _streamingSessions.value[sessionId]
               if (isActive) {
                 messages.value.push({
                   role: 'assistant',
@@ -225,12 +283,16 @@ export const useChatStore = defineStore('chat', () => {
                 })
                 currentChunk.value = ''
                 currentThinking.value = ''
+              } else {
+                pendingNotifications.value[sessionId] = Date.now()
               }
             } else if (json.type === 'error') {
               sessionStatus.value[sessionId] = 'error'
-              streaming.value = false
+              delete _streamingSessions.value[sessionId]
               if (isActive) {
                 currentChunk.value = `\n\n[Error: ${json.content}]`
+              } else {
+                pendingNotifications.value[sessionId] = Date.now()
               }
             }
           } catch {
@@ -239,9 +301,9 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
 
-      if (streaming.value) {
+      if (_streamingSessions.value[sessionId]) {
         sessionStatus.value[sessionId] = 'idle'
-        streaming.value = false
+        delete _streamingSessions.value[sessionId]
         if (Number(activeSessionId.value) === Number(sessionId)) {
           messages.value.push({
             role: 'assistant',
@@ -250,6 +312,8 @@ export const useChatStore = defineStore('chat', () => {
           })
           currentChunk.value = ''
           currentThinking.value = ''
+        } else {
+          pendingNotifications.value[sessionId] = Date.now()
         }
       }
 
@@ -257,7 +321,7 @@ export const useChatStore = defineStore('chat', () => {
     } catch (err) {
       console.error('Error en sendMessage:', err)
       sessionStatus.value[sessionId] = 'error'
-      streaming.value = false
+      delete _streamingSessions.value[sessionId]
       if (Number(activeSessionId.value) === Number(sessionId)) {
         currentChunk.value = `\n\n[Error: ${err.message}]`
       }
@@ -295,6 +359,9 @@ export const useChatStore = defineStore('chat', () => {
           activeSessionId.value = null
           messages.value = []
         }
+        delete _streamingSessions.value[sessionId]
+        delete _sessionStreamCache.value[sessionId]
+        delete pendingNotifications.value[sessionId]
         await loadSessions()
       }
     } catch (err) {
@@ -303,7 +370,6 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function stopAllExecutions() {
-    streaming.value = false
     creating.value = false
     executingCount.value = 0
     messages.value = []
@@ -311,7 +377,10 @@ export const useChatStore = defineStore('chat', () => {
     currentThinking.value = ''
     activeSessionId.value = null
     _sessionCmdCount.value = {}
+    _streamingSessions.value = {}
     sessionStatus.value = {}
+    pendingNotifications.value = {}
+    _sessionStreamCache.value = {}
   }
 
   function pushMessage(msg) {
@@ -351,8 +420,10 @@ export const useChatStore = defineStore('chat', () => {
   return {
     sessions, activeSessionId, messages,
     streaming, creating, executing, sessionStatus, currentChunk, currentThinking,
+    pendingNotifications,
     loadSessions, createSession, createSessionIfNeeded, runCommand, loadMessages,
     sendMessage, deleteMessage, deleteSession, stopAllExecutions,
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
+    _saveMessageToDb, clearPendingNotification,
   }
 })

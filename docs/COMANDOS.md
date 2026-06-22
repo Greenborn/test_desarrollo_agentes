@@ -86,9 +86,11 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/dev_documento_listar` | Obtiene toda la documentación de un proyecto. Si no se especifica, usa el de la sesión actual | `/dev_documento_listar [--id=<id_proyecto>]` |
 | `/dev_documento_actualizar` | Actualiza la documentación del proyecto usando OpenCode para el tipo indicado | `/dev_documento_actualizar --tipo=<tipo>` |
 | `/dev_opencode_iniciar` | Inicia una sesión OpenCode: seleccionar proveedor, modelo, modo y enviar prompt. Después de cada respuesta se puede seguir enviando mensajes. | `/dev_opencode_iniciar` |
-| `/dev_opencode_generar_commit` | Genera un mensaje de commit de los cambios realizados usando OpenCode. Seleccioná proveedor, modelo y modo para obtener una propuesta de commit en modo planificación. | `/dev_opencode_generar_commit` |
+| `/dev_opencode_generar_commit` | Genera un mensaje de commit de los cambios realizados usando OpenCode. Seleccioná proveedor, modelo, modo y modalidad de envío (encolar/enviar) para obtener una propuesta de commit. | `/dev_opencode_generar_commit` |
 | `/dev_opencode_finalizar` | Finaliza la sesión OpenCode activa | `/dev_opencode_finalizar` |
 | `/dev_git_crear_rama` | Crea una rama Git a partir del proyecto y ticket de la sesión | `/dev_git_crear_rama` |
+| `/dev_redmine_comentarios_listar` | Lista todos los comentarios de Redmine pendientes de envío | `/dev_redmine_comentarios_listar` |
+| `/dev_redmine_comentarios_enviar` | Agrupa los comentarios pendientes, muestra vista previa editable y permite enviarlos a Redmine | `/dev_redmine_comentarios_enviar` |
 
 ---
 

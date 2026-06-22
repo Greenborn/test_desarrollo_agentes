@@ -29,6 +29,7 @@
           @click="selectSession(s.id)"
         >
           <span class="status-led" :class="getSessionStatus(s.id)"></span>
+          <span v-if="pendingNotifications[s.id]" class="notification-dot" title="Novedades pendientes"></span>
           <span v-if="s.id_ticket_redmine" class="ticket-badge">#{{ s.id_ticket_redmine }}</span>
           <span class="text-truncate">{{ s.title }}</span>
           <span
@@ -58,7 +59,7 @@ export default {
     const chat = useChatStore()
     const cmd = useCommandStore()
     const ui = useUiStore()
-    const { sessions, activeSessionId, creating, sessionStatus } = storeToRefs(chat)
+    const { sessions, activeSessionId, creating, sessionStatus, pendingNotifications } = storeToRefs(chat)
     const { sidebarCollapsed, sidebarWidth, omnifilter } = storeToRefs(ui)
 
     const sidebarTransitioning = ref(false)
@@ -150,6 +151,7 @@ export default {
       activeTab,
       activeSessionId,
       creating,
+      pendingNotifications,
       sidebarCollapsed,
       sidebarWidth,
       sidebarTransitioning,
@@ -285,6 +287,21 @@ export default {
 .status-led.error {
   background-color: #ef4444;
   box-shadow: 0 0 6px #ef4444;
+}
+.notification-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 4px;
+  background-color: #75AADB;
+  box-shadow: 0 0 6px #75AADB;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
 }
 .ticket-badge {
   display: inline-block;

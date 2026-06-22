@@ -305,6 +305,27 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Respuesta 200:** `{ success: true, proyectoId: "slug_del_proyecto" }`
 - **Respuesta 200 (error):** `{ success: false, message: "..." }`
 
+### `POST /api/redmine/comments`
+- **Auth:** Requerida
+- **Body:** `{ session_id: number, ticket_redmine_id: number, comentario: string }`
+- **Descripción:** Encola un comentario en la tabla `redmine_comentarios` con estado `pendiente`. Se usa desde el flujo de commit cuando el modo de envío es "encolar".
+- **Respuesta 200:** `{ success: true, id: number }`
+- **Respuesta 400:** `{ error: "..." }` (campos requeridos faltantes)
+
+### `GET /api/redmine/comments`
+- **Auth:** Requerida
+- **Query:** `estado` (string, default `"pendiente"`)
+- **Descripción:** Obtiene los comentarios de Redmine filtrados por estado y workspace, ordenados por fecha de creación ascendente.
+- **Respuesta 200:** `{ success: true, comentarios: [{ id, session_id, ticket_redmine_id, comentario, estado, created_at, updated_at }] }`
+
+### `POST /api/redmine/comments/send`
+- **Auth:** Requerida
+- **Body:** `{ comentarios_ids: number[], mensaje: string }`
+- **Descripción:** Envía los comentarios pendientes a Redmine. Todos los comentarios deben pertenecer al mismo ticket. Concatena el mensaje y lo envía vía `PUT /issues/{ticketId}.json` con `{ issue: { notes: mensaje } }`. En caso de éxito marca los comentarios como `enviado`; en caso de error los marca como `error`.
+- **Respuesta 200:** `{ success: true, ticket_id: number, cantidad: number }`
+- **Respuesta 400:** `{ error: "..." }` (IDs inválidos, mensaje vacío, comentarios de distintos tickets, etc.)
+- **Respuesta 500:** `{ error: "..." }` (error de API Redmine)
+
 ---
 
 ## Tickets (`/api/tickets`)

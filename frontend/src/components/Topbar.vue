@@ -2,6 +2,8 @@
   <nav class="navbar navbar-dark px-3" style="background: #1a2744; border-bottom: 2px solid #75AADB;">
     <router-link class="navbar-brand mb-0 h1 text-decoration-none" to="/">{{ workspaceName }}</router-link>
     <LayoutControls />
+    <span v-if="currentGitBranch && currentGitBranch !== 'Sin repo'" class="small ms-2" style="color: #3fb950;">● {{ currentGitBranch }}</span>
+    <span v-else-if="currentGitBranch === 'Sin repo'" class="small ms-2 text-muted">Sin repo</span>
     <CommandInput v-if="user" />
     <div class="dropdown" v-if="user">
       <button class="btn btn-dark dropdown-toggle" data-bs-toggle="dropdown">
@@ -17,7 +19,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/auth.js'
 import { useRouter } from 'vue-router'
@@ -54,6 +56,7 @@ export default {
     })
     const router = useRouter()
     const navegadorSessionId = ref(null)
+    const currentGitBranch = ref(null)
 
     register({
       name: '/help',
@@ -177,7 +180,7 @@ export default {
     register({
       name: '/dev_opencode_iniciar',
       category: 'Desarrollo',
-      description: 'Inicia una sesión con OpenCode: seleccionar proveedor, modelo, modo y enviar prompt.',
+      description: 'Inicia una sesión con OpenCode: seleccionar proveedor, modelo, modo y enviar prompt. Si ya hay una sesión activa, la cierra y abre una nueva.',
       usage: '/dev_opencode_iniciar',
       async execute(args, { cmdStore, chatStore }) {
         const sessionId = chatStore.activeSessionId
@@ -187,12 +190,22 @@ export default {
         }
 
         if (ocStore.ocSessionId) {
+          try {
+            await fetch('/api/opencode/abort', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, sessionId }),
+            })
+          } catch (err) {
+            console.error('Error al abortar sesión OpenCode previa:', err)
+          }
+          ocStore.finish()
           chatStore.messages.push({
             role: 'opencode_info',
-            content: JSON.stringify({ type: 'info', message: 'OpenCode ya está activo en esta sesión. Escribí tu mensaje directamente o usá /dev_opencode_finalizar para terminar la sesión.' }),
+            content: JSON.stringify({ type: 'info', message: 'Sesión OpenCode anterior cerrada. Iniciando nueva sesión...' }),
             _key: 'info-' + Date.now(),
           })
-          return
         }
 
         const data = await ocStore.start()
@@ -519,13 +532,54 @@ export default {
       },
     })
 
+    async function fetchGitBranch() {
+      const sessionId = chatStore.activeSessionId
+      if (!sessionId || !cmdStore.currentDir) {
+        currentGitBranch.value = null
+        return
+      }
+      try {
+        const verifyRes = await fetch('/api/command/git-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ sessionId }),
+        })
+        const verifyData = await verifyRes.json()
+        if (!verifyData.isRepo) {
+          currentGitBranch.value = 'Sin repo'
+          return
+        }
+        const branchRes = await fetch('/api/command/git', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ command: 'rev-parse --abbrev-ref HEAD', sessionId }),
+        })
+        const branchData = await branchRes.json()
+        if (branchData.success && branchData.stdout) {
+          currentGitBranch.value = branchData.stdout.trim()
+        } else {
+          currentGitBranch.value = 'HEAD'
+        }
+      } catch (err) {
+        console.error('Error al obtener rama actual:', err.message)
+        currentGitBranch.value = 'Sin repo'
+      }
+    }
+
     function openSettings() {
       modal.open(SettingsView, {}, { title: 'Configuración', wide: true })
     }
 
+    watch(() => cmdStore.currentDir, () => {
+      fetchGitBranch()
+    })
+
     onMounted(() => {
       cmdStore.loadLastDirectory()
       wsStore.loadWorkspaces()
+      fetchGitBranch()
     })
 
     function logout() {
@@ -533,7 +587,7 @@ export default {
       router.push('/')
     }
 
-    return { user, logout, openSettings, workspaceName }
+    return { user, logout, openSettings, workspaceName, currentGitBranch }
   },
 }
 </script>

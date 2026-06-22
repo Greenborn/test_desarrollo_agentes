@@ -101,6 +101,16 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 **UNIQUE compuesto:** `(user_id, key)`
 
+**Keys de layout (preferencias de UI por usuario):**
+| Key | Ejemplo | Descripción |
+|-----|---------|-------------|
+| `sidebar_collapsed` | `'true'` / `'false'` | Sidebar izquierdo colapsado |
+| `sidebar_width` | `'220'` | Ancho del sidebar izquierdo (px o %) |
+| `panel_collapsed` | `'true'` / `'false'` | Panel inferior colapsado |
+| `panel_height` | `'250'` | Alto del panel inferior (px o %) |
+| `right_panel_collapsed` | `'true'` / `'false'` | Panel lateral derecho colapsado |
+| `right_panel_width` | `'220'` | Ancho del panel derecho (px o %) |
+
 ---
 
 ## 6. `command_history`
@@ -173,7 +183,22 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
-## 11. `tickets`
+## 11. `redmine_comentarios`
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
+| `ticket_redmine_id` | INTEGER | NOT NULL — FK lógica → `tickets(redmine_id)` |
+| `comentario` | TEXT | NOT NULL |
+| `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` — FK lógica → `workspaces(id)` |
+| `estado` | ENUM(`'pendiente'`, `'enviado'`, `'error'`) | DEFAULT `'pendiente'` |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+---
+
+## 12. `tickets`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -213,6 +238,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `gastos_tokens_usados` | `id_chat_session` | `chat_sessions` | `id` | CASCADE |
 | `gastos_tokens_usados` | `id_proyecto` | `proyectos` | `id` | CASCADE |
 | `tickets` | `proyecto_id` | `proyectos` | `id` | CASCADE |
+| `redmine_comentarios` | `session_id` | `chat_sessions` | `id` | CASCADE |
 
 ---
 
@@ -244,7 +270,11 @@ tickets
 templates
  (tabla independiente, sin FK)
 
+redmine_comentarios
+ └─ chat_sessions.id (FK)
+
 chat_sessions
  ├─ gastos_tokens_usados.id_chat_session (FK)
- └─ command_history.session_id (FK)
+ ├─ command_history.session_id (FK)
+ └─ redmine_comentarios.session_id (FK)
 ```

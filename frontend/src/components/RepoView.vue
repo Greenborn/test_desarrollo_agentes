@@ -57,7 +57,7 @@
       </div>
       <div class="d-flex flex-grow-1" style="min-height: 0;">
         <div class="git-graph-panel flex-grow-1 overflow-auto">
-          <GitGraphSvg :commits="structuredCommits" :zoom="zoom" />
+          <GitGraphSvg :commits="structuredCommits" :zoom="zoom" :branches="branches" />
         </div>
         <div class="git-branches-panel flex-shrink-0 overflow-y-auto px-3 py-2 border-start border-secondary" style="width: 170px;">
           <div class="small text-secondary mb-2" style="font-size: 0.7rem;">Ramas</div>

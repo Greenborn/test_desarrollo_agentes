@@ -6,6 +6,7 @@
       <TicketDetail v-if="selectedTicket" class="flex-grow-1" />
       <ProjectDetail v-else-if="selectedProject" class="flex-grow-1" />
       <ChatWindow v-else class="flex-grow-1" />
+      <SidebarRight />
     </div>
     <div
       class="bottom-panel"
@@ -26,6 +27,7 @@ import { onMounted, watch, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import Topbar from '../components/Topbar.vue'
 import SidebarChat from '../components/SidebarChat.vue'
+import SidebarRight from '../components/SidebarRight.vue'
 import ChatWindow from '../components/ChatWindow.vue'
 import ProjectDetail from '../components/ProjectDetail.vue'
 import TicketDetail from '../components/TicketDetail.vue'
@@ -39,7 +41,7 @@ import { useTicketStore } from '../stores/ticket.js'
 import { useUiStore } from '../stores/ui.js'
 
 export default {
-  components: { Topbar, SidebarChat, ChatWindow, ProjectDetail, TicketDetail, AppModal, DevInstancePanel },
+  components: { Topbar, SidebarChat, SidebarRight, ChatWindow, ProjectDetail, TicketDetail, AppModal, DevInstancePanel },
   setup() {
     const auth = useAuthStore()
     const chat = useChatStore()

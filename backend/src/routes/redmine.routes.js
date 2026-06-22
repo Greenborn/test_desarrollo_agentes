@@ -487,4 +487,121 @@ router.post('/proyectos/importar-tickets-all', async (req, res) => {
   }
 });
 
+router.post('/comments', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { session_id, ticket_redmine_id, comentario } = req.body;
+
+  if (!session_id) {
+    return res.status(400).json({ error: 'session_id es requerido' });
+  }
+  if (!ticket_redmine_id) {
+    return res.status(400).json({ error: 'ticket_redmine_id es requerido' });
+  }
+  if (!comentario || !comentario.trim()) {
+    return res.status(400).json({ error: 'comentario es requerido' });
+  }
+
+  try {
+    const wsId = req.session.workspaceId || 1;
+    const [insertedId] = await db('redmine_comentarios').insert({
+      session_id,
+      ticket_redmine_id,
+      comentario: comentario.trim(),
+      workspace_id: wsId,
+      estado: 'pendiente',
+    });
+
+    res.json({ success: true, id: insertedId });
+  } catch (err) {
+    console.log('Error al encolar comentario Redmine:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/comments', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const wsId = req.session.workspaceId || 1;
+    const estado = req.query.estado || 'pendiente';
+
+    const comentarios = await db('redmine_comentarios')
+      .where({ workspace_id: wsId, estado })
+      .orderBy('created_at', 'asc');
+
+    res.json({ success: true, comentarios });
+  } catch (err) {
+    console.log('Error al listar comentarios Redmine:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/comments/send', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { comentarios_ids, mensaje } = req.body;
+
+  if (!comentarios_ids || !Array.isArray(comentarios_ids) || comentarios_ids.length === 0) {
+    return res.status(400).json({ error: 'comentarios_ids debe ser un array no vacío' });
+  }
+  if (!mensaje || !mensaje.trim()) {
+    return res.status(400).json({ error: 'mensaje es requerido' });
+  }
+
+  try {
+    const wsId = req.session.workspaceId || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
+
+    if (!token || !url) {
+      return res.status(400).json({ error: 'Redmine no configurado' });
+    }
+
+    const comentarios = await db('redmine_comentarios')
+      .whereIn('id', comentarios_ids)
+      .andWhere({ workspace_id: wsId, estado: 'pendiente' });
+
+    if (comentarios.length === 0) {
+      return res.status(400).json({ error: 'No se encontraron comentarios pendientes con los IDs especificados' });
+    }
+
+    const ticketIds = [...new Set(comentarios.map(c => c.ticket_redmine_id))];
+
+    if (ticketIds.length > 1) {
+      return res.status(400).json({ error: 'Todos los comentarios deben pertenecer al mismo ticket' });
+    }
+
+    const ticketRedmineId = ticketIds[0];
+    const baseUrl = url.replace(/\/+$/, '');
+
+    const response = await fetch(`${baseUrl}/issues/${ticketRedmineId}.json`, {
+      method: 'PUT',
+      headers: {
+        'X-Redmine-API-Key': token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ issue: { notes: mensaje.trim() } }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      await db('redmine_comentarios')
+        .whereIn('id', comentarios_ids)
+        .update({ estado: 'error', updated_at: db.fn.now() });
+      console.log('Error al enviar comentario a Redmine:', errText.slice(0, 300));
+      return res.status(500).json({ error: 'Error al enviar comentario a Redmine: ' + errText.slice(0, 300) });
+    }
+
+    await db('redmine_comentarios')
+      .whereIn('id', comentarios_ids)
+      .update({ estado: 'enviado', updated_at: db.fn.now() });
+
+    res.json({ success: true, ticket_id: ticketRedmineId, cantidad: comentarios.length });
+  } catch (err) {
+    console.log('Error al enviar comentarios Redmine:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

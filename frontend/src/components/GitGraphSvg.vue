@@ -69,11 +69,12 @@
         :key="'br-' + b"
         :x="node.labelX + 310 + bi * 110"
         :y="node.cy + 4"
-        :fill="node.color"
+        :fill="b === currentBranchName ? '#3fb950' : node.color"
         font-size="10"
-        font-weight="bold"
+        :font-weight="b === currentBranchName ? 'bold' : 'normal'"
         font-family="sans-serif"
-      >▸ {{ b }}</text>
+        :text-decoration="b === currentBranchName ? 'underline' : 'none'"
+      >{{ b === currentBranchName ? '●' : '▸' }} {{ b }}</text>
 
       <g
         v-for="(t, ti) in node.tags"
@@ -116,9 +117,15 @@ export default {
   props: {
     commits: { type: Array, default: () => [] },
     zoom: { type: Number, default: 100 },
+    branches: { type: Array, default: () => [] },
   },
   setup(props) {
     const commitsData = computed(() => props.commits)
+
+    const currentBranchName = computed(() => {
+      const b = props.branches.find(b => b.isCurrent)
+      return b ? b.name : null
+    })
 
     const laneInfo = computed(() => {
       const list = commitsData.value
@@ -242,6 +249,7 @@ export default {
       svgHeight,
       viewBoxValue,
       laneCenter,
+      currentBranchName,
     }
   },
 }

@@ -273,20 +273,25 @@ export default {
           if (_isActiveSession(sessionId)) ocThinking.value += content
         },
         onControl(control) {
+          const controlMsg = {
+            role: 'opencode_control',
+            content: JSON.stringify(control),
+            controlData: control,
+            _key: 'control-' + Date.now(),
+          }
+          chat._saveMessageToDb(sessionId, controlMsg)
           if (_isActiveSession(sessionId)) {
-            chat.pushMessage({
-              role: 'opencode_control',
-              content: JSON.stringify(control),
-              controlData: control,
-              _key: 'control-' + Date.now(),
-            })
+            chat.pushMessage(controlMsg)
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
         onDone(json, fullText) {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+          const content = json.fullResponse || fullText || '(sin respuesta)'
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content })
           if (_isActiveSession(sessionId)) {
-            const content = json.fullResponse || fullText || '(sin respuesta)'
             chat.pushMessage({
               role: 'opencode_result',
               content,
@@ -319,17 +324,22 @@ export default {
               },
               _key: 'control-' + Date.now(),
             })
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
         onError(msg) {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'error')
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
           if (_isActiveSession(sessionId)) {
             chat.pushMessage({
               role: 'opencode_result',
               content: `[Error: ${msg}]`,
               _key: 'error-' + Date.now(),
             })
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
       })
@@ -353,18 +363,28 @@ export default {
           if (_isActiveSession(sessionId)) ocThinking.value += content
         },
         onControl(control) {
+          const controlMsg = {
+            role: 'opencode_control',
+            content: JSON.stringify(control),
+            controlData: control,
+            _key: 'control-' + Date.now(),
+          }
+          chat._saveMessageToDb(sessionId, controlMsg)
           if (_isActiveSession(sessionId)) {
-            chat.pushMessage({
-              role: 'opencode_control',
-              content: JSON.stringify(control),
-              controlData: control,
-              _key: 'control-' + Date.now(),
-            })
+            chat.pushMessage(controlMsg)
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
         async onDone(json, fullText) {
-          if (!_isActiveSession(sessionId)) return
           const opencodeResponse = json.fullResponse || fullText || '(sin respuesta)'
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: opencodeResponse })
+          ocStreaming.value = false
+          if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+          if (!_isActiveSession(sessionId)) {
+            chat.pendingNotifications[sessionId] = Date.now()
+            return
+          }
 
           try {
             const systemPrompt = 'Eres un asistente que reduce mensajes de commit. Recibes un mensaje de commit y debes acortarlo a un máximo de 256 caracteres manteniendo el significado y la claridad. Devuelve ÚNICAMENTE el mensaje reducido, sin explicaciones ni formato adicional.'
@@ -466,6 +486,7 @@ export default {
         onError(msg) {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'error')
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
           if (_isActiveSession(sessionId)) {
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (idx >= 0) {
@@ -473,6 +494,8 @@ export default {
               chat.messages[idx].role = 'opencode_result'
               chat.messages[idx].content = '[Error: ' + msg + ']'
             }
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
       })
@@ -504,21 +527,26 @@ export default {
           if (_isActiveSession(sessionId)) ocThinking.value += content
         },
         onControl(control) {
+          const controlMsg = {
+            role: 'opencode_control',
+            content: JSON.stringify(control),
+            controlData: control,
+            _key: 'control-' + Date.now(),
+          }
+          chat._saveMessageToDb(sessionId, controlMsg)
           if (_isActiveSession(sessionId)) {
-            chat.pushMessage({
-              role: 'opencode_control',
-              content: JSON.stringify(control),
-              controlData: control,
-              _key: 'control-' + Date.now(),
-            })
+            chat.pushMessage(controlMsg)
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
         async onDone(json, fullText) {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+          const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse })
           if (_isActiveSession(sessionId)) {
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-            const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
             if (idx >= 0) {
               chat.messages[idx].streaming = false
               chat.messages[idx].role = 'opencode_result'
@@ -550,17 +578,22 @@ export default {
                 _key: 'result-' + Date.now(),
               })
             }
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
         onError(msg) {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'error')
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
           if (_isActiveSession(sessionId)) {
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (idx >= 0) {
               chat.messages[idx].content = '[Error: ' + msg + ']'
               chat.messages[idx].streaming = false
             }
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
       })
@@ -808,6 +841,57 @@ export default {
             chat.messages[idx] = {
               role: 'result',
               content: 'Error de conexión al crear el ticket.',
+              _key: 'err-' + Date.now(),
+            }
+          }
+        }
+        return
+      } else if (controlType === 'redmine_comments_send') {
+        if (value === null) {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Envío de comentarios cancelado.',
+              _key: 'result-' + Date.now(),
+            }
+          }
+          return
+        }
+        try {
+          const res = await fetch('/api/redmine/comments/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              comentarios_ids: value.comentarios_ids,
+              mensaje: value.mensaje,
+            }),
+          })
+          const data = await res.json()
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            if (data.success) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: `✓ ${data.cantidad} comentario${data.cantidad !== 1 ? 's' : ''} enviado${data.cantidad !== 1 ? 's' : ''} al ticket #${data.ticket_id} correctamente.`,
+                _key: 'result-' + Date.now(),
+              }
+            } else {
+              chat.messages[idx] = {
+                role: 'result',
+                content: 'Error: ' + (data.error || 'Error al enviar comentarios'),
+                _key: 'err-' + Date.now(),
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error al enviar comentarios Redmine:', err.message)
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Error de conexión al enviar comentarios.',
               _key: 'err-' + Date.now(),
             }
           }
@@ -1304,20 +1388,25 @@ export default {
           if (_isActiveSession(sessionId)) ocThinking.value += content
         },
         onControl(control) {
+          const controlMsg = {
+            role: 'opencode_control',
+            content: JSON.stringify(control),
+            controlData: control,
+            _key: 'control-' + Date.now(),
+          }
+          chat._saveMessageToDb(sessionId, controlMsg)
           if (_isActiveSession(sessionId)) {
-            chat.pushMessage({
-              role: 'opencode_control',
-              content: JSON.stringify(control),
-              controlData: control,
-              _key: 'control-' + Date.now(),
-            })
+            chat.pushMessage(controlMsg)
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
         onDone(json, fullText) {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+          const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse })
           if (_isActiveSession(sessionId)) {
-            const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (idx >= 0) {
               chat.messages[idx].streaming = false
@@ -1352,17 +1441,22 @@ export default {
               },
               _key: 'control-' + Date.now(),
             })
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
         onError(msg) {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'error')
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
           if (_isActiveSession(sessionId)) {
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (idx >= 0) {
               chat.messages[idx].content = '[Error: ' + msg + ']'
               chat.messages[idx].streaming = false
             }
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
       })
@@ -1400,20 +1494,25 @@ export default {
           if (_isActiveSession(sessionId)) ocThinking.value += content
         },
         onControl(control) {
+          const controlMsg = {
+            role: 'opencode_control',
+            content: JSON.stringify(control),
+            controlData: control,
+            _key: 'control-' + Date.now(),
+          }
+          chat._saveMessageToDb(sessionId, controlMsg)
           if (_isActiveSession(sessionId)) {
-            chat.pushMessage({
-              role: 'opencode_control',
-              content: JSON.stringify(control),
-              controlData: control,
-              _key: 'control-' + Date.now(),
-            })
+            chat.pushMessage(controlMsg)
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
         onDone(json, fullText) {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+          const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse })
           if (_isActiveSession(sessionId)) {
-            const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
             // Demote the previous descripcion_result to a plain result (no buttons)
             for (let i = chat.messages.length - 1; i >= 0; i--) {
               const m = chat.messages[i]
@@ -1459,17 +1558,22 @@ export default {
               },
               _key: 'control-' + Date.now(),
             })
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
         onError(msg) {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'error')
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
           if (_isActiveSession(sessionId)) {
             const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (streamIdx >= 0) {
               chat.messages[streamIdx].content = '[Error: ' + msg + ']'
               chat.messages[streamIdx].streaming = false
             }
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
           }
         },
       })
@@ -1695,20 +1799,25 @@ export default {
             if (_isActiveSession(sid)) ocThinking.value += content
           },
           onControl(control) {
+            const controlMsg = {
+              role: 'opencode_control',
+              content: JSON.stringify(control),
+              controlData: control,
+              _key: 'control-' + Date.now(),
+            }
+            chat._saveMessageToDb(sid, controlMsg)
             if (_isActiveSession(sid)) {
-              chat.pushMessage({
-                role: 'opencode_control',
-                content: JSON.stringify(control),
-                controlData: control,
-                _key: 'control-' + Date.now(),
-              })
+              chat.pushMessage(controlMsg)
+            } else {
+              chat.pendingNotifications[sid] = Date.now()
             }
           },
           onDone(json, fullText) {
             ocStreaming.value = false
             if (sid) chat.setSessionStatus(sid, 'idle')
+            const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
+            chat._saveMessageToDb(sid, { role: 'opencode_result', content: fullResponse })
             if (_isActiveSession(sid)) {
-              const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
               const idx = chat.messages.findIndex((m) => m._key === newStreamKey)
               if (idx >= 0) {
                 chat.messages[idx].role = 'opencode_result'
@@ -1728,11 +1837,14 @@ export default {
                   _key: 'control-' + Date.now(),
                 }
               }
+            } else {
+              chat.pendingNotifications[sid] = Date.now()
             }
           },
           onError(msg) {
             ocStreaming.value = false
             if (sid) chat.setSessionStatus(sid, 'error')
+            chat._saveMessageToDb(sid, { role: 'opencode_result', content: `[Error: ${msg}]` })
             if (_isActiveSession(sid)) {
               const idx = chat.messages.findIndex((m) => m._key === newStreamKey)
               if (idx >= 0) {
@@ -1742,6 +1854,8 @@ export default {
               if (oldIdx >= 0) {
                 chat.messages[oldIdx].controlData.loading = false
               }
+            } else {
+              chat.pendingNotifications[sid] = Date.now()
             }
           },
         })
@@ -1833,11 +1947,12 @@ export default {
           _key: 'control-' + Date.now(),
         })
       } else if (subStepType === 'form') {
-        const { model, thinking = '', mode = 'Plan', temperature = '0.7' } = value || {}
+        const { model, thinking = '', mode = 'Plan', temperature = '0.7', modo_envio = 'encolar' } = value || {}
         commitSetupData.model = model
         commitSetupData.thinking = thinking
         commitSetupData.mode = mode
         commitSetupData.temperature = temperature
+        commitData.modo_envio = modo_envio
         await ocStore.select('model', model)
         await ocStore.select('thinking', thinking || '')
         await ocStore.select('mode', mode)
@@ -1976,43 +2091,65 @@ export default {
         }
 
         if (addComment && idTicket) {
-          try {
-            const proyectoId = session?.proyecto_id || null
-            let commitUrl = ''
-            if (proyectoId) {
-              const repoRes = await fetch('/api/proyecto/repositorio/' + encodeURIComponent(proyectoId), { credentials: 'include' })
-              const repoData = await repoRes.json()
-              if (repoData.url_github) {
-                const hashRes = await fetch('/api/command/git', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: JSON.stringify({ command: 'rev-parse HEAD', sessionId }),
-                })
-                const hashData = await hashRes.json()
-                if (hashData.success && hashData.stdout) {
-                  const hash = hashData.stdout.trim()
-                  commitUrl = repoData.url_github.replace(/\/+$/, '') + '/commit/' + hash
+          const modoEnvio = commitData.modo_envio || 'encolar'
+          if (modoEnvio === 'enviar') {
+            try {
+              const proyectoId = session?.proyecto_id || null
+              let commitUrl = ''
+              if (proyectoId) {
+                const repoRes = await fetch('/api/proyecto/repositorio/' + encodeURIComponent(proyectoId), { credentials: 'include' })
+                const repoData = await repoRes.json()
+                if (repoData.url_github) {
+                  const hashRes = await fetch('/api/command/git', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ command: 'rev-parse HEAD', sessionId }),
+                  })
+                  const hashData = await hashRes.json()
+                  if (hashData.success && hashData.stdout) {
+                    const hash = hashData.stdout.trim()
+                    commitUrl = repoData.url_github.replace(/\/+$/, '') + '/commit/' + hash
+                  }
                 }
               }
-            }
 
-            const notes = cleanMsg + '\n\n' + commitUrl
-            const ticketRes = await fetch('/api/tickets/session/' + sessionId, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ notes }),
-            })
-            const ticketData = await ticketRes.json()
-            if (ticketData.success) {
-              resultLines.push('', '✓ Comentario agregado al ticket #' + idTicket + '.')
-            } else {
-              resultLines.push('', '✗ Error al agregar comentario al ticket: ' + (ticketData.error || 'Error desconocido'))
+              const notes = cleanMsg + '\n\n' + commitUrl
+              const ticketRes = await fetch('/api/tickets/session/' + sessionId, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ notes }),
+              })
+              const ticketData = await ticketRes.json()
+              if (ticketData.success) {
+                resultLines.push('', '✓ Comentario agregado al ticket #' + idTicket + '.')
+              } else {
+                resultLines.push('', '✗ Error al agregar comentario al ticket: ' + (ticketData.error || 'Error desconocido'))
+              }
+            } catch (err) {
+              console.error('Error al agregar comentario al ticket:', err.message)
+              resultLines.push('', '✗ Error al agregar comentario al ticket: ' + err.message)
             }
-          } catch (err) {
-            console.error('Error al agregar comentario al ticket:', err.message)
-            resultLines.push('', '✗ Error al agregar comentario al ticket: ' + err.message)
+          } else {
+            try {
+              const notesBody = cleanMsg
+              const commentRes = await fetch('/api/redmine/comments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ session_id: sessionId, ticket_redmine_id: idTicket, comentario: notesBody }),
+              })
+              const commentData = await commentRes.json()
+              if (commentData.success) {
+                resultLines.push('', '✓ Comentario encolado para el ticket #' + idTicket + '. Usá /dev_redmine_comentarios_enviar para enviarlo.')
+              } else {
+                resultLines.push('', '✗ Error al encolar comentario: ' + (commentData.error || 'Error desconocido'))
+              }
+            } catch (err) {
+              console.error('Error al encolar comentario:', err.message)
+              resultLines.push('', '✗ Error al encolar comentario: ' + err.message)
+            }
           }
         }
 

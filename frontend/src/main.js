@@ -30,6 +30,8 @@ import './composables/commands/despliegue.js'
 import './composables/commands/resolucionesGetAll.js'
 import './composables/commands/resolucionDefault.js'
 import './composables/commands/templates.js'
+import './composables/commands/redmineComentariosListar.js'
+import './composables/commands/redmineComentariosEnviar.js'
 
 const app = createApp(App)
 const pinia = createPinia()
