@@ -130,7 +130,7 @@ function loadGitignore(dirPath) {
   return []
 }
 
-function buildTree(dirPath, parentPatterns, useGitignore) {
+function buildTree(dirPath, parentPatterns, useGitignore, showHidden) {
   const name = path.basename(dirPath) || dirPath
   const stat = fs.statSync(dirPath)
   const node = { name, type: stat.isDirectory() ? 'directory' : 'file', path: dirPath }
@@ -143,12 +143,16 @@ function buildTree(dirPath, parentPatterns, useGitignore) {
       const entries = fs.readdirSync(dirPath, { withFileTypes: true })
       let filtered = entries.filter((e) => e.name !== '.' && e.name !== '..')
       if (useGitignore) {
-        filtered = filtered.filter((e) => e.name !== '.git' && !matchesGitignore(e, dirPath, patterns))
+        filtered = filtered.filter((e) => {
+          if (e.name === '.git') return false
+          if (showHidden && e.name.startsWith('.')) return true
+          return !matchesGitignore(e, dirPath, patterns)
+        })
       }
       node.children = filtered.map((e) => {
         const fullPath = path.join(dirPath, e.name)
         try {
-          return buildTree(fullPath, patterns, useGitignore)
+          return buildTree(fullPath, patterns, useGitignore, showHidden)
         } catch (err) {
           console.log(`Error al procesar ${fullPath}: ${err.message}`)
           return { name: e.name, type: 'error', error: err.message, path: fullPath }
@@ -184,6 +188,7 @@ router.get('/arbol-directorios', async (req, res) => {
     const dirArg = req.query.dir || '';
     const sessionId = req.query.sessionId ? parseInt(req.query.sessionId) : null;
     const useGitignore = req.query.useGitignore !== 'false';
+    const showHidden = req.query.showHidden !== 'false';
     const filterExtension = (req.query.filterExtension || '').replace(/^["']|["']$/g, '');
     let baseDir = process.cwd();
     if (sessionId) {
@@ -204,7 +209,7 @@ router.get('/arbol-directorios', async (req, res) => {
     if (!fs.statSync(targetDir).isDirectory()) {
       return res.status(400).json({ success: false, error: `'${targetDir}' no es un directorio` });
     }
-    const tree = buildTree(targetDir, [], useGitignore);
+    const tree = buildTree(targetDir, [], useGitignore, showHidden);
     if (filterExtension) {
       const extensions = filterExtension.split(',').map((s) => s.trim()).filter(Boolean)
       pruneTree(tree, extensions)
@@ -703,6 +708,45 @@ router.post('/git-merge', async (req, res) => {
     res.json(response);
   } catch (err) {
     console.log('Error en git-merge:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/read-file', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const filePath = req.query.path;
+    if (!filePath) {
+      return res.status(400).json({ success: false, error: 'El parámetro path es requerido' });
+    }
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: `El archivo '${filePath}' no existe` });
+    }
+    if (!fs.statSync(filePath).isFile()) {
+      return res.status(400).json({ success: false, error: `'${filePath}' no es un archivo` });
+    }
+    const content = fs.readFileSync(filePath, 'utf-8');
+    res.json({ success: true, content, path: filePath });
+  } catch (err) {
+    console.log('Error en read-file:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/write-file', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { path: filePath, content } = req.body;
+    if (!filePath) {
+      return res.status(400).json({ success: false, error: 'El campo path es requerido' });
+    }
+    if (content === undefined || content === null) {
+      return res.status(400).json({ success: false, error: 'El campo content es requerido' });
+    }
+    fs.writeFileSync(filePath, content, 'utf-8');
+    res.json({ success: true, path: filePath });
+  } catch (err) {
+    console.log('Error en write-file:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });

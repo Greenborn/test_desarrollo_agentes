@@ -6,22 +6,9 @@
   >
     <!-- Tab bar -->
     <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
-      <button
-        class="tab-btn"
-        :class="{ active: activeTab === 'chats' }"
-        @click="activeTab = 'chats'"
-      >
-        Chats
-      </button>
-      <button
-        class="tab-btn"
-        :class="{ active: activeTab === 'files' }"
-        @click="activeTab = 'files'"
-      >
-        Archivos
-      </button>
+      <span class="tab-label">Chats</span>
     </div>
-    <div v-if="activeTab === 'chats'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
+    <div class="d-flex flex-column flex-grow-1" style="min-height: 0;">
     <button class="btn btn-sm mb-2 flex-shrink-0 btn-argentina" @click="createSession" :disabled="creating">
       {{ creating ? 'Creando...' : '＋ Nuevo chat' }}
     </button>
@@ -48,7 +35,6 @@
       </div>
     </div>
     </div>
-    <FileTreePanel v-else :session-id="mostRecentSessionId" />
     <div class="sidebar-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-resize-handle-bar"></div>
     </div>
@@ -61,10 +47,8 @@ import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 import { useUiStore } from '../stores/ui.js'
-import FileTreePanel from './FileTreePanel.vue'
 
 export default {
-  components: { FileTreePanel },
   setup() {
     const chat = useChatStore()
     const cmd = useCommandStore()
@@ -73,12 +57,7 @@ export default {
     const { sidebarCollapsed, sidebarWidth, omnifilter } = storeToRefs(ui)
 
     const sidebarTransitioning = ref(false)
-    const activeTab = ref('chats')
     let transitionTimer = null
-
-    const mostRecentSessionId = computed(() => {
-      return sessions.value.length > 0 ? sessions.value[0].id : null
-    })
 
     const filteredSessions = computed(() => {
       const filter = omnifilter.value.toLowerCase()
@@ -162,9 +141,7 @@ export default {
     return {
       chat,
       filteredSessions,
-      activeTab,
       activeSessionId,
-      mostRecentSessionId,
       creating,
       pendingNotifications,
       sidebarCollapsed,
@@ -202,6 +179,12 @@ export default {
 .tab-btn.active {
   color: #75AADB;
   border-bottom-color: #75AADB;
+}
+.tab-label {
+  color: #75AADB;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-bottom: 2px solid #75AADB;
 }
 .sidebar-chat {
   position: relative;

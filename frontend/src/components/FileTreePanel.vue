@@ -18,11 +18,12 @@
         <div
           v-for="item in flatTree"
           :key="item.node.path"
-          class="tree-node d-flex align-items-center px-1 py-0"
+           class="tree-node d-flex align-items-center py-0"
           :class="{ 'tree-directory': item.node.type === 'directory' }"
-          :style="{ paddingLeft: (item.depth * 14 + 8) + 'px' }"
+          :style="{ paddingLeft: (item.depth * 20) + 'px' }"
           :title="item.node.path"
           @click="item.node.type === 'directory' ? toggleDirectory(item.node.path) : null"
+          @dblclick="item.node.type === 'file' ? openFile(item.node.path) : null"
         >
           <span v-if="item.node.type === 'directory'" class="tree-toggle flex-shrink-0">
             {{ isExpanded(item.node.path) ? '▾' : '▸' }}
@@ -38,6 +39,8 @@
 
 <script>
 import { ref, computed, watch } from 'vue'
+import { useModalStore } from '../stores/modal.js'
+import FileEditorModal from './FileEditorModal.vue'
 
 const FILE_ICONS = {
   js: '\u{1F4D1}',
@@ -71,10 +74,16 @@ export default {
     sessionId: { type: Number, default: null },
   },
   setup(props) {
+    const modal = useModalStore()
     const tree = ref(null)
     const loading = ref(true)
     const error = ref(null)
-    const expandedPaths = ref(new Set())
+    const expandedPaths = ref({})
+
+    function openFile(path) {
+      const name = path.split('/').pop() || path
+      modal.open(FileEditorModal, { filePath: path }, { title: `Editar: ${name}`, wide: true })
+    }
 
     function getFileIcon(node) {
       if (node.type === 'directory') return '\u{1F4C1}'
@@ -83,17 +92,17 @@ export default {
     }
 
     function isExpanded(path) {
-      return expandedPaths.value.has(path)
+      return !!expandedPaths.value[path]
     }
 
     function toggleDirectory(path) {
-      const s = new Set(expandedPaths.value)
-      if (s.has(path)) {
-        s.delete(path)
+      const next = { ...expandedPaths.value }
+      if (next[path]) {
+        delete next[path]
       } else {
-        s.add(path)
+        next[path] = true
       }
-      expandedPaths.value = s
+      expandedPaths.value = next
     }
 
     function flattenNodes(nodes, depth) {
@@ -119,13 +128,13 @@ export default {
       error.value = null
       tree.value = null
       try {
-        const res = await fetch(`/api/command/arbol-directorios?sessionId=${props.sessionId}&useGitignore=true`, {
+        const res = await fetch(`/api/command/arbol-directorios?sessionId=${props.sessionId}&useGitignore=true&showHidden=true`, {
           credentials: 'include',
         })
         const data = await res.json()
         if (data.success) {
           tree.value = data.tree
-          expandedPaths.value = new Set()
+          expandedPaths.value = {}
         } else {
           error.value = data.error || 'Error al cargar el árbol'
         }
@@ -143,7 +152,7 @@ export default {
     return {
       tree, loading, error, expandedPaths,
       flatTree, fetchTree,
-      getFileIcon, isExpanded, toggleDirectory,
+      getFileIcon, isExpanded, toggleDirectory, openFile,
     }
   },
 }

@@ -6,6 +6,7 @@
   >
     <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
       <button class="tab-btn" :class="{ active: activeTab === 'comentarios' }" @click="activeTab = 'comentarios'">Comentarios</button>
+      <button class="tab-btn" :class="{ active: activeTab === 'archivos' }" @click="activeTab = 'archivos'">Archivos</button>
     </div>
 
     <template v-if="activeTab === 'comentarios'">
@@ -30,6 +31,9 @@
         </div>
       </div>
     </template>
+    <template v-else-if="activeTab === 'archivos'">
+      <FileTreePanel :session-id="mostRecentSessionId" />
+    </template>
     <div class="sidebar-right-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-right-resize-handle-bar"></div>
     </div>
@@ -42,8 +46,10 @@ import { storeToRefs } from 'pinia'
 import { useUiStore } from '../stores/ui.js'
 import { useChatStore } from '../stores/chat.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
+import FileTreePanel from './FileTreePanel.vue'
 
 export default {
+  components: { FileTreePanel },
   setup() {
     const ui = useUiStore()
     const chat = useChatStore()
@@ -62,6 +68,10 @@ export default {
 
     const sessionWithTicket = computed(() => {
       return activeSession.value?.id_ticket_redmine || null
+    })
+
+    const mostRecentSessionId = computed(() => {
+      return sessions.value.length > 0 ? sessions.value[0].id : null
     })
 
     function formatDate(dateStr) {
@@ -126,6 +136,7 @@ export default {
       rightPanelWidth,
       rightPanelTransitioning,
       activeTab,
+      mostRecentSessionId,
       activeSession,
       sessionWithTicket,
       comments,
