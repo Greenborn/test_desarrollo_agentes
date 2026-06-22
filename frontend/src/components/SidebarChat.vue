@@ -13,8 +13,15 @@
       >
         Chats
       </button>
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'files' }"
+        @click="activeTab = 'files'"
+      >
+        Archivos
+      </button>
     </div>
-    <template v-if="activeTab === 'chats'">
+    <div v-if="activeTab === 'chats'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
     <button class="btn btn-sm mb-2 flex-shrink-0 btn-argentina" @click="createSession" :disabled="creating">
       {{ creating ? 'Creando...' : '＋ Nuevo chat' }}
     </button>
@@ -40,7 +47,8 @@
         </button>
       </div>
     </div>
-    </template>
+    </div>
+    <FileTreePanel v-else :session-id="mostRecentSessionId" />
     <div class="sidebar-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-resize-handle-bar"></div>
     </div>
@@ -53,8 +61,10 @@ import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 import { useUiStore } from '../stores/ui.js'
+import FileTreePanel from './FileTreePanel.vue'
 
 export default {
+  components: { FileTreePanel },
   setup() {
     const chat = useChatStore()
     const cmd = useCommandStore()
@@ -65,6 +75,10 @@ export default {
     const sidebarTransitioning = ref(false)
     const activeTab = ref('chats')
     let transitionTimer = null
+
+    const mostRecentSessionId = computed(() => {
+      return sessions.value.length > 0 ? sessions.value[0].id : null
+    })
 
     const filteredSessions = computed(() => {
       const filter = omnifilter.value.toLowerCase()
@@ -150,6 +164,7 @@ export default {
       filteredSessions,
       activeTab,
       activeSessionId,
+      mostRecentSessionId,
       creating,
       pendingNotifications,
       sidebarCollapsed,
