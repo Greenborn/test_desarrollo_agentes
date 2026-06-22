@@ -278,6 +278,7 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
   | `go_to_url` | `{ id_session?, url }` | `{ success: true, id_session }` |
   | `set_headless` | `{ headless: boolean\|"0"\|"1" }` | `{ success: true, reiniciado, id_session?, headless }` |
   | `close` | `{ id_session }` | `{ success: true }` |
+  | `extract_form_controls` | `{ id_session? }` | `{ success: true, id_session, url, title, forms, controls }` |
 
 ---
 

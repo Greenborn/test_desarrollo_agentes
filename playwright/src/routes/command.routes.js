@@ -80,6 +80,26 @@ router.post('/command', async (req, res) => {
       return res.json({ success: true, reiniciado: false, headless: value });
     }
 
+    if (comando === 'extract_form_controls') {
+      let idSession = parametros?.id_session;
+      if (!idSession) {
+        const active = browserManager.getActiveSession();
+        if (active) idSession = active.id;
+      }
+      if (!idSession) {
+        return res.status(400).json({
+          error: 'No hay sesión activa. Usá "start" primero o pasá "id_session"',
+        });
+      }
+
+      try {
+        const data = await browserManager.extractFormControls(idSession);
+        return res.json({ success: true, id_session: idSession, ...data });
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+
     if (comando === 'close') {
       const idSession = parametros?.id_session;
       if (!idSession) {

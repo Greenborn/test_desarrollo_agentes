@@ -175,16 +175,76 @@ curl -X POST http://localhost:4098/api/command \
 | Sesión no existe | 500 | `Sesión no encontrada: "uuid..."` |
 | Error de navegación | 500 | `Error al navegar a https://...: ...` |
 
+### 4.3 `extract_form_controls`
+
+Extrae todos los controles de formulario (`input`, `select`, `textarea`, `button`) de la página actual de una sesión activa, junto con metadatos de los formularios.
+
+#### Parámetros
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `id_session` | `string` | No (usa sesión activa si se omite) | UUID de la sesión obtenido de `start` |
+
+#### Ejemplo
+
+```bash
+curl -X POST http://localhost:4098/api/command \
+  -H 'Content-Type: application/json' \
+  -d '{"comando":"extract_form_controls","parametros":{"id_session":"550e8400-e29b-41d4-a716-446655440000"}}'
+```
+
+#### Respuesta
+
+```json
+{
+  "success": true,
+  "id_session": "550e8400-...",
+  "url": "https://ejemplo.com/login",
+  "title": "Iniciar Sesión",
+  "forms": [
+    { "id": "login-form", "name": null, "action": "https://ejemplo.com/login", "method": "post", "autocomplete": "on", "novalidate": false }
+  ],
+  "controls": [
+    {
+      "tag": "input",
+      "type": "email",
+      "name": "email",
+      "id": "email-input",
+      "placeholder": "correo@ejemplo.com",
+      "value": "",
+      "disabled": false,
+      "required": true,
+      "visible": true,
+      "label": "Correo electrónico",
+      "maxLength": 255,
+      "autocomplete": "email",
+      "rect": { "x": 200, "y": 150, "width": 300, "height": 38 },
+      "form": "login-form"
+    }
+  ]
+}
+```
+
+#### Errores posibles
+
+| Causa | HTTP | Mensaje |
+|---|---|---|
+| No hay sesión activa | 400 | `No hay sesión activa. Usá "start" primero o pasá "id_session"` |
+| Sesión no existe | 500 | `Sesión no encontrada: "uuid..."` |
+
 ---
 
 ## 5. Flujo típico
 
 ```
-1. POST /api/command  { "comando": "start",             "parametros": { "navegador": "chrome" } }
+1. POST /api/command  { "comando": "start",                        "parametros": { "navegador": "chrome" } }
    → { "id_session": "abc-123" }
 
-2. POST /api/command  { "comando": "go_to_url",         "parametros": { "id_session": "abc-123", "url": "https://ejemplo.com" } }
+2. POST /api/command  { "comando": "go_to_url",                    "parametros": { "id_session": "abc-123", "url": "https://ejemplo.com" } }
    → { "success": true }
+
+3. POST /api/command  { "comando": "extract_form_controls",        "parametros": { "id_session": "abc-123" } }
+   → { "success": true, "forms": [...], "controls": [...], ... }
 ```
 
 ---
@@ -202,10 +262,11 @@ curl -X POST http://localhost:4098/api/command \
 ### Funciones internas (exportadas por `browserManager.js`)
 
 | Función | Descripción |
-|---|---|---|
+|---|---|
 | `setDb(knexInstance)` | Inyecta instancia Knex para escritura de logs en BD |
 | `startSession(navegador, headless, resolution, chatSessionId)` | Lanza navegador, crea sesión, retorna UUID |
 | `goToUrl(idSession, url)` | Navega a URL en la sesión |
+| `extractFormControls(idSession)` | Extrae todos los controles de formulario de la página (`input`, `select`, `textarea`, `button`) con sus características y metadatos del formulario |
 | `getSession(idSession)` | Retorna datos de la sesión o `null` |
 | `closeSession(idSession)` | Cierra navegador y elimina sesión |
 
@@ -250,16 +311,18 @@ playwright/
 
 ```
 COMANDOS DISPONIBLES:
-- start         → inicia navegador chrome/firefox, devuelve id_session
-- go_to_url     → navega a una URL en una sesión existente
-- set_headless  → cambia modo headless (0=visible, 1=headless)
-- close         → cierra una sesión de navegador
+- start                    → inicia navegador chrome/firefox, devuelve id_session
+- go_to_url                → navega a una URL en una sesión existente
+- set_headless             → cambia modo headless (0=visible, 1=headless)
+- close                    → cierra una sesión de navegador
+- extract_form_controls    → extrae todos los controles de formulario de la página actual
 
 USO:
-  { "comando": "start",        "parametros": { "navegador": "chrome"|"firefox", "headless": true|false, "chat_session_id": 123 } }
-  { "comando": "go_to_url",    "parametros": { "id_session": "uuid", "url": "https://..." } }
-  { "comando": "set_headless", "parametros": { "headless": "0"|"1" } }
-  { "comando": "close",        "parametros": { "id_session": "uuid" } }
+  { "comando": "start",                    "parametros": { "navegador": "chrome"|"firefox", "headless": true|false, "chat_session_id": 123 } }
+  { "comando": "go_to_url",                "parametros": { "id_session": "uuid", "url": "https://..." } }
+  { "comando": "set_headless",             "parametros": { "headless": "0"|"1" } }
+  { "comando": "close",                    "parametros": { "id_session": "uuid" } }
+  { "comando": "extract_form_controls",    "parametros": { "id_session": "uuid" } }
 
 LOGS DE RED Y CONSOLA:
   Al iniciar una sesión con `start`, el servicio captura automáticamente:

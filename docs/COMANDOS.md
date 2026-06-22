@@ -49,6 +49,7 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/navegador_ir_url` | Navega a una URL en la sesión de navegador activa | `/navegador_ir_url --url=<url>` |
 | `/navegador_configurar_headless` | Cambia el modo headless (0 = visible, 1 = headless). Si hay sesión activa, la reinicia | `/navegador_configurar_headless --mode=<0\|1>` |
 | `/navegador_finalizar` | Finaliza la sesión de navegador activa | `/navegador_finalizar` |
+| `/navegador_extraer_formularios` | Extrae todos los controles de formulario de la página actual del navegador y los devuelve como JSON | `/navegador_extraer_formularios` |
 | `/resoluciones_get_all` | Muestra las resoluciones de pantalla configuradas con selector interactivo para establecer una por defecto | `/resoluciones_get_all` |
 | `/resolucion_default` | Muestra la resolución de pantalla por defecto configurada | `/resolucion_default` |
 
