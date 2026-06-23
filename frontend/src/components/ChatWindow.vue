@@ -7,6 +7,7 @@
         <span class="ticket-sep text-muted">—</span>
         <span class="ticket-subject text-truncate">{{ ticketInfo.subject }}</span>
       </template>
+      <span v-if="currentGitBranch && currentGitBranch !== 'Sin repo'" class="branch-name ms-2">· rama: {{ currentGitBranch }}</span>
       <div class="zoom-controls ms-auto d-flex align-items-center gap-1">
         <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomOut" :disabled="chatZoom <= 50" title="Alejar">−</button>
         <span class="zoom-level small" @click="chatZoom = 100; saveZoom(100)" style="cursor:pointer; min-width:36px; text-align:center;" title="Restablecer zoom">{{ chatZoom }}%</span>
@@ -102,6 +103,44 @@ export default {
     const _streamSessionId = ref(null)
     const ticketInfo = ref(null)
     const chatZoom = ref(100)
+    const currentGitBranch = ref(null)
+
+    async function fetchGitBranch() {
+      const sessionId = chat.activeSessionId
+      if (!sessionId || !cmdStore.currentDir) {
+        currentGitBranch.value = null
+        return
+      }
+      try {
+        const verifyRes = await fetch('/api/command/git-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ sessionId }),
+        })
+        const verifyData = await verifyRes.json()
+        if (!verifyData.isRepo) {
+          currentGitBranch.value = 'Sin repo'
+          return
+        }
+        const branchRes = await fetch('/api/command/git', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ command: 'rev-parse --abbrev-ref HEAD', sessionId }),
+        })
+        const branchData = await branchRes.json()
+        if (branchData.success && branchData.stdout) {
+          currentGitBranch.value = branchData.stdout.trim()
+        } else {
+          currentGitBranch.value = 'HEAD'
+        }
+      } catch (err) {
+        console.error('Error al obtener rama actual:', err.message)
+        currentGitBranch.value = 'Sin repo'
+      }
+    }
+
     async function _getProyectoId() {
       const sid = chat.activeSessionId
       if (!sid) return null
@@ -310,7 +349,7 @@ export default {
             chat.pendingNotifications[sessionId] = Date.now()
           }
         },
-        onDone(json, fullText) {
+        async onDone(json, fullText) {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'idle')
           const content = json.fullResponse || fullText || '(sin respuesta)'
@@ -321,6 +360,7 @@ export default {
               content,
               _key: 'result-' + Date.now(),
             })
+            fetchGitBranch()
             const next = ocStore.messageQueue.shift()
             if (next && _isActiveSession(sessionId)) {
               const queueMsg = chat.messages.find((m) => m.role === 'opencode_info' && m.content?.includes('encolado'))
@@ -508,6 +548,7 @@ export default {
               }
             }
           }
+          fetchGitBranch()
         },
         onError(msg) {
           ocStreaming.value = false
@@ -1357,6 +1398,7 @@ export default {
           }
         }
       }
+      fetchGitBranch()
     }
 
     async function showBranchSelector(sessionId, repoAcronimo, proyectoId, ticketRedmineId) {
@@ -2240,22 +2282,26 @@ export default {
 
       const known = find(cmdName)
 
-      await chat.runCommand(raw, async (loadingIdx) => {
-        if (known) {
-          return known.execute(parts.slice(1), { cmdStore, chatStore: chat, loadingIdx })
-        }
-        const res = await fetch('/api/command/execute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ command: raw }),
+      try {
+        await chat.runCommand(raw, async (loadingIdx) => {
+          if (known) {
+            return known.execute(parts.slice(1), { cmdStore, chatStore: chat, loadingIdx })
+          }
+          const res = await fetch('/api/command/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: raw }),
+          })
+          const data = await res.json()
+          if (data.success) {
+            return data.result
+          }
+          throw new Error(data.result || 'Error al ejecutar comando')
         })
-        const data = await res.json()
-        if (data.success) {
-          return data.result
-        }
-        throw new Error(data.result || 'Error al ejecutar comando')
-      })
+      } finally {
+        await fetchGitBranch()
+      }
     }
 
     let resizeObserver = null
@@ -2278,7 +2324,12 @@ export default {
 
     watch(activeSessionId, () => {
       loadTicketInfo()
+      fetchGitBranch()
       scrollToBottom()
+    })
+
+    watch(() => cmdStore.currentDir, () => {
+      fetchGitBranch()
     })
 
     watch(
@@ -2302,6 +2353,7 @@ export default {
       }
       loadTicketInfo()
       loadZoom()
+      fetchGitBranch()
     })
 
     onUnmounted(() => {
@@ -2333,6 +2385,7 @@ export default {
       chatZoom,
       zoomIn,
       zoomOut,
+      currentGitBranch,
     }
   },
 }
@@ -2341,6 +2394,11 @@ export default {
 <style>
 html, body {
   overflow-x: hidden;
+}
+.branch-name {
+  color: #3fb950;
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 .blink {
   animation: blink 1s step-end infinite;

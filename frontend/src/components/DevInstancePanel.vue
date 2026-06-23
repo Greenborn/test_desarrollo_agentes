@@ -1,6 +1,5 @@
 <template>
   <div class="dev-instance-panel h-100 d-flex flex-column">
-    <!-- Tab bar -->
     <div class="tab-bar d-flex align-items-center px-3 pt-2 pb-0 flex-shrink-0">
       <button
         class="tab-btn"
@@ -62,11 +61,19 @@
       </button>
     </div>
 
-    <!-- Tab: Instancias de Desarrollo -->
     <template v-if="activeTab === 'instancias'">
-      <div v-if="!hasProcesses" class="flex-grow-1 d-flex align-items-center justify-content-center text-muted small">
+      <div v-if="!hasProcesses" class="flex-grow-1 d-flex flex-column align-items-center justify-content-center text-muted small" style="gap: 10px;">
         <span v-if="errorMsg">{{ errorMsg }}</span>
-        <span v-else>No hay instancia de desarrollo activa. Use /despliegue_iniciar_instancia para iniciarla.</span>
+        <template v-else>
+          <span>No hay instancia de desarrollo activa.</span>
+          <button
+            class="btn btn-sm py-1 px-3"
+            style="font-size: 0.75rem; background: rgba(117, 170, 219, 0.15); color: #75AADB; border: 1px solid rgba(117, 170, 219, 0.3);"
+            :disabled="!activeSessionId || startingInstancia"
+            @click="iniciarInstancia"
+          >{{ startingInstancia ? 'Iniciando…' : '▶ Iniciar Instancia Desarrollo' }}</button>
+          <span v-if="!activeSessionId" class="small" style="color: #6b7280;">Seleccione una sesión de chat para habilitar el botón.</span>
+        </template>
       </div>
       <div v-else class="d-flex flex-grow-1" style="min-height: 0;">
         <div class="left-panel d-flex flex-column flex-shrink-0 overflow-y-auto px-2 py-1">
@@ -98,17 +105,14 @@
       </div>
     </template>
 
-    <!-- Tab: Repositorio -->
     <template v-if="activeTab === 'repositorio'">
       <RepoView class="flex-grow-1" />
     </template>
 
-    <!-- Tab: Tickets -->
     <template v-if="activeTab === 'tickets'">
       <TicketPanel class="flex-grow-1" />
     </template>
 
-    <!-- Tab: Proyectos -->
     <template v-if="activeTab === 'proyectos'">
       <div class="proyectos-panel d-flex flex-column flex-grow-1" style="min-height: 0;">
         <div class="px-3 py-2 flex-shrink-0">
@@ -143,17 +147,14 @@
       </div>
     </template>
 
-    <!-- Tab: Console Log Navegador -->
     <template v-if="activeTab === 'console_logs'">
       <ConsoleLogPanel class="flex-grow-1" />
     </template>
 
-    <!-- Tab: Eventos del Navegador -->
     <template v-if="activeTab === 'events'">
       <BrowserEventPanel class="flex-grow-1" />
     </template>
 
-    <!-- Tab: Actividad de Red -->
     <template v-if="activeTab === 'network_logs'">
       <NetworkLogPanel class="flex-grow-1" />
     </template>
@@ -169,6 +170,9 @@ import ConsoleLogPanel from './ConsoleLogPanel.vue'
 import NetworkLogPanel from './NetworkLogPanel.vue'
 import BrowserEventPanel from './BrowserEventPanel.vue'
 import { useProjectStore } from '../stores/project.js'
+import { useChatStore } from '../stores/chat.js'
+import { useCommandRegistry } from '../composables/useCommandRegistry.js'
+import { useCommandStore } from '../stores/command.js'
 
 export default {
   components: { RepoView, TicketPanel, ConsoleLogPanel, NetworkLogPanel, BrowserEventPanel },
@@ -190,8 +194,12 @@ export default {
     let logsTimer = null
 
     const projectStore = useProjectStore()
+    const chatStore = useChatStore()
+    const cmdStore = useCommandStore()
+    const { find } = useCommandRegistry()
     const { projects, selectedProject, pinnedProjectId } = storeToRefs(projectStore)
     const projectFilter = ref('')
+    const startingInstancia = ref(false)
 
     const filteredProjects = computed(() => {
       const filter = projectFilter.value.toLowerCase().trim()
@@ -207,6 +215,7 @@ export default {
       projectStore.selectProject(p)
     }
 
+    const activeSessionId = computed(() => chatStore.activeSessionId)
     const hasProcesses = computed(() => state.processes.length > 0)
 
     const processNames = computed(() => state.processes.map(p => p.name))
@@ -281,6 +290,32 @@ export default {
       }
     }
 
+    async function iniciarInstancia() {
+      if (!activeSessionId.value) return
+      startingInstancia.value = true
+      try {
+        const cmd = find('/despliegue_iniciar_instancia')
+        await chatStore.runCommand('/despliegue_iniciar_instancia', async (loadingIdx) => {
+          if (cmd) {
+            return cmd.execute([], { cmdStore, chatStore, loadingIdx })
+          }
+          const res = await fetch('/api/command/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: '/despliegue_iniciar_instancia' }),
+          })
+          const data = await res.json()
+          if (data.success) return data.result
+          throw new Error(data.result || 'Error al ejecutar comando')
+        })
+      } catch (err) {
+        console.error('Error al iniciar instancia:', err)
+      } finally {
+        startingInstancia.value = false
+      }
+    }
+
     async function detener() {
       deteniendo.value = true
       try {
@@ -328,6 +363,9 @@ export default {
       errorMsg,
       logContainerRef,
       hasProcesses,
+      activeSessionId,
+      startingInstancia,
+      iniciarInstancia,
       typeLabel,
       displayText,
       displayedLines,

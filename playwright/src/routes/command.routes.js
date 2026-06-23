@@ -7,6 +7,11 @@ router.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+router.get('/status', (req, res) => {
+  const active = browserManager.getActiveSession();
+  res.json({ hasActiveSession: !!active });
+});
+
 router.post('/command', async (req, res) => {
   try {
     const { comando, parametros } = req.body;
@@ -119,8 +124,9 @@ router.post('/command', async (req, res) => {
 
       try {
         const chatSessionId = parametros?.chat_session_id || session.chatSessionId;
-        browserManager.setupEventRecording(session.page, idSession, chatSessionId);
-        return res.json({ success: true, id_session: idSession, recording: true });
+        const recordingId = parametros?.recording_id || null;
+        browserManager.setupEventRecording(session.page, idSession, chatSessionId, recordingId);
+        return res.json({ success: true, id_session: idSession, recording: true, recording_id: recordingId });
       } catch (err) {
         return res.status(500).json({ error: err.message });
       }

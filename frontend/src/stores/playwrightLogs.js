@@ -5,7 +5,9 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
   const networkLogs = ref([])
   const consoleLogs = ref([])
   const events = ref([])
-  const loading = ref({ network: false, console: false, events: false })
+  const recordings = ref([])
+  const recordingEvents = ref([])
+  const loading = ref({ network: false, console: false, events: false, recordings: false, recordingEvents: false })
   const eventRecordingName = ref('')
 
   async function fetchNetworkLogs(chatSessionId) {
@@ -92,18 +94,66 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
     }
   }
 
-  async function createEventRecording({ name, chatSessionId }) {
+  const uncategorizedCount = ref(0)
+
+  async function fetchRecordings(projectId) {
+    const query = projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''
+    loading.value.recordings = true
+    try {
+      const res = await fetch(`/api/playwright-logs/event-recordings${query}`, { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        recordings.value = data.recordings || []
+        uncategorizedCount.value = data.uncategorizedCount || 0
+      }
+    } catch (err) {
+      console.error('Error fetching recordings:', err.message)
+    } finally {
+      loading.value.recordings = false
+    }
+  }
+
+  async function fetchRecordingEvents(recordingId) {
+    const query = recordingId === null || recordingId === undefined
+      ? 'recording_id=none'
+      : `recording_id=${recordingId}`
+    loading.value.recordingEvents = true
+    try {
+      const res = await fetch(`/api/playwright-logs/events?${query}`, { credentials: 'include' })
+      if (res.ok) {
+        recordingEvents.value = await res.json()
+      }
+    } catch (err) {
+      console.error('Error fetching recording events:', err.message)
+    } finally {
+      loading.value.recordingEvents = false
+    }
+  }
+
+  async function createEventRecording({ name, chatSessionId, projectId }) {
     const res = await fetch('/api/playwright-logs/event-recordings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ name, chat_session_id: chatSessionId }),
+      body: JSON.stringify({ name, chat_session_id: chatSessionId, project_id: projectId || null }),
     })
     const data = await res.json()
     if (!res.ok) {
       throw new Error(data.error || 'Error al crear grabación')
     }
     return data
+  }
+
+  async function deleteRecording(id) {
+    const res = await fetch(`/api/playwright-logs/event-recordings/${id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error || 'Error al eliminar grabación')
+    }
+    recordings.value = recordings.value.filter(r => r.id !== id)
   }
 
   async function clearConsoleLogs(chatSessionId) {
@@ -125,6 +175,9 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
     networkLogs,
     consoleLogs,
     events,
+    recordings,
+    recordingEvents,
+    uncategorizedCount,
     loading,
     eventRecordingName,
     fetchNetworkLogs,
@@ -133,6 +186,9 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
     clearNetworkLogs,
     clearConsoleLogs,
     clearEvents,
+    fetchRecordings,
+    fetchRecordingEvents,
     createEventRecording,
+    deleteRecording,
   }
 })

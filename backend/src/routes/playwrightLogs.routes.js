@@ -70,10 +70,43 @@ router.delete('/network', async (req, res) => {
   }
 });
 
+router.get('/event-recordings', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { project_id, chat_session_id } = req.query;
+
+  try {
+    let query = db('playwright_event_recordings as r')
+      .leftJoin('playwright_events as e', 'r.id', 'e.recording_id')
+      .select('r.*')
+      .count('e.id as event_count')
+      .groupBy('r.id')
+      .orderBy('r.created_at', 'desc');
+
+    if (project_id) {
+      query = query.where('r.project_id', project_id);
+    }
+    if (chat_session_id) {
+      query = query.where('r.chat_session_id', parseInt(chat_session_id));
+    }
+
+    const recordings = await query;
+
+    const [{ uncategorizedCount }] = await db('playwright_events')
+      .whereNull('recording_id')
+      .count('* as uncategorizedCount');
+
+    res.json({ recordings, uncategorizedCount: parseInt(uncategorizedCount) });
+  } catch (err) {
+    console.log('Error al obtener grabaciones:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/event-recordings', async (req, res) => {
   if (!authGuard(req, res)) return;
 
-  const { name, chat_session_id } = req.body;
+  const { name, chat_session_id, project_id } = req.body;
 
   if (!name) {
     return res.status(400).json({ error: 'El nombre es requerido' });
@@ -83,20 +116,14 @@ router.post('/event-recordings', async (req, res) => {
   }
 
   try {
-    const existing = await db('playwright_event_recordings')
-      .where({ name })
-      .first();
-
-    if (existing) {
-      return res.status(409).json({ error: 'Ya existe una grabación con ese nombre' });
-    }
-
     const [id] = await db('playwright_event_recordings').insert({
       name,
       chat_session_id: parseInt(chat_session_id),
+      project_id: project_id || null,
     });
 
-    res.status(201).json({ id, name, chat_session_id: parseInt(chat_session_id) });
+    const created = await db('playwright_event_recordings').where({ id }).first();
+    res.status(201).json({ ...created, event_count: 0 });
   } catch (err) {
     console.log('Error al crear grabación de eventos:', err.message);
     res.status(500).json({ error: err.message });
@@ -106,16 +133,26 @@ router.post('/event-recordings', async (req, res) => {
 router.get('/events', async (req, res) => {
   if (!authGuard(req, res)) return;
 
-  const chatSessionId = req.query.chat_session_id;
-  if (!chatSessionId) {
-    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  const { chat_session_id, recording_id } = req.query;
+
+  if (!chat_session_id && !recording_id) {
+    return res.status(400).json({ error: 'chat_session_id o recording_id es requerido' });
   }
 
   try {
-    const logs = await db('playwright_events')
-      .where({ chat_session_id: parseInt(chatSessionId) })
-      .orderBy('created_at', 'desc')
-      .limit(500);
+    let query = db('playwright_events').orderBy('created_at', 'desc').limit(500);
+
+    if (recording_id) {
+      if (recording_id === 'none') {
+        query = query.whereNull('recording_id');
+      } else {
+        query = query.where({ recording_id: parseInt(recording_id) });
+      }
+    } else {
+      query = query.where({ chat_session_id: parseInt(chat_session_id) });
+    }
+
+    const logs = await query;
     res.json(logs);
   } catch (err) {
     console.log('Error al obtener eventos:', err.message);
@@ -126,15 +163,26 @@ router.get('/events', async (req, res) => {
 router.delete('/events', async (req, res) => {
   if (!authGuard(req, res)) return;
 
-  const chatSessionId = req.query.chat_session_id;
-  if (!chatSessionId) {
-    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  const { chat_session_id, recording_id } = req.query;
+
+  if (!chat_session_id && !recording_id) {
+    return res.status(400).json({ error: 'chat_session_id o recording_id es requerido' });
   }
 
   try {
-    await db('playwright_events')
-      .where({ chat_session_id: parseInt(chatSessionId) })
-      .del();
+    let query = db('playwright_events');
+
+    if (recording_id) {
+      if (recording_id === 'none') {
+        query = query.whereNull('recording_id');
+      } else {
+        query = query.where({ recording_id: parseInt(recording_id) });
+      }
+    } else {
+      query = query.where({ chat_session_id: parseInt(chat_session_id) });
+    }
+
+    await query.del();
     res.json({ success: true });
   } catch (err) {
     console.log('Error al limpiar eventos:', err.message);
@@ -157,6 +205,57 @@ router.delete('/console', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.log('Error al limpiar console logs:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/event-recordings/:id', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { id } = req.params;
+  const { name, project_id } = req.body;
+
+  try {
+    const existing = await db('playwright_event_recordings').where({ id }).first();
+    if (!existing) {
+      return res.status(404).json({ error: 'Grabación no encontrada' });
+    }
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (project_id !== undefined) updateData.project_id = project_id;
+
+    if (Object.keys(updateData).length > 0) {
+      await db('playwright_event_recordings').where({ id }).update(updateData);
+    }
+
+    const updated = await db('playwright_event_recordings').where({ id }).first();
+    const [{ event_count }] = await db('playwright_events')
+      .where({ recording_id: id })
+      .count('* as event_count');
+
+    res.json({ ...updated, event_count: parseInt(event_count) });
+  } catch (err) {
+    console.log('Error al actualizar grabación:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/event-recordings/:id', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { id } = req.params;
+
+  try {
+    const existing = await db('playwright_event_recordings').where({ id }).first();
+    if (!existing) {
+      return res.status(404).json({ error: 'Grabación no encontrada' });
+    }
+
+    await db('playwright_event_recordings').where({ id }).del();
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al eliminar grabación:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

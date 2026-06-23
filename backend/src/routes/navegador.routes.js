@@ -33,6 +33,24 @@ async function updateSessionTimestamp(sessionId) {
   } catch {}
 }
 
+router.get('/status', async (req, res) => {
+  try {
+    const running = await playwrightManager.isRunning();
+    if (!running) {
+      return res.json({ hasActiveSession: false });
+    }
+    const pwRes = await fetch(`${playwrightManager.baseUrl()}/api/status`);
+    if (!pwRes.ok) {
+      return res.json({ hasActiveSession: false });
+    }
+    const data = await pwRes.json();
+    res.json(data);
+  } catch (err) {
+    console.log('Error al verificar estado del navegador:', err.message);
+    res.json({ hasActiveSession: false });
+  }
+});
+
 router.post('/command', async (req, res) => {
   if (!authGuard(req, res)) return;
 

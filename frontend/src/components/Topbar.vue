@@ -2,8 +2,6 @@
   <nav class="navbar navbar-dark px-3" style="background: #1a2744; border-bottom: 2px solid #75AADB;">
     <router-link class="navbar-brand mb-0 h1 text-decoration-none" to="/">{{ workspaceName }}</router-link>
     <LayoutControls />
-    <span v-if="currentGitBranch && currentGitBranch !== 'Sin repo'" class="small ms-2" style="color: #3fb950;">● {{ currentGitBranch }}</span>
-    <span v-else-if="currentGitBranch === 'Sin repo'" class="small ms-2 text-muted">Sin repo</span>
     <CommandInput v-if="user" />
     <div class="dropdown" v-if="user">
       <button class="btn btn-dark dropdown-toggle" data-bs-toggle="dropdown">
@@ -19,7 +17,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/auth.js'
 import { useRouter } from 'vue-router'
@@ -56,7 +54,6 @@ export default {
     })
     const router = useRouter()
     const navegadorSessionId = ref(null)
-    const currentGitBranch = ref(null)
 
     register({
       name: '/help',
@@ -532,54 +529,13 @@ export default {
       },
     })
 
-    async function fetchGitBranch() {
-      const sessionId = chatStore.activeSessionId
-      if (!sessionId || !cmdStore.currentDir) {
-        currentGitBranch.value = null
-        return
-      }
-      try {
-        const verifyRes = await fetch('/api/command/git-verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ sessionId }),
-        })
-        const verifyData = await verifyRes.json()
-        if (!verifyData.isRepo) {
-          currentGitBranch.value = 'Sin repo'
-          return
-        }
-        const branchRes = await fetch('/api/command/git', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ command: 'rev-parse --abbrev-ref HEAD', sessionId }),
-        })
-        const branchData = await branchRes.json()
-        if (branchData.success && branchData.stdout) {
-          currentGitBranch.value = branchData.stdout.trim()
-        } else {
-          currentGitBranch.value = 'HEAD'
-        }
-      } catch (err) {
-        console.error('Error al obtener rama actual:', err.message)
-        currentGitBranch.value = 'Sin repo'
-      }
-    }
-
     function openSettings() {
       modal.open(SettingsView, {}, { title: 'Configuración', wide: true })
     }
 
-    watch(() => cmdStore.currentDir, () => {
-      fetchGitBranch()
-    })
-
     onMounted(() => {
       cmdStore.loadLastDirectory()
       wsStore.loadWorkspaces()
-      fetchGitBranch()
     })
 
     function logout() {
@@ -587,7 +543,7 @@ export default {
       router.push('/')
     }
 
-    return { user, logout, openSettings, workspaceName, currentGitBranch }
+    return { user, logout, openSettings, workspaceName }
   },
 }
 </script>

@@ -30,7 +30,7 @@ function getDefaultHeadless() {
   return defaultHeadless;
 }
 
-function setupEventRecording(page, sessionId, chatSessionId) {
+function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
   if (!chatSessionId) return;
 
   page.exposeFunction('__pwRecordEvent', async (eventData) => {
@@ -38,6 +38,7 @@ function setupEventRecording(page, sessionId, chatSessionId) {
       if (!db) return;
       await db('playwright_events').insert({
         chat_session_id: chatSessionId,
+        recording_id: recordingId || null,
         playwright_session_id: sessionId,
         event_type: eventData.type,
         selector: eventData.selector || null,
