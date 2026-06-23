@@ -6,6 +6,7 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
   const consoleLogs = ref([])
   const events = ref([])
   const loading = ref({ network: false, console: false, events: false })
+  const eventRecordingName = ref('')
 
   async function fetchNetworkLogs(chatSessionId) {
     if (!chatSessionId) {
@@ -111,6 +112,7 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
     consoleLogs,
     events,
     loading,
+    eventRecordingName,
     fetchNetworkLogs,
     fetchConsoleLogs,
     fetchEvents,

@@ -1,15 +1,42 @@
 <template>
   <div class="events-panel d-flex flex-column h-100" style="min-height: 0;">
-    <div class="log-header d-flex align-items-center px-3 py-1 flex-shrink-0">
+    <div class="log-header d-flex align-items-center gap-2 px-3 py-1 flex-shrink-0 flex-wrap">
       <span class="fw-semibold small" style="color: #e6edf3;">Eventos del Navegador</span>
       <span class="badge bg-secondary-subtle text-secondary ms-2" style="font-size: 0.6rem;">{{ events.length }} eventos</span>
       <span v-if="!activeSessionId" class="small text-muted ms-2">(sin sesión activa)</span>
-      <button
-        class="btn btn-sm btn-outline-danger py-0 px-2 ms-auto"
-        style="font-size: 0.7rem;"
-        :disabled="!activeSessionId || clearing"
-        @click="clearEvents"
-      >Limpiar</button>
+      <div class="d-flex align-items-center gap-1 ms-auto">
+        <span v-if="isRecording" class="recording-dot" title="Grabando eventos"></span>
+        <button
+          v-if="!isRecording"
+          class="btn btn-sm py-0 px-2"
+          style="font-size: 0.65rem; background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3);"
+          :disabled="!activeSessionId || starting"
+          @click="startRecording"
+        >{{ starting ? 'Iniciando…' : '▶ Grabar' }}</button>
+        <button
+          v-if="isRecording"
+          class="btn btn-sm py-0 px-2"
+          style="font-size: 0.65rem; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);"
+          :disabled="!activeSessionId || stopping"
+          @click="stopRecording"
+        >{{ stopping ? 'Deteniendo…' : '⏹ Detener' }}</button>
+        <button
+          class="btn btn-sm btn-outline-danger py-0 px-2"
+          style="font-size: 0.7rem;"
+          :disabled="!activeSessionId || clearing"
+          @click="clearEvents"
+        >Limpiar</button>
+      </div>
+    </div>
+    <div class="name-bar d-flex align-items-center gap-2 px-3 py-1 flex-shrink-0">
+      <span class="small text-muted" style="font-size: 0.6rem;">Nombre:</span>
+      <input
+        v-model="recordingName"
+        class="form-control form-control-sm name-input"
+        placeholder="Nombre de la grabación"
+        @blur="persistName"
+      />
+      <span v-if="recordError" class="small text-danger" style="font-size: 0.6rem;">{{ recordError }}</span>
     </div>
     <div class="overflow-y-auto flex-grow-1" ref="containerRef">
       <div v-if="!activeSessionId" class="d-flex align-items-center justify-content-center h-100 text-muted small">
@@ -114,6 +141,77 @@ export default {
     const activeSessionId = computed(() => chatStore.activeSessionId)
     const events = computed(() => logsStore.events)
     const loading = computed(() => logsStore.loading.events)
+
+    const isRecording = ref(false)
+    const starting = ref(false)
+    const stopping = ref(false)
+    const recordError = ref('')
+    const recordingName = ref(logsStore.eventRecordingName || 'Nueva grabación')
+
+    function persistName() {
+      logsStore.eventRecordingName = recordingName.value
+    }
+
+    async function startRecording() {
+      const sessionId = activeSessionId.value
+      if (!sessionId) return
+      starting.value = true
+      recordError.value = ''
+      try {
+        const res = await fetch('/api/navegador/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            comando: 'start_event_recording',
+            parametros: {},
+            sessionId,
+          }),
+        })
+        const data = await res.json()
+        if (data.error) {
+          recordError.value = data.error
+        } else {
+          isRecording.value = true
+          persistName()
+        }
+      } catch (err) {
+        console.error('Error al iniciar grabación:', err)
+        recordError.value = 'Error de conexión con el servicio de navegador'
+      } finally {
+        starting.value = false
+      }
+    }
+
+    async function stopRecording() {
+      const sessionId = activeSessionId.value
+      if (!sessionId) return
+      stopping.value = true
+      recordError.value = ''
+      try {
+        const res = await fetch('/api/navegador/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            comando: 'stop_event_recording',
+            parametros: {},
+            sessionId,
+          }),
+        })
+        const data = await res.json()
+        if (data.error) {
+          recordError.value = data.error
+        } else {
+          isRecording.value = false
+        }
+      } catch (err) {
+        console.error('Error al detener grabación:', err)
+        recordError.value = 'Error de conexión con el servicio de navegador'
+      } finally {
+        stopping.value = false
+      }
+    }
 
     const EVENT_LABELS = {
       click: 'Click',
@@ -240,6 +338,14 @@ export default {
       activeSessionId,
       events,
       loading,
+      isRecording,
+      starting,
+      stopping,
+      recordError,
+      recordingName,
+      startRecording,
+      stopRecording,
+      persistName,
       typeClass,
       describeEvent,
       isExpanded,
@@ -335,6 +441,34 @@ export default {
   overflow-y: auto;
   margin: 2px 0 0;
   border: 1px solid #30363d;
+}
+.name-bar {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+}
+.name-input {
+  max-width: 280px;
+  background: #0d1117 !important;
+  border-color: #374151 !important;
+  color: #e0e0e0 !important;
+  font-size: 0.65rem !important;
+  height: 22px !important;
+  padding: 0 6px !important;
+}
+.name-input:focus {
+  border-color: #75AADB !important;
+  box-shadow: 0 0 0 1px rgba(117, 170, 219, 0.2) !important;
+}
+.recording-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
 }
 .bg-purple-subtle {
   background-color: rgba(168, 85, 247, 0.15) !important;
