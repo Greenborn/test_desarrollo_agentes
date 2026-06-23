@@ -70,6 +70,39 @@ router.delete('/network', async (req, res) => {
   }
 });
 
+router.post('/event-recordings', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { name, chat_session_id } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ error: 'El nombre es requerido' });
+  }
+  if (!chat_session_id) {
+    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  }
+
+  try {
+    const existing = await db('playwright_event_recordings')
+      .where({ name })
+      .first();
+
+    if (existing) {
+      return res.status(409).json({ error: 'Ya existe una grabación con ese nombre' });
+    }
+
+    const [id] = await db('playwright_event_recordings').insert({
+      name,
+      chat_session_id: parseInt(chat_session_id),
+    });
+
+    res.status(201).json({ id, name, chat_session_id: parseInt(chat_session_id) });
+  } catch (err) {
+    console.log('Error al crear grabación de eventos:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/events', async (req, res) => {
   if (!authGuard(req, res)) return;
 

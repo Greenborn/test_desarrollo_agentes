@@ -92,6 +92,20 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
     }
   }
 
+  async function createEventRecording({ name, chatSessionId }) {
+    const res = await fetch('/api/playwright-logs/event-recordings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ name, chat_session_id: chatSessionId }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      throw new Error(data.error || 'Error al crear grabación')
+    }
+    return data
+  }
+
   async function clearConsoleLogs(chatSessionId) {
     if (!chatSessionId) return
     try {
@@ -119,5 +133,6 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
     clearNetworkLogs,
     clearConsoleLogs,
     clearEvents,
+    createEventRecording,
   }
 })

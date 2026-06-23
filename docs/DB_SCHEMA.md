@@ -317,7 +317,19 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
-## 17. `playwright_console_logs`
+## 17. `playwright_event_recordings`
+
+| Columna | Tipo | Restricciones |
+|---------|------|---------------|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `chat_session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
+| `name` | VARCHAR(255) | NOT NULL, **UNIQUE** — nombre único global de la grabación |
+| `playwright_session_id` | VARCHAR(36) | nullable — UUID de la sesión del navegador en Playwright |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+---
+
+## 18. `playwright_console_logs`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -349,6 +361,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `playwright_network_logs` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 | `playwright_events` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 | `playwright_console_logs` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
+| `playwright_event_recordings` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 
 ---
 

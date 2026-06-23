@@ -628,6 +628,14 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Elimina todos los eventos de usuario registrados para la sesión de chat.
 - **Respuesta 200:** `{ success: true }`
 
+### `POST /api/playwright-logs/event-recordings`
+- **Auth:** Requerida
+- **Body:** `{ name: string, chat_session_id: number }`
+- **Descripción:** Crea un registro de grabación de eventos con nombre único global. Valida que no exista otro registro con el mismo nombre. Se usa antes de iniciar una grabación de eventos para reservar el nombre.
+- **Respuesta 201:** `{ id: number, name: string, chat_session_id: number }`
+- **Respuesta 400:** `{ error: "El nombre es requerido" }` o `{ error: "chat_session_id es requerido" }`
+- **Respuesta 409:** `{ error: "Ya existe una grabación con ese nombre" }`
+
 ---
 
 ## Notas

@@ -155,8 +155,23 @@ export default {
     async function startRecording() {
       const sessionId = activeSessionId.value
       if (!sessionId) return
+
+      const name = recordingName.value.trim()
+      if (!name) {
+        recordError.value = 'Debe ingresar un nombre para la grabación'
+        return
+      }
+
       starting.value = true
       recordError.value = ''
+      try {
+        await logsStore.createEventRecording({ name, chatSessionId: sessionId })
+      } catch (err) {
+        recordError.value = err.message
+        starting.value = false
+        return
+      }
+
       try {
         const res = await fetch('/api/navegador/command', {
           method: 'POST',
