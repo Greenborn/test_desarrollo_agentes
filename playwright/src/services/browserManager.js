@@ -762,6 +762,74 @@ function closeAllSessions() {
   }
 }
 
+async function executeAction(idSession, action) {
+  if (!idSession) {
+    throw new Error('Parámetro "id_session" es requerido');
+  }
+  if (!action || !action.type) {
+    throw new Error('Acción inválida: se requiere type');
+  }
+
+  const session = sessions.get(idSession);
+  if (!session) {
+    throw new Error(`Sesión no encontrada: "${idSession}"`);
+  }
+
+  const { page } = session;
+  const { type, selector, value, key, x, y } = action;
+
+  try {
+    switch (type) {
+      case 'click': {
+        if (!selector) throw new Error('Acción click requiere selector');
+        await page.click(selector);
+        console.log(`Sesión ${idSession} click en "${selector}"`);
+        break;
+      }
+      case 'fill': {
+        if (!selector) throw new Error('Acción fill requiere selector');
+        await page.fill(selector, value || '');
+        console.log(`Sesión ${idSession} fill en "${selector}" → "${value}"`);
+        break;
+      }
+      case 'select': {
+        if (!selector) throw new Error('Acción select requiere selector');
+        await page.selectOption(selector, value || '');
+        console.log(`Sesión ${idSession} select en "${selector}" → "${value}"`);
+        break;
+      }
+      case 'submit': {
+        if (!selector) throw new Error('Acción submit requiere selector');
+        await page.evaluate((sel) => {
+          const form = document.querySelector(sel);
+          if (form) form.submit();
+        }, selector);
+        console.log(`Sesión ${idSession} submit formulario "${selector}"`);
+        break;
+      }
+      case 'press': {
+        if (!selector) throw new Error('Acción press requiere selector');
+        await page.press(selector, key || 'Enter');
+        console.log(`Sesión ${idSession} press "${key}" en "${selector}"`);
+        break;
+      }
+      case 'scroll': {
+        await page.evaluate(({ sx, sy }) => {
+          window.scrollTo(sx || 0, sy || 0);
+        }, { sx: x, sy: y });
+        console.log(`Sesión ${idSession} scroll a x=${x}, y=${y}`);
+        break;
+      }
+      default:
+        throw new Error(`Tipo de acción no soportado: "${type}"`);
+    }
+    return { success: true, type, selector: selector || null };
+  } catch (err) {
+    console.log(`Error ejecutando ${type} en sesión ${idSession}:`, err.message);
+    throw new Error(`Error al ejecutar ${type}: ${err.message}`);
+  }
+}
+
 export default {
   setDb,
   startSession,
@@ -769,6 +837,7 @@ export default {
   extractFormControls,
   setupEventRecording,
   stopEventRecording,
+  executeAction,
   getSession,
   getActiveSession,
   closeSession,

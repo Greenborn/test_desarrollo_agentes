@@ -157,6 +157,31 @@ router.post('/command', async (req, res) => {
       }
     }
 
+    if (comando === 'execute_action') {
+      let idSession = parametros?.id_session;
+      if (!idSession) {
+        const active = browserManager.getActiveSession();
+        if (active) idSession = active.id;
+      }
+      if (!idSession) {
+        return res.status(400).json({
+          error: 'No hay sesión activa. Usá "start" primero o pasá "id_session"',
+        });
+      }
+
+      const action = parametros?.action;
+      if (!action) {
+        return res.status(400).json({ error: 'Parámetro "action" es requerido' });
+      }
+
+      try {
+        const result = await browserManager.executeAction(idSession, action);
+        return res.json({ success: true, id_session: idSession, ...result });
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+
     if (comando === 'close') {
       const idSession = parametros?.id_session;
       if (!idSession) {

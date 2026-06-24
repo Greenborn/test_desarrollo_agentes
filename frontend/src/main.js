@@ -44,6 +44,7 @@ import './composables/commands/ambientesMerge.js'
 import './composables/commands/navegadorGrabacionObtener.js'
 import './composables/commands/navegadorGrabacionAcciones.js'
 import './composables/commands/navegadorGrabacionListar.js'
+import './composables/commands/navegadorGrabacionReproducir.js'
 
 const app = createApp(App)
 const pinia = createPinia()
