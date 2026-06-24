@@ -41,6 +41,9 @@ import './composables/commands/proyectoVarActualizar.js'
 import './composables/commands/proyectoVarEliminar.js'
 import './composables/commands/ambientesListar.js'
 import './composables/commands/ambientesMerge.js'
+import './composables/commands/navegadorGrabacionObtener.js'
+import './composables/commands/navegadorGrabacionAcciones.js'
+import './composables/commands/navegadorGrabacionListar.js'
 
 const app = createApp(App)
 const pinia = createPinia()

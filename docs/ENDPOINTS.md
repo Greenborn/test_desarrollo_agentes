@@ -618,23 +618,50 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ### `GET /api/playwright-logs/events`
 - **Auth:** Requerida
-- **Query:** `chat_session_id` (number, requerido)
-- **Descripción:** Obtiene las últimas 500 entradas de eventos de usuario registradas para la sesión de chat, ordenadas por fecha descendente.
-- **Respuesta 200:** `[{ id, chat_session_id, playwright_session_id, event_type, selector, tag_name, text_content, value, url, x, y, key, key_code, alt_key, ctrl_key, shift_key, meta_key, scroll_x, scroll_y, target_rect, metadata, created_at }]`
+- **Query:** `chat_session_id?` (number, opcional), `recording_id?` (number|"none", opcional), `order?` ("asc"|"desc", opcional, default "desc")
+- **Descripción:** Obtiene las últimas 500 entradas de eventos de usuario. Se puede filtrar por `chat_session_id` o `recording_id` (o `recording_id=none` para eventos no asignados). Por defecto ordena descendente; usar `order=asc` para orden ascendente (más antiguos primero).
+- **Respuesta 200:** `[{ id, chat_session_id, recording_id, playwright_session_id, event_type, selector, tag_name, text_content, value, url, x, y, key, key_code, alt_key, ctrl_key, shift_key, meta_key, scroll_x, scroll_y, target_rect, metadata, created_at }]`
 
 ### `DELETE /api/playwright-logs/events`
 - **Auth:** Requerida
-- **Query:** `chat_session_id` (number, requerido)
-- **Descripción:** Elimina todos los eventos de usuario registrados para la sesión de chat.
+- **Query:** `chat_session_id?` (number, opcional), `recording_id?` (number|"none", opcional)
+- **Descripción:** Elimina eventos. Se puede filtrar por `chat_session_id` o `recording_id` (o `recording_id=none` para eventos no asignados).
 - **Respuesta 200:** `{ success: true }`
 
 ### `POST /api/playwright-logs/event-recordings`
 - **Auth:** Requerida
-- **Body:** `{ name: string, chat_session_id: number }`
-- **Descripción:** Crea un registro de grabación de eventos con nombre único global. Valida que no exista otro registro con el mismo nombre. Se usa antes de iniciar una grabación de eventos para reservar el nombre.
-- **Respuesta 201:** `{ id: number, name: string, chat_session_id: number }`
+- **Body:** `{ name: string, chat_session_id: number, project_id?: string }`
+- **Descripción:** Crea un registro de grabación de eventos. Si se especifica `project_id`, la grabación queda vinculada directamente al proyecto.
+- **Respuesta 201:** `{ id: number, name: string, chat_session_id: number, project_id: string|null, event_count: number }`
 - **Respuesta 400:** `{ error: "El nombre es requerido" }` o `{ error: "chat_session_id es requerido" }`
-- **Respuesta 409:** `{ error: "Ya existe una grabación con ese nombre" }`
+
+### `GET /api/playwright-logs/event-recordings`
+- **Auth:** Requerida
+- **Query:** `project_id?` (opcional), `chat_session_id?` (opcional)
+- **Descripción:** Lista todas las grabaciones de eventos, filtradas opcionalmente por proyecto o sesión de chat. Cada grabación incluye su `event_count`. También retorna el `uncategorizedCount` de eventos sin grabación asignada.
+- **Respuesta 200:** `{ recordings: Array<{ id, name, chat_session_id, project_id, event_count, created_at }>, uncategorizedCount: number }`
+
+### `GET /api/playwright-logs/event-recordings/:id`
+- **Auth:** Requerida
+- **Params:** `id` (number, requerido)
+- **Descripción:** Obtiene una grabación de eventos por su ID, incluyendo el conteo de eventos.
+- **Respuesta 200:** `{ id, name, chat_session_id, project_id, event_count, created_at }`
+- **Respuesta 404:** `{ error: "Grabación no encontrada" }`
+
+### `PUT /api/playwright-logs/event-recordings/:id`
+- **Auth:** Requerida
+- **Params:** `id` (number, requerido)
+- **Body:** `{ name?: string, project_id?: string }`
+- **Descripción:** Actualiza el nombre y/o proyecto de una grabación.
+- **Respuesta 200:** `{ id, name, chat_session_id, project_id, event_count, created_at }`
+- **Respuesta 404:** `{ error: "Grabación no encontrada" }`
+
+### `DELETE /api/playwright-logs/event-recordings/:id`
+- **Auth:** Requerida
+- **Params:** `id` (number, requerido)
+- **Descripción:** Elimina una grabación. Los eventos vinculados pasan a tener `recording_id = NULL` (ON DELETE SET NULL).
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 404:** `{ error: "Grabación no encontrada" }`
 
 ---
 

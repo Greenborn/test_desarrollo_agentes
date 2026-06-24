@@ -109,8 +109,15 @@
             :key="evt.id || i"
             class="event-entry rounded"
             :class="{ expanded: expandedId === evt.id }"
+            @contextmenu.prevent="showContextMenu($event, evt)"
           >
             <div class="event-summary d-flex align-items-start gap-2 px-2 py-1" @click="toggleExpand(evt.id)">
+              <button
+                class="btn btn-sm p-0 event-delete-btn flex-shrink-0 mt-1"
+                :disabled="deletingEventId === evt.id"
+                @click.stop="deleteSingleEvent(evt)"
+                title="Eliminar evento"
+              >🗑️</button>
               <span class="event-type-badge badge flex-shrink-0 mt-1" :class="typeClass(evt.event_type)" style="font-size: 0.6rem; min-width: 44px;">{{ evt.event_type }}</span>
               <div class="min-w-0 flex-grow-1">
                 <div class="event-description">{{ describeEvent(evt) }}</div>
@@ -192,6 +199,20 @@
         </div>
       </div>
     </div>
+    <div
+      v-if="contextMenu.show"
+      class="context-menu-backdrop"
+      @mousedown="closeContextMenu"
+      @contextmenu.prevent
+    ></div>
+    <div
+      v-if="contextMenu.show"
+      class="context-menu"
+      :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
+      @click.stop
+    >
+      <div class="context-menu-item" @click="deleteContextEvent">Eliminar evento</div>
+    </div>
   </div>
 </template>
 
@@ -218,6 +239,8 @@ export default {
     const clearing = ref(false)
     const hasBrowserSession = ref(false)
     const newNameInputRef = ref(null)
+    const contextMenu = ref({ show: false, x: 0, y: 0, event: null })
+    const deletingEventId = ref(null)
 
     const selectedRecordingId = ref(null)
     const isRecording = ref(false)
@@ -266,6 +289,47 @@ export default {
     const displayedEvents = computed(() => logsStore.recordingEvents)
 
     const uncategorizedCount = computed(() => logsStore.uncategorizedCount)
+
+    function showContextMenu(e, evt) {
+      contextMenu.value = { show: true, x: e.clientX, y: e.clientY, event: evt }
+    }
+
+    function closeContextMenu() {
+      contextMenu.value.show = false
+    }
+
+    async function deleteEventById(id) {
+      if (!id) return
+      deletingEventId.value = id
+      try {
+        const res = await fetch(`/api/playwright-logs/events/${id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+        if (res.ok) {
+          logsStore.recordingEvents = logsStore.recordingEvents.filter(e => e.id !== id)
+        }
+      } catch (err) {
+        console.error('Error al eliminar evento:', err.message)
+      } finally {
+        deletingEventId.value = null
+      }
+    }
+
+    async function deleteSingleEvent(evt) {
+      await deleteEventById(evt.id)
+    }
+
+    async function deleteContextEvent() {
+      const evt = contextMenu.value.event
+      if (!evt || !evt.id) return
+      closeContextMenu()
+      await deleteEventById(evt.id)
+    }
+
+    function onDocumentClick(e) {
+      if (contextMenu.value.show && e.button !== 2) closeContextMenu()
+    }
 
     function selectRecording(id) {
       selectedRecordingId.value = id
@@ -542,6 +606,7 @@ export default {
     })
 
     watch(() => logsStore.recordingEvents, async () => {
+      if (!isRecording.value) return
       await nextTick()
       if (containerRef.value) {
         containerRef.value.scrollTop = containerRef.value.scrollHeight
@@ -555,12 +620,14 @@ export default {
       statusTimer = setInterval(fetchStatus, 5000)
       recordingPollTimer = setInterval(fetchRecordings, 5000)
       pollTimer = setInterval(fetchRecordingEvents, 3000)
+      document.addEventListener('mousedown', onDocumentClick)
     })
 
     onBeforeUnmount(() => {
       if (pollTimer) clearInterval(pollTimer)
       if (statusTimer) clearInterval(statusTimer)
       if (recordingPollTimer) clearInterval(recordingPollTimer)
+      document.removeEventListener('mousedown', onDocumentClick)
     })
 
     return {
@@ -587,6 +654,11 @@ export default {
       startRecording,
       confirmNewRecording,
       cancelNewRecording,
+      contextMenu,
+      showContextMenu,
+      closeContextMenu,
+      deleteContextEvent,
+      deleteSingleEvent,
       startingInstancia,
       iniciarInstancia,
       stopRecording,
@@ -674,6 +746,22 @@ export default {
 .event-entry.expanded {
   background: rgba(117, 170, 219, 0.08);
 }
+.event-delete-btn {
+  background: rgba(239, 68, 68, 0.2) !important;
+  border: 1px solid rgba(239, 68, 68, 0.4) !important;
+  color: #ef4444 !important;
+  font-size: 0.65rem !important;
+  line-height: 1 !important;
+  min-width: 20px;
+  min-height: 18px;
+  border-radius: 3px !important;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.event-delete-btn:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.35) !important;
+}
 .event-summary {
   cursor: pointer;
   min-height: 32px;
@@ -756,5 +844,34 @@ export default {
 }
 .text-purple {
   color: #a855f7 !important;
+}
+.context-menu-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9998;
+}
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #1a2744;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 140px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.context-menu-item {
+  padding: 6px 14px;
+  font-size: 0.72rem;
+  color: #e6edf3;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.context-menu-item:hover {
+  background: rgba(117, 170, 219, 0.15);
+  color: #75AADB;
 }
 </style>

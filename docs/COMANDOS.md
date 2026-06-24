@@ -52,6 +52,9 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/navegador_extraer_formularios` | Extrae todos los controles de formulario de la página actual del navegador y los devuelve como JSON | `/navegador_extraer_formularios` |
 | `/navegador_eventos_iniciar` | Inicia la grabación de eventos de usuario en el navegador activo (clicks, inputs, keydown, scroll, focus, blur, submit, change). Requiere sesión de navegador activa. Los eventos se guardan en la tabla `playwright_events` asociados a la sesión de chat | `/navegador_eventos_iniciar` |
 | `/navegador_eventos_detener` | Pausa la grabación de eventos. Los listeners permanecen pero no registran nuevos eventos hasta volver a iniciar | `/navegador_eventos_detener` |
+| `/navegador_grabacion_obtener` | Obtiene información de una grabación de eventos por su ID (nombre, proyecto, cantidad de eventos, fecha de creación) | `/navegador_grabacion_obtener --id=<id>` |
+| `/navegador_grabacion_listar` | Lista todas las grabaciones de eventos. Opcionalmente filtrar por proyecto. Si no se especifica proyecto, usa el asignado a la sesión de chat actual | `/navegador_grabacion_listar [--project_id=<id>]` |
+| `/navegador_grabacion_acciones` | Genera un arreglo JSON de acciones a partir de los eventos de una grabación, ordenado del más antiguo al más reciente. Convierte clicks, inputs, changes, submits, keydowns y scrolls en acciones tipo `click`, `fill`, `select`, `submit`, `press` y `scroll` | `/navegador_grabacion_acciones --id=<id>` |
 | `/resoluciones_get_all` | Muestra las resoluciones de pantalla configuradas con selector interactivo para establecer una por defecto | `/resoluciones_get_all` |
 | `/resolucion_default` | Muestra la resolución de pantalla por defecto configurada | `/resolucion_default` |
 

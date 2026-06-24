@@ -103,6 +103,31 @@ router.get('/event-recordings', async (req, res) => {
   }
 });
 
+router.get('/event-recordings/:id', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { id } = req.params;
+
+  try {
+    const recording = await db('playwright_event_recordings as r')
+      .leftJoin('playwright_events as e', 'r.id', 'e.recording_id')
+      .select('r.*')
+      .count('e.id as event_count')
+      .where('r.id', id)
+      .groupBy('r.id')
+      .first();
+
+    if (!recording) {
+      return res.status(404).json({ error: 'Grabación no encontrada' });
+    }
+
+    res.json(recording);
+  } catch (err) {
+    console.log('Error al obtener grabación:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/event-recordings', async (req, res) => {
   if (!authGuard(req, res)) return;
 
@@ -140,7 +165,8 @@ router.get('/events', async (req, res) => {
   }
 
   try {
-    let query = db('playwright_events').orderBy('created_at', 'desc').limit(500);
+    const orderDir = req.query.order === 'asc' ? 'asc' : 'desc';
+    let query = db('playwright_events').orderBy('created_at', orderDir).limit(500);
 
     if (recording_id) {
       if (recording_id === 'none') {
@@ -186,6 +212,23 @@ router.delete('/events', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.log('Error al limpiar eventos:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/events/:id', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { id } = req.params;
+
+  try {
+    const deleted = await db('playwright_events').where({ id }).del();
+    if (!deleted) {
+      return res.status(404).json({ error: 'Evento no encontrado' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al eliminar evento:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
