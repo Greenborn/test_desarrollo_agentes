@@ -28,7 +28,7 @@
       @click="toggleRightPanel"
       title="Toggle right panel"
     >
-      <div class="layout-icon split-h">
+      <div class="layout-icon split-h mirror-h">
         <div class="part left"></div>
         <div class="part right" :class="{ filled: !rightPanelCollapsed }"></div>
       </div>
@@ -109,6 +109,16 @@ export default {
 }
 .layout-icon.split-h .part.left.filled {
   background: currentColor;
+}
+.layout-icon.split-h.mirror-h .part.left {
+  width: auto;
+  flex: 1;
+  border-right: none;
+}
+.layout-icon.split-h.mirror-h .part.right {
+  width: 40%;
+  flex: none;
+  border-left: 1.5px solid currentColor;
 }
 .layout-icon.split-v .part.top {
   flex: 1;

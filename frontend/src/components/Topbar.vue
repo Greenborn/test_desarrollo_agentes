@@ -1,6 +1,6 @@
 <template>
   <nav class="navbar navbar-dark px-3" style="background: #1a2744; border-bottom: 2px solid #75AADB;">
-    <router-link class="navbar-brand mb-0 h1 text-decoration-none" to="/">{{ workspaceName }}</router-link>
+    <a class="navbar-brand mb-0 h1 text-decoration-none" href="#" @click.prevent="openWorkspaceSwitcher">{{ workspaceName }}</a>
     <LayoutControls />
     <CommandInput v-if="user" />
     <div class="dropdown" v-if="user">
@@ -32,6 +32,7 @@ import CommandInput from './CommandInput.vue'
 import LayoutControls from './LayoutControls.vue'
 import HelpContent from './HelpModal.vue'
 import CrearProyectoModal from './CrearProyectoModal.vue'
+import WorkspaceSwitcherModal from './WorkspaceSwitcherModal.vue'
 import SettingsView from '../views/SettingsView.vue'
 
 export default {
@@ -533,6 +534,10 @@ export default {
       modal.open(SettingsView, {}, { title: 'Configuración', wide: true })
     }
 
+    function openWorkspaceSwitcher() {
+      modal.open(WorkspaceSwitcherModal, {}, { title: 'Espacios de Trabajo' })
+    }
+
     onMounted(() => {
       cmdStore.loadLastDirectory()
       wsStore.loadWorkspaces()
@@ -543,7 +548,7 @@ export default {
       router.push('/')
     }
 
-    return { user, logout, openSettings, workspaceName }
+    return { user, logout, openSettings, openWorkspaceSwitcher, workspaceName }
   },
 }
 </script>
