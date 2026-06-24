@@ -128,4 +128,119 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.get('/export-all', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const workspaces = await db('workspaces').select('id', 'name').orderBy('id');
+    const configuracionGeneral = {};
+
+    for (const ws of workspaces) {
+      const settingsRows = await db('settings')
+        .where({ workspace_id: ws.id })
+        .select('setting_key', 'setting_value', 'encrypted');
+
+      const keys = {};
+      for (const row of settingsRows) {
+        let value = row.setting_value;
+        if (row.encrypted && value) {
+          try {
+            value = decrypt(value);
+          } catch (errDec) {
+            console.log('Error al desencriptar', row.setting_key, ':', errDec.message);
+          }
+        }
+        if (row.setting_key === 'screen_resolutions') {
+          try { keys.screen_resolutions = JSON.parse(value); } catch { keys.screen_resolutions = []; }
+        } else {
+          keys[row.setting_key] = value;
+        }
+      }
+
+      const environments = await db('workspace_environments')
+        .where({ workspace_id: ws.id })
+        .select('name', 'branch', 'description')
+        .orderBy('id');
+
+      const wsData = { ...keys };
+      if (environments.length > 0) {
+        wsData.ambientes = environments.map(e => ({
+          nombre: e.name,
+          rama: e.branch,
+          descripcion: e.description,
+        }));
+      }
+
+      configuracionGeneral[ws.name] = wsData;
+    }
+
+    res.json({
+      version: 1,
+      exported_at: new Date().toISOString(),
+      configuracion_general: configuracionGeneral,
+    });
+  } catch (err) {
+    console.log('Error al exportar settings:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/import-all', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { configuracion_general } = req.body;
+    if (!configuracion_general || typeof configuracion_general !== 'object') {
+      return res.status(400).json({ error: 'configuracion_general es requerido' });
+    }
+
+    for (const [wsName, wsData] of Object.entries(configuracion_general)) {
+      const ws = await db('workspaces').where({ name: wsName }).first();
+      if (!ws) {
+        console.log('Workspace no encontrado para importar:', wsName);
+        continue;
+      }
+
+      const { ambientes, ...settingsKeys } = wsData;
+
+      for (const [key, value] of Object.entries(settingsKeys)) {
+        let toStore = String(value);
+        let encrypted = false;
+
+        if (key === 'deepseek_key' || key === 'redmine_token') {
+          toStore = encrypt(String(value));
+          encrypted = true;
+        }
+
+        if (key === 'screen_resolutions') {
+          toStore = JSON.stringify(value);
+        }
+
+        await db('settings')
+          .insert({ workspace_id: ws.id, setting_key: key, setting_value: toStore, encrypted })
+          .onConflict(['workspace_id', 'setting_key'])
+          .merge();
+      }
+
+      if (Array.isArray(ambientes)) {
+        for (const env of ambientes) {
+          if (!env.nombre || !env.rama) continue;
+          await db('workspace_environments')
+            .insert({
+              workspace_id: ws.id,
+              name: env.nombre,
+              branch: env.rama,
+              description: env.descripcion || null,
+            })
+            .onConflict(['workspace_id', 'name'])
+            .merge();
+        }
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al importar settings:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;

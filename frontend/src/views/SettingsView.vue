@@ -20,6 +20,9 @@
         <button class="btn btn-sm btn-outline-argentina flex-shrink-0" @click="promptCreate">+ Nuevo</button>
         <button class="btn btn-sm btn-outline-argentina flex-shrink-0" @click="promptRename" v-if="selectedWId !== 1">Editar</button>
         <button class="btn btn-sm btn-outline-danger flex-shrink-0" @click="confirmDelete" v-if="selectedWId !== 1">Eliminar</button>
+        <button class="btn btn-sm btn-outline-argentina flex-shrink-0 ms-auto" @click="exportAllConfig">Exportar</button>
+        <button class="btn btn-sm btn-outline-argentina flex-shrink-0" @click="triggerImport">Importar</button>
+        <input type="file" ref="importInput" accept=".json" @change="handleImport" style="display:none" />
       </div>
     </div>
 
@@ -346,6 +349,7 @@ export default {
     const newEnvDescription = ref('')
     const selectedWId = ref(1)
     const wsMessage = ref('')
+    const importInput = ref(null)
 
     function matches(label) {
       if (!searchTerm.value) return true
@@ -711,6 +715,55 @@ export default {
       setTimeout(() => { wsMessage.value = '' }, 3000)
     }
 
+    function triggerImport() {
+      importInput.value?.click()
+    }
+
+    async function exportAllConfig() {
+      try {
+        const res = await fetch('/api/settings/export-all', { credentials: 'include' })
+        const data = await res.json()
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `configuracion_${new Date().toISOString().split('T')[0]}.json`
+        a.click()
+        URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error('Error al exportar configuración:', err.message)
+        wsMessage.value = 'Error al exportar configuración'
+        setTimeout(() => { wsMessage.value = '' }, 3000)
+      }
+    }
+
+    async function handleImport(event) {
+      const file = event.target.files[0]
+      if (!file) return
+      try {
+        const text = await file.text()
+        const data = JSON.parse(text)
+        const res = await fetch('/api/settings/import-all', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(data),
+        })
+        const result = await res.json()
+        if (result.success) {
+          wsMessage.value = 'Configuración importada correctamente.'
+          await reloadSettings()
+        } else {
+          wsMessage.value = result.error || 'Error al importar configuración'
+        }
+      } catch (err) {
+        console.error('Error al importar configuración:', err.message)
+        wsMessage.value = 'Error al importar configuración'
+      }
+      setTimeout(() => { wsMessage.value = '' }, 3000)
+      event.target.value = ''
+    }
+
     return {
       keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput,
       docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput, refinarPromptInput,
@@ -726,6 +779,7 @@ export default {
       saveLocale, savePriorityColor, addResolution, removeResolution, resetResolutions, saveResolutions, matches,
       saveEnvironment, addEnvironment, deleteEnvironment,
       onWorkspaceChange, promptCreate, promptRename, confirmDelete,
+      exportAllConfig, handleImport, triggerImport, importInput,
     }
   },
 }

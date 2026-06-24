@@ -71,6 +71,38 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 - Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `omnifilter_debounce_ms`, `screen_resolutions`
 - **Respuesta:** `{ success: true }`
 
+### `GET /api/settings/export-all`
+- **Auth:** Requerida
+- **Descripción:** Exporta todas las configuraciones de todos los workspaces, incluyendo settings y ambientes (DEV/TST/PRD). Los valores encriptados (`deepseek_key`, `redmine_token`) se devuelven en texto plano. Sin hardcoding de keys — incluye automáticamente cualquier key presente en la DB.
+- **Respuesta 200:**
+```json
+{
+  "version": 1,
+  "exported_at": "2026-06-23T12:00:00.000Z",
+  "configuracion_general": {
+    "Por Defecto": {
+      "deepseek_key": "sk-plain-text",
+      "redmine_token": "token-plain-text",
+      "redmine_url": "https://...",
+      "system_prompt": "...",
+      "ambientes": [
+        { "nombre": "DEV", "rama": "develop", "descripcion": "Desarrollo" },
+        { "nombre": "TST", "rama": "TST", "descripcion": "Testing" },
+        { "nombre": "PRD", "rama": "PRD", "descripcion": "Producción" }
+      ]
+    },
+    "Otro Workspace": { "...": "..." }
+  }
+}
+```
+
+### `POST /api/settings/import-all`
+- **Auth:** Requerida
+- **Body:** Misma estructura que `GET /api/settings/export-all`
+- **Descripción:** Importa configuraciones desde un JSON. Busca cada workspace por **nombre** en la DB. Las credenciales (`deepseek_key`, `redmine_token`) se re-encriptan antes de almacenar. Los ambientes se actualizan por nombre dentro de cada workspace. Las keys nuevas se crean automáticamente sin necesidad de actualizar el código.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 400:** `{ error: "configuracion_general es requerido" }`
+
 ---
 
 ## Comandos del sistema (`/api/command`)
