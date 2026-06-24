@@ -262,6 +262,61 @@ router.post('/refine', async (req, res) => {
   }
 });
 
+router.post('/summarize-file', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { fileContent, filePath, sessionId } = req.body;
+    if (!fileContent) return res.status(400).json({ error: 'fileContent requerido' });
+
+    const systemPrompt = 'Describí el propósito del siguiente archivo de código en no más de 300 caracteres. Sé conciso y específico. Describí únicamente su funcionalidad principal, sin detallar implementación interna.';
+    const message = `Archivo: ${filePath || 'sin nombre'}\n\n\`\`\`\n${fileContent.slice(0, 8000)}\n\`\`\``;
+    const messages = [{ role: 'user', content: message }];
+
+    const wsId = req.session.workspaceId || 1;
+    let description = '';
+    let usageData = null;
+
+    for await (const chunk of streamChat(messages, wsId, systemPrompt)) {
+      if (chunk.type === 'usage') {
+        usageData = chunk;
+        continue;
+      }
+      if (chunk.type === 'response') {
+        description += chunk.content;
+      }
+    }
+
+    if (usageData && sessionId) {
+      try {
+        const chatSess = await db('chat_sessions').where({ id: sessionId }).select('proyecto_id').first();
+        const idProyecto = chatSess?.proyecto_id;
+        if (idProyecto) {
+          const gastosPort = process.env.SERVICIO_GASTOS_PORT || 4100;
+          const precio = (usageData.completion_tokens || 0) * 0.0000011;
+          await fetch(`http://localhost:${gastosPort}/api/gastos/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id_chat_session: parseInt(sessionId),
+              id_proyecto: idProyecto,
+              precio: precio,
+              tokens: usageData.total_tokens || 0,
+            }),
+          });
+        }
+      } catch (e) {
+        console.log('[gastos] error al registrar en summarize-file:', e.message);
+      }
+    }
+
+    const trimmed = description.slice(0, 300).trim();
+    res.json({ description: trimmed || '(sin descripción)' });
+  } catch (err) {
+    console.log('Error en summarize-file:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/sessions/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {

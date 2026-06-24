@@ -47,6 +47,10 @@ router.get('/', async (req, res) => {
         keys.ticket_descripcion_prompt = row.setting_value;
       } else if (row.setting_key === 'deteccion_funcionalidades_prompt') {
         keys.deteccion_funcionalidades_prompt = row.setting_value;
+      } else if (row.setting_key === 'code_file_extensions') {
+        keys.code_file_extensions = row.setting_value;
+      } else if (row.setting_key === 'code_file_max_size_kb') {
+        keys.code_file_max_size_kb = row.setting_value;
       } else if (row.setting_key === 'ticket_refinar_prompt') {
         keys.ticket_refinar_prompt = row.setting_value;
       } else if (row.setting_key === 'repo_acronimo') {
@@ -74,6 +78,8 @@ router.get('/', async (req, res) => {
       ticket_descripcion_prompt: 'Eres un asistente experto en redactar descripciones técnicas para tickets de Redmine. Tu objetivo principal es generar una descripción ÓPTIMA y detallada para el siguiente ticket:\n\nContexto del ticket:\n- Título: {subject}\n- Estado actual: {status}\n- Prioridad: {priority}\n- Asignado a: {assigned_to}\n\nInstrucciones:\n1. Genera una descripción clara, precisa y bien estructurada que explique el problema o requerimiento del ticket.\n2. Utiliza la siguiente solicitud del usuario como guía para el contenido:\n{user_input}\n3. La descripción debe ser profesional, técnica y útil para desarrolladores.\n4. Incluye solo información relevante al ticket, sin divagaciones.',
       ticket_refinar_prompt: 'Eres un asistente especializado en refinar descripciones técnicas de tickets para Redmine. Toma la descripción proporcionada y transfórmala en una descripción estructurada con las siguientes secciones:\n\n## Objetivo\nDescripción general de la tarea o cambio a realizar, explicando el propósito y la idea principal.\n\n## Cambios a realizar\nInforme detallado a medio nivel de los cambios concretos que deben aplicarse, organizado de forma clara.\n\nReglas:\n- No inventes nada que no esté presente en el texto original.\n- Sé conciso y técnico, apropiado para desarrolladores.\n- Devuelve únicamente la descripción formateada, sin comentarios adicionales.',
       deteccion_funcionalidades_prompt: 'Analizá el proyecto en el directorio actual e identificá todas las funcionalidades implementadas.\n\nLa respuesta debe estar estructurada en formato Markdown con la siguiente jerarquía:\n\n# [Nombre del Subproyecto] (backend | frontend)\n\n## [Módulo o Conjunto de Rutas]\n\n### Si es backend:\n- Endpoint, método HTTP, tablas utilizadas, permisos requeridos\n\n### Si es frontend:\n- Componente, ruta Vue Router, propósito, otros componentes usados, composables, endpoints llamados\n\nUsá tablas cuando sea apropiado para listar múltiples elementos con sus propiedades. Identificá cada funcionalidad a partir del código fuente, incluyendo archivos backend (rutas, controladores, modelos) y frontend (componentes Vue, vistas, stores).',
+      code_file_extensions: '.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql',
+      code_file_max_size_kb: '100',
       repo_acronimo: 'TKT',
       locale: 'es_ES.UTF-8',
       priority_color_low: '#6b7280',

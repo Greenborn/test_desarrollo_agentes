@@ -47,4 +47,62 @@ router.get('/:proyectoId', async (req, res) => {
   }
 });
 
+router.post('/escaneo/iniciar', async (req, res) => {
+  try {
+    const { session_id } = req.body;
+    if (!session_id) return res.status(400).json({ error: 'session_id requerido' });
+
+    const [id] = await db('documentacion_escaneo').insert({ session_id });
+    const row = await db('documentacion_escaneo').where({ id }).first();
+    res.status(201).json({ id, fecha_hora_inicio: row.fecha_hora_inicio });
+  } catch (err) {
+    console.log('Error al iniciar escaneo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/escaneo/:id/finalizar', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { total_archivos, archivos_procesados } = req.body;
+
+    await db('documentacion_escaneo')
+      .where({ id })
+      .update({
+        fecha_hora_fin: db.fn.now(),
+        total_archivos: total_archivos || 0,
+        archivos_procesados: archivos_procesados || 0,
+      });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al finalizar escaneo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/archivo', async (req, res) => {
+  try {
+    const { escaneo_id, nombre, ruta, tipo, extension, tamano, descripcion } = req.body;
+    if (!escaneo_id) return res.status(400).json({ error: 'escaneo_id requerido' });
+    if (!nombre) return res.status(400).json({ error: 'nombre requerido' });
+    if (!ruta) return res.status(400).json({ error: 'ruta requerida' });
+
+    const [id] = await db('documentacion_archivo').insert({
+      escaneo_id,
+      nombre,
+      ruta,
+      tipo: tipo || 'file',
+      extension: extension || null,
+      tamano: tamano || null,
+      descripcion: descripcion || null,
+    });
+
+    res.status(201).json({ id });
+  } catch (err) {
+    console.log('Error al guardar archivo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

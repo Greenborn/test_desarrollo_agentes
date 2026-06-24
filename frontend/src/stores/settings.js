@@ -16,6 +16,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const ticketDescripcionPrompt = ref('')
   const ticketRefinarPrompt = ref('')
   const deteccionFuncionalidadesPrompt = ref('')
+  const codeFileExtensions = ref('.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql')
+  const codeFileMaxSizeKb = ref(100)
   const omnifilterDebounceMs = ref(2000)
   const repoAcronimo = ref('TKT')
   const locale = ref('es_ES.UTF-8')
@@ -54,6 +56,8 @@ export const useSettingsStore = defineStore('settings', () => {
       ticketDescripcionPrompt.value = keys.ticket_descripcion_prompt || ''
       ticketRefinarPrompt.value = keys.ticket_refinar_prompt || ''
       deteccionFuncionalidadesPrompt.value = keys.deteccion_funcionalidades_prompt || ''
+      codeFileExtensions.value = keys.code_file_extensions || '.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql'
+      codeFileMaxSizeKb.value = parseInt(keys.code_file_max_size_kb, 10) || 100
       omnifilterDebounceMs.value = keys.omnifilter_debounce_ms ? parseInt(keys.omnifilter_debounce_ms, 10) : 2000
       repoAcronimo.value = keys.repo_acronimo || 'TKT'
       locale.value = keys.locale || 'es_ES.UTF-8'
@@ -105,6 +109,8 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'ticket_descripcion_prompt': ticketDescripcionPrompt.value = value; break
       case 'ticket_refinar_prompt': ticketRefinarPrompt.value = value; break
       case 'deteccion_funcionalidades_prompt': deteccionFuncionalidadesPrompt.value = value; break
+      case 'code_file_extensions': codeFileExtensions.value = value; break
+      case 'code_file_max_size_kb': codeFileMaxSizeKb.value = parseInt(value, 10) || 100; break
       case 'omnifilter_debounce_ms': omnifilterDebounceMs.value = parseInt(value, 10) || 2000; break
       case 'repo_acronimo': repoAcronimo.value = value; break
       case 'locale': locale.value = value; break
@@ -126,11 +132,11 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   return { deepseekKey, redmineToken, redmineUrl, systemPrompt, omnifilterDebounceMs, repoAcronimo,
-           locale, screenResolutions, replayIntervalMs,
+           locale, screenResolutions,
            documentacionPromptBaseDatos, documentacionPromptSubproyectos,
            documentacionPromptEndpoints, documentacionPromptWebSockets,
            documentacionPromptFuncionalidades, ticketDescripcionPrompt, ticketRefinarPrompt,
-           deteccionFuncionalidadesPrompt,
+           deteccionFuncionalidadesPrompt, codeFileExtensions, codeFileMaxSizeKb,
            priorityColorLow, priorityColorNormal, priorityColorHigh, priorityColorUrgent, priorityColorImmediate,
            saveError, saveSuccess, clearFeedback, load, save, applyPriorityColors }
 })

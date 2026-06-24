@@ -265,6 +265,24 @@
           </button>
         </div>
 
+        <div v-if="matches('codigo extensiones archivos code_file')" class="border-top border-secondary pt-3">
+          <label class="form-label mb-2 fw-bold">Archivos de Código</label>
+          <div class="small text-muted mb-2">Extensiones de archivos considerados código (separadas por coma) y tamaño máximo en KB para incluir en el árbol.</div>
+          <div class="d-flex gap-2 mb-2 align-items-start">
+            <div style="flex: 1;">
+              <label class="form-label small">Extensiones</label>
+              <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" v-model="codeExtensionsInput" placeholder=".js,.vue,.py,..." />
+            </div>
+            <div style="width: 120px;">
+              <label class="form-label small">Max KB</label>
+              <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" v-model.number="codeMaxSizeInput" min="1" />
+            </div>
+            <div class="pt-4">
+              <button class="btn btn-sm btn-argentina" @click="saveCodeConfig">Guardar</button>
+            </div>
+          </div>
+        </div>
+
         <div v-if="matches('intervalo reproduccion navegador')" class="border-top border-secondary pt-3">
           <label class="form-label">Intervalo de Reproducción del Navegador (ms)</label>
           <div class="small text-muted mb-2">Tiempo entre cada acción al reproducir grabaciones en Eventos del Navegador</div>
@@ -362,6 +380,8 @@ export default {
     const descripcionPromptInput = ref('')
     const refinarPromptInput = ref('')
     const deteccionPromptInput = ref('')
+    const codeExtensionsInput = ref('.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql')
+    const codeMaxSizeInput = ref(100)
     const omnifilterDebounceInput = ref(2000)
     const repoAcronimoInput = ref('TKT')
     const localeInput = ref('es_ES.UTF-8')
@@ -466,6 +486,14 @@ export default {
 
     watch(() => settings.deteccionFuncionalidadesPrompt, (val) => {
       deteccionPromptInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.codeFileExtensions, (val) => {
+      codeExtensionsInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.codeFileMaxSizeKb, (val) => {
+      codeMaxSizeInput.value = val
     }, { immediate: true })
 
     for (const [key, refName] of Object.entries(DOC_STORE_MAP)) {
@@ -607,6 +635,12 @@ export default {
     function saveDeteccionPrompt() {
       settings.clearFeedback()
       settings.save('deteccion_funcionalidades_prompt', deteccionPromptInput.value)
+    }
+
+    function saveCodeConfig() {
+      settings.clearFeedback()
+      settings.save('code_file_extensions', codeExtensionsInput.value)
+      settings.save('code_file_max_size_kb', String(codeMaxSizeInput.value))
     }
 
     function saveLocale() {
@@ -869,6 +903,7 @@ export default {
       keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput,
       docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput, refinarPromptInput,
       deteccionPromptInput,
+      codeExtensionsInput, codeMaxSizeInput,
       showKey, showRedmineToken, searchTerm, omnifilterDebounceInput, repoAcronimoInput,
       localeInput,
       priorityColorLowInput, priorityColorNormalInput, priorityColorHighInput,
@@ -878,7 +913,7 @@ export default {
       environmentsList, newEnvName, newEnvBranch, newEnvDescription,
       replayIntervalInput,
       saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
-      saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveDeteccionPrompt, saveRepoAcronimo,
+      saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveDeteccionPrompt, saveCodeConfig, saveRepoAcronimo,
       saveLocale, savePriorityColor, saveReplayInterval,
       addResolution, removeResolution, resetResolutions, saveResolutions, matches,
       saveEnvironment, addEnvironment, deleteEnvironment,

@@ -130,7 +130,7 @@ function loadGitignore(dirPath) {
   return []
 }
 
-function buildTree(dirPath, parentPatterns, useGitignore, showHidden) {
+function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeBytes) {
   const name = path.basename(dirPath) || dirPath
   const stat = fs.statSync(dirPath)
   const node = { name, type: stat.isDirectory() ? 'directory' : 'file', path: dirPath }
@@ -152,7 +152,7 @@ function buildTree(dirPath, parentPatterns, useGitignore, showHidden) {
       node.children = filtered.map((e) => {
         const fullPath = path.join(dirPath, e.name)
         try {
-          return buildTree(fullPath, patterns, useGitignore, showHidden)
+          return buildTree(fullPath, patterns, useGitignore, showHidden, maxSizeBytes)
         } catch (err) {
           console.log(`Error al procesar ${fullPath}: ${err.message}`)
           return { name: e.name, type: 'error', error: err.message, path: fullPath }
@@ -166,20 +166,34 @@ function buildTree(dirPath, parentPatterns, useGitignore, showHidden) {
   }
   if (!stat.isDirectory()) {
     node.size = stat.size
+    if (maxSizeBytes && stat.size > maxSizeBytes) {
+      node.skipped = true
+    }
   }
   return node
 }
 
-function pruneTree(node, extensions) {
+function filterTree(node, extensions, maxSizeBytes) {
   if (node.type === 'file') {
+    if (node.skipped) return false
     const ext = path.extname(node.name).slice(1)
-    return extensions.includes(ext)
+    return extensions.length === 0 || extensions.includes(ext)
   }
   if (node.type === 'directory' && node.children) {
-    node.children = node.children.filter((child) => pruneTree(child, extensions))
-    return node.children.length > 0
+    node.children = node.children.filter((child) => filterTree(child, extensions, maxSizeBytes))
+    const hasContent = node.children.length > 0
+    if (!hasContent) delete node.children
+    return hasContent
   }
   return false
+}
+
+function countTreeFiles(node) {
+  if (node.type === 'file') return 1
+  if (node.type === 'directory' && node.children) {
+    return node.children.reduce((sum, child) => sum + countTreeFiles(child), 0)
+  }
+  return 0
 }
 
 router.get('/arbol-directorios', async (req, res) => {
@@ -190,6 +204,8 @@ router.get('/arbol-directorios', async (req, res) => {
     const useGitignore = req.query.useGitignore !== 'false';
     const showHidden = req.query.showHidden !== 'false';
     const filterExtension = (req.query.filterExtension || '').replace(/^["']|["']$/g, '');
+    const codeExtensions = (req.query.codeExtensions || '').replace(/^["']|["']$/g, '');
+    const maxSizeKb = parseInt(req.query.maxSizeKb, 10) || 0;
     let baseDir = process.cwd();
     if (sessionId) {
       const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
@@ -209,12 +225,21 @@ router.get('/arbol-directorios', async (req, res) => {
     if (!fs.statSync(targetDir).isDirectory()) {
       return res.status(400).json({ success: false, error: `'${targetDir}' no es un directorio` });
     }
-    const tree = buildTree(targetDir, [], useGitignore, showHidden);
-    if (filterExtension) {
+    const maxSizeBytes = maxSizeKb > 0 ? maxSizeKb * 1024 : 0;
+    const tree = buildTree(targetDir, [], useGitignore, showHidden, maxSizeBytes || undefined);
+
+    if (codeExtensions) {
+      const extensions = codeExtensions.split(',').map((s) => s.trim().replace(/^\./, '')).filter(Boolean)
+      filterTree(tree, extensions, maxSizeBytes || undefined)
+    } else if (filterExtension) {
       const extensions = filterExtension.split(',').map((s) => s.trim()).filter(Boolean)
-      pruneTree(tree, extensions)
+      filterTree(tree, extensions, maxSizeBytes || undefined)
+    } else if (maxSizeBytes) {
+      filterTree(tree, [], maxSizeBytes)
     }
-    res.json({ success: true, tree, gitignore: useGitignore });
+
+    const totalFiles = countTreeFiles(tree)
+    res.json({ success: true, tree, totalFiles, gitignore: useGitignore });
   } catch (err) {
     console.log('Error en arbol-directorios:', err.message);
     res.status(500).json({ success: false, error: err.message });

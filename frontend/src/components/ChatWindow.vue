@@ -35,20 +35,12 @@
         </div>
       </template>
     </div>
-    <div v-if="ocStreaming && activeSessionId && _isActiveSession(_streamSessionId)" class="border-top p-2" style="border-color: #374151; background: #0d1b2a;">
-      <div class="rounded-3 p-3 text-start" style="background: #1a2744; border: 1px solid #75AADB; color: #f0f0f0;">
-        <div v-if="ocThinking" class="mb-2">
-          <button class="btn btn-sm w-100 text-start btn-outline-argentina" data-bs-toggle="collapse" data-bs-target="#oc-think-stream">
-            🧠 OpenCode razonando...
-          </button>
-          <div class="collapse show mt-1" id="oc-think-stream">
-            <pre class="mb-0 small text-muted" style="white-space: pre-wrap;">{{ ocThinking }}</pre>
-          </div>
+    <div v-if="deteccionState.running" class="border-top p-2" style="border-color: #75AADB; background: #0d1b2a;">
+      <div class="d-flex align-items-center gap-2">
+        <div class="flex-grow-1 small text-truncate" style="color: #e0e0e0;">
+          📄 {{ deteccionState.processed + 1 }}/{{ deteccionState.total }}: {{ deteccionState.current }}
         </div>
-        <div style="white-space: pre-wrap;">{{ ocChunk }}<span class="blink">▌</span></div>
-        <div class="mt-2">
-          <button class="btn btn-sm btn-outline-danger" @click="abortOpencode">⏹ Detener</button>
-        </div>
+        <button class="btn btn-sm btn-outline-danger flex-shrink-0" @click="abortDeteccion">⏹ Detener</button>
       </div>
     </div>
     <div class="border-top p-2" style="border-color: #374151;" v-if="activeSessionId">
@@ -82,6 +74,7 @@ import { useModalStore } from '../stores/modal.js'
 import { useOpencodeStore } from '../stores/opencode.js'
 import { useSettingsStore } from '../stores/settings.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
+import { deteccionState, abortDeteccion } from '../composables/commands/deteccionFuncionalidades.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useProjectVariables } from '../composables/useProjectVariables.js'
 import ChatMessage from './ChatMessage.vue'
@@ -741,8 +734,6 @@ export default {
         await handleOpencodeSetup(controlId, value, controlMsg)
       } else if (stepType === 'generar_commit_setup') {
         await handleGenerarCommitSetup(controlId, value, controlMsg)
-      } else if (stepType === 'deteccion_funcionalidades_setup') {
-        await handleDeteccionFuncionalidadesSetup(controlId, value, controlMsg)
       } else if (stepType === 'documentacion_update') {
         await handleDocumentacionUpdate(controlId, value, controlMsg)
       } else if (stepType === 'ticket_descripcion') {
@@ -1095,7 +1086,6 @@ export default {
     let docUpdateData = { provider: '', model: '', thinking: '', mode: '', temperature: '' }
     let descripcionData = { provider: '', model: '', thinking: '', mode: 'Plan', temperature: '' }
     const descripcionUserInput = ref('')
-    let deteccionData = { provider: '', model: '', thinking: '', mode: '', temperature: '' }
     let repoCrearRamaData = { proyectoId: '', ticketRedmineId: '', baseBranch: '', repoAcronimo: '' }
 
     async function handleDocumentacionUpdate(controlId, value, controlMsg) {
@@ -2151,178 +2141,6 @@ export default {
       }
     }
 
-    async function handleDeteccionFuncionalidadesSetup(controlId, value, controlMsg) {
-      const subStepType = controlMsg.controlData.subStepType
-
-      if (subStepType === 'provider') {
-        deteccionData.provider = value
-        await ocStore.select('provider', value)
-        ocStore.selectedProvider = value
-        const models = ocStore.getModelsForProvider(value)
-        chat.pushMessage({
-          role: 'opencode_control',
-          controlData: {
-            controlId: 'df-form-' + Date.now(),
-            controlType: 'generar_commit_form',
-            stepType: 'deteccion_funcionalidades_setup',
-            subStepType: 'form',
-            models,
-            modelValue: ocStore.savedModel || '',
-            thinkingOptions: ocStore.thinkingOptions,
-            thinkingValue: ocStore.savedThinking || '',
-            temperatureOptions: ocStore.temperatureOptions,
-            temperatureValue: ocStore.savedTemperature || '0.7',
-          },
-          _key: 'control-' + Date.now(),
-        })
-      } else if (subStepType === 'form') {
-        const { model, thinking = '', mode = 'Plan', temperature = '0.7' } = value || {}
-        deteccionData.model = model
-        deteccionData.thinking = thinking
-        deteccionData.mode = mode
-        deteccionData.temperature = temperature
-        await ocStore.select('model', model)
-        await ocStore.select('thinking', thinking || '')
-        await ocStore.select('mode', mode)
-        if (temperature) await ocStore.select('temperature', temperature)
-        ocStore.selectedModel = model
-        ocStore.selectedThinking = thinking || ''
-        ocStore.selectedMode = mode
-        ocStore.selectedTemperature = temperature || ''
-
-        const settingsStore = useSettingsStore()
-        const defaultPrompt = 'Analizá el proyecto en el directorio actual e identificá todas las funcionalidades implementadas.\n\nLa respuesta debe estar estructurada en formato Markdown con la siguiente jerarquía:\n\n# [Nombre del Subproyecto] (backend | frontend)\n\n## [Módulo o Conjunto de Rutas]\n\n### Si es backend:\n- Endpoint, método HTTP, tablas utilizadas, permisos requeridos\n\n### Si es frontend:\n- Componente, ruta Vue Router, propósito, otros componentes usados, composables, endpoints llamados\n\nUsá tablas cuando sea apropiado para listar múltiples elementos con sus propiedades. Identificá cada funcionalidad a partir del código fuente, incluyendo archivos backend (rutas, controladores, modelos) y frontend (componentes Vue, vistas, stores).'
-        const prompt = settingsStore.deteccionFuncionalidadesPrompt || defaultPrompt
-
-        await opencodeStreamPromptFuncionalidades(
-          chat.activeSessionId,
-          prompt,
-          deteccionData.provider,
-          model,
-          thinking,
-          mode,
-          temperature,
-        )
-      }
-    }
-
-    async function opencodeStreamPromptFuncionalidades(sessionId, prompt, provider, model, thinking, mode, temperature) {
-      ocStreaming.value = true
-      ocChunk.value = ''
-      ocThinking.value = ''
-      _streamSessionId.value = sessionId
-      if (sessionId) chat.setSessionStatus(sessionId, 'executing')
-
-      const detectionMsg = await addMessage('opencode_stream', '', { streaming: true })
-      detectionMsg._key = 'stream-detection-' + Date.now()
-
-      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
-        onChunk(content) {
-          if (_isActiveSession(sessionId)) {
-            ocChunk.value += content
-            const idx = chat.messages.findIndex((m) => m._key === detectionMsg._key)
-            if (idx >= 0) chat.messages[idx].content = ocChunk.value
-          }
-        },
-        onThinking(content) {
-          if (_isActiveSession(sessionId)) {
-            ocThinking.value += content
-            const idx = chat.messages.findIndex((m) => m._key === detectionMsg._key)
-            if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
-          }
-        },
-        onControl(control) {
-          const controlMsg = {
-            role: 'opencode_control',
-            content: JSON.stringify(control),
-            controlData: control,
-            _key: 'control-' + Date.now(),
-          }
-          chat._saveMessageToDb(sessionId, controlMsg)
-          if (_isActiveSession(sessionId)) {
-            chat.pushMessage(controlMsg)
-          } else {
-            chat.pendingNotifications[sessionId] = Date.now()
-          }
-        },
-        async onDone(json, fullText) {
-          const detectionResponse = json.fullResponse || fullText || '(sin respuesta)'
-          const detectionThinking = json.thinking || ocThinking.value || null
-          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: detectionResponse, thinking: detectionThinking })
-
-          const detIdx = chat.messages.findIndex((m) => m._key === detectionMsg._key)
-          if (detIdx >= 0) {
-            chat.messages[detIdx] = {
-              role: 'opencode_result',
-              content: detectionResponse,
-              thinking: detectionThinking,
-              _key: 'detection-' + Date.now(),
-            }
-          }
-
-          ocChunk.value = ''
-          ocThinking.value = ''
-
-          const refinePrompt = 'Tomá el análisis anterior y presentalo en un formato limpio y bien estructurado. Agrupá la información de manera jerárquica usando Markdown con títulos, subtítulos y tablas donde corresponda. Asegurate de mantener toda la información técnica (endpoints, métodos HTTP, tablas, permisos, componentes, rutas, composables, etc.) pero organizada de forma clara y legible.'
-
-          const refineMsg = await addMessage('opencode_stream', '', { streaming: true })
-          refineMsg._key = 'stream-refine-' + Date.now()
-
-          await ocStore.streamPrompt(sessionId, refinePrompt, provider, model, thinking, mode, temperature, {
-            onChunk(content) {
-              if (_isActiveSession(sessionId)) {
-                ocChunk.value += content
-                const idx = chat.messages.findIndex((m) => m._key === refineMsg._key)
-                if (idx >= 0) chat.messages[idx].content = ocChunk.value
-              }
-            },
-            onThinking(content) {
-              if (_isActiveSession(sessionId)) {
-                ocThinking.value += content
-                const idx = chat.messages.findIndex((m) => m._key === refineMsg._key)
-                if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
-              }
-            },
-            onControl(control) {
-              const controlMsg = {
-                role: 'opencode_control',
-                content: JSON.stringify(control),
-                controlData: control,
-                _key: 'control-' + Date.now(),
-              }
-              chat._saveMessageToDb(sessionId, controlMsg)
-              if (_isActiveSession(sessionId)) {
-                chat.pushMessage(controlMsg)
-              } else {
-                chat.pendingNotifications[sessionId] = Date.now()
-              }
-            },
-            async onDone(json2, fullText2) {
-              const finalResponse = json2.fullResponse || fullText2 || '(sin respuesta)'
-              const finalThinking = json2.thinking || null
-              chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: finalResponse, thinking: finalThinking })
-              ocStreaming.value = false
-              if (sessionId) chat.setSessionStatus(sessionId, 'idle')
-              if (!_isActiveSession(sessionId)) {
-                chat.pendingNotifications[sessionId] = Date.now()
-                return
-              }
-
-              const refIdx = chat.messages.findIndex((m) => m._key === refineMsg._key)
-              if (refIdx >= 0) {
-                chat.messages[refIdx] = {
-                  role: 'opencode_result',
-                  content: finalResponse,
-                  thinking: finalThinking,
-                  _key: 'result-' + Date.now(),
-                }
-              }
-            },
-          })
-        },
-      })
-    }
-
     async function regenerateCommit(controlId, controlMsg) {
       const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
       if (idx >= 0) {
@@ -2631,6 +2449,8 @@ export default {
       rawMsgKeys,
       msgKey,
       toggleRawView,
+      deteccionState,
+      abortDeteccion,
       messagesContainer,
       ticketInfo,
       priorityClass,

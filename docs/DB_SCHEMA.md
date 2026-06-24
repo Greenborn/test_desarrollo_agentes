@@ -84,6 +84,8 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `ticket_descripcion_prompt` | *(default interno)* | Prompt para redactar descripción de tickets |
 | `ticket_refinar_prompt` | *(default interno)* | Prompt para refinar descripción de tickets |
 | `deteccion_funcionalidades_prompt` | *(default interno)* | Prompt para detección de funcionalidades con OpenCode |
+| `code_file_extensions` | `.js,.jsx,.ts,.tsx,.vue,.py,.php,...` | Extensiones de archivos considerados código (separadas por coma) |
+| `code_file_max_size_kb` | `100` | Tamaño máximo en KB para incluir archivos en el árbol de código |
 | `documentacion_prompt_*` | *(default interno)* | Prompts de documentación por tipo |
 | `screen_resolutions` | `[{ id, width, height }, ...]` | Array JSON de resoluciones de pantalla para Playwright. Configurable desde Settings. Default: 14 resoluciones comunes (desktop + mobile) |
 
@@ -333,7 +335,33 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
-## 18. `playwright_console_logs`
+## 18. `documentacion_escaneo`
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
+| `fecha_hora_inicio` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+| `fecha_hora_fin` | TIMESTAMP | nullable |
+| `total_archivos` | INTEGER | nullable |
+| `archivos_procesados` | INTEGER | nullable |
+
+## 19. `documentacion_archivo`
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `escaneo_id` | INTEGER UNSIGNED | NOT NULL, FK → `documentacion_escaneo(id)` ON DELETE CASCADE |
+| `nombre` | VARCHAR(500) | NOT NULL |
+| `ruta` | TEXT | NOT NULL |
+| `tipo` | VARCHAR(50) | NOT NULL — `file` o `directory` |
+| `extension` | VARCHAR(50) | nullable |
+| `tamano` | INTEGER | nullable — tamaño en bytes |
+| `descripcion` | TEXT | nullable — descripción generada por DeepSeek |
+
+---
+
+## 20. `playwright_console_logs`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -366,6 +394,8 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `playwright_events` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 | `playwright_console_logs` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 | `playwright_event_recordings` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
+| `documentacion_escaneo` | `session_id` | `chat_sessions` | `id` | CASCADE |
+| `documentacion_archivo` | `escaneo_id` | `documentacion_escaneo` | `id` | CASCADE |
 
 ---
 
@@ -404,7 +434,11 @@ redmine_comentarios
  └─ chat_sessions.id (FK)
 
 chat_sessions
+ ├─ documentacion_escaneo.session_id (FK)
  ├─ gastos_tokens_usados.id_chat_session (FK)
  ├─ command_history.session_id (FK)
  └─ redmine_comentarios.session_id (FK)
+
+documentacion_escaneo
+ └─ documentacion_archivo.escaneo_id (FK)
 ```

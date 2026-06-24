@@ -11,15 +11,64 @@ function authGuard(req, res) {
   return true;
 }
 
+const DOC_BASE = () => `http://localhost:${process.env.SERVICIO_DOCUMENTAL_PORT || 4099}/api/documentacion`;
+
 router.get('/:proyectoId', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const docPort = process.env.SERVICIO_DOCUMENTAL_PORT || 4099;
-    const response = await fetch(`http://localhost:${docPort}/api/documentacion/${req.params.proyectoId}`);
+    const response = await fetch(`${DOC_BASE()}/${req.params.proyectoId}`);
     const data = await response.json();
     res.json(data);
   } catch (err) {
     console.log('Error al obtener documentación:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/escaneo/iniciar', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const response = await fetch(`${DOC_BASE()}/escaneo/iniciar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+    });
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    console.log('Error al iniciar escaneo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/escaneo/:id/finalizar', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const response = await fetch(`${DOC_BASE()}/escaneo/${req.params.id}/finalizar`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.log('Error al finalizar escaneo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/archivo', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const response = await fetch(`${DOC_BASE()}/archivo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+    });
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    console.log('Error al guardar archivo:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

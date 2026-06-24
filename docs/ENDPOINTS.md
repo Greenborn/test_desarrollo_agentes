@@ -50,6 +50,12 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
   - `data: {"type":"error","content":"..."}`
 - Los roles no estándar (`command`, `result`, `opencode_info`, `opencode_result`) se normalizan a `user`/`system` antes de enviar a DeepSeek. Ver `normalizeMessages()` en `services/deepseek.js`.
 
+### `POST /api/chat/summarize-file`
+- **Auth:** Requerida
+- **Body:** `{ fileContent: string, filePath?: string, sessionId?: number }`
+- **Respuesta:** `{ description: string }`
+- **Descripción:** Envía el contenido de un archivo a DeepSeek para obtener una descripción de máximo 300 caracteres. No streaming — respuesta directa JSON. Usado por `/deteccion_funcionalidades` para describir cada archivo de código.
+
 ### `DELETE /api/chat/sessions/:id`
 - **Auth:** Requerida
 - **Respuesta:** `{ success: true, sessionId }`
@@ -68,7 +74,7 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 - **Workspace:** Guarda con `workspace_id` de la sesión
 - **Body:** `{ key: string, value: string }`
 - Si `key === "deepseek_key"` se encripta con AES-256-CBC antes de almacenar
-- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `omnifilter_debounce_ms`, `screen_resolutions`
+- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `omnifilter_debounce_ms`, `screen_resolutions`
 - **Respuesta:** `{ success: true }`
 
 ### `GET /api/settings/export-all`
