@@ -79,7 +79,8 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 {
   "version": 1,
   "exported_at": "2026-06-23T12:00:00.000Z",
-  "configuracion_general": {
+  "configuracion_general": {},
+  "workspaces": {
     "Por Defecto": {
       "deepseek_key": "sk-plain-text",
       "redmine_token": "token-plain-text",
@@ -101,7 +102,7 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 - **Body:** Misma estructura que `GET /api/settings/export-all`
 - **Descripción:** Importa configuraciones desde un JSON. Busca cada workspace por **nombre** en la DB. Las credenciales (`deepseek_key`, `redmine_token`) se re-encriptan antes de almacenar. Los ambientes se actualizan por nombre dentro de cada workspace. Las keys nuevas se crean automáticamente sin necesidad de actualizar el código.
 - **Respuesta 200:** `{ success: true }`
-- **Respuesta 400:** `{ error: "configuracion_general es requerido" }`
+- **Respuesta 400:** `{ error: "workspaces es requerido" }`
 
 ---
 

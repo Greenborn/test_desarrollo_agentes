@@ -176,7 +176,8 @@ router.get('/export-all', async (req, res) => {
     res.json({
       version: 1,
       exported_at: new Date().toISOString(),
-      configuracion_general: configuracionGeneral,
+      configuracion_general: {},
+      workspaces: configuracionGeneral,
     });
   } catch (err) {
     console.log('Error al exportar settings:', err.message);
@@ -187,12 +188,12 @@ router.get('/export-all', async (req, res) => {
 router.post('/import-all', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { configuracion_general } = req.body;
-    if (!configuracion_general || typeof configuracion_general !== 'object') {
-      return res.status(400).json({ error: 'configuracion_general es requerido' });
+    const { workspaces } = req.body;
+    if (!workspaces || typeof workspaces !== 'object') {
+      return res.status(400).json({ error: 'workspaces es requerido' });
     }
 
-    for (const [wsName, wsData] of Object.entries(configuracion_general)) {
+    for (const [wsName, wsData] of Object.entries(workspaces)) {
       const ws = await db('workspaces').where({ name: wsName }).first();
       if (!ws) {
         console.log('Workspace no encontrado para importar:', wsName);

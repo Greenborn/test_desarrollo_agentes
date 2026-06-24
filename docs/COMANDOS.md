@@ -34,7 +34,8 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | Comando | Descripción | Uso |
 |---|---|---|
 | `/redmine_test_conexion` | Prueba la conexión a la instancia de Redmine configurada | `/redmine_test_conexion` |
-| `/redmine_listar_proyectos` | Lista proyectos Redmine. Con `--import` importa todos a la base de datos local | `/redmine_listar_proyectos [--import]` |
+| `/redmine_listar_proyectos` | Lista proyectos disponibles en Redmine (solo lectura) | `/redmine_listar_proyectos` |
+| `/redmine_importar_proyectos` | Importa proyectos de Redmine a la base de datos local. Usar `--all` para importar todos, `--id` para uno específico por ID de Redmine, o `--slug` para importar por slug | `/redmine_importar_proyectos --all \| --id=<redmine_id> \| --slug=<slug>` |
 | `/redmine_listar_tickets` | Obtiene la lista de tickets de Redmine para un proyecto importado. Usa Tab para autocompletar con los proyectos disponibles | `/redmine_listar_tickets --id=<id_proyecto>` |
 | `/redmine_importar_tickets` | Importa todos los tickets de Redmine de un proyecto o de todos los proyectos a la base de datos local. Usa Tab para autocompletar | `/redmine_importar_tickets [--id=<id_proyecto> \| --all]` |
 | `/redmine_crear_ticket` | Abre un formulario inline para crear un nuevo ticket en Redmine: seleccionar proyecto, asunto, descripción, estado, prioridad, asignado y % de avance | `/redmine_crear_ticket` |

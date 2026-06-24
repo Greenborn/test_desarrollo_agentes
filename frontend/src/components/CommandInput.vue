@@ -47,6 +47,7 @@ import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useChatStore } from '../stores/chat.js'
 import { useUiStore } from '../stores/ui.js'
 import { useSettingsStore } from '../stores/settings.js'
+import { useProjectStore } from '../stores/project.js'
 
 export default {
   setup() {
@@ -54,6 +55,7 @@ export default {
     const chatStore = useChatStore()
     const uiStore = useUiStore()
     const settingsStore = useSettingsStore()
+    const projectStore = useProjectStore()
     const { find, suggest } = useCommandRegistry()
     const { autocompleteOptions, autocompleteVisible, arrowIndex, currentDir } = storeToRefs(cmdStore)
     const { activeSessionId } = storeToRefs(chatStore)
@@ -141,7 +143,7 @@ export default {
 
       await chatStore.runCommand(raw, async (loadingIdx) => {
         if (known) {
-          return known.execute(parts.slice(1), { cmdStore, chatStore, loadingIdx })
+          return known.execute(parts.slice(1), { cmdStore, chatStore, projectStore, loadingIdx })
         }
         if (!cmdName.startsWith('/')) return null
         const res = await fetch('/api/command/execute', {

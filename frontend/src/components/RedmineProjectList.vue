@@ -23,18 +23,7 @@
         <pre class="small mb-0 p-2 rounded" style="background: #1a2744; border: 1px solid #2a2a3e; white-space: pre-wrap; word-break: break-word; max-height: 120px; overflow-y: auto; color: #e0e0e0;">{{ project.description }}</pre>
       </div>
 
-      <div class="d-flex justify-content-end">
-        <button
-          v-if="!imported[project.id]"
-          class="btn btn-sm btn-outline-argentina"
-          :disabled="loading[project.id]"
-          @click="importProject(project)"
-        >
-          <span v-if="loading[project.id]" class="spinner-border spinner-border-sm me-1"></span>
-          {{ loading[project.id] ? 'Importando...' : 'Importar' }}
-        </button>
-        <span v-else class="badge bg-success">Importado ✓</span>
-      </div>
+      
     </div>
   </div>
 </template>
@@ -44,45 +33,11 @@ export default {
   props: {
     projects: { type: Array, required: true },
   },
-  emits: ['confirm'],
   data() {
     return {
-      loading: {},
-      imported: {},
     }
   },
   methods: {
-    async importProject(project) {
-      this.loading = { ...this.loading, [project.id]: true }
-      try {
-        const res = await fetch('/api/redmine/proyectos/import', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: project.id,
-            name: project.name,
-            description: project.description,
-            status: project.status,
-            created_on: project.created_on,
-            updated_on: project.updated_on,
-            parent: project.parent,
-          }),
-        })
-        const data = await res.json()
-        if (data.success) {
-          this.imported = { ...this.imported, [project.id]: true }
-          this.$emit('confirm', { action: 'imported', proyectoId: data.proyectoId, projectName: project.name })
-        } else {
-          alert(data.message || 'Error al importar proyecto.')
-        }
-      } catch (err) {
-        console.error('Error al importar proyecto Redmine:', err.message)
-        alert('Error de conexión al importar proyecto.')
-      } finally {
-        this.loading = { ...this.loading, [project.id]: false }
-      }
-    },
     formatDate(dateStr) {
       if (!dateStr) return '—'
       const d = new Date(dateStr)

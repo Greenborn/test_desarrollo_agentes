@@ -182,12 +182,21 @@ router.post('/proyectos/import-all', async (req, res) => {
         }
 
         const existing = await db('proyectos').where({ redmine_id: p.id }).first();
+        const wsId = req.session.workspaceId || 1;
+
         if (existing) {
+          await db('proyectos').where({ redmine_id: p.id }).update({
+            descripcion: p.description || '',
+            redmine_status: p.status || null,
+            redmine_updated_on: toDateTime(p.updated_on),
+            redmine_parent_id: p.parent?.id ? String(p.parent.id) : null,
+            redmine_parent_name: p.parent?.name || null,
+            workspace_id: wsId,
+          });
           yaExistentes.push({ id: p.id, name: p.name, identifier: p.identifier });
           continue;
         }
 
-        const wsId = req.session.workspaceId || 1;
         await db('proyectos').insert({
           id: proyectoId,
           descripcion: p.description || '',
@@ -237,15 +246,11 @@ router.post('/proyectos/import', async (req, res) => {
   }
 
   try {
-    const existing = await db('proyectos').where({ id: proyectoId }).first();
-    if (existing) {
-      res.json({ success: false, message: `El proyecto "${name}" ya existe en la base de local.` });
-      return;
-    }
-
     const wsId = req.session.workspaceId || 1;
-    await db('proyectos').insert({
-      id: proyectoId,
+
+    const existing = await db('proyectos').where({ redmine_id: id }).first();
+
+    const data = {
       descripcion: description || '',
       redmine_id: id,
       redmine_status: status || null,
@@ -254,9 +259,16 @@ router.post('/proyectos/import', async (req, res) => {
       redmine_parent_id: parent?.id ? String(parent.id) : null,
       redmine_parent_name: parent?.name || null,
       workspace_id: wsId,
-    });
+    };
 
-    res.json({ success: true, proyectoId });
+    if (existing) {
+      await db('proyectos').where({ redmine_id: id }).update(data);
+      res.json({ success: true, proyectoId: existing.id, action: 'updated' });
+    } else {
+      data.id = proyectoId;
+      await db('proyectos').insert(data);
+      res.json({ success: true, proyectoId, action: 'imported' });
+    }
   } catch (err) {
     console.log('Error al importar proyecto Redmine:', err.message);
     res.json({ success: false, message: 'Error al importar proyecto: ' + err.message });
