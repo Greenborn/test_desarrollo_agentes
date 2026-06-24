@@ -6,14 +6,44 @@ const { register } = useCommandRegistry()
 register({
   name: '/chat_get_ticket',
   category: 'Proyecto',
-  description: 'Muestra el ticket de Redmine asignado a la sesión actual. Con --comments muestra también los comentarios.',
-  usage: '/chat_get_ticket [--comments]',
+  description: 'Muestra el ticket de Redmine asignado a la sesión actual. Con --comments muestra también los comentarios. Con --field=<campo> muestra solo el valor de un campo específico.',
+  usage: '/chat_get_ticket [--comments] [--field=<campo>]',
   async autocomplete(args, cmdStore) {
+    const FIELD_OPTIONS = [
+      'redmine_id', 'subject', 'description', 'status_name',
+      'priority_name', 'assigned_to_name', 'proyecto_id',
+      'tracker_name', 'author_name', 'start_date', 'due_date',
+      'estimated_hours', 'done_ratio', 'fixed_version_name',
+      'redmine_created_on', 'redmine_updated_on', 'redmine_closed_on',
+      'idTicketRedmine',
+    ]
+
+    for (const arg of args) {
+      if (arg.startsWith('--field')) {
+        const eqIdx = arg.indexOf('=')
+        if (eqIdx >= 0) {
+          const partial = arg.slice(eqIdx + 1)
+          const filtered = FIELD_OPTIONS.filter(f => f.startsWith(partial))
+          if (filtered.length > 0) {
+            cmdStore.showAutocomplete(filtered.map(f => ({ display: f, value: `--field=${f}` })))
+          } else {
+            cmdStore.hideAutocomplete()
+          }
+        } else {
+          cmdStore.showAutocomplete(['--field='])
+        }
+        return
+      }
+    }
+
     const usedFlags = getUsedFlags(args)
-    if (usedFlags.includes('--comments')) {
-      cmdStore.hideAutocomplete()
+    const available = []
+    if (!usedFlags.includes('--comments')) available.push('--comments')
+    if (!usedFlags.includes('--field=')) available.push('--field=')
+    if (available.length > 0) {
+      cmdStore.showAutocomplete(available)
     } else {
-      cmdStore.showAutocomplete(['--comments'])
+      cmdStore.hideAutocomplete()
     }
   },
   async execute(args, { chatStore }) {
@@ -22,7 +52,7 @@ register({
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
 
-    const { params } = parseCommandArgs(args, { comments: { required: false } })
+    const { params } = parseCommandArgs(args, { comments: { required: false }, field: { required: false } })
     const showComments = params.comments === 'true'
 
     try {
@@ -37,6 +67,14 @@ register({
       const t = data.ticket
       if (!t) {
         return `Ticket #${data.idTicketRedmine} asignado (no encontrado en base de datos local).`
+      }
+
+      if (params.field) {
+        const value = t[params.field] !== undefined ? t[params.field] : data[params.field]
+        if (value === undefined) {
+          return `Campo "${params.field}" no encontrado en el ticket.`
+        }
+        return `${value}`
       }
 
       let output = (
