@@ -5,7 +5,7 @@ const { register } = useCommandRegistry()
 register({
   name: '/resoluciones_get_all',
   category: 'Navegador',
-  description: 'Muestra las resoluciones de pantalla configuradas con opción para establecer una por defecto.',
+  description: 'Muestra las resoluciones de pantalla configuradas.',
   usage: '/resoluciones_get_all',
   async execute(args, { chatStore }) {
     const [settingsRes, defaultRes] = await Promise.all([
@@ -24,20 +24,15 @@ register({
     }
 
     const defaultId = defaultRes.value || ''
+    const lines = resolutions.map(r => {
+      const marker = r.id === defaultId ? ' ✅ (por defecto)' : ''
+      return `  • ${r.id} — ${r.width}x${r.height}${marker}`
+    })
 
     chatStore.messages.push({
-      role: 'opencode_control',
-      controlData: {
-        controlId: 'res-default-' + Date.now(),
-        controlType: 'resolution_select',
-        stepType: 'resolution_set_default',
-        options: resolutions.map(r => ({
-          label: `${r.id} — ${r.width}x${r.height}`,
-          value: r.id,
-        })),
-        preselect: defaultId || '',
-      },
-      _key: 'ctrl-' + Date.now(),
+      role: 'result',
+      content: `**Resoluciones disponibles:**\n${lines.join('\n')}\n\nUsá \`/resolucion_set_default --resolucion=ID\` para cambiar la resolución por defecto.`,
+      _key: 'res-' + Date.now(),
     })
   },
 })

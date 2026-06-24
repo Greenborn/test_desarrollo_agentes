@@ -40,10 +40,27 @@ router.get('/console', async (req, res) => {
   }
 
   try {
-    const logs = await db('playwright_console_logs')
-      .where({ chat_session_id: parseInt(chatSessionId) })
+    let query = db('playwright_console_logs')
+      .where({ chat_session_id: parseInt(chatSessionId) });
+
+    const since = req.query.since;
+    if (since) {
+      query = query.where('created_at', '>', since);
+    }
+
+    const types = req.query.types;
+    if (types) {
+      const typeList = types.split(',').map(t => t.trim()).filter(Boolean);
+      if (typeList.length > 0) {
+        query = query.whereIn('type', typeList);
+      }
+    }
+
+    const limit = req.query.limit ? Math.min(parseInt(req.query.limit), 500) : 500;
+
+    const logs = await query
       .orderBy('created_at', 'desc')
-      .limit(500);
+      .limit(limit);
     res.json(logs);
   } catch (err) {
     console.log('Error al obtener console logs:', err.message);

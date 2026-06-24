@@ -103,7 +103,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { usePlaywrightLogsStore } from '../stores/playwrightLogs.js'
 import { useChatStore } from '../stores/chat.js'
 
@@ -198,13 +198,6 @@ export default {
     async function poll() {
       await logsStore.fetchNetworkLogs(activeSessionId.value)
     }
-
-    watch(networkLogs, async () => {
-      await nextTick()
-      if (containerRef.value) {
-        containerRef.value.scrollTop = containerRef.value.scrollHeight
-      }
-    })
 
     onMounted(() => {
       poll()

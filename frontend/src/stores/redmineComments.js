@@ -21,10 +21,31 @@ export const useRedmineCommentsStore = defineStore('redmineComments', () => {
     }
   }
 
+  async function refreshComments() {
+    if (activeTicketId.value) {
+      await loadComments(activeTicketId.value)
+    }
+  }
+
+  async function queueComment(sessionId, ticketRedmineId, comentario) {
+    const res = await fetch('/api/redmine/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ session_id: sessionId, ticket_redmine_id: ticketRedmineId, comentario }),
+    })
+    const data = await res.json()
+    if (!data.success) {
+      throw new Error(data.error || 'Error al encolar comentario')
+    }
+    await loadComments(ticketRedmineId)
+    return data
+  }
+
   function clearComments() {
     comments.value = []
     activeTicketId.value = null
   }
 
-  return { comments, loading, activeTicketId, loadComments, clearComments }
+  return { comments, loading, activeTicketId, loadComments, refreshComments, queueComment, clearComments }
 })

@@ -243,7 +243,8 @@ Todo comando que controle directamente el navegador web (iniciar, navegar, confi
 Los comandos de resolución de pantalla **quedan excluidos** por ser una categoría independiente:
 
 - `/resoluciones_get_all` — muestra resoluciones configuradas
-- `/resolucion_default` — muestra resolución por defecto
+- `/resolucion_get_default` — muestra resolución por defecto
+- `/resolucion_set_default` — establece resolución por defecto con autocompletado
 
 ## 10. Comandos de despliegue
 

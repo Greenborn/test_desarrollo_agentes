@@ -1,9 +1,11 @@
 <template>
   <div class="commit-result-control">
     <div class="mb-2" style="color: #9ca3af; font-size: 0.8rem;">Propuesta de commit:</div>
-    <div class="result-text p-3 mb-2 rounded-3" style="background: #0f1a2e; border: 1px solid #374151; color: #e0e0e0; white-space: pre-wrap; word-break: break-word; font-size: 0.875rem;">
-      {{ message }}
-    </div>
+    <textarea
+      v-model="editedMessage"
+      class="form-control bg-dark text-light border-secondary font-monospace p-3 mb-2 rounded-3"
+      style="min-height: 100px; resize: vertical; font-size: 0.875rem;"
+    ></textarea>
     <label class="d-flex align-items-center gap-2 mb-2" style="color: #9ca3af; font-size: 0.8rem; cursor: pointer;">
       <input type="checkbox" v-model="addComment" class="form-check-input" style="cursor: pointer;" />
       Agregar comentario al ticket
@@ -40,11 +42,12 @@ export default {
   },
   emits: ['confirm'],
   setup(props, { emit }) {
+    const editedMessage = ref(props.message)
     const addComment = ref(true)
     const modoEnvio = ref(props.modoEnvioInicial || 'encolar')
 
     function confirmar() {
-      emit('confirm', { action: 'confirm', message: props.message, addComment: addComment.value, modo_envio: modoEnvio.value })
+      emit('confirm', { action: 'confirm', message: editedMessage.value, addComment: addComment.value, modo_envio: modoEnvio.value })
     }
 
     function reintentar() {
@@ -55,7 +58,7 @@ export default {
       emit('confirm', null)
     }
 
-    return { addComment, modoEnvio, confirmar, reintentar, cancelar }
+    return { editedMessage, addComment, modoEnvio, confirmar, reintentar, cancelar }
   },
 }
 </script>

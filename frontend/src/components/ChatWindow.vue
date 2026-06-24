@@ -79,6 +79,7 @@ import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 import { useModalStore } from '../stores/modal.js'
 import { useOpencodeStore } from '../stores/opencode.js'
+import { useRedmineCommentsStore } from '../stores/redmineComments.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useProjectVariables } from '../composables/useProjectVariables.js'
 import ChatMessage from './ChatMessage.vue'
@@ -92,6 +93,7 @@ export default {
     const cmdStore = useCommandStore()
     const modal = useModalStore()
     const ocStore = useOpencodeStore()
+    const redmineComments = useRedmineCommentsStore()
     const { find } = useCommandRegistry()
     const { getVariables, interpolate } = useProjectVariables()
     const { activeSessionId, messages, streaming, executing, currentChunk, currentThinking, sessions } = storeToRefs(chat)
@@ -328,6 +330,8 @@ export default {
       _streamSessionId.value = sessionId
       if (sessionId) chat.setSessionStatus(sessionId, 'executing')
 
+      const _buildStartTime = mode === 'Build' ? new Date().toISOString() : null
+
       await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
         onChunk(content) {
           if (_isActiveSession(sessionId)) ocChunk.value += content
@@ -361,6 +365,30 @@ export default {
               _key: 'result-' + Date.now(),
             })
             fetchGitBranch()
+
+            if (mode === 'Build' && _buildStartTime) {
+              try {
+                const sinceParam = _buildStartTime
+                const res = await fetch(`/api/playwright-logs/console?chat_session_id=${sessionId}&since=${encodeURIComponent(sinceParam)}&types=error,warn&limit=20`, { credentials: 'include' })
+                const newLogs = await res.json()
+                if (Array.isArray(newLogs) && newLogs.length > 0) {
+                  const errors = newLogs.filter(l => l.type === 'error')
+                  const warnings = newLogs.filter(l => l.type === 'warn')
+                  chat.pushMessage({
+                    role: 'opencode_info',
+                    content: JSON.stringify({
+                      type: 'console_errors',
+                      errors: newLogs,
+                      summary: `Se detectaron ${errors.length} error(es) y ${warnings.length} advertencia(s) en la consola del navegador`,
+                    }),
+                    _key: 'console-err-' + Date.now(),
+                  })
+                }
+              } catch (err) {
+                console.error('Error al verificar console logs:', err.message)
+              }
+            }
+
             const next = ocStore.messageQueue.shift()
             if (next && _isActiveSession(sessionId)) {
               const queueMsg = chat.messages.find((m) => m.role === 'opencode_info' && m.content?.includes('encolado'))
@@ -2215,18 +2243,8 @@ export default {
           } else {
             try {
               const notesBody = cleanMsg
-              const commentRes = await fetch('/api/redmine/comments', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ session_id: sessionId, ticket_redmine_id: idTicket, comentario: notesBody }),
-              })
-              const commentData = await commentRes.json()
-              if (commentData.success) {
-                resultLines.push('', '✓ Comentario encolado para el ticket #' + idTicket + '. Usá /dev_redmine_comentarios_enviar para enviarlo.')
-              } else {
-                resultLines.push('', '✗ Error al encolar comentario: ' + (commentData.error || 'Error desconocido'))
-              }
+              const commentData = await redmineComments.queueComment(sessionId, idTicket, notesBody)
+              resultLines.push('', '✓ Comentario encolado para el ticket #' + idTicket + '. Usá /dev_redmine_comentarios_enviar para enviarlo.')
             } catch (err) {
               console.error('Error al encolar comentario:', err.message)
               resultLines.push('', '✗ Error al encolar comentario: ' + err.message)

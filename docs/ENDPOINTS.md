@@ -633,8 +633,12 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ### `GET /api/playwright-logs/console`
 - **Auth:** Requerida
-- **Query:** `chat_session_id` (number, requerido)
-- **Descripción:** Obtiene las últimas 500 entradas de console log registradas para la sesión de chat, ordenadas por fecha descendente.
+- **Query:**
+  - `chat_session_id` (number, requerido)
+  - `since` (string ISO datetime, opcional) — Filtra logs con `created_at > since`
+  - `types` (string, opcional) — Filtra por tipo(s), separados por coma (ej: `error,warn`)
+  - `limit` (number, opcional, default 500, max 500) — Número máximo de logs a devolver
+- **Descripción:** Obtiene entradas de console log registradas para la sesión de chat, ordenadas por fecha descendente.
 - **Respuesta 200:** `[{ id, chat_session_id, playwright_session_id, type, text, location, created_at }]`
 
 ### `DELETE /api/playwright-logs/network`
