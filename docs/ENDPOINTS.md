@@ -60,6 +60,11 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 - **Auth:** Requerida
 - **Respuesta:** `{ success: true, sessionId }`
 
+### `DELETE /api/chat/sessions/:id/messages`
+- **Auth:** Requerida
+- **Respuesta:** `{ success: true, sessionId }`
+- **Descripción:** Elimina todos los mensajes de una sesión sin eliminar la sesión ni sus metadatos (ticket, proyecto, etc.).
+
 ---
 
 ## Configuración (`/api/settings`)

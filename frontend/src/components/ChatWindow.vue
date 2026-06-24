@@ -8,10 +8,13 @@
         <span class="ticket-subject text-truncate">{{ ticketInfo.subject }}</span>
       </template>
       <span v-if="currentGitBranch && currentGitBranch !== 'Sin repo'" class="branch-name ms-2">· rama: {{ currentGitBranch }}</span>
-      <div class="zoom-controls ms-auto d-flex align-items-center gap-1">
-        <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomOut" :disabled="chatZoom <= 50" title="Alejar">−</button>
-        <span class="zoom-level small" @click="chatZoom = 100; saveZoom(100)" style="cursor:pointer; min-width:36px; text-align:center;" title="Restablecer zoom">{{ chatZoom }}%</span>
-        <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomIn" :disabled="chatZoom >= 200" title="Acercar">+</button>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <button class="btn btn-sm btn-outline-danger px-2" @click="clearChat" title="Limpiar chat">🗑️</button>
+        <div class="zoom-controls d-flex align-items-center gap-1">
+          <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomOut" :disabled="chatZoom <= 50" title="Alejar">−</button>
+          <span class="zoom-level small" @click="chatZoom = 100; saveZoom(100)" style="cursor:pointer; min-width:36px; text-align:center;" title="Restablecer zoom">{{ chatZoom }}%</span>
+          <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomIn" :disabled="chatZoom >= 200" title="Acercar">+</button>
+        </div>
       </div>
     </div>
     <div class="flex-grow-1 overflow-y-auto p-3" ref="messagesContainer" style="min-height: 0;" :style="{ fontSize: chatZoom + '%' }">
@@ -330,6 +333,12 @@ export default {
         console.error('Error al eliminar mensaje:', err)
       }
       closeCtxMenu()
+    }
+
+    async function clearChat() {
+      const confirmed = confirm('¿Eliminar todos los mensajes de este chat? Esta acción no se puede deshacer.')
+      if (!confirmed) return
+      await chat.clearMessages(chat.activeSessionId)
     }
 
     async function opencodeStreamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature) {
@@ -2449,6 +2458,7 @@ export default {
       rawMsgKeys,
       msgKey,
       toggleRawView,
+      clearChat,
       deteccionState,
       abortDeteccion,
       messagesContainer,

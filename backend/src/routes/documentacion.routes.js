@@ -25,6 +25,18 @@ router.get('/:proyectoId', async (req, res) => {
   }
 });
 
+router.get('/escaneo/ultimo/:sessionId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const response = await fetch(`${DOC_BASE()}/escaneo/ultimo/${req.params.sessionId}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.log('Error al obtener último escaneo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/escaneo/iniciar', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
@@ -69,6 +81,34 @@ router.post('/archivo', async (req, res) => {
     res.status(response.status).json(data);
   } catch (err) {
     console.log('Error al guardar archivo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/archivo/por-escaneo/:escaneoId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const response = await fetch(`${DOC_BASE()}/archivo/por-escaneo/${req.params.escaneoId}`, { method: 'DELETE' });
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.log('Error al limpiar archivos del escaneo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/archivo/batch', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const response = await fetch(`${DOC_BASE()}/archivo/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+    });
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    console.log('Error al guardar batch de archivos:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

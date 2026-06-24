@@ -47,6 +47,19 @@ router.get('/:proyectoId', async (req, res) => {
   }
 });
 
+router.get('/escaneo/ultimo/:sessionId', async (req, res) => {
+  try {
+    const row = await db('documentacion_escaneo')
+      .where({ session_id: req.params.sessionId })
+      .orderBy('fecha_hora_inicio', 'desc')
+      .first();
+    res.json(row ? { id: row.id } : { id: null });
+  } catch (err) {
+    console.log('Error al obtener último escaneo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/escaneo/iniciar', async (req, res) => {
   try {
     const { session_id } = req.body;
@@ -101,6 +114,47 @@ router.post('/archivo', async (req, res) => {
     res.status(201).json({ id });
   } catch (err) {
     console.log('Error al guardar archivo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/archivo/por-escaneo/:escaneoId', async (req, res) => {
+  try {
+    await db('documentacion_archivo').where({ escaneo_id: req.params.escaneoId }).del();
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al limpiar archivos del escaneo:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/archivo/batch', async (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items debe ser un arreglo no vacío' });
+    }
+
+    for (const item of items) {
+      if (!item.escaneo_id) return res.status(400).json({ error: 'escaneo_id requerido en cada item' });
+      if (!item.nombre) return res.status(400).json({ error: 'nombre requerido en cada item' });
+      if (!item.ruta) return res.status(400).json({ error: 'ruta requerida en cada item' });
+    }
+
+    const rows = items.map((item) => ({
+      escaneo_id: item.escaneo_id,
+      nombre: item.nombre,
+      ruta: item.ruta,
+      tipo: item.tipo || 'file',
+      extension: item.extension || null,
+      tamano: item.tamano || null,
+      descripcion: item.descripcion || null,
+    }));
+
+    await db('documentacion_archivo').insert(rows);
+    res.status(201).json({ inserted: rows.length });
+  } catch (err) {
+    console.log('Error al guardar batch de archivos:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

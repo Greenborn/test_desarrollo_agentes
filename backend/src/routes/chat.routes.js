@@ -200,6 +200,19 @@ router.delete('/sessions/:sessionId/messages/:messageId', async (req, res) => {
   }
 });
 
+router.delete('/sessions/:id/messages', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const session = await db('chat_sessions').where({ id: req.params.id, user_id: req.session.userId }).first();
+    if (!session) return res.status(404).json({ error: 'Sesión no encontrada' });
+    await db('chat_messages').where({ session_id: req.params.id }).del();
+    res.json({ success: true, sessionId: req.params.id });
+  } catch (err) {
+    console.log('Error al limpiar mensajes:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/refine', async (req, res) => {
   if (!authGuard(req, res)) return;
   const { text, systemPrompt, sessionId } = req.body;

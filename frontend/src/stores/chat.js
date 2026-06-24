@@ -379,6 +379,26 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function clearMessages(sessionId) {
+    try {
+      const res = await fetch(`${API}/chat/sessions/${sessionId}/messages`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.error || 'Error al limpiar mensajes')
+      }
+      if (Number(activeSessionId.value) === Number(sessionId)) {
+        messages.value = []
+        currentChunk.value = ''
+        currentThinking.value = ''
+      }
+    } catch (err) {
+      console.error('Error al limpiar mensajes:', err)
+    }
+  }
+
   function stopAllExecutions() {
     creating.value = false
     executingCount.value = 0
@@ -432,7 +452,7 @@ export const useChatStore = defineStore('chat', () => {
     streaming, creating, executing, sessionStatus, currentChunk, currentThinking,
     pendingNotifications,
     loadSessions, createSession, createSessionIfNeeded, runCommand, loadMessages,
-    sendMessage, deleteMessage, deleteSession, stopAllExecutions,
+    sendMessage, deleteMessage, deleteSession, clearMessages, stopAllExecutions,
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
     _saveMessageToDb, clearPendingNotification,
   }

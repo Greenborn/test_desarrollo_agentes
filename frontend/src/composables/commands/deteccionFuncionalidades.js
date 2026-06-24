@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 import { useCommandRegistry } from '../useCommandRegistry.js'
+import { parseCommandArgs } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
@@ -37,12 +38,33 @@ function flattenFiles(node) {
   return files
 }
 
+let batch = []
+
+async function flushBatch() {
+  if (batch.length === 0) return
+  const items = batch.splice(0)
+  try {
+    await fetch('/api/documentacion/archivo/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ items }),
+    })
+  } catch (err) {
+    console.error('Error al guardar batch de archivos:', err)
+  }
+}
+
 register({
   name: '/deteccion_funcionalidades',
   category: 'Detección',
-  description: 'Obtiene el listado de archivos de código del proyecto, los resume uno por uno vía DeepSeek y entrega el JSON completo con descripciones.',
-  usage: '/deteccion_funcionalidades',
+  description: 'Obtiene el listado de archivos de código del proyecto, los resume uno por uno vía DeepSeek y entrega el JSON completo con descripciones. Si se especifica --escaneo-id, reutiliza un escaneo existente sobrescribiendo sus datos.',
+  usage: '/deteccion_funcionalidades [--escaneo-id=&lt;id&gt;]',
   async execute(args, { chatStore }) {
+    const { params } = parseCommandArgs(args, {
+      'escaneo-id': { required: false },
+    })
+
     const sessionId = chatStore.activeSessionId
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
@@ -77,90 +99,103 @@ register({
         _key: 'count-' + Date.now(),
       })
 
-      let escaneoId = null
-      try {
-        const escRes = await fetch('/api/documentacion/escaneo/iniciar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ session_id: sessionId }),
-        })
-        const escData = await escRes.json()
-        escaneoId = escData.id
-      } catch (err) {
-        console.error('Error al iniciar escaneo en DB:', err)
+      let escaneoId = params['escaneo-id'] ? parseInt(params['escaneo-id'], 10) : null
+      if (!escaneoId) {
+        try {
+          const ultimoRes = await fetch('/api/documentacion/escaneo/ultimo/' + sessionId, { credentials: 'include' })
+          const ultimoData = await ultimoRes.json()
+          escaneoId = ultimoData.id
+        } catch (err) {
+          console.error('Error al obtener último escaneo:', err)
+        }
+      }
+      if (escaneoId) {
+        try {
+          await fetch('/api/documentacion/archivo/por-escaneo/' + escaneoId, { method: 'DELETE', credentials: 'include' })
+        } catch (err) {
+          console.error('Error al limpiar archivos previos del escaneo:', err)
+        }
+      } else {
+        try {
+          const escRes = await fetch('/api/documentacion/escaneo/iniciar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ session_id: sessionId }),
+          })
+          const escData = await escRes.json()
+          escaneoId = escData.id
+        } catch (err) {
+          console.error('Error al iniciar escaneo en DB:', err)
+        }
       }
 
       deteccionState.running = true
       deteccionState.total = files.length
       deteccionState.processed = 0
 
-      for (let i = 0; i < files.length; i++) {
-        if (_deteccionAbort) break
+      for (let i = 0; i < files.length && !_deteccionAbort; i += 10) {
+        const chunk = files.slice(i, i + 10)
 
-        const file = files[i]
         deteccionState.processed = i
-        deteccionState.current = file.path
+        deteccionState.current = chunk.length > 1 ? `${chunk[0].path} (+${chunk.length - 1})` : chunk[0].path
 
-        try {
-          const fileRes = await fetch(`/api/command/read-file?path=${encodeURIComponent(file.path)}`, { credentials: 'include' })
-          const fileData = await fileRes.json()
+        const results = await Promise.all(chunk.map(async (file) => {
+          try {
+            const fileRes = await fetch(`/api/command/read-file?path=${encodeURIComponent(file.path)}`, { credentials: 'include' })
+            const fileData = await fileRes.json()
 
-          if (fileData.success && fileData.content) {
-            const summaryRes = await fetch('/api/chat/summarize-file', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ filePath: file.path, fileContent: fileData.content, sessionId }),
-            })
-            const summaryData = await summaryRes.json()
+            let description
+            if (fileData.success && fileData.content) {
+              const summaryRes = await fetch('/api/chat/summarize-file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ filePath: file.path, fileContent: fileData.content, sessionId }),
+              })
+              const summaryData = await summaryRes.json()
+              description = summaryData.description || '(sin descripción)'
+            } else {
+              description = '(error al leer)'
+            }
 
-            file.description = summaryData.description || '(sin descripción)'
-
-            chatStore.pushMessage({
-              role: 'result',
-              content: `✅ ${file.path} — ${file.description}`,
-              _key: 'desc-' + Date.now(),
-            })
-          } else {
-            file.description = '(error al leer)'
-            chatStore.pushMessage({
-              role: 'result',
-              content: `⚠️ ${file.path} — error al leer el archivo`,
-              _key: 'err-' + Date.now(),
-            })
+            file.description = description
+            return { file, description, error: null }
+          } catch (err) {
+            console.error('Error procesando archivo:', file.path, err)
+            file.description = err.message || 'error'
+            return { file, description: err.message || 'error', error: err }
           }
-        } catch (err) {
-          console.error('Error procesando archivo:', file.path, err)
-          file.description = err.message || 'error'
+        }))
+
+        for (const { file, description, error } of results) {
+          const prefix = error ? '⚠️' : '✅'
           chatStore.pushMessage({
             role: 'result',
-            content: `⚠️ ${file.path} — ${err.message || 'error'}`,
-            _key: 'err-' + Date.now(),
+            content: `${prefix} ${file.path} — ${description}`,
+            _key: 'desc-' + Date.now(),
           })
         }
 
-        if (escaneoId && file.description) {
-          try {
+        if (escaneoId) {
+          for (const { file, description } of results) {
             const ext = file.name.includes('.') ? file.name.split('.').pop() : null
-            await fetch('/api/documentacion/archivo', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                escaneo_id: escaneoId,
-                nombre: file.name,
-                ruta: file.path,
-                tipo: file.type || 'file',
-                extension: ext,
-                tamano: file.size || null,
-                descripcion: file.description || null,
-              }),
+            batch.push({
+              escaneo_id: escaneoId,
+              nombre: file.name,
+              ruta: file.path,
+              tipo: file.type || 'file',
+              extension: ext,
+              tamano: file.size || null,
+              descripcion: description || null,
             })
-          } catch (err) {
-            console.error('Error al guardar archivo en DB:', file.path, err)
           }
+          await flushBatch()
         }
+      }
+
+      if (escaneoId && batch.length > 0) {
+        await flushBatch()
       }
 
       if (escaneoId) {

@@ -160,7 +160,7 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/deteccion_funcionalidades` | Inicia un agente OpenCode en el directorio del proyecto para detectar y listar todas las funcionalidades implementadas. Seleccioná proveedor, modelo y modo para obtener el listado completo de funcionalidades detectadas. | `/deteccion_funcionalidades` |
+| `/deteccion_funcionalidades` | Obtiene el listado de archivos de código del proyecto filtrado por extensiones configurables, los resume uno por uno vía DeepSeek y entrega el JSON completo con descripciones. Por defecto reutiliza el último escaneo de la sesión (si existe), sobrescribiendo sus archivos. Con `--escaneo-id` reutiliza un escaneo específico. | `/deteccion_funcionalidades [--escaneo-id=<id>]` |
 
 ---
 
