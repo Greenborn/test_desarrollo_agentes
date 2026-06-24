@@ -68,7 +68,7 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 - **Workspace:** Guarda con `workspace_id` de la sesión
 - **Body:** `{ key: string, value: string }`
 - Si `key === "deepseek_key"` se encripta con AES-256-CBC antes de almacenar
-- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `omnifilter_debounce_ms`, `screen_resolutions`
+- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `omnifilter_debounce_ms`, `screen_resolutions`
 - **Respuesta:** `{ success: true }`
 
 ### `GET /api/settings/export-all`
@@ -629,7 +629,7 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Auth:** Requerida
 - **Query:** `chat_session_id` (number, requerido)
 - **Descripción:** Obtiene las últimas 500 peticiones de red (tipo `document`, `xhr`, `fetch`) registradas para la sesión de chat, ordenadas por fecha descendente.
-- **Respuesta 200:** `[{ id, chat_session_id, playwright_session_id, method, url, status_code, request_headers, response_headers, resource_type, response_body, error, created_at }]`
+- **Respuesta 200:** `[{ id, chat_session_id, playwright_session_id, method, url, status_code, request_headers, response_headers, resource_type, response_body, request_body, request_size, response_size, error, created_at }]`
 
 ### `GET /api/playwright-logs/console`
 - **Auth:** Requerida
@@ -699,6 +699,50 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Elimina una grabación. Los eventos vinculados pasan a tener `recording_id = NULL` (ON DELETE SET NULL).
 - **Respuesta 200:** `{ success: true }`
 - **Respuesta 404:** `{ error: "Grabación no encontrada" }`
+
+---
+
+## Estado de Base de Datos (`/api/state`)
+
+### `GET /api/state/export`
+- **Auth:** Requerida
+- **Descripción:** Exporta el estado completo de la base de datos (configuración, proyectos, tickets, plantillas, etc.) en un JSON estructurado. Los valores encriptados (`deepseek_key`, `redmine_token`) se devuelven en texto plano. Incluye las siguientes tablas:
+  - `workspaces` — espacios de trabajo
+  - `settings` — configuración por workspace
+  - `workspace_environments` — ambientes por workspace
+  - `proyectos` — proyectos importados
+  - `project_variables` — variables por proyecto
+  - `tickets` — tickets importados
+  - `templates` — plantillas markdown
+  - `user_settings` — preferencias de UI por usuario
+  - `redmine_comentarios` — comentarios Redmine pendientes
+  - `gastos_tokens_usados` — registros de gastos de tokens
+- **Respuesta 200:**
+```json
+{
+  "version": 1,
+  "exported_at": "2026-06-24T12:00:00.000Z",
+  "tables": {
+    "workspaces": [],
+    "settings": [],
+    "workspace_environments": [],
+    "proyectos": [],
+    "project_variables": [],
+    "tickets": [],
+    "templates": [],
+    "user_settings": [],
+    "redmine_comentarios": [],
+    "gastos_tokens_usados": []
+  }
+}
+```
+
+### `POST /api/state/import`
+- **Auth:** Requerida
+- **Body:** Misma estructura que `GET /api/state/export` (campo `tables`)
+- **Descripción:** Reemplaza completamente los datos de las tablas incluidas con los del JSON importado. Usa `FOREIGN_KEY_CHECKS=0` para evitar pérdida de datos en tablas no incluidas. El workspace por defecto (id=1) está protegido contra eliminación. Las credenciales (`deepseek_key`, `redmine_token`) se re-encriptan automáticamente. Todo el proceso se ejecuta dentro de una transacción: si algo falla, se revierte completamente.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 400:** `{ error: "tables es requerido" }`
 
 ---
 

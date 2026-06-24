@@ -4,7 +4,8 @@
       {{ msg.content }}
     </div>
     <div v-else-if="msg.role === 'result'" class="d-inline-block rounded-3 p-2 text-start font-monospace small" style="max-width: 90%; background: #16213e; border: 1px solid #75AADB; color: #e0e0e0;">
-      <ChatFormatter :text="msg.content" />
+      <ChatFormatter v-if="!isRaw" :text="msg.content" />
+      <pre v-else class="mb-0" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
     </div>
     <div v-else-if="msg.role === 'opencode_control'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #1a2744; border: 1px solid #75AADB; color: #e0e0e0;">
       <ChatGenerarCommitForm v-if="parsedControl && parsedControl.controlType === 'generar_commit_form'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :temperatureOptions="parsedControl.temperatureOptions || []" :temperatureValue="parsedControl.temperatureValue || ''" :modeValue="parsedControl.modeValue || 'Plan'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
@@ -42,10 +43,18 @@
           <pre class="mb-0 small text-muted" style="white-space: pre-wrap;">{{ msg.thinking }}</pre>
         </div>
       </div>
-      <ChatFormatter :text="msg.content" /><span v-if="msg.streaming" class="blink">▌</span>
+      <ChatFormatter v-if="!isRaw" :text="msg.content" /><pre v-else class="mb-0" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre><span v-if="msg.streaming" class="blink">▌</span>
     </div>
     <div v-else-if="msg.role === 'opencode_result'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #1a2744; border: 1px solid #75AADB; color: #f0f0f0;">
-      <ChatFormatter :text="msg.content" />
+      <div v-if="msg.thinking" class="mb-2">
+        <button class="btn btn-sm w-100 text-start btn-outline-argentina" data-bs-toggle="collapse" :data-bs-target="'#think-' + uid">
+          🧠 Razonamiento interno
+        </button>
+        <div class="collapse mt-1" :id="'think-' + uid">
+          <pre class="mb-0 small text-muted" style="white-space: pre-wrap;">{{ msg.thinking }}</pre>
+        </div>
+      </div>
+      <ChatFormatter v-if="!isRaw" :text="msg.content" /><pre v-else class="mb-0" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
       <div v-if="parsedInfo && parsedInfo.hash" class="mt-2 small" style="color: #75AADB;">Hash: {{ parsedInfo.hash }}</div>
     </div>
     <div v-else-if="msg.role === 'opencode_info'" class="d-block w-100 rounded-3 p-2 text-start small" style="background: #1a2744; border: 1px solid #374151; color: #9ca3af;">
@@ -80,7 +89,7 @@
           <pre class="mb-0 small text-muted" style="white-space: pre-wrap;">{{ msg.thinking }}</pre>
         </div>
       </div>
-      <ChatFormatter :text="msg.content" />
+      <ChatFormatter v-if="!isRaw" :text="msg.content" /><pre v-else class="mb-0" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
     </div>
   </div>
 </template>
@@ -109,9 +118,16 @@ export default {
   components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatOpencodeForm, ChatGenerarCommitForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, TicketCreateControl, DescripcionInputControl, DescripcionResultControl, CommitResultControl, ChatControlButtons, ResolutionSelectControl, RedmineCommentsSendControl },
   props: {
     msg: { type: Object, required: true },
+    rawMsgKeys: { type: Set, default: () => new Set() },
   },
   emits: ['control-confirm', 'contextmenu'],
   computed: {
+    msgKey() {
+      return this.msg.id || this.msg._key
+    },
+    isRaw() {
+      return this.rawMsgKeys.has(this.msgKey)
+    },
     uid() {
       counter++
       return 'cm-' + counter

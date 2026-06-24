@@ -7,6 +7,7 @@ let db = null;
 
 const ALLOWED_RESOURCE_TYPES = ['document', 'xhr', 'fetch'];
 const MAX_BODY_LENGTH = 10000;
+const MAX_REQUEST_BODY_LENGTH = 8192;
 
 function setDb(knexInstance) {
   db = knexInstance;
@@ -501,11 +502,27 @@ function setupPageListeners(page, sessionId, chatSessionId) {
     if (!ALLOWED_RESOURCE_TYPES.includes(resourceType)) return;
 
     let body = null;
+    let responseSize = null;
     try {
       const buf = await response.body();
       body = buf.toString('utf-8').substring(0, MAX_BODY_LENGTH);
+      responseSize = buf.length;
     } catch {
       body = null;
+      responseSize = null;
+    }
+
+    let requestBody = null;
+    let requestSize = null;
+    try {
+      const postData = req.postData();
+      if (postData) {
+        requestSize = Buffer.byteLength(postData, 'utf-8');
+        requestBody = postData.substring(0, MAX_REQUEST_BODY_LENGTH);
+      }
+    } catch {
+      requestBody = null;
+      requestSize = null;
     }
 
     try {
@@ -520,6 +537,9 @@ function setupPageListeners(page, sessionId, chatSessionId) {
         response_headers: JSON.stringify(response.headers()),
         resource_type: resourceType,
         response_body: body,
+        request_body: requestBody,
+        request_size: requestSize,
+        response_size: responseSize,
       });
     } catch (err) {
       console.log(`[browserManager] Error al guardar network log:`, err.message);
@@ -529,6 +549,19 @@ function setupPageListeners(page, sessionId, chatSessionId) {
   page.on('requestfailed', async (request) => {
     const resourceType = request.resourceType();
     if (!ALLOWED_RESOURCE_TYPES.includes(resourceType)) return;
+
+    let requestBody = null;
+    let requestSize = null;
+    try {
+      const postData = request.postData();
+      if (postData) {
+        requestSize = Buffer.byteLength(postData, 'utf-8');
+        requestBody = postData.substring(0, MAX_REQUEST_BODY_LENGTH);
+      }
+    } catch {
+      requestBody = null;
+      requestSize = null;
+    }
 
     try {
       if (!db) return;
@@ -541,6 +574,8 @@ function setupPageListeners(page, sessionId, chatSessionId) {
         request_headers: JSON.stringify(request.headers()),
         resource_type: resourceType,
         error: request.failure()?.errorText || 'Unknown error',
+        request_body: requestBody,
+        request_size: requestSize,
       });
     } catch (err) {
       console.log(`[browserManager] Error al guardar request failed:`, err.message);

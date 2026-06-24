@@ -97,6 +97,21 @@
             @click="deleteRecording"
             title="Eliminar grabación"
           >🗑️</button>
+          <button
+            v-if="!replaying && selectedRecordingId !== null"
+            class="btn btn-sm py-0 px-2"
+            style="font-size: 0.65rem; background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3);"
+            :disabled="!hasBrowserSession || isRecording || displayedEvents.length === 0"
+            @click="replayRecording"
+          >▶ Reproducir</button>
+          <template v-if="replaying">
+            <button
+              class="btn btn-sm py-0 px-2"
+              style="font-size: 0.65rem; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);"
+              @click="cancelReplay"
+            >⏹ Detener</button>
+            <span class="small text-muted">Paso {{ replayProgress.current }}/{{ replayProgress.total }}</span>
+          </template>
         </div>
       </div>
       <div class="overflow-y-auto flex-grow-1" ref="containerRef">
@@ -223,6 +238,7 @@ import { useChatStore } from '../stores/chat.js'
 import { useProjectStore } from '../stores/project.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useCommandStore } from '../stores/command.js'
+import { useSettingsStore } from '../stores/settings.js'
 import { storeToRefs } from 'pinia'
 
 export default {
@@ -231,6 +247,7 @@ export default {
     const chatStore = useChatStore()
     const projectStore = useProjectStore()
     const cmdStore = useCommandStore()
+    const settingsStore = useSettingsStore()
     const { find } = useCommandRegistry()
     const { selectedProject } = storeToRefs(projectStore)
 
@@ -251,6 +268,9 @@ export default {
     const showNewRecordingInput = ref(false)
     const newRecordingName = ref('')
     const startingInstancia = ref(false)
+    const replaying = ref(false)
+    const replayProgress = ref({ current: 0, total: 0 })
+    const replayCancelled = ref(false)
 
     let pollTimer = null
     let statusTimer = null
@@ -585,6 +605,158 @@ export default {
       }
     }
 
+    function eventToAction(evt) {
+      switch (evt.event_type) {
+        case 'click':
+        case 'dblclick':
+          return { type: 'click', selector: evt.selector }
+        case 'input':
+        case 'change':
+          if (evt.tag_name === 'select') {
+            return { type: 'select', selector: evt.selector, value: evt.value || '' }
+          }
+          return { type: 'fill', selector: evt.selector, value: evt.value || '' }
+        case 'submit':
+          return { type: 'submit', selector: evt.selector }
+        case 'keydown':
+          return { type: 'press', selector: evt.selector, key: evt.key || 'Enter' }
+        case 'scroll':
+          return { type: 'scroll', x: evt.scroll_x || 0, y: evt.scroll_y || 0 }
+        default:
+          return null
+      }
+    }
+
+    function describeAction(evt) {
+      const label = EVENT_LABELS[evt.event_type] || evt.event_type
+      switch (evt.event_type) {
+        case 'click': return `Click en "${evt.text_content || evt.selector}"`
+        case 'input': return `Escribir "${evt.value}" en "${evt.text_content || evt.selector}"`
+        case 'change': return `Cambiar "${evt.text_content || evt.selector}" a "${evt.value}"`
+        case 'submit': return `Submit formulario "${evt.text_content || evt.selector}"`
+        case 'keydown': return `Presionar tecla "${evt.key}" en "${evt.text_content || evt.selector}"`
+        case 'scroll': return `Scroll a (${evt.scroll_x}, ${evt.scroll_y})`
+        default: return `${label}: ${evt.text_content || evt.selector || ''}`
+      }
+    }
+
+    async function replayRecording() {
+      if (!selectedRecordingId.value || !activeSessionId.value) return
+      replaying.value = true
+      replayCancelled.value = false
+      replayProgress.value = { current: 0, total: 0 }
+
+      try {
+        const res = await fetch(`/api/playwright-logs/events?recording_id=${selectedRecordingId.value}&order=asc`, {
+          credentials: 'include',
+        })
+        if (!res.ok) throw new Error('Error al obtener eventos')
+        const events = await res.json()
+
+        const recording = logsStore.recordings.find(r => r.id === selectedRecordingId.value)
+        const recordingName = recording ? recording.name : 'Grabación'
+
+        const interval = settingsStore.replayIntervalMs || 1000
+
+        const actionEntries = events.map(e => ({ action: eventToAction(e), event: e })).filter(a => a.action !== null)
+        replayProgress.value.total = actionEntries.length
+
+        try {
+          await fetch(`/api/chat/sessions/${activeSessionId.value}/save-messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              messages: [{ role: 'command', content: `▶ Reproduciendo grabación: "${recordingName}" (${actionEntries.length} acciones)` }],
+            }),
+          })
+        } catch (e) {
+          console.error('Error al enviar inicio al chat:', e.message)
+        }
+
+        for (let i = 0; i < actionEntries.length; i++) {
+          if (replayCancelled.value) break
+
+          replayProgress.value.current = i + 1
+          const { action, event: evt } = actionEntries[i]
+
+          try {
+            const execRes = await fetch('/api/navegador/command', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                comando: 'execute_action',
+                parametros: { action },
+                sessionId: activeSessionId.value,
+              }),
+            })
+            const execData = await execRes.json()
+            if (execData.error) throw new Error(execData.error)
+
+            const desc = describeAction(evt)
+            try {
+              await fetch(`/api/chat/sessions/${activeSessionId.value}/save-messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                  messages: [{ role: 'result', content: `Paso ${i + 1}/${actionEntries.length}: ${desc}` }],
+                }),
+              })
+            } catch (e) {
+              console.error('Error al enviar paso al chat:', e.message)
+            }
+          } catch (err) {
+            console.error(`Error ejecutando paso ${i + 1}:`, err.message)
+            try {
+              await fetch(`/api/chat/sessions/${activeSessionId.value}/save-messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                  messages: [{ role: 'result', content: `❌ Paso ${i + 1}/${actionEntries.length}: Error - ${err.message}` }],
+                }),
+              })
+            } catch (e) {
+              console.error('Error al reportar fallo al chat:', e.message)
+            }
+          }
+
+          if (i < actionEntries.length - 1 && !replayCancelled.value) {
+            await new Promise(r => setTimeout(r, interval))
+          }
+        }
+
+        const completed = !replayCancelled.value
+        const summary = completed
+          ? `✅ Reproducción completada: ${replayProgress.value.current}/${replayProgress.value.total} acciones ejecutadas.`
+          : `⏹ Reproducción cancelada: ${replayProgress.value.current}/${replayProgress.value.total} acciones ejecutadas.`
+        try {
+          await fetch(`/api/chat/sessions/${activeSessionId.value}/save-messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              messages: [{ role: 'result', content: summary }],
+            }),
+          })
+        } catch (e) {
+          console.error('Error al enviar resumen al chat:', e.message)
+        }
+      } catch (err) {
+        console.error('Error en reproducción:', err.message)
+      } finally {
+        replaying.value = false
+        replayCancelled.value = false
+        replayProgress.value = { current: 0, total: 0 }
+      }
+    }
+
+    function cancelReplay() {
+      replayCancelled.value = true
+    }
+
     async function fetchStatus() {
       try {
         const res = await fetch('/api/navegador/status', { credentials: 'include' })
@@ -664,6 +836,10 @@ export default {
       stopRecording,
       clearEvents,
       deleteRecording,
+      replaying,
+      replayProgress,
+      replayRecording,
+      cancelReplay,
       typeClass,
       describeEvent,
       isExpanded,

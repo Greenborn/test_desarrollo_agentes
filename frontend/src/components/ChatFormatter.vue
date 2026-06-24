@@ -76,14 +76,22 @@ function parseMarkdown(text) {
       const tableLines = [t]
       while (i + 1 < lines.length) {
         const n = lines[i + 1].trim()
-        if (!n.startsWith('|') || !n.endsWith('|')) break
+        if (!n.startsWith('|')) break
         tableLines.push(n)
         i++
       }
-      if (tableLines.length >= 2 && /^\|[-:| ]+\|$/.test(tableLines[1].trim())) {
+      if (tableLines.length >= 2 && /^\|[-:| ]+\|?$/.test(tableLines[1].trim())) {
         closeP()
-        const headerCells = tableLines[0].split('|').slice(1, -1).map(c => c.trim())
-        const alignments = tableLines[1].split('|').slice(1, -1).map(a => {
+
+        function splitRow(row) {
+          const parts = row.split('|')
+          if (parts.length > 0 && parts[0].trim() === '') parts.shift()
+          if (parts.length > 0 && parts[parts.length - 1].trim() === '') parts.pop()
+          return parts.map(p => p.trim())
+        }
+
+        const headerCells = splitRow(tableLines[0])
+        const alignments = splitRow(tableLines[1]).map(a => {
           if (a.startsWith(':') && a.endsWith(':')) return ' style="text-align:center"'
           if (a.endsWith(':')) return ' style="text-align:right"'
           return ''
@@ -94,7 +102,7 @@ function parseMarkdown(text) {
         })
         tableHtml += '</tr></thead><tbody>'
         for (let r = 2; r < tableLines.length; r++) {
-          const cells = tableLines[r].split('|').slice(1, -1).map(c => c.trim())
+          const cells = splitRow(tableLines[r])
           tableHtml += '<tr>'
           cells.forEach((cell, idx) => {
             tableHtml += `<td${alignments[idx] || ''}>${processInline(cell)}</td>`

@@ -83,6 +83,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `repo_acronimo` | `'TKT'` | Acrónimo para ramas Git |
 | `ticket_descripcion_prompt` | *(default interno)* | Prompt para redactar descripción de tickets |
 | `ticket_refinar_prompt` | *(default interno)* | Prompt para refinar descripción de tickets |
+| `deteccion_funcionalidades_prompt` | *(default interno)* | Prompt para detección de funcionalidades con OpenCode |
 | `documentacion_prompt_*` | *(default interno)* | Prompts de documentación por tipo |
 | `screen_resolutions` | `[{ id, width, height }, ...]` | Array JSON de resoluciones de pantalla para Playwright. Configurable desde Settings. Default: 14 resoluciones comunes (desktop + mobile) |
 
@@ -281,6 +282,9 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `response_headers` | TEXT | nullable — JSON con headers de la respuesta |
 | `resource_type` | VARCHAR(50) | nullable — `document`, `xhr`, `fetch` |
 | `response_body` | TEXT | nullable — cuerpo de respuesta truncado a 10K chars |
+| `request_body` | TEXT | nullable — cuerpo de la petición truncado a 8KB |
+| `request_size` | INTEGER | nullable — tamaño en bytes del cuerpo de la petición |
+| `response_size` | INTEGER | nullable — tamaño en bytes del cuerpo de la respuesta |
 | `error` | TEXT | nullable — texto de error para peticiones fallidas |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 

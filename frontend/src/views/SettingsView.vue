@@ -23,6 +23,9 @@
         <button class="btn btn-sm btn-outline-argentina flex-shrink-0 ms-auto" @click="exportAllConfig">Exportar</button>
         <button class="btn btn-sm btn-outline-argentina flex-shrink-0" @click="triggerImport">Importar</button>
         <input type="file" ref="importInput" accept=".json" @change="handleImport" style="display:none" />
+        <button class="btn btn-sm btn-outline-info flex-shrink-0" @click="exportFullState">Exportar Estado DB</button>
+        <button class="btn btn-sm btn-outline-info flex-shrink-0" @click="triggerImportState">Importar Estado DB</button>
+        <input type="file" ref="importStateInput" accept=".json" @change="handleImportState" style="display:none" />
       </div>
     </div>
 
@@ -250,6 +253,33 @@
           </button>
         </div>
 
+        <div v-if="matches('deteccion funcionalidades prompt deteccion_funcionalidades')">
+          <label class="form-label">Prompt — Detección de Funcionalidades (OpenCode)</label>
+          <textarea
+            class="form-control font-monospace bg-dark text-light border-secondary"
+            rows="4"
+            v-model="deteccionPromptInput"
+          ></textarea>
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDeteccionPrompt">
+            Guardar Prompt
+          </button>
+        </div>
+
+        <div v-if="matches('intervalo reproduccion navegador')" class="border-top border-secondary pt-3">
+          <label class="form-label">Intervalo de Reproducción del Navegador (ms)</label>
+          <div class="small text-muted mb-2">Tiempo entre cada acción al reproducir grabaciones en Eventos del Navegador</div>
+          <input
+            type="number"
+            class="form-control bg-dark text-light border-secondary"
+            v-model.number="replayIntervalInput"
+            min="100"
+            step="100"
+            placeholder="1000"
+            style="max-width: 200px;"
+          />
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveReplayInterval">Guardar</button>
+        </div>
+
         <div v-if="matches('resoluciones pantalla resolucion')" class="border-top border-secondary pt-3">
           <label class="form-label mb-2 fw-bold">Resoluciones de Pantalla</label>
           <div class="small text-muted mb-2">Usadas por /navegador_iniciar --resolution=ID</div>
@@ -331,6 +361,7 @@ export default {
     const searchTerm = ref('')
     const descripcionPromptInput = ref('')
     const refinarPromptInput = ref('')
+    const deteccionPromptInput = ref('')
     const omnifilterDebounceInput = ref(2000)
     const repoAcronimoInput = ref('TKT')
     const localeInput = ref('es_ES.UTF-8')
@@ -344,6 +375,7 @@ export default {
     const newResWidth = ref(1920)
     const newResHeight = ref(1080)
     const environmentsList = ref([])
+    const replayIntervalInput = ref(1000)
     const newEnvName = ref('')
     const newEnvBranch = ref('')
     const newEnvDescription = ref('')
@@ -420,12 +452,20 @@ export default {
       resolutionsEdit.value = val.map(r => ({ ...r }))
     }, { immediate: true, deep: true })
 
+    watch(() => settings.replayIntervalMs, (val) => {
+      replayIntervalInput.value = val
+    }, { immediate: true })
+
     watch(() => settings.ticketDescripcionPrompt, (val) => {
       descripcionPromptInput.value = val
     }, { immediate: true })
 
     watch(() => settings.ticketRefinarPrompt, (val) => {
       refinarPromptInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.deteccionFuncionalidadesPrompt, (val) => {
+      deteccionPromptInput.value = val
     }, { immediate: true })
 
     for (const [key, refName] of Object.entries(DOC_STORE_MAP)) {
@@ -564,9 +604,19 @@ export default {
       settings.save('ticket_refinar_prompt', refinarPromptInput.value)
     }
 
+    function saveDeteccionPrompt() {
+      settings.clearFeedback()
+      settings.save('deteccion_funcionalidades_prompt', deteccionPromptInput.value)
+    }
+
     function saveLocale() {
       settings.clearFeedback()
       settings.save('locale', localeInput.value)
+    }
+
+    function saveReplayInterval() {
+      settings.clearFeedback()
+      settings.save('replay_interval_ms', String(replayIntervalInput.value))
     }
 
     function savePriorityColor(key) {
@@ -764,9 +814,61 @@ export default {
       event.target.value = ''
     }
 
+    const importStateInput = ref(null)
+
+    function triggerImportState() {
+      importStateInput.value?.click()
+    }
+
+    async function exportFullState() {
+      try {
+        const res = await fetch('/api/state/export', { credentials: 'include' })
+        const data = await res.json()
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `estado_db_${new Date().toISOString().split('T')[0]}.json`
+        a.click()
+        URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error('Error al exportar estado DB:', err.message)
+        wsMessage.value = 'Error al exportar estado DB'
+        setTimeout(() => { wsMessage.value = '' }, 3000)
+      }
+    }
+
+    async function handleImportState(event) {
+      const file = event.target.files[0]
+      if (!file) return
+      try {
+        const text = await file.text()
+        const data = JSON.parse(text)
+        const res = await fetch('/api/state/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(data),
+        })
+        const result = await res.json()
+        if (result.success) {
+          wsMessage.value = 'Estado DB importado correctamente.'
+          await reloadSettings()
+        } else {
+          wsMessage.value = result.error || 'Error al importar estado DB'
+        }
+      } catch (err) {
+        console.error('Error al importar estado DB:', err.message)
+        wsMessage.value = 'Error al importar estado DB'
+      }
+      setTimeout(() => { wsMessage.value = '' }, 3000)
+      event.target.value = ''
+    }
+
     return {
       keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput,
       docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput, refinarPromptInput,
+      deteccionPromptInput,
       showKey, showRedmineToken, searchTerm, omnifilterDebounceInput, repoAcronimoInput,
       localeInput,
       priorityColorLowInput, priorityColorNormalInput, priorityColorHighInput,
@@ -774,12 +876,15 @@ export default {
       settings, workspaces, selectedWId, wsMessage,
       resolutionsEdit, newResId, newResWidth, newResHeight,
       environmentsList, newEnvName, newEnvBranch, newEnvDescription,
+      replayIntervalInput,
       saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
-      saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveRepoAcronimo,
-      saveLocale, savePriorityColor, addResolution, removeResolution, resetResolutions, saveResolutions, matches,
+      saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveDeteccionPrompt, saveRepoAcronimo,
+      saveLocale, savePriorityColor, saveReplayInterval,
+      addResolution, removeResolution, resetResolutions, saveResolutions, matches,
       saveEnvironment, addEnvironment, deleteEnvironment,
       onWorkspaceChange, promptCreate, promptRename, confirmDelete,
       exportAllConfig, handleImport, triggerImport, importInput,
+      exportFullState, handleImportState, triggerImportState, importStateInput,
     }
   },
 }

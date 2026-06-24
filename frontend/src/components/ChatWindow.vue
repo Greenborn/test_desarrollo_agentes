@@ -19,7 +19,7 @@
         <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
       </div>
       <template v-else>
-        <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
+        <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
         <div v-if="streaming" class="text-start mb-3">
           <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 80%; background: #1a2744; border: 1px solid #374151; color: #e0e0e0;">
             <div v-if="currentThinking" class="mb-2">
@@ -67,6 +67,7 @@
     </div>
     <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu"></div>
     <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
+      <div class="context-menu-item" @click="toggleRawView(ctxMenu.msg)">{{ rawMsgKeys.has(msgKey(ctxMenu.msg)) ? '🎨 Vista formateada' : '📄 Vista texto plano' }}</div>
       <div class="context-menu-item text-danger" @click="deleteMessage(ctxMenu.msg)">🗑️ Eliminar mensaje</div>
     </div>
   </div>
@@ -79,6 +80,7 @@ import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 import { useModalStore } from '../stores/modal.js'
 import { useOpencodeStore } from '../stores/opencode.js'
+import { useSettingsStore } from '../stores/settings.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useProjectVariables } from '../composables/useProjectVariables.js'
@@ -234,6 +236,7 @@ export default {
     const docUpdateProyectoId = ref('')
     const docUpdateType = ref('')
     const ctxMenu = reactive({ show: false, x: 0, y: 0, msg: null })
+    const rawMsgKeys = reactive(new Set())
 
     async function send() {
       let raw = input.value.trim()
@@ -310,6 +313,19 @@ export default {
       ctxMenu.msg = msg
     }
 
+    function msgKey(msg) {
+      return msg.id || msg._key
+    }
+
+    function toggleRawView(msg) {
+      const key = msgKey(msg)
+      if (rawMsgKeys.has(key)) {
+        rawMsgKeys.delete(key)
+      } else {
+        rawMsgKeys.add(key)
+      }
+    }
+
     function closeCtxMenu() {
       ctxMenu.show = false
     }
@@ -357,11 +373,13 @@ export default {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'idle')
           const content = json.fullResponse || fullText || '(sin respuesta)'
-          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content })
+          const thinking = json.thinking || ocThinking.value || null
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content, thinking })
           if (_isActiveSession(sessionId)) {
             chat.pushMessage({
               role: 'opencode_result',
               content,
+              thinking,
               _key: 'result-' + Date.now(),
             })
             fetchGitBranch()
@@ -449,10 +467,18 @@ export default {
 
       await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
         onChunk(content) {
-          if (_isActiveSession(sessionId)) ocChunk.value += content
+          if (_isActiveSession(sessionId)) {
+            ocChunk.value += content
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) chat.messages[idx].content = ocChunk.value
+          }
         },
         onThinking(content) {
-          if (_isActiveSession(sessionId)) ocThinking.value += content
+          if (_isActiveSession(sessionId)) {
+            ocThinking.value += content
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+          }
         },
         onControl(control) {
           const controlMsg = {
@@ -470,7 +496,8 @@ export default {
         },
         async onDone(json, fullText) {
           const opencodeResponse = json.fullResponse || fullText || '(sin respuesta)'
-          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: opencodeResponse })
+          const thinking = json.thinking || ocThinking.value || null
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: opencodeResponse, thinking })
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'idle')
           if (!_isActiveSession(sessionId)) {
@@ -616,10 +643,18 @@ export default {
 
       await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
         onChunk(content) {
-          if (_isActiveSession(sessionId)) ocChunk.value += content
+          if (_isActiveSession(sessionId)) {
+            ocChunk.value += content
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) chat.messages[idx].content = ocChunk.value
+          }
         },
         onThinking(content) {
-          if (_isActiveSession(sessionId)) ocThinking.value += content
+          if (_isActiveSession(sessionId)) {
+            ocThinking.value += content
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+          }
         },
         onControl(control) {
           const controlMsg = {
@@ -639,13 +674,15 @@ export default {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'idle')
           const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
-          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse })
+          const thinking = json.thinking || ocThinking.value || null
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse, thinking })
           if (_isActiveSession(sessionId)) {
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (idx >= 0) {
               chat.messages[idx].streaming = false
               chat.messages[idx].role = 'opencode_result'
               chat.messages[idx].content = fullResponse
+              chat.messages[idx].thinking = thinking
             }
 
             try {
@@ -704,6 +741,8 @@ export default {
         await handleOpencodeSetup(controlId, value, controlMsg)
       } else if (stepType === 'generar_commit_setup') {
         await handleGenerarCommitSetup(controlId, value, controlMsg)
+      } else if (stepType === 'deteccion_funcionalidades_setup') {
+        await handleDeteccionFuncionalidadesSetup(controlId, value, controlMsg)
       } else if (stepType === 'documentacion_update') {
         await handleDocumentacionUpdate(controlId, value, controlMsg)
       } else if (stepType === 'ticket_descripcion') {
@@ -1056,6 +1095,7 @@ export default {
     let docUpdateData = { provider: '', model: '', thinking: '', mode: '', temperature: '' }
     let descripcionData = { provider: '', model: '', thinking: '', mode: 'Plan', temperature: '' }
     const descripcionUserInput = ref('')
+    let deteccionData = { provider: '', model: '', thinking: '', mode: '', temperature: '' }
     let repoCrearRamaData = { proyectoId: '', ticketRedmineId: '', baseBranch: '', repoAcronimo: '' }
 
     async function handleDocumentacionUpdate(controlId, value, controlMsg) {
@@ -1480,10 +1520,18 @@ export default {
 
       await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
         onChunk(content) {
-          if (_isActiveSession(sessionId)) ocChunk.value += content
+          if (_isActiveSession(sessionId)) {
+            ocChunk.value += content
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) chat.messages[idx].content = ocChunk.value
+          }
         },
         onThinking(content) {
-          if (_isActiveSession(sessionId)) ocThinking.value += content
+          if (_isActiveSession(sessionId)) {
+            ocThinking.value += content
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+          }
         },
         onControl(control) {
           const controlMsg = {
@@ -1503,13 +1551,15 @@ export default {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'idle')
           const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
-          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse })
+          const thinking = json.thinking || ocThinking.value || null
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse, thinking })
           if (_isActiveSession(sessionId)) {
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (idx >= 0) {
               chat.messages[idx].streaming = false
               chat.messages[idx].role = 'opencode_result'
               chat.messages[idx].content = fullResponse
+              chat.messages[idx].thinking = thinking
             }
             chat.pushMessage({
               role: 'opencode_control',
@@ -1586,10 +1636,18 @@ export default {
 
       await ocStore.streamPrompt(sessionId, userPrompt, descripcionData.provider, ocStore.selectedModel || descripcionData.model, ocStore.selectedThinking || descripcionData.thinking, ocStore.selectedMode || descripcionData.mode, temperature, {
         onChunk(content) {
-          if (_isActiveSession(sessionId)) ocChunk.value += content
+          if (_isActiveSession(sessionId)) {
+            ocChunk.value += content
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) chat.messages[idx].content = ocChunk.value
+          }
         },
         onThinking(content) {
-          if (_isActiveSession(sessionId)) ocThinking.value += content
+          if (_isActiveSession(sessionId)) {
+            ocThinking.value += content
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+          }
         },
         onControl(control) {
           const controlMsg = {
@@ -1609,7 +1667,8 @@ export default {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'idle')
           const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
-          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse })
+          const thinking = json.thinking || ocThinking.value || null
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse, thinking })
           if (_isActiveSession(sessionId)) {
             // Demote the previous descripcion_result to a plain result (no buttons)
             for (let i = chat.messages.length - 1; i >= 0; i--) {
@@ -2092,6 +2151,178 @@ export default {
       }
     }
 
+    async function handleDeteccionFuncionalidadesSetup(controlId, value, controlMsg) {
+      const subStepType = controlMsg.controlData.subStepType
+
+      if (subStepType === 'provider') {
+        deteccionData.provider = value
+        await ocStore.select('provider', value)
+        ocStore.selectedProvider = value
+        const models = ocStore.getModelsForProvider(value)
+        chat.pushMessage({
+          role: 'opencode_control',
+          controlData: {
+            controlId: 'df-form-' + Date.now(),
+            controlType: 'generar_commit_form',
+            stepType: 'deteccion_funcionalidades_setup',
+            subStepType: 'form',
+            models,
+            modelValue: ocStore.savedModel || '',
+            thinkingOptions: ocStore.thinkingOptions,
+            thinkingValue: ocStore.savedThinking || '',
+            temperatureOptions: ocStore.temperatureOptions,
+            temperatureValue: ocStore.savedTemperature || '0.7',
+          },
+          _key: 'control-' + Date.now(),
+        })
+      } else if (subStepType === 'form') {
+        const { model, thinking = '', mode = 'Plan', temperature = '0.7' } = value || {}
+        deteccionData.model = model
+        deteccionData.thinking = thinking
+        deteccionData.mode = mode
+        deteccionData.temperature = temperature
+        await ocStore.select('model', model)
+        await ocStore.select('thinking', thinking || '')
+        await ocStore.select('mode', mode)
+        if (temperature) await ocStore.select('temperature', temperature)
+        ocStore.selectedModel = model
+        ocStore.selectedThinking = thinking || ''
+        ocStore.selectedMode = mode
+        ocStore.selectedTemperature = temperature || ''
+
+        const settingsStore = useSettingsStore()
+        const defaultPrompt = 'Analizá el proyecto en el directorio actual e identificá todas las funcionalidades implementadas.\n\nLa respuesta debe estar estructurada en formato Markdown con la siguiente jerarquía:\n\n# [Nombre del Subproyecto] (backend | frontend)\n\n## [Módulo o Conjunto de Rutas]\n\n### Si es backend:\n- Endpoint, método HTTP, tablas utilizadas, permisos requeridos\n\n### Si es frontend:\n- Componente, ruta Vue Router, propósito, otros componentes usados, composables, endpoints llamados\n\nUsá tablas cuando sea apropiado para listar múltiples elementos con sus propiedades. Identificá cada funcionalidad a partir del código fuente, incluyendo archivos backend (rutas, controladores, modelos) y frontend (componentes Vue, vistas, stores).'
+        const prompt = settingsStore.deteccionFuncionalidadesPrompt || defaultPrompt
+
+        await opencodeStreamPromptFuncionalidades(
+          chat.activeSessionId,
+          prompt,
+          deteccionData.provider,
+          model,
+          thinking,
+          mode,
+          temperature,
+        )
+      }
+    }
+
+    async function opencodeStreamPromptFuncionalidades(sessionId, prompt, provider, model, thinking, mode, temperature) {
+      ocStreaming.value = true
+      ocChunk.value = ''
+      ocThinking.value = ''
+      _streamSessionId.value = sessionId
+      if (sessionId) chat.setSessionStatus(sessionId, 'executing')
+
+      const detectionMsg = await addMessage('opencode_stream', '', { streaming: true })
+      detectionMsg._key = 'stream-detection-' + Date.now()
+
+      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
+        onChunk(content) {
+          if (_isActiveSession(sessionId)) {
+            ocChunk.value += content
+            const idx = chat.messages.findIndex((m) => m._key === detectionMsg._key)
+            if (idx >= 0) chat.messages[idx].content = ocChunk.value
+          }
+        },
+        onThinking(content) {
+          if (_isActiveSession(sessionId)) {
+            ocThinking.value += content
+            const idx = chat.messages.findIndex((m) => m._key === detectionMsg._key)
+            if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+          }
+        },
+        onControl(control) {
+          const controlMsg = {
+            role: 'opencode_control',
+            content: JSON.stringify(control),
+            controlData: control,
+            _key: 'control-' + Date.now(),
+          }
+          chat._saveMessageToDb(sessionId, controlMsg)
+          if (_isActiveSession(sessionId)) {
+            chat.pushMessage(controlMsg)
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
+          }
+        },
+        async onDone(json, fullText) {
+          const detectionResponse = json.fullResponse || fullText || '(sin respuesta)'
+          const detectionThinking = json.thinking || ocThinking.value || null
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: detectionResponse, thinking: detectionThinking })
+
+          const detIdx = chat.messages.findIndex((m) => m._key === detectionMsg._key)
+          if (detIdx >= 0) {
+            chat.messages[detIdx] = {
+              role: 'opencode_result',
+              content: detectionResponse,
+              thinking: detectionThinking,
+              _key: 'detection-' + Date.now(),
+            }
+          }
+
+          ocChunk.value = ''
+          ocThinking.value = ''
+
+          const refinePrompt = 'Tomá el análisis anterior y presentalo en un formato limpio y bien estructurado. Agrupá la información de manera jerárquica usando Markdown con títulos, subtítulos y tablas donde corresponda. Asegurate de mantener toda la información técnica (endpoints, métodos HTTP, tablas, permisos, componentes, rutas, composables, etc.) pero organizada de forma clara y legible.'
+
+          const refineMsg = await addMessage('opencode_stream', '', { streaming: true })
+          refineMsg._key = 'stream-refine-' + Date.now()
+
+          await ocStore.streamPrompt(sessionId, refinePrompt, provider, model, thinking, mode, temperature, {
+            onChunk(content) {
+              if (_isActiveSession(sessionId)) {
+                ocChunk.value += content
+                const idx = chat.messages.findIndex((m) => m._key === refineMsg._key)
+                if (idx >= 0) chat.messages[idx].content = ocChunk.value
+              }
+            },
+            onThinking(content) {
+              if (_isActiveSession(sessionId)) {
+                ocThinking.value += content
+                const idx = chat.messages.findIndex((m) => m._key === refineMsg._key)
+                if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+              }
+            },
+            onControl(control) {
+              const controlMsg = {
+                role: 'opencode_control',
+                content: JSON.stringify(control),
+                controlData: control,
+                _key: 'control-' + Date.now(),
+              }
+              chat._saveMessageToDb(sessionId, controlMsg)
+              if (_isActiveSession(sessionId)) {
+                chat.pushMessage(controlMsg)
+              } else {
+                chat.pendingNotifications[sessionId] = Date.now()
+              }
+            },
+            async onDone(json2, fullText2) {
+              const finalResponse = json2.fullResponse || fullText2 || '(sin respuesta)'
+              const finalThinking = json2.thinking || null
+              chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: finalResponse, thinking: finalThinking })
+              ocStreaming.value = false
+              if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+              if (!_isActiveSession(sessionId)) {
+                chat.pendingNotifications[sessionId] = Date.now()
+                return
+              }
+
+              const refIdx = chat.messages.findIndex((m) => m._key === refineMsg._key)
+              if (refIdx >= 0) {
+                chat.messages[refIdx] = {
+                  role: 'opencode_result',
+                  content: finalResponse,
+                  thinking: finalThinking,
+                  _key: 'result-' + Date.now(),
+                }
+              }
+            },
+          })
+        },
+      })
+    }
+
     async function regenerateCommit(controlId, controlMsg) {
       const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
       if (idx >= 0) {
@@ -2397,6 +2628,9 @@ export default {
       closeCtxMenu,
       deleteMessage,
       ctxMenu,
+      rawMsgKeys,
+      msgKey,
+      toggleRawView,
       messagesContainer,
       ticketInfo,
       priorityClass,

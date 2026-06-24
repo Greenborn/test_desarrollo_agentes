@@ -76,6 +76,9 @@
             <span v-else class="status-badge badge bg-danger-subtle text-danger flex-shrink-0" style="font-size: 0.6rem; min-width: 32px;">ERR</span>
             <span class="network-url text-truncate flex-grow-1">{{ log.url }}</span>
             <span class="resource-type-badge badge flex-shrink-0" style="font-size: 0.55rem;">{{ log.resource_type }}</span>
+            <span v-if="log.request_size !== null || log.response_size !== null" class="size-badge flex-shrink-0" style="font-size: 0.55rem;">
+              ↑{{ formatSize(log.request_size) }} ↓{{ formatSize(log.response_size) }}
+            </span>
             <span class="network-time flex-shrink-0">{{ formatTime(log.created_at) }}</span>
           </div>
           <div v-if="isExpanded(log.id)" class="network-details px-3 py-2">
@@ -86,6 +89,10 @@
             <div v-if="log.response_headers" class="mb-2">
               <div class="detail-label">Response Headers</div>
               <pre class="detail-pre">{{ formatJson(log.response_headers) }}</pre>
+            </div>
+            <div v-if="log.request_body" class="mb-2">
+              <div class="detail-label">Request Body</div>
+              <pre class="detail-pre">{{ log.request_body }}</pre>
             </div>
             <div v-if="log.response_body" class="mb-2">
               <div class="detail-label">Response Body</div>
@@ -174,6 +181,13 @@ export default {
       expandedId.value = expandedId.value === id ? null : id
     }
 
+    function formatSize(bytes) {
+      if (bytes === null || bytes === undefined) return '-'
+      if (bytes < 1024) return bytes + ' B'
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+      return (bytes / 1048576).toFixed(1) + ' MB'
+    }
+
     function formatTime(ts) {
       if (!ts) return ''
       const d = new Date(ts)
@@ -224,6 +238,7 @@ export default {
       isExpanded,
       toggleExpand,
       formatTime,
+      formatSize,
       formatJson,
       clearLogs,
     }

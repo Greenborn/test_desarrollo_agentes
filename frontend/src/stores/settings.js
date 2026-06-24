@@ -15,6 +15,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const documentacionPromptFuncionalidades = ref('')
   const ticketDescripcionPrompt = ref('')
   const ticketRefinarPrompt = ref('')
+  const deteccionFuncionalidadesPrompt = ref('')
   const omnifilterDebounceMs = ref(2000)
   const repoAcronimo = ref('TKT')
   const locale = ref('es_ES.UTF-8')
@@ -24,6 +25,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const priorityColorUrgent = ref('#ef4444')
   const priorityColorImmediate = ref('#ef4444')
   const screenResolutions = ref([])
+  const replayIntervalMs = ref(1000)
   const saveError = ref('')
   const saveSuccess = ref('')
 
@@ -51,6 +53,7 @@ export const useSettingsStore = defineStore('settings', () => {
       documentacionPromptFuncionalidades.value = keys.documentacion_prompt_funcionalidades || ''
       ticketDescripcionPrompt.value = keys.ticket_descripcion_prompt || ''
       ticketRefinarPrompt.value = keys.ticket_refinar_prompt || ''
+      deteccionFuncionalidadesPrompt.value = keys.deteccion_funcionalidades_prompt || ''
       omnifilterDebounceMs.value = keys.omnifilter_debounce_ms ? parseInt(keys.omnifilter_debounce_ms, 10) : 2000
       repoAcronimo.value = keys.repo_acronimo || 'TKT'
       locale.value = keys.locale || 'es_ES.UTF-8'
@@ -60,6 +63,7 @@ export const useSettingsStore = defineStore('settings', () => {
       priorityColorUrgent.value = keys.priority_color_urgent || '#ef4444'
       priorityColorImmediate.value = keys.priority_color_immediate || '#ef4444'
       screenResolutions.value = keys.screen_resolutions || []
+      replayIntervalMs.value = keys.replay_interval_ms ? parseInt(keys.replay_interval_ms, 10) : 1000
       applyPriorityColors()
     } catch (err) {
       console.error('Error al cargar settings:', err)
@@ -100,6 +104,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'documentacion_prompt_funcionalidades': documentacionPromptFuncionalidades.value = value; break
       case 'ticket_descripcion_prompt': ticketDescripcionPrompt.value = value; break
       case 'ticket_refinar_prompt': ticketRefinarPrompt.value = value; break
+      case 'deteccion_funcionalidades_prompt': deteccionFuncionalidadesPrompt.value = value; break
       case 'omnifilter_debounce_ms': omnifilterDebounceMs.value = parseInt(value, 10) || 2000; break
       case 'repo_acronimo': repoAcronimo.value = value; break
       case 'locale': locale.value = value; break
@@ -111,6 +116,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'screen_resolutions':
         try { screenResolutions.value = JSON.parse(value) } catch { screenResolutions.value = [] }
         break
+      case 'replay_interval_ms': replayIntervalMs.value = parseInt(value, 10) || 1000; break
     }
   }
 
@@ -120,10 +126,11 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   return { deepseekKey, redmineToken, redmineUrl, systemPrompt, omnifilterDebounceMs, repoAcronimo,
-           locale, screenResolutions,
+           locale, screenResolutions, replayIntervalMs,
            documentacionPromptBaseDatos, documentacionPromptSubproyectos,
            documentacionPromptEndpoints, documentacionPromptWebSockets,
            documentacionPromptFuncionalidades, ticketDescripcionPrompt, ticketRefinarPrompt,
+           deteccionFuncionalidadesPrompt,
            priorityColorLow, priorityColorNormal, priorityColorHigh, priorityColorUrgent, priorityColorImmediate,
            saveError, saveSuccess, clearFeedback, load, save, applyPriorityColors }
 })

@@ -22,6 +22,7 @@ import despliegueRoutes from './routes/despliegue.routes.js';
 import templatesRoutes from './routes/templates.routes.js';
 import environmentsRoutes from './routes/environments.routes.js';
 import playwrightLogsRoutes from './routes/playwrightLogs.routes.js';
+import stateRoutes from './routes/state.routes.js';
 import opencode from './services/opencode.js';
 import * as devInstanceManager from './services/devInstanceManager.js';
 import db from './config/db.js';
@@ -53,6 +54,7 @@ app.use('/api/despliegue', despliegueRoutes);
 app.use('/api/templates', templatesRoutes);
 app.use('/api/environments', environmentsRoutes);
 app.use('/api/playwright-logs', playwrightLogsRoutes);
+app.use('/api/state', stateRoutes);
 
 let pwProcess = null;
 let docProcess = null;

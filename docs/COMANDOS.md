@@ -57,6 +57,7 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/navegador_grabacion_listar` | Lista todas las grabaciones de eventos. Opcionalmente filtrar por proyecto. Si no se especifica proyecto, usa el asignado a la sesión de chat actual | `/navegador_grabacion_listar [--project_id=<id>]` |
 | `/navegador_grabacion_acciones` | Genera un arreglo JSON de acciones a partir de los eventos de una grabación, ordenado del más antiguo al más reciente. Convierte clicks, inputs, changes, submits, keydowns y scrolls en acciones tipo `click`, `fill`, `select`, `submit`, `press` y `scroll` | `/navegador_grabacion_acciones --id=<id>` |
 | `/navegador_grabacion_reproducir` | Reproduce una grabación de eventos en la instancia de navegador activa. Cada acción se ejecuta con un intervalo configurable (por defecto 1000ms). Muestra el progreso paso a paso en el chat | `/navegador_grabacion_reproducir --id=<id> [--intervalo=<ms>]` |
+| `replay_interval_ms` | Setting de workspace que define el intervalo entre acciones al reproducir una grabación desde el panel Eventos del Navegador (botón ▶ Reproducir). Se configura en Settings → Intervalo de Reproducción del Navegador. Por defecto: 1000ms | `Configuración → Intervalo de Reproducción` |
 | `/resoluciones_get_all` | Muestra las resoluciones de pantalla configuradas | `/resoluciones_get_all` |
 | `/resolucion_get_default` | Muestra la resolución de pantalla por defecto configurada | `/resolucion_get_default` |
 | `/resolucion_set_default` | Establece la resolución de pantalla por defecto. Usa Tab para autocompletar el ID de resolución | `/resolucion_set_default --resolucion=<ID>` |
@@ -152,6 +153,14 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 |---|---|---|
 | `/ambientes_listar` | Lista los ambientes configurados (DEV, TST, PRD, etc.) con su rama y descripción | `/ambientes_listar` |
 | `/ambientes_merge` | Hace merge de la rama actual a la rama del ambiente destino, hace push y opcionalmente notifica a Redmine. Requiere que no haya cambios pendientes. Si hay conflictos, el usuario debe resolverlos manualmente | `/ambientes_merge --ambiente=<nombre> [--mensaje=<texto>] [--comentar=<enviar|encolar>]` |
+
+---
+
+## Detección
+
+| Comando | Descripción | Uso |
+|---|---|---|
+| `/deteccion_funcionalidades` | Inicia un agente OpenCode en el directorio del proyecto para detectar y listar todas las funcionalidades implementadas. Seleccioná proveedor, modelo y modo para obtener el listado completo de funcionalidades detectadas. | `/deteccion_funcionalidades` |
 
 ---
 

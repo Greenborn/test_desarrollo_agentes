@@ -241,6 +241,7 @@ router.post('/send', async (req, res) => {
     }
 
     let fullResponse = '';
+    let fullThinking = '';
 
     try {
       const partTypes = {};
@@ -274,6 +275,7 @@ router.post('/send', async (req, res) => {
           const delta = event.properties.delta || '';
 
           if (partType === 'reasoning') {
+            fullThinking += delta;
             res.write(`data: ${JSON.stringify({ type: 'thinking', content: delta, sessionId })}\n\n`);
           } else {
             fullResponse += delta;
@@ -289,14 +291,14 @@ router.post('/send', async (req, res) => {
       const diff = await server.getSessionDiff(ocSessionId);
 
       if (sessionId) {
-        await saveLongMessage(sessionId, 'opencode_result', fullResponse);
+        await saveLongMessage(sessionId, 'opencode_result', fullResponse, { thinking: fullThinking || null });
         await saveLongMessage(sessionId, 'opencode_info', JSON.stringify({ type: 'finished', hash: ocSessionId, diff: diff || [] }));
         await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
       }
 
       await registrarGastos(sessionId, ocSessionId, server, fullResponse);
 
-      res.write(`data: ${JSON.stringify({ type: 'done', ocSessionId, hash: ocSessionId, fullResponse, diff: diff || [] })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'done', ocSessionId, hash: ocSessionId, fullResponse, thinking: fullThinking, diff: diff || [] })}\n\n`);
       res.end();
 
     } catch (msgErr) {

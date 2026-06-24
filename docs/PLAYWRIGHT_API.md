@@ -135,7 +135,7 @@ Cuando se provee `chat_session_id`, el servicio registra automáticamente en BD:
 
 | Tabla | Contenido |
 |---|---|
-| `playwright_network_logs` | Peticiones de red (`document`, `xhr`, `fetch`) con metod, URL, status code, headers y body truncado |
+| `playwright_network_logs` | Peticiones de red (`document`, `xhr`, `fetch`) con method, URL, status code, headers, body truncado, tamaño de datos y cuerpo de petición |
 | `playwright_console_logs` | Mensajes de consola del navegador con tipo (`log`, `warn`, `error`, etc.), texto y ubicación |
 | `playwright_events` | Eventos de usuario del navegador capturados con `start_event_recording` (clicks, inputs, keydown, scroll, etc.) |
 
