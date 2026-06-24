@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 import { useCommandRegistry } from '../useCommandRegistry.js'
+import { useOpencodeStore } from '../../stores/opencode.js'
 import { parseCommandArgs } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
@@ -25,19 +26,6 @@ function resetState() {
   deteccionState.processed = 0
 }
 
-function flattenFiles(node) {
-  const files = []
-  if (node.type === 'file') {
-    files.push(node)
-  }
-  if (node.type === 'directory' && node.children) {
-    for (const child of node.children) {
-      files.push(...flattenFiles(child))
-    }
-  }
-  return files
-}
-
 let batch = []
 
 async function flushBatch() {
@@ -55,10 +43,150 @@ async function flushBatch() {
   }
 }
 
+function flattenFiles(node) {
+  const files = []
+  if (node.type === 'file') {
+    files.push(node)
+  }
+  if (node.type === 'directory' && node.children) {
+    for (const child of node.children) {
+      files.push(...flattenFiles(child))
+    }
+  }
+  return files
+}
+
+let _deteccionTree = null
+let _deteccionFiles = []
+let _deteccionEscaneoId = null
+let _deteccionSessionId = null
+let _deteccionChatStore = null
+
+export async function startDeteccionProcessing(sessionId, chatStore, model, thinking) {
+  _deteccionAbort = false
+  batch = []
+
+  const tree = _deteccionTree
+  const files = _deteccionFiles
+  const escaneoId = _deteccionEscaneoId
+
+  deteccionState.running = true
+  deteccionState.total = files.length
+  deteccionState.processed = 0
+
+  for (let i = 0; i < files.length && !_deteccionAbort; i += 10) {
+    const chunk = files.slice(i, i + 10)
+
+    deteccionState.processed = i
+    deteccionState.current = chunk.length > 1 ? `${chunk[0].path} (+${chunk.length - 1})` : chunk[0].path
+
+    const reads = await Promise.all(chunk.map(async (file) => {
+      try {
+        const fileRes = await fetch(`/api/command/read-file?path=${encodeURIComponent(file.path)}`, { credentials: 'include' })
+        const fileData = await fileRes.json()
+        return { file, content: fileData.success ? (fileData.content || '') : null, error: !fileData.success }
+      } catch (err) {
+        return { file, content: null, error: err.message || 'error' }
+      }
+    }))
+
+    const validFiles = reads.filter(r => r.content !== null)
+    const descriptions = {}
+
+    if (validFiles.length > 0) {
+      try {
+        const batchRes = await fetch('/api/chat/summarize-files-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            files: validFiles.map(r => ({ path: r.file.path, content: r.content })),
+            model,
+            thinking,
+            sessionId,
+          }),
+        })
+        const batchData = await batchRes.json()
+        if (batchData.descriptions) {
+          for (const [path, desc] of Object.entries(batchData.descriptions)) {
+            descriptions[path] = desc
+          }
+        }
+      } catch (err) {
+        console.error('Error en batch DeepSeek:', err)
+      }
+    }
+
+    for (const r of reads) {
+      const desc = r.content ? (descriptions[r.file.path] || '(sin descripción)') : '(error al leer)'
+      r.file.description = desc
+      const prefix = r.content ? '✅' : '⚠️'
+      chatStore.pushMessage({
+        role: 'result',
+        content: `${prefix} ${r.file.path} — ${desc}`,
+        _key: 'desc-' + Date.now(),
+      })
+    }
+
+    if (escaneoId) {
+      for (const r of reads) {
+        const ext = r.file.name.includes('.') ? r.file.name.split('.').pop() : null
+        batch.push({
+          escaneo_id: escaneoId,
+          nombre: r.file.name,
+          ruta: r.file.path,
+          tipo: r.file.type || 'file',
+          extension: ext,
+          tamano: r.file.size || null,
+          descripcion: r.file.description || null,
+        })
+      }
+      await flushBatch()
+    }
+  }
+
+  if (escaneoId && batch.length > 0) {
+    await flushBatch()
+  }
+
+  if (escaneoId) {
+    try {
+      await fetch(`/api/documentacion/escaneo/${escaneoId}/finalizar`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          total_archivos: files.length,
+          archivos_procesados: deteccionState.processed + (_deteccionAbort ? 0 : 1),
+        }),
+      })
+    } catch (err) {
+      console.error('Error al finalizar escaneo en DB:', err)
+    }
+  }
+
+  if (_deteccionAbort) {
+    chatStore.pushMessage({
+      role: 'result',
+      content: '⏹ Proceso detenido por el usuario.',
+      _key: 'abort-' + Date.now(),
+    })
+  }
+
+  deteccionState.running = false
+  deteccionState.current = ''
+
+  chatStore.pushMessage({
+    role: 'result',
+    content: JSON.stringify(tree, null, 2),
+    _key: 'json-' + Date.now(),
+  })
+}
+
 register({
   name: '/deteccion_funcionalidades',
   category: 'Detección',
-  description: 'Obtiene el listado de archivos de código del proyecto, los resume uno por uno vía DeepSeek y entrega el JSON completo con descripciones. Si se especifica --escaneo-id, reutiliza un escaneo existente sobrescribiendo sus datos.',
+  description: 'Analiza archivos de código del proyecto y genera descripciones vía DeepSeek. Permite elegir modelo y nivel de pensamiento.',
   usage: '/deteccion_funcionalidades [--escaneo-id=&lt;id&gt;]',
   async execute(args, { chatStore }) {
     const { params } = parseCommandArgs(args, {
@@ -90,14 +218,10 @@ register({
         throw new Error(data.error || 'Error al obtener árbol de directorios')
       }
 
-      const tree = data.tree
-      const files = flattenFiles(tree)
-
-      chatStore.pushMessage({
-        role: 'result',
-        content: `📊 Total archivos de código: ${files.length}`,
-        _key: 'count-' + Date.now(),
-      })
+      _deteccionTree = data.tree
+      _deteccionFiles = flattenFiles(data.tree)
+      _deteccionSessionId = sessionId
+      _deteccionChatStore = chatStore
 
       let escaneoId = params['escaneo-id'] ? parseInt(params['escaneo-id'], 10) : null
       if (!escaneoId) {
@@ -129,106 +253,33 @@ register({
           console.error('Error al iniciar escaneo en DB:', err)
         }
       }
-
-      deteccionState.running = true
-      deteccionState.total = files.length
-      deteccionState.processed = 0
-
-      for (let i = 0; i < files.length && !_deteccionAbort; i += 10) {
-        const chunk = files.slice(i, i + 10)
-
-        deteccionState.processed = i
-        deteccionState.current = chunk.length > 1 ? `${chunk[0].path} (+${chunk.length - 1})` : chunk[0].path
-
-        const results = await Promise.all(chunk.map(async (file) => {
-          try {
-            const fileRes = await fetch(`/api/command/read-file?path=${encodeURIComponent(file.path)}`, { credentials: 'include' })
-            const fileData = await fileRes.json()
-
-            let description
-            if (fileData.success && fileData.content) {
-              const summaryRes = await fetch('/api/chat/summarize-file', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ filePath: file.path, fileContent: fileData.content, sessionId }),
-              })
-              const summaryData = await summaryRes.json()
-              description = summaryData.description || '(sin descripción)'
-            } else {
-              description = '(error al leer)'
-            }
-
-            file.description = description
-            return { file, description, error: null }
-          } catch (err) {
-            console.error('Error procesando archivo:', file.path, err)
-            file.description = err.message || 'error'
-            return { file, description: err.message || 'error', error: err }
-          }
-        }))
-
-        for (const { file, description, error } of results) {
-          const prefix = error ? '⚠️' : '✅'
-          chatStore.pushMessage({
-            role: 'result',
-            content: `${prefix} ${file.path} — ${description}`,
-            _key: 'desc-' + Date.now(),
-          })
-        }
-
-        if (escaneoId) {
-          for (const { file, description } of results) {
-            const ext = file.name.includes('.') ? file.name.split('.').pop() : null
-            batch.push({
-              escaneo_id: escaneoId,
-              nombre: file.name,
-              ruta: file.path,
-              tipo: file.type || 'file',
-              extension: ext,
-              tamano: file.size || null,
-              descripcion: description || null,
-            })
-          }
-          await flushBatch()
-        }
-      }
-
-      if (escaneoId && batch.length > 0) {
-        await flushBatch()
-      }
-
-      if (escaneoId) {
-        try {
-          await fetch(`/api/documentacion/escaneo/${escaneoId}/finalizar`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              total_archivos: files.length,
-              archivos_procesados: deteccionState.processed + (_deteccionAbort ? 0 : 1),
-            }),
-          })
-        } catch (err) {
-          console.error('Error al finalizar escaneo en DB:', err)
-        }
-      }
-
-      if (_deteccionAbort) {
-        chatStore.pushMessage({
-          role: 'result',
-          content: '⏹ Proceso detenido por el usuario.',
-          _key: 'abort-' + Date.now(),
-        })
-      }
-
-      deteccionState.running = false
-      deteccionState.current = ''
+      _deteccionEscaneoId = escaneoId
 
       chatStore.pushMessage({
         role: 'result',
-        content: JSON.stringify(tree, null, 2),
-        _key: 'json-' + Date.now(),
+        content: `📊 Total archivos de código: ${_deteccionFiles.length}`,
+        _key: 'count-' + Date.now(),
+      })
+
+      const ocStore = useOpencodeStore()
+
+      const modelOptions = [
+        { label: '🟢 DeepSeek Flash (deepseek-chat) — más rápido y económico', value: 'deepseek-chat' },
+        { label: '🔴 DeepSeek Reasoner (deepseek-reasoner) — razonamiento profundo', value: 'deepseek-reasoner' },
+      ]
+
+      chatStore.pushMessage({
+        role: 'opencode_control',
+        controlData: {
+          controlId: 'df-model-' + Date.now(),
+          controlType: 'select',
+          stepType: 'deteccion_model_setup',
+          subStepType: 'model',
+          options: modelOptions,
+          placeholder: 'Selecciona modelo DeepSeek...',
+          preselect: ocStore.savedModel || 'deepseek-chat',
+        },
+        _key: 'ctrl-model-' + Date.now(),
       })
     } catch (err) {
       resetState()

@@ -625,6 +625,91 @@ export default {
       })
     }
 
+    async function opencodeStreamPromptTestingNotes(sessionId, prompt, provider, model, thinking, mode, temperature) {
+      if (!_isActiveSession(sessionId)) {
+        console.log('[testing-notes] sesión inactiva, ignorando')
+        return
+      }
+      ocStreaming.value = true
+      if (sessionId) chat.setSessionStatus(sessionId, 'ai-thinking')
+      ocChunk.value = ''
+      ocThinking.value = ''
+
+      const streamMsg = {
+        role: 'opencode_stream',
+        content: '',
+        thinking: null,
+        streaming: true,
+        _key: 'stream-' + Date.now(),
+      }
+      chat.pushMessage(streamMsg)
+
+      await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
+        onChunk(text) {
+          if (!_isActiveSession(sessionId)) return
+          ocChunk.value += text
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].content = ocChunk.value
+        },
+        onThinking(text) {
+          if (!_isActiveSession(sessionId)) return
+          ocThinking.value += text
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+        },
+        onControl(control) {
+          if (!_isActiveSession(sessionId)) return
+          console.log('[testing-notes] control:', control)
+        },
+        async onDone(json, fullText) {
+          const opencodeResponse = json.fullResponse || fullText || '(sin respuesta)'
+          const thinking = json.thinking || ocThinking.value || null
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: opencodeResponse, thinking })
+          ocStreaming.value = false
+          if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+          if (!_isActiveSession(sessionId)) {
+            chat.pendingNotifications[sessionId] = Date.now()
+            return
+          }
+
+          if (_isActiveSession(sessionId)) {
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'opencode_control',
+                controlData: {
+                  controlId: 'ambientes-diff-comment-' + Date.now(),
+                  controlType: 'ambientes_diff_comment',
+                  message: opencodeResponse,
+                  sourceEnv: testingNotesData.origen,
+                  targetEnv: testingNotesData.destino,
+                  modo_envio: 'encolar',
+                  fromTestingNotes: true,
+                },
+                _key: 'control-' + Date.now(),
+              }
+            }
+          }
+        },
+        onError(msg) {
+          console.error('[testing-notes] error:', msg)
+          ocStreaming.value = false
+          if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
+          if (_isActiveSession(sessionId)) {
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) {
+              chat.messages[idx].streaming = false
+              chat.messages[idx].role = 'opencode_result'
+              chat.messages[idx].content = '[Error: ' + msg + ']'
+            }
+          } else {
+            chat.pendingNotifications[sessionId] = Date.now()
+          }
+        },
+      })
+    }
+
     const DOC_LABELS = {
       base_datos: 'Base de Datos',
       subproyectos: 'Subproyectos',
@@ -743,8 +828,57 @@ export default {
         await handleOpencodeSetup(controlId, value, controlMsg)
       } else if (stepType === 'generar_commit_setup') {
         await handleGenerarCommitSetup(controlId, value, controlMsg)
+      } else if (stepType === 'ambientes_diff_testing_setup') {
+        await handleAmbientesDiffTestingSetup(controlId, value, controlMsg)
       } else if (stepType === 'documentacion_update') {
         await handleDocumentacionUpdate(controlId, value, controlMsg)
+      } else if (stepType === 'deteccion_model_setup') {
+        const subStepType = controlMsg.controlData.subStepType
+        if (subStepType === 'model') {
+          const { startDeteccionProcessing } = await import('../composables/commands/deteccionFuncionalidades.js')
+          const ocStore = useOpencodeStore()
+          await ocStore.select('model', value)
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'opencode_confirmed',
+              content: value,
+              _key: 'confirmed-' + Date.now(),
+            }
+          }
+          chat.pushMessage({
+            role: 'opencode_control',
+            controlData: {
+              controlId: 'df-thinking-' + Date.now(),
+              controlType: 'select',
+              stepType: 'deteccion_model_setup',
+              subStepType: 'thinking',
+              options: [
+                { label: 'Low — mínimo esfuerzo de razonamiento (Flash)', value: 'low' },
+                { label: 'Medium — equilibrio velocidad/profundidad', value: 'medium' },
+                { label: 'High — máximo razonamiento profundo', value: 'high' },
+              ],
+              placeholder: 'Selecciona nivel de pensamiento...',
+              preselect: ocStore.savedThinking || 'low',
+            },
+            _key: 'ctrl-thinking-' + Date.now(),
+          })
+        } else if (subStepType === 'thinking') {
+          const { startDeteccionProcessing } = await import('../composables/commands/deteccionFuncionalidades.js')
+          const ocStore = useOpencodeStore()
+          await ocStore.select('thinking', value)
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'opencode_confirmed',
+              content: value,
+              _key: 'confirmed-' + Date.now(),
+            }
+          }
+          const model = ocStore.selectedModel || 'deepseek-chat'
+          await startDeteccionProcessing(chat.activeSessionId, chat, model, value)
+        }
+        return
       } else if (stepType === 'ticket_descripcion') {
         if (controlType === 'followup' || controlType === 'opencode_form') {
           const { model, thinking, mode, temperature, prompt } = value
@@ -841,6 +975,20 @@ export default {
           await regenerateCommit(controlId, controlMsg)
         } else if (value.action === 'confirm') {
           await executeCommit(controlId, controlMsg, value.message, value.addComment, value.modo_envio)
+        }
+        return
+      } else if (controlType === 'ambientes_diff_comment') {
+        if (value === null) {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Generación de comentario cancelada.',
+              _key: 'result-' + Date.now(),
+            }
+          }
+        } else if (value.action === 'confirm') {
+          await executeAmbientesDiffComment(controlId, controlMsg, value.message, value.modo_envio)
         }
         return
       } else if (stepType === 'resolution_set_default') {
@@ -1092,6 +1240,8 @@ export default {
     let ocSetupData = { provider: '', model: '', thinking: '', mode: '', prompt: '' }
     let commitSetupData = { provider: '', model: '', thinking: '', mode: '', temperature: '' }
     let commitData = { prompt: '', provider: '', model: '', thinking: '', mode: '', temperature: '' }
+    let testingNotesSetupData = { provider: '', model: '', thinking: '', mode: 'Plan', temperature: '' }
+    let testingNotesData = { prompt: '', provider: '', model: '', thinking: '', mode: '', temperature: '', origen: '', destino: '' }
     let docUpdateData = { provider: '', model: '', thinking: '', mode: '', temperature: '' }
     let descripcionData = { provider: '', model: '', thinking: '', mode: 'Plan', temperature: '' }
     const descripcionUserInput = ref('')
@@ -2150,6 +2300,106 @@ export default {
       }
     }
 
+    async function handleAmbientesDiffTestingSetup(controlId, value, controlMsg) {
+      const subStepType = controlMsg.controlData.subStepType
+
+      if (subStepType === 'provider') {
+        testingNotesSetupData.provider = value
+        testingNotesData.origen = controlMsg.controlData.origen || ''
+        testingNotesData.destino = controlMsg.controlData.destino || ''
+        testingNotesData.diffData = controlMsg.controlData.diffData || null
+        await ocStore.select('provider', value)
+        ocStore.selectedProvider = value
+        const models = ocStore.getModelsForProvider(value)
+        chat.pushMessage({
+          role: 'opencode_control',
+          controlData: {
+            controlId: 'tn-form-' + Date.now(),
+            controlType: 'generar_commit_form',
+            stepType: 'ambientes_diff_testing_setup',
+            subStepType: 'form',
+            models,
+            modelValue: ocStore.savedModel || '',
+            thinkingOptions: ocStore.thinkingOptions,
+            thinkingValue: ocStore.savedThinking || '',
+            temperatureOptions: ocStore.temperatureOptions,
+            temperatureValue: ocStore.savedTemperature || '0.7',
+          },
+          _key: 'control-' + Date.now(),
+        })
+      } else if (subStepType === 'form') {
+        const { model, thinking = '', mode = 'Plan', temperature = '0.7' } = value || {}
+        testingNotesSetupData.model = model
+        testingNotesSetupData.thinking = thinking
+        testingNotesSetupData.mode = mode
+        testingNotesSetupData.temperature = temperature
+        await ocStore.select('model', model)
+        await ocStore.select('thinking', thinking || '')
+        await ocStore.select('mode', mode)
+        if (temperature) await ocStore.select('temperature', temperature)
+        ocStore.selectedModel = model
+        ocStore.selectedThinking = thinking || ''
+        ocStore.selectedMode = mode
+        ocStore.selectedTemperature = temperature || ''
+
+        const origen = testingNotesData.origen
+        const destino = testingNotesData.destino
+        const diffData = testingNotesData.diffData
+
+        let diffSummary = ''
+        if (diffData && diffData.commits && diffData.commits.length > 0) {
+          diffSummary = diffData.commits.map(c => `- ${c.message}`).join('\n')
+        }
+
+        let prompt
+        try {
+          const tmplRes = await fetch('/api/templates/testing-notes-prompt', { credentials: 'include' })
+          if (tmplRes.ok) {
+            const tmplData = await tmplRes.json()
+            prompt = tmplData.content
+          } else {
+            prompt = `Analizá las diferencias entre las ramas "${diffData?.sourceBranch || origen}" y "${diffData?.targetBranch || destino}" del proyecto.\n\nLos commits que diferen ambas ramas son:\n${diffSummary || '(sin commits detallados)'}\n\nGenerá un listado de puntos a considerar para realizar pruebas (testing):\n- Qué funcionalidades se ven afectadas\n- Qué se recomienda testear específicamente\n- Casos de prueba sugeridos\n\nDevolvé la respuesta en formato markdown listando cada punto.`
+          }
+        } catch (err) {
+          console.error('Error al cargar plantilla testing-notes-prompt:', err)
+          prompt = `Analizá las diferencias entre las ramas "${diffData?.sourceBranch || origen}" y "${diffData?.targetBranch || destino}" del proyecto.\n\nLos commits que diferen ambas ramas son:\n${diffSummary || '(sin commits detallados)'}\n\nGenerá un listado de puntos a considerar para realizar pruebas (testing):\n- Qué funcionalidades se ven afectadas\n- Qué se recomienda testear específicamente\n- Casos de prueba sugeridos\n\nDevolvé la respuesta en formato markdown listando cada punto.`
+        }
+
+        testingNotesData.prompt = prompt
+        testingNotesData.provider = testingNotesSetupData.provider
+        testingNotesData.model = model
+        testingNotesData.thinking = thinking
+        testingNotesData.mode = mode
+        testingNotesData.temperature = temperature
+
+        await opencodeStreamPromptTestingNotes(
+          chat.activeSessionId,
+          prompt,
+          testingNotesSetupData.provider,
+          model,
+          thinking,
+          mode,
+          temperature,
+        )
+      }
+    }
+
+    async function regenerateTestingNotes(controlId, controlMsg) {
+      const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+      if (idx >= 0) {
+        chat.messages[idx].controlData.loading = true
+      }
+      await opencodeStreamPromptTestingNotes(
+        chat.activeSessionId,
+        testingNotesData.prompt,
+        testingNotesData.provider,
+        testingNotesData.model,
+        testingNotesData.thinking,
+        testingNotesData.mode,
+        testingNotesData.temperature,
+      )
+    }
+
     async function regenerateCommit(controlId, controlMsg) {
       const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
       if (idx >= 0) {
@@ -2338,6 +2588,113 @@ export default {
           console.error('Error al finalizar sesión OpenCode tras commit:', finishErr.message)
         }
         ocStore.finish()
+      }
+    }
+
+    async function executeAmbientesDiffComment(controlId, controlMsg, message, modo_envio) {
+      const sessionId = chat.activeSessionId
+      const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+      if (idx >= 0) {
+        chat.messages[idx].controlData.loading = true
+      }
+
+      try {
+        const session = sessions.value.find(s => Number(s.id) === Number(sessionId))
+        const idTicket = session?.id_ticket_redmine || ticketInfo.value?.redmine_id || null
+
+        if (!idTicket) {
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'No hay ticket asociado a la sesión. Use /chat_set_ticket para asignar uno.',
+              _key: 'err-' + Date.now(),
+            }
+          }
+          return
+        }
+
+        const notesBody = message.trim()
+
+        if (modo_envio === 'enviar') {
+          try {
+            const ticketRes = await fetch('/api/tickets/session/' + sessionId, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ notes: notesBody }),
+            })
+            const ticketData = await ticketRes.json()
+
+            if (idx >= 0) {
+              if (ticketData.success) {
+                chat.messages[idx] = {
+                  role: 'result',
+                  content: '✓ Comentario enviado al ticket #' + idTicket + '.',
+                  _key: 'result-' + Date.now(),
+                }
+              } else {
+                chat.messages[idx] = {
+                  role: 'result',
+                  content: '✗ Error al enviar comentario: ' + (ticketData.error || 'Error desconocido'),
+                  _key: 'err-' + Date.now(),
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error al enviar comentario al ticket:', err.message)
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: '✗ Error al enviar comentario: ' + err.message,
+                _key: 'err-' + Date.now(),
+              }
+            }
+          }
+        } else {
+          try {
+            await redmineComments.queueComment(sessionId, idTicket, notesBody)
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: '✓ Comentario encolado para el ticket #' + idTicket + '. Usá /dev_redmine_comentarios_enviar para enviarlo.',
+                _key: 'result-' + Date.now(),
+              }
+            }
+          } catch (err) {
+            console.error('Error al encolar comentario:', err.message)
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: '✗ Error al encolar comentario: ' + err.message,
+                _key: 'err-' + Date.now(),
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error al procesar comentario de diff:', err.message)
+        if (idx >= 0) {
+          chat.messages[idx] = {
+            role: 'result',
+            content: 'Error de conexión: ' + err.message,
+            _key: 'err-' + Date.now(),
+          }
+        }
+      } finally {
+        const fromTestingNotes = controlMsg?.controlData?.fromTestingNotes
+        if (fromTestingNotes) {
+          try {
+            await fetch('/api/opencode/finish', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, directory: cmdStore.currentDir || undefined }),
+            })
+          } catch (finishErr) {
+            console.error('Error al cerrar sesión OpenCode:', finishErr.message)
+          }
+          ocStore.finish()
+        }
       }
     }
 

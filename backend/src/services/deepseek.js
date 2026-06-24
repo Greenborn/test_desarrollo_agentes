@@ -30,7 +30,7 @@ export function normalizeMessages(messages) {
       case 'result':
         return { role: 'user', content: `[RESULTADO] ${m.content}` };
       case 'opencode_info':
-        return { role: 'system', content: m.content };
+        return { role: 'user', content: `[INFO] ${m.content}` };
       case 'opencode_result':
         return { role: 'user', content: `[OPENCODE] ${m.content}` };
       default:
@@ -39,21 +39,28 @@ export function normalizeMessages(messages) {
   });
 }
 
-export async function* streamChat(messages, workspaceId, customSystemPrompt = null) {
+export async function* streamChat(messages, workspaceId, customSystemPrompt = null, options = {}) {
   const apiKey = await getDeepSeekKey(workspaceId);
   if (!apiKey) throw new Error('DeepSeek API key no configurada');
 
   const systemPrompt = customSystemPrompt || await getSystemPrompt(workspaceId);
 
+  const model = options.model || 'deepseek-chat';
+
   const body = {
-    model: 'deepseek-chat',
+    model,
     messages: [
       { role: 'system', content: systemPrompt },
       ...normalizeMessages(messages),
     ],
     stream: true,
     stream_options: { include_usage: true },
+    enable_cache: true,
   };
+
+  if (options.reasoningEffort) {
+    body.reasoning_effort = options.reasoningEffort;
+  }
 
   const response = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',

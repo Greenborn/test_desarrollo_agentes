@@ -456,7 +456,7 @@ router.post('/proyectos/importar-tickets-all', async (req, res) => {
       return;
     }
 
-    const proyectos = await db('proyectos').whereNotNull('redmine_id').orderBy('id');
+    const proyectos = await db('proyectos').where({ workspace_id: wsId }).whereNotNull('redmine_id').orderBy('id');
 
     if (proyectos.length === 0) {
       res.json({ success: false, message: 'No hay proyectos con ID de Redmine asociado.' });

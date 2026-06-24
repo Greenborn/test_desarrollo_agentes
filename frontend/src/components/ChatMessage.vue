@@ -27,6 +27,7 @@
       <DescripcionResultControl v-else-if="parsedControl && parsedControl.controlType === 'refinar_result'" :description="parsedControl.description || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <CommitResultControl v-else-if="parsedControl && parsedControl.controlType === 'commit_result'" :message="parsedControl.message || ''" :loading="parsedControl.loading || false" :modoEnvioInicial="parsedControl.modo_envio || 'encolar'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <RedmineCommentsSendControl v-else-if="parsedControl && parsedControl.controlType === 'redmine_comments_send'" :comentarios_ids="parsedControl.comentarios_ids || []" :ticket_redmine_id="parsedControl.ticket_redmine_id || 0" :mensaje="parsedControl.mensaje || ''" :cantidad="parsedControl.cantidad || 0" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <AmbientesDiffCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ambientes_diff_comment'" :message="parsedControl.message || ''" :sourceEnv="parsedControl.sourceEnv || ''" :targetEnv="parsedControl.targetEnv || ''" :modoEnvioInicial="parsedControl.modo_envio || 'encolar'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <div v-else class="d-flex flex-column gap-2">
         <pre class="mb-0 small" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
       </div>
@@ -111,11 +112,12 @@ import DescripcionResultControl from './DescripcionResultControl.vue'
 import CommitResultControl from './CommitResultControl.vue'
 import ResolutionSelectControl from './ResolutionSelectControl.vue'
 import RedmineCommentsSendControl from './RedmineCommentsSendControl.vue'
+import AmbientesDiffCommentControl from './AmbientesDiffCommentControl.vue'
 
 let counter = 0
 
 export default {
-  components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatOpencodeForm, ChatGenerarCommitForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, TicketCreateControl, DescripcionInputControl, DescripcionResultControl, CommitResultControl, ChatControlButtons, ResolutionSelectControl, RedmineCommentsSendControl },
+  components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatOpencodeForm, ChatGenerarCommitForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, TicketCreateControl, DescripcionInputControl, DescripcionResultControl, CommitResultControl, ChatControlButtons, ResolutionSelectControl, RedmineCommentsSendControl, AmbientesDiffCommentControl },
   props: {
     msg: { type: Object, required: true },
     rawMsgKeys: { type: Set, default: () => new Set() },

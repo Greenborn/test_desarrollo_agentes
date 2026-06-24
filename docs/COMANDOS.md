@@ -153,6 +153,8 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 |---|---|---|
 | `/ambientes_listar` | Lista los ambientes configurados (DEV, TST, PRD, etc.) con su rama y descripción | `/ambientes_listar` |
 | `/ambientes_merge` | Hace merge de la rama actual a la rama del ambiente destino, hace push y opcionalmente notifica a Redmine. Requiere que no haya cambios pendientes. Si hay conflictos, el usuario debe resolverlos manualmente | `/ambientes_merge --ambiente=<nombre> [--mensaje=<texto>] [--comentar=<enviar|encolar>]` |
+| `/ambientes_diff` | Lista los commits que diferen dos ambientes (ramas), ordenados por fecha ascendente, con enlace a GitHub | `/ambientes_diff --origen=<nombre> --destino=<nombre>` |
+| `/ambientes_diff_comentar` | Genera un comentario para el ticket Redmine con las diferencias entre dos ambientes. Con `--tipo=commits` lista los commits. Con `--tipo=testing_notes` usa un agente OpenCode para generar notas de testing basadas en los cambios. Siempre muestra un textarea editable con opción de enviar o encolar | `/ambientes_diff_comentar --origen=<nombre> --destino=<nombre> [--tipo=<commits|testing_notes>]` |
 
 ---
 

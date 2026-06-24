@@ -44,16 +44,19 @@ router.get('/options', async (req, res) => {
     const url = await getRedmineUrl(wsId);
 
     if (!token || !url) {
-      return res.json({ statuses: [], priorities: [], users: [] });
+      return res.json({ statuses: [], priorities: [], trackers: [], users: [] });
     }
 
     const baseUrl = url.replace(/\/+$/, '');
 
-    const [statusesRes, prioritiesRes, usersRes] = await Promise.all([
+    const [statusesRes, prioritiesRes, trackersRes, usersRes] = await Promise.all([
       fetch(baseUrl + '/issue_statuses.json', {
         headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
       }),
       fetch(baseUrl + '/enumerations/issue_priorities.json', {
+        headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+      }),
+      fetch(baseUrl + '/trackers.json', {
         headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
       }),
       fetch(baseUrl + '/users.json?limit=100&status=1', {
@@ -61,15 +64,17 @@ router.get('/options', async (req, res) => {
       }),
     ]);
 
-    const [statusesData, prioritiesData, usersData] = await Promise.all([
+    const [statusesData, prioritiesData, trackersData, usersData] = await Promise.all([
       statusesRes.json(),
       prioritiesRes.json(),
+      trackersRes.json(),
       usersRes.json(),
     ]);
 
     res.json({
       statuses: (statusesData.issue_statuses || []).map(s => ({ id: s.id, name: s.name })),
       priorities: (prioritiesData.issue_priorities || []).map(p => ({ id: p.id, name: p.name })),
+      trackers: (trackersData.trackers || []).map(t => ({ id: t.id, name: t.name })),
       users: (usersData.users || []).map(u => ({
         id: u.id,
         name: [u.firstname, u.lastname].filter(Boolean).join(' '),
@@ -353,7 +358,7 @@ router.get('/project-members/:projectId', async (req, res) => {
 router.post('/create', async (req, res) => {
   if (!authGuard(req, res)) return;
 
-  const { subject, description, project_id, status_name, status_id, priority_name, priority_id, assigned_to_name, assigned_to_id, done_ratio } = req.body;
+  const { subject, description, project_id, status_name, status_id, priority_name, priority_id, tracker_name, tracker_id, assigned_to_name, assigned_to_id, done_ratio } = req.body;
 
   if (!subject || !subject.trim()) {
     return res.status(400).json({ error: 'El asunto es requerido.' });
@@ -395,9 +400,42 @@ router.post('/create', async (req, res) => {
 
     if (description) redminePayload.description = description;
     if (status_id != null) redminePayload.status_id = status_id;
-    if (priority_id != null) redminePayload.priority_id = priority_id;
     if (assigned_to_id != null) redminePayload.assigned_to_id = assigned_to_id;
     if (done_ratio !== undefined) redminePayload.done_ratio = done_ratio;
+
+    if (priority_id != null) {
+      redminePayload.priority_id = priority_id;
+    } else if (priority_name) {
+      try {
+        const priRes = await fetch(baseUrl + '/enumerations/issue_priorities.json', {
+          headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+        });
+        if (priRes.ok) {
+          const priData = await priRes.json();
+          const match = (priData.issue_priorities || []).find(p => p.name === priority_name);
+          if (match) redminePayload.priority_id = match.id;
+        }
+      } catch (e) {
+        console.log('Error al resolver priority_id desde Redmine:', e.message);
+      }
+    }
+
+    if (tracker_id != null) {
+      redminePayload.tracker_id = tracker_id;
+    } else if (tracker_name) {
+      try {
+        const trkRes = await fetch(baseUrl + '/trackers.json', {
+          headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+        });
+        if (trkRes.ok) {
+          const trkData = await trkRes.json();
+          const match = (trkData.trackers || []).find(t => t.name === tracker_name);
+          if (match) redminePayload.tracker_id = match.id;
+        }
+      } catch (e) {
+        console.log('Error al resolver tracker_id desde Redmine:', e.message);
+      }
+    }
 
     const redmineRes = await fetch(baseUrl + '/issues.json', {
       method: 'POST',

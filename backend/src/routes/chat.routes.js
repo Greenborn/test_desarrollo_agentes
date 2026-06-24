@@ -278,7 +278,7 @@ router.post('/refine', async (req, res) => {
 router.post('/summarize-file', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { fileContent, filePath, sessionId } = req.body;
+    const { fileContent, filePath, sessionId, model, thinking } = req.body;
     if (!fileContent) return res.status(400).json({ error: 'fileContent requerido' });
 
     const systemPrompt = 'Describí el propósito del siguiente archivo de código en no más de 300 caracteres. Sé conciso y específico. Describí únicamente su funcionalidad principal, sin detallar implementación interna.';
@@ -286,10 +286,14 @@ router.post('/summarize-file', async (req, res) => {
     const messages = [{ role: 'user', content: message }];
 
     const wsId = req.session.workspaceId || 1;
+    const streamOptions = {};
+    if (model) streamOptions.model = model;
+    if (thinking) streamOptions.reasoningEffort = thinking;
+
     let description = '';
     let usageData = null;
 
-    for await (const chunk of streamChat(messages, wsId, systemPrompt)) {
+    for await (const chunk of streamChat(messages, wsId, systemPrompt, streamOptions)) {
       if (chunk.type === 'usage') {
         usageData = chunk;
         continue;
@@ -326,6 +330,89 @@ router.post('/summarize-file', async (req, res) => {
     res.json({ description: trimmed || '(sin descripción)' });
   } catch (err) {
     console.log('Error en summarize-file:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/summarize-files-batch', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { files, model, thinking, sessionId } = req.body;
+    if (!Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ error: 'files debe ser un arreglo no vacío' });
+    }
+
+    const parts = files.map((f, i) => {
+      const content = (f.content || '').slice(0, 8000);
+      return `[Archivo ${i + 1}]\nRuta: ${f.path || 'sin nombre'}\n\`\`\`\n${content}\n\`\`\``;
+    });
+
+    const systemPrompt = 'Analizá los siguientes archivos de código. Para cada uno, devolvé una descripción de máximo 300 caracteres describiendo su propósito y funcionalidad principal.';
+    const message = `Respondé ÚNICAMENTE con un objeto JSON válido donde las claves sean las rutas de los archivos y los valores sean las descripciones. Sin explicaciones ni texto adicional.\n\n${parts.join('\n\n')}`;
+    const messages = [{ role: 'user', content: message }];
+
+    const wsId = req.session.workspaceId || 1;
+    const streamOptions = {};
+    if (model) streamOptions.model = model;
+    if (thinking) streamOptions.reasoningEffort = thinking;
+
+    let rawResponse = '';
+    let usageData = null;
+
+    for await (const chunk of streamChat(messages, wsId, systemPrompt, streamOptions)) {
+      if (chunk.type === 'usage') {
+        usageData = chunk;
+        continue;
+      }
+      if (chunk.type === 'response') {
+        rawResponse += chunk.content;
+      }
+    }
+
+    if (usageData && sessionId) {
+      try {
+        const chatSess = await db('chat_sessions').where({ id: sessionId }).select('proyecto_id').first();
+        const idProyecto = chatSess?.proyecto_id;
+        if (idProyecto) {
+          const gastosPort = process.env.SERVICIO_GASTOS_PORT || 4100;
+          const precio = (usageData.completion_tokens || 0) * 0.0000011;
+          await fetch(`http://localhost:${gastosPort}/api/gastos/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id_chat_session: parseInt(sessionId),
+              id_proyecto: idProyecto,
+              precio: precio,
+              tokens: usageData.total_tokens || 0,
+            }),
+          });
+        }
+      } catch (e) {
+        console.log('[gastos] error al registrar en summarize-files-batch:', e.message);
+      }
+    }
+
+    let descriptions = {};
+    try {
+      const trimmed = rawResponse.trim();
+      const jsonStart = trimmed.indexOf('{');
+      const jsonEnd = trimmed.lastIndexOf('}');
+      if (jsonStart >= 0 && jsonEnd > jsonStart) {
+        descriptions = JSON.parse(trimmed.slice(jsonStart, jsonEnd + 1));
+      }
+    } catch (e) {
+      console.log('Error parseando JSON de batch:', e.message);
+    }
+
+    for (const f of files) {
+      if (!descriptions[f.path]) {
+        descriptions[f.path] = '(sin descripción)';
+      }
+    }
+
+    res.json({ descriptions });
+  } catch (err) {
+    console.log('Error en summarize-files-batch:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

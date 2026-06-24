@@ -737,6 +737,103 @@ router.post('/git-merge', async (req, res) => {
   }
 });
 
+router.post('/git-diff-branches', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { sessionId, sourceEnv, targetEnv } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'sessionId es requerido' });
+    }
+    if (!sourceEnv || !targetEnv) {
+      return res.status(400).json({ success: false, error: 'sourceEnv y targetEnv son requeridos' });
+    }
+
+    const wsId = req.session.workspaceId || 1;
+
+    const source = await db('workspace_environments')
+      .where({ workspace_id: wsId, name: sourceEnv })
+      .first();
+    if (!source) {
+      return res.status(400).json({ success: false, error: `Ambiente "${sourceEnv}" no encontrado` });
+    }
+
+    const target = await db('workspace_environments')
+      .where({ workspace_id: wsId, name: targetEnv })
+      .first();
+    if (!target) {
+      return res.status(400).json({ success: false, error: `Ambiente "${targetEnv}" no encontrado` });
+    }
+
+    const sourceBranch = source.branch;
+    const targetBranch = target.branch;
+
+    if (sourceBranch === targetBranch) {
+      return res.json({ success: true, commits: [], sourceEnv, targetEnv, sourceBranch, targetBranch, remoteUrl: null, message: 'Ambos ambientes usan la misma rama.' });
+    }
+
+    const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+    if (!session) {
+      return res.status(400).json({ success: false, error: 'Sesión de chat no encontrada' });
+    }
+    const cwd = session.cwd || process.cwd();
+
+    try {
+      execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf-8' });
+    } catch (e) {
+      return res.status(400).json({ success: false, error: 'El directorio no es un repositorio Git.' });
+    }
+
+    let remoteUrl = null;
+    try {
+      const remote = execSync('git remote get-url origin', { cwd, encoding: 'utf-8' }).trim();
+      if (remote.startsWith('git@')) {
+        remoteUrl = remote.replace(/^git@([^:]+):/, 'https://$1/').replace(/\.git$/, '');
+      } else if (remote.startsWith('https://')) {
+        remoteUrl = remote.replace(/\.git$/, '');
+      }
+    } catch (e) {
+      console.log('[git-diff-branches] no se pudo obtener remote URL:', e.message);
+    }
+
+    const logOutput = execSync(
+      `git log --left-right --format="%m|%H|%h|%s|%an|%ad" --date=short --date-order --reverse "${sourceBranch}"..."${targetBranch}"`,
+      { cwd, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
+    );
+
+    const commits = [];
+    for (const line of logOutput.trim().split('\n')) {
+      if (!line) continue;
+      const marker = line[0];
+      const rest = line.slice(1);
+      const parts = rest.split('|');
+      if (parts.length < 6) continue;
+      const hash = parts[1];
+      const shortHash = parts[2];
+      const message = parts[3];
+      const author = parts[4];
+      const date = parts[5];
+      const side = marker === '<' ? 'left' : marker === '>' ? 'right' : 'unknown';
+      const githubUrl = remoteUrl ? `${remoteUrl}/commit/${hash}` : null;
+      commits.push({ hash, shortHash, message, author, date, side, githubUrl });
+    }
+
+    res.json({
+      success: true,
+      commits,
+      sourceEnv,
+      targetEnv,
+      sourceBranch,
+      targetBranch,
+      remoteUrl,
+      sourceLabel: source.description || sourceEnv,
+      targetLabel: target.description || targetEnv,
+    });
+  } catch (err) {
+    console.log('Error en git-diff-branches:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/read-file', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {

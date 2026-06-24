@@ -54,7 +54,13 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 - **Auth:** Requerida
 - **Body:** `{ fileContent: string, filePath?: string, sessionId?: number }`
 - **Respuesta:** `{ description: string }`
-- **Descripción:** Envía el contenido de un archivo a DeepSeek para obtener una descripción de máximo 300 caracteres. No streaming — respuesta directa JSON. Usado por `/deteccion_funcionalidades` para describir cada archivo de código.
+- **Descripción:** Envía el contenido de un archivo a DeepSeek para obtener una descripción de máximo 300 caracteres. No streaming — respuesta directa JSON.
+
+### `POST /api/chat/summarize-files-batch`
+- **Auth:** Requerida
+- **Body:** `{ files: [{ path: string, content: string }], model?: string, thinking?: string, sessionId?: number }`
+- **Respuesta:** `{ descriptions: { [path]: string } }`
+- **Descripción:** Envía múltiples archivos en un solo prompt a DeepSeek. Retorna un JSON con las rutas como claves y descripciones como valores. Usado por `/deteccion_funcionalidades` para procesar batches de 10 archivos en una sola llamada, reduciendo significativamente las requests a la API.
 
 ### `DELETE /api/chat/sessions/:id`
 - **Auth:** Requerida

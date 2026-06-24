@@ -26,8 +26,15 @@
 
     <div class="ticket-field row-fields">
       <div class="field-item">
+        <span class="field-label">Tipo:</span>
+        <select v-model="form.tracker_name" class="ticket-select" @change="onTrackerChange">
+          <option value="" disabled>Selecciona tipo...</option>
+          <option v-for="t in options.trackers" :key="t.id || t.name" :value="t.name">{{ t.name }}</option>
+        </select>
+      </div>
+      <div class="field-item">
         <span class="field-label">Estado:</span>
-        <select v-model="form.status_name" class="ticket-select">
+        <select v-model="form.status_name" class="ticket-select" @change="onStatusChange">
           <option value="" disabled>Selecciona estado...</option>
           <option v-for="s in options.statuses" :key="s.id || s.name" :value="s.name">{{ s.name }}</option>
         </select>
@@ -89,12 +96,14 @@ export default {
     const options = reactive({
       statuses: [],
       priorities: [],
+      trackers: [],
       users: [],
     })
     const allProjects = ref([])
     const selectedIds = reactive({
       status_id: null,
       priority_id: null,
+      tracker_id: null,
       assigned_to_id: null,
     })
 
@@ -104,6 +113,7 @@ export default {
       description: '',
       status_name: '',
       priority_name: '',
+      tracker_name: '',
       assigned_to_name: '',
       done_ratio: 0,
     })
@@ -159,6 +169,7 @@ export default {
         const genData = await genRes.json()
         options.statuses = genData.statuses || []
         options.priorities = genData.priorities || []
+        options.trackers = genData.trackers || []
       } catch (err) {
         console.error('Error al cargar opciones:', err)
       }
@@ -180,6 +191,14 @@ export default {
           { id: null, name: 'Alta' },
           { id: null, name: 'Urgente' },
           { id: null, name: 'Inmediata' },
+        ]
+      }
+      if (options.trackers.length === 0) {
+        options.trackers = [
+          { id: null, name: 'Bug' },
+          { id: null, name: 'Feature' },
+          { id: null, name: 'Support' },
+          { id: null, name: 'Task' },
         ]
       }
     }
@@ -209,6 +228,16 @@ export default {
     function onPriorityChange() {
       const match = options.priorities.find(p => p.name === form.priority_name)
       selectedIds.priority_id = match ? match.id : null
+    }
+
+    function onStatusChange() {
+      const match = options.statuses.find(s => s.name === form.status_name)
+      selectedIds.status_id = match ? match.id : null
+    }
+
+    function onTrackerChange() {
+      const match = options.trackers.find(t => t.name === form.tracker_name)
+      selectedIds.tracker_id = match ? match.id : null
     }
 
     function onUserChange() {
@@ -244,9 +273,11 @@ export default {
           description: form.description,
           status_name: form.status_name || undefined,
           priority_name: form.priority_name || undefined,
+          tracker_name: form.tracker_name || undefined,
           assigned_to_name: form.assigned_to_name || undefined,
           status_id: selectedIds.status_id,
           priority_id: selectedIds.priority_id,
+          tracker_id: selectedIds.tracker_id,
           assigned_to_id: selectedIds.assigned_to_id,
           done_ratio: form.done_ratio,
         }
@@ -273,7 +304,7 @@ export default {
 
     return {
       form, options, allProjects, flattenedProjects, errors, saving, selectedIds,
-      save, cancel, onProjectChange, onPriorityChange, onUserChange, loadProjectUsers,
+      save, cancel, onProjectChange, onPriorityChange, onStatusChange, onTrackerChange, onUserChange, loadProjectUsers,
     }
   },
 }
