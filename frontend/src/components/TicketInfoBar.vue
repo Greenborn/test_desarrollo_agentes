@@ -11,6 +11,7 @@
       <button v-if="!devInstanceRunning" class="btn btn-sm btn-outline-argentina px-2" @click="$emit('iniciar-instancia-dev')" title="Iniciar instancia desarrollo">▶️</button>
       <button v-else class="btn btn-sm btn-outline-danger px-2" @click="$emit('detener-instancia-dev')" title="Detener instancia desarrollo">⏹️</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="$emit('generar-commit')" title="Generar commit">💾</button>
+      <button class="btn btn-sm btn-outline-argentina px-2" @click="$emit('iniciar-opencode')" title="Iniciar OpenCode">🚀</button>
       <button class="btn btn-sm btn-outline-danger px-2" @click="$emit('clear-chat')" title="Limpiar chat">🗑️</button>
       <div class="zoom-controls d-flex align-items-center gap-1">
         <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomOut" :disabled="gitStore.chatZoom <= 50" title="Alejar">−</button>
@@ -30,7 +31,7 @@ export default {
     activeSessionId: { type: [Number, String], default: null },
     devInstanceRunning: { type: Boolean, default: false },
   },
-  emits: ['clear-chat', 'generar-commit', 'iniciar-instancia-dev', 'detener-instancia-dev'],
+  emits: ['clear-chat', 'generar-commit', 'iniciar-instancia-dev', 'detener-instancia-dev', 'iniciar-opencode'],
   setup() {
     const gitStore = useGitStore()
 

@@ -301,6 +301,47 @@ router.put('/event-recordings/:id', async (req, res) => {
   }
 });
 
+router.post('/event-recordings/:id/clone', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { id } = req.params;
+
+  try {
+    const original = await db('playwright_event_recordings').where({ id }).first();
+    if (!original) {
+      return res.status(404).json({ error: 'Grabación no encontrada' });
+    }
+
+    const newName = `${original.name} (copia)`;
+
+    const [newRecording] = await db('playwright_event_recordings').insert({
+      name: newName,
+      chat_session_id: original.chat_session_id,
+      project_id: original.project_id,
+      playwright_session_id: original.playwright_session_id,
+    });
+
+    const events = await db('playwright_events').where({ recording_id: id });
+    if (events.length > 0) {
+      const copiedEvents = events.map(e => {
+        const { id: _ignore, ...rest } = e;
+        return { ...rest, recording_id: newRecording };
+      });
+      await db('playwright_events').insert(copiedEvents);
+    }
+
+    const [{ event_count }] = await db('playwright_events')
+      .where({ recording_id: newRecording })
+      .count('* as event_count');
+
+    const result = await db('playwright_event_recordings').where({ id: newRecording }).first();
+    res.json({ ...result, event_count: parseInt(event_count) });
+  } catch (err) {
+    console.log('Error al clonar grabación:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/event-recordings/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
 

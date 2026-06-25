@@ -144,6 +144,39 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
     return data
   }
 
+  async function updateRecording(id, data) {
+    const res = await fetch(`/api/playwright-logs/event-recordings/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) {
+      const err = await res.json()
+      throw new Error(err.error || 'Error al actualizar grabación')
+    }
+    const updated = await res.json()
+    const idx = recordings.value.findIndex(r => r.id === id)
+    if (idx >= 0) {
+      recordings.value[idx] = updated
+    }
+    return updated
+  }
+
+  async function cloneRecording(id) {
+    const res = await fetch(`/api/playwright-logs/event-recordings/${id}/clone`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (!res.ok) {
+      const err = await res.json()
+      throw new Error(err.error || 'Error al clonar grabación')
+    }
+    const cloned = await res.json()
+    recordings.value.push(cloned)
+    return cloned
+  }
+
   async function deleteRecording(id) {
     const res = await fetch(`/api/playwright-logs/event-recordings/${id}`, {
       method: 'DELETE',
@@ -189,6 +222,8 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
     fetchRecordings,
     fetchRecordingEvents,
     createEventRecording,
+    updateRecording,
+    cloneRecording,
     deleteRecording,
   }
 })

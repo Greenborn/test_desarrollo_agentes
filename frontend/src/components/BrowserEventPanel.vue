@@ -1,6 +1,6 @@
 <template>
   <div class="events-panel h-100 d-flex" style="min-height: 0;">
-    <div class="recording-list d-flex flex-column flex-shrink-0 overflow-hidden border-end border-secondary">
+    <div class="recording-list d-flex flex-column flex-shrink-0 border-end border-secondary" :style="{ width: uiStore.recordingListWidth + 'px' }">
       <div class="recording-list-header px-2 py-1 small fw-semibold text-secondary flex-shrink-0">Grabaciones</div>
       <div class="recording-list-body overflow-y-auto flex-grow-1 px-1">
         <div
@@ -18,12 +18,21 @@
           :key="rec.id"
           class="recording-item d-flex align-items-center gap-1 px-2 py-1 rounded"
           :class="{ selected: selectedRecordingId === rec.id }"
-          @click="selectRecording(rec.id)"
         >
           <span v-if="currentRecordingId === rec.id" class="recording-dot-sm" title="Grabando"></span>
           <span v-else class="recording-icon">🎬</span>
-          <span class="small flex-grow-1 text-truncate">{{ rec.name }}</span>
+          <template v-if="editingRecordingId === rec.id">
+            <input v-model="editName" class="form-control form-control-sm flex-grow-1" style="font-size: 0.65rem; background: #0d1117; border-color: #374151; color: #e0e0e0; height: 22px;" @keyup.enter="saveRename(rec)" @keyup.escape="cancelRename" @blur="cancelRename" autofocus />
+          </template>
+          <template v-else>
+            <span class="small flex-grow-1 text-truncate" @click="selectRecording(rec.id)">{{ rec.name }}</span>
+          </template>
           <span class="badge bg-secondary-subtle text-secondary flex-shrink-0" style="font-size: 0.55rem;">{{ rec.event_count }}</span>
+          <button v-if="editingRecordingId !== rec.id && isRecording && currentRecordingId === rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="stopRecording()" title="Detener">⏹</button>
+          <button v-else-if="editingRecordingId !== rec.id && !isRecording" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="startRecordingOn(rec)" title="Grabar">▶</button>
+          <button v-if="editingRecordingId !== rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="deleteRecording(rec)" title="Eliminar">🗑️</button>
+          <button v-if="editingRecordingId !== rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="startRename(rec)" title="Renombrar">✏️</button>
+          <button v-if="editingRecordingId !== rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="cloneRecording(rec)" title="Clonar">📋</button>
         </div>
         <div
           v-for="(groupRecs, projectId) in recordingsByGroup.withProject"
@@ -35,12 +44,21 @@
             :key="rec.id"
             class="recording-item d-flex align-items-center gap-1 px-2 py-1 rounded"
             :class="{ selected: selectedRecordingId === rec.id }"
-            @click="selectRecording(rec.id)"
           >
             <span v-if="currentRecordingId === rec.id" class="recording-dot-sm" title="Grabando"></span>
             <span v-else class="recording-icon">🎬</span>
-            <span class="small flex-grow-1 text-truncate">{{ rec.name }}</span>
+            <template v-if="editingRecordingId === rec.id">
+              <input v-model="editName" class="form-control form-control-sm flex-grow-1" style="font-size: 0.65rem; background: #0d1117; border-color: #374151; color: #e0e0e0; height: 22px;" @keyup.enter="saveRename(rec)" @keyup.escape="cancelRename" @blur="cancelRename" autofocus />
+            </template>
+            <template v-else>
+              <span class="small flex-grow-1 text-truncate" @click="selectRecording(rec.id)">{{ rec.name }}</span>
+            </template>
             <span class="badge bg-secondary-subtle text-secondary flex-shrink-0" style="font-size: 0.55rem;">{{ rec.event_count }}</span>
+            <button v-if="editingRecordingId !== rec.id && isRecording && currentRecordingId === rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="stopRecording()" title="Detener">⏹</button>
+            <button v-else-if="editingRecordingId !== rec.id && !isRecording" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="startRecordingOn(rec)" title="Grabar">▶</button>
+            <button v-if="editingRecordingId !== rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="deleteRecording(rec)" title="Eliminar">🗑️</button>
+            <button v-if="editingRecordingId !== rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="startRename(rec)" title="Renombrar">✏️</button>
+            <button v-if="editingRecordingId !== rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="cloneRecording(rec)" title="Clonar">📋</button>
           </div>
         </div>
       </div>
@@ -61,6 +79,9 @@
           <span class="small">+ Nueva grabación</span>
         </button>
       </div>
+      <div class="recording-list-resize-handle" @mousedown.prevent="onRecordingListResizeStart">
+        <div class="recording-list-resize-handle-bar"></div>
+      </div>
     </div>
 
     <div class="recording-events d-flex flex-column flex-grow-1 overflow-hidden">
@@ -71,32 +92,11 @@
         <div class="d-flex align-items-center gap-1 ms-auto">
           <span v-if="isRecording" class="recording-dot" title="Grabando eventos"></span>
           <button
-            v-if="!isRecording"
-            class="btn btn-sm py-0 px-2"
-            style="font-size: 0.65rem; background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3);"
-            :disabled="!activeSessionId || !hasBrowserSession || starting"
-            @click="startRecording"
-          >{{ starting ? 'Iniciando…' : '▶ Grabar' }}</button>
-          <button
-            v-if="isRecording"
-            class="btn btn-sm py-0 px-2"
-            style="font-size: 0.65rem; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);"
-            :disabled="!activeSessionId || stopping"
-            @click="stopRecording"
-          >{{ stopping ? 'Deteniendo…' : '⏹ Detener' }}</button>
-          <button
             class="btn btn-sm btn-outline-danger py-0 px-2"
             style="font-size: 0.7rem;"
             :disabled="!activeSessionId || clearing"
             @click="clearEvents"
           >Limpiar</button>
-          <button
-            v-if="selectedRecordingId !== null"
-            class="btn btn-sm btn-outline-danger py-0 px-2"
-            style="font-size: 0.7rem;"
-            @click="deleteRecording"
-            title="Eliminar grabación"
-          >🗑️</button>
           <button
             v-if="!replaying && selectedRecordingId !== null"
             class="btn btn-sm py-0 px-2"
@@ -240,6 +240,7 @@ import { useBrowserStore } from '../stores/browser.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useCommandStore } from '../stores/command.js'
 import { useSettingsStore } from '../stores/settings.js'
+import { useUiStore } from '../stores/ui.js'
 import { storeToRefs } from 'pinia'
 
 export default {
@@ -250,6 +251,7 @@ export default {
     const browserStore = useBrowserStore()
     const cmdStore = useCommandStore()
     const settingsStore = useSettingsStore()
+    const uiStore = useUiStore()
     const { find } = useCommandRegistry()
     const { selectedProject } = storeToRefs(projectStore)
     const { hasBrowserSession, isRecording, currentRecordingId, selectedRecordingId, starting, stopping } = storeToRefs(browserStore)
@@ -265,6 +267,8 @@ export default {
     const showNewRecordingInput = ref(false)
     const newRecordingName = ref('')
     const startingInstancia = ref(false)
+    const editingRecordingId = ref(null)
+    const editName = ref('')
     const replaying = ref(false)
     const replayProgress = ref({ current: 0, total: 0 })
     const replayCancelled = ref(false)
@@ -465,15 +469,77 @@ export default {
       }
     }
 
-    async function deleteRecording() {
-      if (selectedRecordingId.value === null) return
-      if (!confirm('¿Eliminar esta grabación? Los eventos pasarán a "No catalogado".')) return
+    async function startRecordingOn(rec) {
+      selectedRecordingId.value = rec.id
+      await doStartRecording(rec.id)
+    }
+
+    async function deleteRecording(rec) {
+      if (!confirm(`¿Eliminar "${rec.name}"? Los eventos pasarán a "No catalogado".`)) return
       try {
-        await logsStore.deleteRecording(selectedRecordingId.value)
-        selectedRecordingId.value = null
+        await logsStore.deleteRecording(rec.id)
+        if (selectedRecordingId.value === rec.id) {
+          selectedRecordingId.value = null
+        }
       } catch (err) {
         console.error('Error al eliminar grabación:', err)
       }
+    }
+
+    function startRename(rec) {
+      editingRecordingId.value = rec.id
+      editName.value = rec.name
+    }
+
+    async function saveRename(rec) {
+      const name = editName.value.trim()
+      if (!name) {
+        cancelRename()
+        return
+      }
+      try {
+        await logsStore.updateRecording(rec.id, { name })
+      } catch (err) {
+        console.error('Error al renombrar grabación:', err)
+      }
+      editingRecordingId.value = null
+      editName.value = ''
+    }
+
+    function cancelRename() {
+      editingRecordingId.value = null
+      editName.value = ''
+    }
+
+    async function cloneRecording(rec) {
+      try {
+        const cloned = await logsStore.cloneRecording(rec.id)
+      } catch (err) {
+        console.error('Error al clonar grabación:', err)
+      }
+    }
+
+    function onRecordingListResizeStart(e) {
+      const startX = e.clientX
+      const startWidth = uiStore.recordingListWidth
+
+      function onMouseMove(e) {
+        const newWidth = Math.max(140, Math.min(400, startWidth + e.clientX - startX))
+        uiStore.recordingListWidth = newWidth
+      }
+
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        uiStore.saveLayoutPrefs()
+      }
+
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
     }
 
     const EVENT_LABELS = {
@@ -758,6 +824,8 @@ export default {
       recordError,
       showNewRecordingInput,
       newRecordingName,
+      editingRecordingId,
+      editName,
       activeSessionId,
       loadingEvents,
       recordingsByGroup,
@@ -778,6 +846,12 @@ export default {
       stopRecording,
       clearEvents,
       deleteRecording,
+      startRecordingOn,
+      startRename,
+      saveRename,
+      cancelRename,
+      cloneRecording,
+      onRecordingListResizeStart,
       replaying,
       replayProgress,
       replayRecording,
@@ -788,6 +862,7 @@ export default {
       toggleExpand,
       formatTime,
       formatJson,
+      uiStore,
     }
   },
 }
@@ -798,10 +873,40 @@ export default {
   background: #0d1117;
 }
 .recording-list {
-  width: 220px;
-  min-width: 180px;
-  max-width: 280px;
+  position: relative;
+  min-width: 140px;
+  max-width: 400px;
   background: #161b22;
+}
+
+.recording-list-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -6px;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recording-list-resize-handle:hover {
+  background: rgba(117, 170, 219, 0.08);
+}
+
+.recording-list-resize-handle-bar {
+  width: 3px;
+  height: 36px;
+  background: #374151;
+  border-radius: 2px;
+  pointer-events: none;
+  transition: background 0.15s;
+}
+
+.recording-list-resize-handle:hover .recording-list-resize-handle-bar {
+  background: #75AADB;
 }
 .recording-list-header {
   border-bottom: 1px solid #30363d;

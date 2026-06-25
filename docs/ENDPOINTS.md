@@ -715,6 +715,13 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Respuesta 200:** `{ id, name, chat_session_id, project_id, event_count, created_at }`
 - **Respuesta 404:** `{ error: "Grabación no encontrada" }`
 
+### `POST /api/playwright-logs/event-recordings/:id/clone`
+- **Auth:** Requerida
+- **Params:** `id` (number, requerido)
+- **Descripción:** Clona una grabación existente, creando una copia con nombre "`original (copia)`" y duplicando todos sus eventos.
+- **Respuesta 201:** `{ id, name, chat_session_id, project_id, event_count, created_at }`
+- **Respuesta 404:** `{ error: "Grabación no encontrada" }`
+
 ### `DELETE /api/playwright-logs/event-recordings/:id`
 - **Auth:** Requerida
 - **Params:** `id` (number, requerido)

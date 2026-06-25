@@ -1,6 +1,6 @@
 <template>
   <div class="d-flex flex-column h-100 overflow-x-hidden" @click="closeCtxMenu">
-    <TicketInfoBar :ticket-info="ticketInfo" :active-session-id="activeSessionId" :dev-instance-running="devInstanceRunning" @clear-chat="clearChat" @generar-commit="generarCommit" @iniciar-instancia-dev="iniciarInstanciaDev" @detener-instancia-dev="detenerInstanciaDev" />
+    <TicketInfoBar :ticket-info="ticketInfo" :active-session-id="activeSessionId" :dev-instance-running="devInstanceRunning" @clear-chat="clearChat" @generar-commit="generarCommit" @iniciar-instancia-dev="iniciarInstanciaDev" @detener-instancia-dev="detenerInstanciaDev" @iniciar-opencode="iniciarOpencode" />
     <div class="flex-grow-1 overflow-y-auto" ref="messagesContainer" style="min-height: 0;" :style="{ fontSize: gitStore.chatZoom + '%' }">
       <div v-if="!activeSessionId" class="text-center text-muted mt-5">
         <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
@@ -271,6 +271,11 @@ export default {
       const confirmed = confirm('¿Eliminar todos los mensajes de este chat? Esta acción no se puede deshacer.')
       if (!confirmed) return
       await chat.clearMessages(chat.activeSessionId)
+    }
+
+    async function iniciarOpencode() {
+      if (!chat.activeSessionId) return
+      await executeCommand('/dev_opencode_iniciar')
     }
 
     async function opencodeStreamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature) {
@@ -2842,6 +2847,7 @@ export default {
       detenerInstanciaDev,
       devInstanceRunning,
       clearChat,
+      iniciarOpencode,
       deteccionState,
       abortDeteccion,
       messagesContainer,

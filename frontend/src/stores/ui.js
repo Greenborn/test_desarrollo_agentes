@@ -9,6 +9,7 @@ export const useUiStore = defineStore('ui', () => {
   const omnifilter = ref('')
   const rightPanelCollapsed = ref(true)
   const rightPanelWidth = ref(220)
+  const recordingListWidth = ref(220)
 
   function toggleSidebar() {
     sidebarCollapsed.value = !sidebarCollapsed.value
@@ -76,6 +77,12 @@ export const useUiStore = defineStore('ui', () => {
           credentials: 'include',
           body: JSON.stringify({ key: 'right_panel_width', value: String(rightPanelWidth.value) }),
         }),
+        fetch('/api/command/setting', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ key: 'recording_list_width', value: String(recordingListWidth.value) }),
+        }),
       ])
     } catch (err) {
       console.error('Error saving layout preferences:', err)
@@ -84,13 +91,14 @@ export const useUiStore = defineStore('ui', () => {
 
   async function loadLayoutPrefs() {
     try {
-      const [sidebarRes, widthRes, panelRes, heightRes, rightCollapsedRes, rightWidthRes] = await Promise.all([
+      const [sidebarRes, widthRes, panelRes, heightRes, rightCollapsedRes, rightWidthRes, recordingListRes] = await Promise.all([
         fetch('/api/command/setting/sidebar_collapsed', { credentials: 'include' }),
         fetch('/api/command/setting/sidebar_width', { credentials: 'include' }),
         fetch('/api/command/setting/panel_collapsed', { credentials: 'include' }),
         fetch('/api/command/setting/panel_height', { credentials: 'include' }),
         fetch('/api/command/setting/right_panel_collapsed', { credentials: 'include' }),
         fetch('/api/command/setting/right_panel_width', { credentials: 'include' }),
+        fetch('/api/command/setting/recording_list_width', { credentials: 'include' }),
       ])
       const sidebarData = await sidebarRes.json()
       const widthData = await widthRes.json()
@@ -98,6 +106,7 @@ export const useUiStore = defineStore('ui', () => {
       const heightData = await heightRes.json()
       const rightCollapsedData = await rightCollapsedRes.json()
       const rightWidthData = await rightWidthRes.json()
+      const recordingListData = await recordingListRes.json()
       if (sidebarData.value !== null) {
         sidebarCollapsed.value = sidebarData.value === 'true'
       }
@@ -131,10 +140,18 @@ export const useUiStore = defineStore('ui', () => {
           rightPanelWidth.value = Math.max(window.innerWidth * 0.05, Math.min(600, raw))
         }
       }
+      if (recordingListData.value !== null) {
+        const raw = parseFloat(recordingListData.value) || 220
+        if (raw <= 95) {
+          recordingListWidth.value = Math.max(140, (raw / 100) * window.innerWidth)
+        } else {
+          recordingListWidth.value = Math.max(140, Math.min(400, raw))
+        }
+      }
     } catch (err) {
       console.error('Error loading layout preferences:', err)
     }
   }
 
-  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, omnifilter, rightPanelCollapsed, rightPanelWidth, toggleSidebar, togglePanel, toggleRightPanel, setPanelHeight, setRightPanelWidth, setOmnifilter, saveLayoutPrefs, loadLayoutPrefs }
+  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, omnifilter, rightPanelCollapsed, rightPanelWidth, recordingListWidth, toggleSidebar, togglePanel, toggleRightPanel, setPanelHeight, setRightPanelWidth, setOmnifilter, saveLayoutPrefs, loadLayoutPrefs }
 })
