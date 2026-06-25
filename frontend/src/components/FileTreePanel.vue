@@ -8,7 +8,7 @@
     </div>
     <div v-else-if="error" class="p-2 small text-center" style="margin-top: 1rem;">
       <span class="text-danger">{{ error }}</span>
-      <button class="btn btn-sm btn-outline-secondary ms-2 mt-1" @click="fetchTree">Reintentar</button>
+      <button class="btn btn-sm btn-outline-secondary ms-2 mt-1" @click="reloadTree">Reintentar</button>
     </div>
     <div v-else class="d-flex flex-column h-100">
       <div class="tree-header small text-muted px-2 py-1 flex-shrink-0 text-truncate" :title="tree.path">
@@ -22,11 +22,11 @@
           :class="{ 'tree-directory': item.node.type === 'directory' }"
           :style="{ paddingLeft: (item.depth * 20) + 'px' }"
           :title="item.node.path"
-          @click="item.node.type === 'directory' ? toggleDirectory(item.node.path) : null"
+          @click="item.node.type === 'directory' ? handleToggleDirectory(item.node.path) : null"
           @dblclick="item.node.type === 'file' ? openFile(item.node.path) : null"
         >
           <span v-if="item.node.type === 'directory'" class="tree-toggle flex-shrink-0">
-            {{ isExpanded(item.node.path) ? '▾' : '▸' }}
+            {{ handleIsExpanded(item.node.path) ? '▾' : '▸' }}
           </span>
           <span v-else class="tree-toggle-placeholder flex-shrink-0"></span>
           <span class="tree-icon flex-shrink-0">{{ getFileIcon(item.node) }}</span>
@@ -38,7 +38,7 @@
 </template>
 
 <script>
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useModalStore } from '../stores/modal.js'
 import { useFileTreeStore } from '../stores/fileTree.js'
 import FileEditorModal from './FileEditorModal.vue'
@@ -78,6 +78,11 @@ export default {
     const modal = useModalStore()
     const fileTreeStore = useFileTreeStore()
 
+    const tree = computed(() => props.sessionId ? fileTreeStore.getTree(props.sessionId) : null)
+    const loading = computed(() => props.sessionId ? fileTreeStore.getLoading(props.sessionId) : false)
+    const error = computed(() => props.sessionId ? fileTreeStore.getError(props.sessionId) : null)
+    const flatTree = computed(() => props.sessionId ? fileTreeStore.getFlatTree(props.sessionId) : [])
+
     function openFile(path) {
       const name = path.split('/').pop() || path
       modal.open(FileEditorModal, { filePath: path }, { title: `Editar: ${name}`, wide: true })
@@ -89,20 +94,25 @@ export default {
       return FILE_ICONS[ext] || '\u{1F4C4}'
     }
 
+    function reloadTree() {
+      if (props.sessionId) fileTreeStore.fetchTree(props.sessionId)
+    }
+
+    function handleToggleDirectory(path) {
+      if (props.sessionId) fileTreeStore.toggleDirectory(props.sessionId, path)
+    }
+
+    function handleIsExpanded(path) {
+      return props.sessionId ? fileTreeStore.isExpanded(props.sessionId, path) : false
+    }
+
     watch(() => props.sessionId, (newId) => {
       if (newId) fileTreeStore.fetchTree(newId)
     }, { immediate: true })
 
     return {
-      tree: fileTreeStore.tree,
-      loading: fileTreeStore.loading,
-      error: fileTreeStore.error,
-      expandedPaths: fileTreeStore.expandedPaths,
-      flatTree: fileTreeStore.flatTree,
-      fetchTree: fileTreeStore.fetchTree,
-      getFileIcon,
-      isExpanded: fileTreeStore.isExpanded,
-      toggleDirectory: fileTreeStore.toggleDirectory,
+      tree, loading, error, flatTree,
+      getFileIcon, reloadTree, handleToggleDirectory, handleIsExpanded,
       openFile,
     }
   },

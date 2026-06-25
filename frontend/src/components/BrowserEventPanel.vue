@@ -625,6 +625,7 @@ export default {
               messages: [{ role: 'command', content: `▶ Reproduciendo grabación: "${recordingName}" (${actionEntries.length} acciones)` }],
             }),
           })
+          chatStore.pushMessage({ role: 'command', content: `▶ Reproduciendo grabación: "${recordingName}" (${actionEntries.length} acciones)` }, activeSessionId.value)
         } catch (e) {
           console.error('Error al enviar inicio al chat:', e.message)
         }
@@ -649,6 +650,7 @@ export default {
                   messages: [{ role: 'result', content: `Paso ${i + 1}/${actionEntries.length}: ${desc}` }],
                 }),
               })
+              chatStore.pushMessage({ role: 'result', content: `Paso ${i + 1}/${actionEntries.length}: ${desc}` }, activeSessionId.value)
             } catch (e) {
               console.error('Error al enviar paso al chat:', e.message)
             }
@@ -663,6 +665,7 @@ export default {
                   messages: [{ role: 'result', content: `❌ Paso ${i + 1}/${actionEntries.length}: Error - ${err.message}` }],
                 }),
               })
+              chatStore.pushMessage({ role: 'result', content: `❌ Paso ${i + 1}/${actionEntries.length}: Error - ${err.message}` }, activeSessionId.value)
             } catch (e) {
               console.error('Error al reportar fallo al chat:', e.message)
             }
@@ -686,6 +689,7 @@ export default {
               messages: [{ role: 'result', content: summary }],
             }),
           })
+          chatStore.pushMessage({ role: 'result', content: summary }, activeSessionId.value)
         } catch (e) {
           console.error('Error al enviar resumen al chat:', e.message)
         }

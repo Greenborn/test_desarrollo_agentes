@@ -32,7 +32,7 @@
       </div>
     </template>
     <template v-else-if="activeTab === 'archivos'">
-      <FileTreePanel :session-id="mostRecentSessionId" />
+      <FileTreePanel :session-id="activeSessionId" />
     </template>
     <div class="sidebar-right-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-right-resize-handle-bar"></div>
@@ -68,10 +68,6 @@ export default {
 
     const sessionWithTicket = computed(() => {
       return activeSession.value?.id_ticket_redmine || null
-    })
-
-    const mostRecentSessionId = computed(() => {
-      return sessions.value.length > 0 ? sessions.value[0].id : null
     })
 
     function formatDate(dateStr) {
@@ -136,7 +132,7 @@ export default {
       rightPanelWidth,
       rightPanelTransitioning,
       activeTab,
-      mostRecentSessionId,
+      activeSessionId,
       activeSession,
       sessionWithTicket,
       comments,
