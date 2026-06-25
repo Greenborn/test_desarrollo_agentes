@@ -153,17 +153,17 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
 
     const projectRoot = session.cwd || process.cwd();
 
-    const results = await devInstanceManager.startDevInstance(projectRoot, deployConfig);
+    const results = await devInstanceManager.startDevInstance(projectRoot, deployConfig, sessionId);
 
     const frontendPorts = await devInstanceManager.waitForFrontendPorts(20000);
 
     const browserSessions = [];
+    let resolution = null;
 
     if (frontendPorts.length > 0) {
       try {
         await playwrightManager.ensureRunning();
 
-        let resolution = null;
         if (customResolution && customResolution.width && customResolution.height) {
           resolution = customResolution;
         } else {

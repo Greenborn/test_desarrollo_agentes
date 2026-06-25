@@ -12,15 +12,17 @@ export const useChatStore = defineStore('chat', () => {
   const executingCount = ref(0)
   const _sessionCmdCount = ref({})
   const _streamingSessions = ref({})
+  const _ocStreamingSessions = ref({})
   const sessionStatus = ref({})
   const currentChunk = ref('')
   const currentThinking = ref('')
   const pendingNotifications = ref({})
   const _sessionStreamCache = ref({})
+  const _ocSessionStreamCache = ref({})
 
   const streaming = computed(() => {
     const sid = activeSessionId.value
-    return sid ? !!_streamingSessions.value[sid] : false
+    return sid ? !!_streamingSessions.value[sid] || !!_ocStreamingSessions.value[sid] : false
   })
   const executing = computed(() => {
     const sid = activeSessionId.value
@@ -212,6 +214,16 @@ export const useChatStore = defineStore('chat', () => {
           return m
         })
       }
+      const ocCache = _ocSessionStreamCache.value[sessionId]
+      if (ocCache && _ocStreamingSessions.value[sessionId]) {
+        messages.value.push({
+          role: 'opencode_stream',
+          content: ocCache.chunk || '',
+          thinking: ocCache.thinking || null,
+          streaming: true,
+          _key: ocCache.msgKey || 'stream-oc-' + Date.now(),
+        })
+      }
     } catch (err) {
       console.error('Error al cargar mensajes:', err)
     }
@@ -372,10 +384,12 @@ export const useChatStore = defineStore('chat', () => {
           activeSessionId.value = null
           messages.value = []
         }
-        delete _streamingSessions.value[sessionId]
-        delete _sessionStreamCache.value[sessionId]
-        delete pendingNotifications.value[sessionId]
-        await loadSessions()
+    delete _streamingSessions.value[sessionId]
+    delete _ocStreamingSessions.value[sessionId]
+    delete _sessionStreamCache.value[sessionId]
+    delete _ocSessionStreamCache.value[sessionId]
+    delete pendingNotifications.value[sessionId]
+    await loadSessions()
       }
     } catch (err) {
       console.error('Error al eliminar sesión:', err)
@@ -411,9 +425,11 @@ export const useChatStore = defineStore('chat', () => {
     activeSessionId.value = null
     _sessionCmdCount.value = {}
     _streamingSessions.value = {}
+    _ocStreamingSessions.value = {}
     sessionStatus.value = {}
     pendingNotifications.value = {}
     _sessionStreamCache.value = {}
+    _ocSessionStreamCache.value = {}
   }
 
   async function pushMessage(msg, targetSessionId) {
@@ -458,6 +474,30 @@ export const useChatStore = defineStore('chat', () => {
     if (sid) sessionStatus.value[sid] = status
   }
 
+  function setOcStreaming(sessionId, active) {
+    if (!sessionId) return
+    if (active) {
+      _ocStreamingSessions.value[sessionId] = true
+    } else {
+      delete _ocStreamingSessions.value[sessionId]
+    }
+  }
+
+  function updateOcStreamCache(sessionId, chunk, thinking, msgKey) {
+    if (!sessionId) return
+    if (!_ocSessionStreamCache.value[sessionId]) {
+      _ocSessionStreamCache.value[sessionId] = { chunk: '', thinking: null, msgKey: null }
+    }
+    const cache = _ocSessionStreamCache.value[sessionId]
+    cache.chunk = chunk
+    cache.thinking = thinking
+    if (msgKey) cache.msgKey = msgKey
+  }
+
+  function clearOcStreamCache(sessionId) {
+    if (sessionId) delete _ocSessionStreamCache.value[sessionId]
+  }
+
   return {
     sessions, activeSessionId, messages,
     streaming, creating, executing, sessionStatus, currentChunk, currentThinking,
@@ -465,6 +505,7 @@ export const useChatStore = defineStore('chat', () => {
     loadSessions, createSession, createSessionIfNeeded, runCommand, loadMessages,
     sendMessage, deleteMessage, deleteSession, clearMessages, stopAllExecutions,
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
+    setOcStreaming, updateOcStreamCache, clearOcStreamCache,
     _saveMessageToDb, clearPendingNotification,
   }
 })

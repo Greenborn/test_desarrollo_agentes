@@ -50,15 +50,23 @@
       >
         Actividad de Red
       </button>
-      <button
-        v-if="activeTab === 'instancias' && hasProcesses"
-        class="btn btn-sm btn-outline-danger py-0 px-2 ms-auto"
-        @click="detener"
-        :disabled="deteniendo"
-        style="font-size: 0.75rem;"
-      >
-        {{ deteniendo ? 'Deteniendo…' : '🛑 Detener' }}
-      </button>
+      <div v-if="activeTab === 'instancias'" class="ms-auto d-flex align-items-center gap-1">
+        <button
+          class="btn btn-sm py-0 px-1"
+          style="font-size: 0.7rem; color: #6b7280; background: none; border: none; line-height: 1;"
+          @click="refrescar"
+          title="Refrescar estado"
+        >↻</button>
+        <button
+          v-if="hasProcesses"
+          class="btn btn-sm btn-outline-danger py-0 px-2"
+          @click="detener"
+          :disabled="deteniendo"
+          style="font-size: 0.75rem;"
+        >
+          {{ deteniendo ? 'Deteniendo…' : '🛑 Detener' }}
+        </button>
+      </div>
     </div>
 
     <template v-if="activeTab === 'instancias'">
@@ -78,7 +86,7 @@
       <div v-else class="d-flex flex-grow-1" style="min-height: 0;">
         <div class="left-panel d-flex flex-column flex-shrink-0 overflow-y-auto px-2 py-1">
           <button
-            v-for="p in state.processes"
+            v-for="p in devProcesses"
             :key="p.name"
             class="process-btn d-flex align-items-center gap-1 w-100 text-start px-2 py-1 mb-1"
             :class="{ selected: selectedProcess === p.name }"
@@ -89,8 +97,8 @@
             <span class="badge ms-auto" :class="p.status === 'running' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'" style="font-size: 0.6rem;">{{ typeLabel(p.type) }}</span>
           </button>
 
-          <div v-if="state.resolution" class="mt-auto pt-1 small text-secondary px-2" style="font-size: 0.65rem;">
-            🖥️ {{ state.resolution.id }} — {{ state.resolution.width }}x{{ state.resolution.height }}
+          <div v-if="devResolution" class="mt-auto pt-1 small text-secondary px-2" style="font-size: 0.65rem;">
+            🖥️ {{ devResolution.id }} — {{ devResolution.width }}x{{ devResolution.height }}
           </div>
         </div>
 
@@ -179,6 +187,17 @@ export default {
   components: { RepoView, TicketPanel, ConsoleLogPanel, NetworkLogPanel, BrowserEventPanel },
   setup() {
     const devStore = useDevInstanceStore()
+    const {
+      processes: devProcesses,
+      resolution: devResolution,
+      logsMap: devLogsMap,
+      hasProcesses,
+      starting: startingInstancia,
+      deteniendo,
+      errorMsg,
+    } = storeToRefs(devStore)
+    const devFetchStatus = devStore.fetchStatus
+    const devDetener = devStore.detener
     const activeTab = ref('instancias')
     const selectedProcess = ref(null)
     const logContainerRef = ref(null)
@@ -211,17 +230,17 @@ export default {
     }
 
     const displayText = computed(() => {
-      const names = devStore.processNames
+      const names = devStore.processNames // computed, not a ref, access through store
       if (names.length === 0) return ''
 
       if (selectedProcess.value) {
-        const lines = devStore.logsMap[selectedProcess.value]
+        const lines = devLogsMap.value[selectedProcess.value]
         return lines ? lines.join('\n') : ''
       }
 
       const combined = []
       for (const name of names) {
-        const lines = devStore.logsMap[name]
+        const lines = devLogsMap.value[name]
         if (lines && lines.length) {
           combined.push(`── ${name} ──`)
           combined.push(...lines)
@@ -241,7 +260,8 @@ export default {
 
     async function iniciarInstancia() {
       if (!activeSessionId.value) return
-      devStore.starting = true
+      startingInstancia.value = true
+      console.log('[DevInstancePanel] Iniciando instancia, sesión:', activeSessionId.value)
       try {
         const cmd = find('/despliegue_iniciar_instancia')
         await chatStore.runCommand('/despliegue_iniciar_instancia', async (loadingIdx, sid) => {
@@ -258,11 +278,18 @@ export default {
           if (data.success) return data.result
           throw new Error(data.result || 'Error al ejecutar comando')
         })
+        console.log('[DevInstancePanel] Comando completado, consultando estado...')
+        await devFetchStatus()
+        console.log('[DevInstancePanel] Estado actual, procesos:', devProcesses.value)
       } catch (err) {
-        console.error('Error al iniciar instancia:', err)
+        console.error('[DevInstancePanel] Error al iniciar instancia:', err)
       } finally {
-        devStore.starting = false
+        startingInstancia.value = false
       }
+    }
+
+    async function refrescar() {
+      await devFetchStatus()
     }
 
     watch(displayText, async () => {
@@ -281,21 +308,23 @@ export default {
     })
 
     return {
-      state: devStore.state,
+      devProcesses,
+      devResolution,
       activeTab,
       selectedProcess,
-      deteniendo: devStore.deteniendo,
-      errorMsg: devStore.errorMsg,
+      deteniendo,
+      errorMsg,
       logContainerRef,
-      hasProcesses: devStore.hasProcesses,
+      hasProcesses,
       activeSessionId,
-      startingInstancia: devStore.starting,
+      startingInstancia,
       iniciarInstancia,
+      refrescar,
       typeLabel,
       displayText,
       displayedLines,
       toggleProcess,
-      detener: devStore.detener,
+      detener: devDetener,
       projectStore,
       selectedProject,
       pinnedProjectId,

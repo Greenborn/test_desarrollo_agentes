@@ -57,7 +57,7 @@ function runNpmCi(dir) {
   });
 }
 
-export async function startDevInstance(projectRoot, deployConfig) {
+export async function startDevInstance(projectRoot, deployConfig, sessionId = null) {
   await stopAll();
 
   const subprojects = getSubprojects(deployConfig);
@@ -109,6 +109,7 @@ export async function startDevInstance(projectRoot, deployConfig) {
       process: proc,
       status: 'running',
       logs: [],
+      sessionId,
       detectedPort: null,
       detectedUrl: null,
     };
@@ -219,7 +220,7 @@ export function setResolution(res) {
 export function getStatus() {
   const processes = [];
   for (const [key, entry] of instances) {
-    processes.push({ name: entry.name, type: entry.type, status: entry.status });
+    processes.push({ name: entry.name, type: entry.type, status: entry.status, sessionId: entry.sessionId });
   }
   return {
     processes,

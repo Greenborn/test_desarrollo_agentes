@@ -1,22 +1,22 @@
 import { defineStore } from 'pinia'
 import { ref, reactive, computed } from 'vue'
+import { useChatStore } from './chat.js'
 
 const API = '/api'
+const STORAGE_KEY = 'opencode_dev_instances'
 
 export const useDevInstanceStore = defineStore('devInstance', () => {
-  const state = reactive({
-    processes: [],
-    frontendPorts: [],
-    browserSessions: [],
-    resolution: null,
-  })
+  const processes = ref([])
+  const frontendPorts = ref([])
+  const browserSessions = ref([])
+  const resolution = ref(null)
   const logsMap = reactive({})
   const starting = ref(false)
   const deteniendo = ref(false)
   const errorMsg = ref('')
 
-  const processNames = computed(() => state.processes.map(p => p.name))
-  const hasProcesses = computed(() => state.processes.length > 0)
+  const hasProcesses = computed(() => processes.value.length > 0)
+  const processNames = computed(() => processes.value.map(p => p.name))
 
   let statusTimer = null
   let logsTimer = null
@@ -26,19 +26,23 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
       const res = await fetch(`${API}/despliegue/estado-instancia-dev`, { credentials: 'include' })
       const data = await res.json()
       if (data.success) {
-        state.processes = data.processes || []
-        state.frontendPorts = data.frontendPorts || []
-        state.browserSessions = data.browserSessions || []
-        state.resolution = data.resolution || null
-        errorMsg.value = ''
+        const procs = data.processes || []
+        console.log('[devInstance] fetchStatus retornó', procs.length, 'procesos:', procs.map(p => p.name).join(', '))
+        if (procs.length > 0) {
+          processes.value = procs
+          frontendPorts.value = data.frontendPorts || []
+          browserSessions.value = data.browserSessions || []
+          resolution.value = data.resolution || null
 
-        const currentNames = new Set(processNames.value)
-        for (const key of Object.keys(logsMap)) {
-          if (!currentNames.has(key)) delete logsMap[key]
+          const currentNames = new Set(procs.map(p => p.name))
+          for (const key of Object.keys(logsMap)) {
+            if (!currentNames.has(key)) delete logsMap[key]
+          }
         }
+        errorMsg.value = ''
       }
     } catch (err) {
-      console.error('Error al obtener estado de dev instance:', err)
+      console.error('[devInstance] Error al obtener estado:', err)
       errorMsg.value = 'Error al conectar con el servidor.'
     }
   }
@@ -53,7 +57,7 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
           logsMap[name] = data.logs || []
         }
       } catch (err) {
-        console.error(`Error al obtener logs para ${name}:`, err)
+        console.error(`[devInstance] Error al obtener logs para ${name}:`, err)
       }
     }
   }
@@ -67,13 +71,13 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
         credentials: 'include',
         body: JSON.stringify({}),
       })
-      state.processes = []
-      state.frontendPorts = []
-      state.browserSessions = []
-      state.resolution = null
+      processes.value = []
+      frontendPorts.value = []
+      browserSessions.value = []
+      resolution.value = null
       for (const key of Object.keys(logsMap)) delete logsMap[key]
     } catch (err) {
-      console.error('Error al detener instancia:', err)
+      console.error('[devInstance] Error al detener:', err)
     } finally {
       deteniendo.value = false
     }
@@ -98,10 +102,10 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
   }
 
   function reset() {
-    state.processes = []
-    state.frontendPorts = []
-    state.browserSessions = []
-    state.resolution = null
+    processes.value = []
+    frontendPorts.value = []
+    browserSessions.value = []
+    resolution.value = null
     for (const key of Object.keys(logsMap)) delete logsMap[key]
     errorMsg.value = ''
     starting.value = false
@@ -109,5 +113,22 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
     stopPolling()
   }
 
-  return { state, logsMap, processNames, hasProcesses, starting, deteniendo, errorMsg, fetchStatus, fetchLogs, detener, startPolling, stopPolling, reset }
+  return {
+    processes,
+    frontendPorts,
+    browserSessions,
+    resolution,
+    logsMap,
+    processNames,
+    hasProcesses,
+    starting,
+    deteniendo,
+    errorMsg,
+    fetchStatus,
+    fetchLogs,
+    detener,
+    startPolling,
+    stopPolling,
+    reset,
+  }
 })

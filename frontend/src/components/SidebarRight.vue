@@ -190,6 +190,7 @@ export default {
   position: relative;
   padding: 8px;
   border-left: 1px solid #374151;
+  background: #1a1a2e;
 }
 .sidebar-right.transitioning {
   transition: width 0.25s ease, min-width 0.25s ease, padding 0.25s ease, border 0.25s ease;
