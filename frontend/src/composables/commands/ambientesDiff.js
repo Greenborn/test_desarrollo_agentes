@@ -118,8 +118,11 @@ register({
       let output = `**Diferencias entre ${data.sourceEnv} (${data.sourceBranch}) → ${data.targetEnv} (${data.targetBranch}):**\n\n`
 
       for (const c of data.commits) {
-        const url = c.githubUrl || `${data.remoteUrl}/commit/${c.hash}`
-        output += `- ${c.message}: ${url}\n`
+        const url = c.githubUrl ? c.githubUrl : (data.remoteUrl ? `${data.remoteUrl}/commit/${c.hash}` : null)
+        output += `- ${c.message}` + (url ? `: ${url}` : '') + '\n'
+        if (c.body) {
+          output += c.body.split('\n').map(l => '  ' + l).join('\n') + '\n'
+        }
       }
 
       chatStore.pushMessage({

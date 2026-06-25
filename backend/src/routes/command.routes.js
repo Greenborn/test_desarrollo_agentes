@@ -750,7 +750,9 @@ router.post('/git-diff-branches', async (req, res) => {
       return res.status(400).json({ success: false, error: 'sourceEnv y targetEnv son requeridos' });
     }
 
-    const wsIds = req.session.workspaceIds || [1];
+    const chatSession = await db('chat_sessions').where({ id: sessionId }).select('workspace_id').first();
+    const wsId = chatSession?.workspace_id || 1;
+    const wsIds = [wsId];
 
     const source = await db('workspace_environments')
       .whereIn('workspace_id', wsIds)
@@ -790,35 +792,59 @@ router.post('/git-diff-branches', async (req, res) => {
     let remoteUrl = null;
     try {
       const remote = execSync('git remote get-url origin', { cwd, encoding: 'utf-8' }).trim();
-      if (remote.startsWith('git@')) {
-        remoteUrl = remote.replace(/^git@([^:]+):/, 'https://$1/').replace(/\.git$/, '');
-      } else if (remote.startsWith('https://')) {
-        remoteUrl = remote.replace(/\.git$/, '');
+      let host = null, path = null;
+      if (/^git@/.test(remote)) {
+        const m = remote.match(/^git@([^:]+):(.+?)(?:\.git)?$/);
+        if (m) { host = m[1]; path = m[2]; }
+      } else if (/^ssh:\/\//.test(remote)) {
+        const m = remote.match(/^ssh:\/\/[^@]*@([^\/:]+)(?::\d+)?\/(.+?)(?:\.git)?$/);
+        if (m) { host = m[1]; path = m[2]; }
+      } else if (/^https?:\/\//.test(remote)) {
+        const m = remote.match(/^https?:\/\/([^\/]+)\/(.+?)(?:\.git)?$/);
+        if (m) { host = m[1]; path = m[2]; }
+      } else if (/^git:\/\//.test(remote)) {
+        const m = remote.match(/^git:\/\/([^\/]+)\/(.+?)(?:\.git)?$/);
+        if (m) { host = m[1]; path = m[2]; }
+      }
+      if (host && path) {
+        remoteUrl = `https://${host}/${path}`;
       }
     } catch (e) {
       console.log('[git-diff-branches] no se pudo obtener remote URL:', e.message);
     }
 
     const logOutput = execSync(
-      `git log --left-right --format="%m|%H|%h|%s|%an|%ad" --date=short --date-order --reverse "${sourceBranch}"..."${targetBranch}"`,
+      `git log --left-right --format="%m|||%H|||%h|||%B|||%an|||%ad|||END|||" --date=short --date-order --reverse "${sourceBranch}"..."${targetBranch}"`,
       { cwd, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
     );
 
     const commits = [];
-    for (const line of logOutput.trim().split('\n')) {
-      if (!line) continue;
-      const marker = line[0];
-      const rest = line.slice(1);
-      const parts = rest.split('|');
+    const records = logOutput.split('|||END|||').filter(r => r.trim());
+    for (const rec of records) {
+      const parts = rec.split('|||');
       if (parts.length < 6) continue;
+
+      const marker = parts[0].trim();
       const hash = parts[1];
       const shortHash = parts[2];
-      const message = parts[3];
+      const fullMessage = parts[3].trim();
       const author = parts[4];
       const date = parts[5];
+
       const side = marker === '<' ? 'left' : marker === '>' ? 'right' : 'unknown';
       const githubUrl = remoteUrl ? `${remoteUrl}/commit/${hash}` : null;
-      commits.push({ hash, shortHash, message, author, date, side, githubUrl });
+
+      const firstNewline = fullMessage.indexOf('\n');
+      let message, body;
+      if (firstNewline === -1) {
+        message = fullMessage;
+        body = '';
+      } else {
+        message = fullMessage.slice(0, firstNewline);
+        body = fullMessage.slice(firstNewline + 1).trim();
+      }
+
+      commits.push({ hash, shortHash, message, body, fullMessage, author, date, side, githubUrl });
     }
 
     res.json({

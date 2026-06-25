@@ -6,11 +6,13 @@ export const useRedmineCommentsStore = defineStore('redmineComments', () => {
   const loading = ref(false)
   const activeTicketId = ref(null)
 
-  async function loadComments(ticketRedmineId) {
+  async function loadComments(ticketRedmineId, sessionId) {
     activeTicketId.value = ticketRedmineId
     loading.value = true
     try {
-      const res = await fetch(`/api/redmine/comments?ticket_redmine_id=${ticketRedmineId}&estado=todos`, { credentials: 'include' })
+      let url = `/api/redmine/comments?ticket_redmine_id=${ticketRedmineId}&estado=todos`
+      if (sessionId) url += `&sessionId=${sessionId}`
+      const res = await fetch(url, { credentials: 'include' })
       const data = await res.json()
       comments.value = data.comentarios || []
     } catch (err) {
@@ -38,7 +40,7 @@ export const useRedmineCommentsStore = defineStore('redmineComments', () => {
     if (!data.success) {
       throw new Error(data.error || 'Error al encolar comentario')
     }
-    await loadComments(ticketRedmineId)
+    await loadComments(ticketRedmineId, sessionId)
     return data
   }
 

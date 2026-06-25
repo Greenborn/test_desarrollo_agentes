@@ -131,12 +131,17 @@ router.put('/proyecto/repositorio', async (req, res) => {
 router.get('/proyecto/repositorio/:proyectoId', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const wsIds = req.session.workspaceIds || [1];
-    const proyecto = await db('proyectos')
-      .select('url_github')
-      .where({ id: req.params.proyectoId })
-      .whereIn('workspace_id', wsIds)
-      .first();
+    let query = db('proyectos').select('url_github').where({ id: req.params.proyectoId });
+
+    const sessionId = req.query.sessionId || req.body?.sessionId;
+    if (sessionId) {
+      const chatSession = await db('chat_sessions').where({ id: sessionId }).select('workspace_id').first();
+      if (chatSession) {
+        query.where({ workspace_id: chatSession.workspace_id });
+      }
+    }
+
+    const proyecto = await query.first();
     res.json({ url_github: proyecto?.url_github || null });
   } catch (err) {
     console.log('Error al obtener repositorio:', err.message);

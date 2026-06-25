@@ -523,9 +523,8 @@ router.post('/comments', async (req, res) => {
   }
 
   try {
-    const wsIds = req.session.workspaceIds || [1];
-    const ticket = await db('tickets').where({ redmine_id: ticket_redmine_id }).select('workspace_id').first();
-    const wsId = (ticket && ticket.workspace_id) || wsIds[0] || 1;
+    const chatSession = await db('chat_sessions').where({ id: session_id }).select('workspace_id').first();
+    const wsId = chatSession?.workspace_id || 1;
     const [insertedId] = await db('redmine_comentarios').insert({
       session_id,
       ticket_redmine_id,
@@ -545,15 +544,29 @@ router.get('/comments', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const wsIds = req.session.workspaceIds || [1];
-    const query = db('redmine_comentarios').whereIn('workspace_id', wsIds);
+    let query = db('redmine_comentarios');
+    let wsId = null;
 
-    if (req.query.estado && req.query.estado !== 'todos') {
-      query.where({ estado: req.query.estado });
+    if (req.query.sessionId) {
+      const chatSession = await db('chat_sessions').where({ id: req.query.sessionId }).select('workspace_id').first();
+      wsId = chatSession?.workspace_id || null;
+    }
+
+    if (wsId) {
+      query.where({ workspace_id: wsId });
+    } else if (req.query.ticket_redmine_id) {
+      const ticket = await db('tickets').where({ redmine_id: req.query.ticket_redmine_id }).select('workspace_id').first();
+      if (ticket?.workspace_id) {
+        query.where({ workspace_id: ticket.workspace_id });
+      }
     }
 
     if (req.query.ticket_redmine_id) {
       query.where({ ticket_redmine_id: parseInt(req.query.ticket_redmine_id, 10) });
+    }
+
+    if (req.query.estado && req.query.estado !== 'todos') {
+      query.where({ estado: req.query.estado });
     }
 
     const comentarios = await query.orderBy('created_at', 'asc');
@@ -578,22 +591,20 @@ router.post('/comments/send', async (req, res) => {
   }
 
   try {
-    const wsIds = req.session.workspaceIds || [1];
-    const wsId = wsIds[0] || 1;
+    const comentarios = await db('redmine_comentarios')
+      .whereIn('id', comentarios_ids)
+      .andWhere({ estado: 'pendiente' });
+
+    if (comentarios.length === 0) {
+      return res.status(400).json({ error: 'No se encontraron comentarios pendientes con los IDs especificados' });
+    }
+
+    const wsId = comentarios[0].workspace_id || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
 
     if (!token || !url) {
       return res.status(400).json({ error: 'Redmine no configurado' });
-    }
-
-    const comentarios = await db('redmine_comentarios')
-      .whereIn('id', comentarios_ids)
-      .whereIn('workspace_id', wsIds)
-      .andWhere({ estado: 'pendiente' });
-
-    if (comentarios.length === 0) {
-      return res.status(400).json({ error: 'No se encontraron comentarios pendientes con los IDs especificados' });
     }
 
     const ticketIds = [...new Set(comentarios.map(c => c.ticket_redmine_id))];

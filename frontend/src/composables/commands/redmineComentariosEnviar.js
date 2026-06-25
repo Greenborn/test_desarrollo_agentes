@@ -67,7 +67,7 @@ register({
     }
 
     try {
-      const url = `/api/redmine/comments?estado=pendiente&ticket_redmine_id=${ticketId}`
+      const url = `/api/redmine/comments?estado=pendiente&ticket_redmine_id=${ticketId}&sessionId=${sessionId}`
       const res = await fetch(url, { credentials: 'include' })
       const data = await res.json()
 

@@ -180,8 +180,10 @@ register({
         commentBody = `Sin diferencias entre ${data.sourceEnv} (${data.sourceBranch}) y ${data.targetEnv} (${data.targetBranch}).`
       } else {
         const lines = data.commits.map(c => {
-          const url = c.githubUrl || `${data.remoteUrl}/commit/${c.hash}`
-          return `- ${c.message}: ${url}`
+          const url = c.githubUrl ? c.githubUrl : (data.remoteUrl ? `${data.remoteUrl}/commit/${c.hash}` : null)
+          let line = `- ${c.message}` + (url ? `: ${url}` : '')
+          if (c.body) line += '\n' + c.body.split('\n').map(l => '  ' + l).join('\n')
+          return line
         })
 
         commentBody = lines.join('\n')

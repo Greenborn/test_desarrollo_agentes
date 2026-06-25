@@ -92,11 +92,12 @@ router.get('/session/:sessionId', async (req, res) => {
 
   try {
     const session = await db('chat_sessions')
-      .select('id_ticket_redmine')
+      .select('id_ticket_redmine', 'proyecto_id')
       .where({ id: req.params.sessionId, user_id: req.session.userId })
       .first();
 
     const idTicketRedmine = session?.id_ticket_redmine || null;
+    const proyectoId = session?.proyecto_id || null;
     let ticket = null;
     let comments = null;
 
@@ -172,7 +173,7 @@ router.get('/session/:sessionId', async (req, res) => {
       }
     }
 
-    res.json({ idTicketRedmine, ticket, comments, attachments });
+    res.json({ idTicketRedmine, proyectoId, ticket, comments, attachments });
   } catch (err) {
     console.log('Error al obtener ticket de sesión:', err.message);
     res.status(500).json({ error: err.message });
