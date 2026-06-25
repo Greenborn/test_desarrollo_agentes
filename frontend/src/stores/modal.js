@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, markRaw } from 'vue'
 
 export const useModalStore = defineStore('modal', () => {
   const stack = ref([])
@@ -8,7 +8,7 @@ export const useModalStore = defineStore('modal', () => {
     const id = Date.now() + Math.random()
     stack.value.push({
       id,
-      component,
+      component: markRaw(component),
       props,
       title: options.title || 'Modal',
       wide: options.wide || false,

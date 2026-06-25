@@ -29,7 +29,7 @@
           </template>
           <span class="badge bg-secondary-subtle text-secondary flex-shrink-0" style="font-size: 0.55rem;">{{ rec.event_count }}</span>
           <button v-if="editingRecordingId !== rec.id && isRecording && currentRecordingId === rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="stopRecording()" title="Detener">⏹</button>
-          <button v-else-if="editingRecordingId !== rec.id && !isRecording" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="startRecordingOn(rec)" title="Grabar">▶</button>
+          <button v-else-if="editingRecordingId !== rec.id && !isRecording && !replaying" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="startRecordingOn(rec)" title="Grabar">▶</button>
           <button v-if="editingRecordingId !== rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="deleteRecording(rec)" title="Eliminar">🗑️</button>
           <button v-if="editingRecordingId !== rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="startRename(rec)" title="Renombrar">✏️</button>
           <button v-if="editingRecordingId !== rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="cloneRecording(rec)" title="Clonar">📋</button>
@@ -55,7 +55,7 @@
             </template>
             <span class="badge bg-secondary-subtle text-secondary flex-shrink-0" style="font-size: 0.55rem;">{{ rec.event_count }}</span>
             <button v-if="editingRecordingId !== rec.id && isRecording && currentRecordingId === rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="stopRecording()" title="Detener">⏹</button>
-            <button v-else-if="editingRecordingId !== rec.id && !isRecording" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="startRecordingOn(rec)" title="Grabar">▶</button>
+            <button v-else-if="editingRecordingId !== rec.id && !isRecording && !replaying" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="startRecordingOn(rec)" title="Grabar">▶</button>
             <button v-if="editingRecordingId !== rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="deleteRecording(rec)" title="Eliminar">🗑️</button>
             <button v-if="editingRecordingId !== rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="startRename(rec)" title="Renombrar">✏️</button>
             <button v-if="editingRecordingId !== rec.id" class="btn btn-link btn-sm p-0 text-secondary" style="text-decoration: none; font-size: 0.6rem; line-height: 1;" @click.stop="cloneRecording(rec)" title="Clonar">📋</button>
@@ -663,6 +663,11 @@ export default {
 
     async function replayRecording() {
       if (!selectedRecordingId.value || !activeSessionId.value) return
+
+      if (isRecording.value && currentRecordingId.value) {
+        await browserStore.stopRecording(activeSessionId.value)
+      }
+
       replaying.value = true
       replayCancelled.value = false
       replayProgress.value = { current: 0, total: 0 }

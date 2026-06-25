@@ -814,50 +814,72 @@ async function executeAction(idSession, action) {
   const { type, selector, value, key, x, y } = action;
 
   try {
-    switch (type) {
-      case 'click': {
-        if (!selector) throw new Error('Acción click requiere selector');
-        await page.click(selector);
-        console.log(`Sesión ${idSession} click en "${selector}"`);
-        break;
-      }
-      case 'fill': {
-        if (!selector) throw new Error('Acción fill requiere selector');
-        await page.fill(selector, value || '');
-        console.log(`Sesión ${idSession} fill en "${selector}" → "${value}"`);
-        break;
-      }
-      case 'select': {
-        if (!selector) throw new Error('Acción select requiere selector');
-        await page.selectOption(selector, value || '');
-        console.log(`Sesión ${idSession} select en "${selector}" → "${value}"`);
-        break;
-      }
-      case 'submit': {
-        if (!selector) throw new Error('Acción submit requiere selector');
-        await page.evaluate((sel) => {
-          const form = document.querySelector(sel);
-          if (form) form.submit();
-        }, selector);
-        console.log(`Sesión ${idSession} submit formulario "${selector}"`);
-        break;
-      }
-      case 'press': {
-        if (!selector) throw new Error('Acción press requiere selector');
-        await page.press(selector, key || 'Enter');
-        console.log(`Sesión ${idSession} press "${key}" en "${selector}"`);
-        break;
-      }
-      case 'scroll': {
-        await page.evaluate(({ sx, sy }) => {
-          window.scrollTo(sx || 0, sy || 0);
-        }, { sx: x, sy: y });
-        console.log(`Sesión ${idSession} scroll a x=${x}, y=${y}`);
-        break;
-      }
-      default:
-        throw new Error(`Tipo de acción no soportado: "${type}"`);
+    // Pausar grabación durante playback para evitar contaminar eventos grabados
+    let wasRecording = false;
+    try {
+      wasRecording = await page.evaluate(() => {
+        const val = window.__pwRecording;
+        window.__pwRecording = false;
+        return val;
+      });
+    } catch (e) {
+      // Página no lista, se ignora
     }
+
+    try {
+      switch (type) {
+        case 'click': {
+          if (!selector) throw new Error('Acción click requiere selector');
+          await page.click(selector);
+          console.log(`Sesión ${idSession} click en "${selector}"`);
+          break;
+        }
+        case 'fill': {
+          if (!selector) throw new Error('Acción fill requiere selector');
+          await page.fill(selector, value || '');
+          console.log(`Sesión ${idSession} fill en "${selector}" → "${value}"`);
+          break;
+        }
+        case 'select': {
+          if (!selector) throw new Error('Acción select requiere selector');
+          await page.selectOption(selector, value || '');
+          console.log(`Sesión ${idSession} select en "${selector}" → "${value}"`);
+          break;
+        }
+        case 'submit': {
+          if (!selector) throw new Error('Acción submit requiere selector');
+          await page.evaluate((sel) => {
+            const form = document.querySelector(sel);
+            if (form) form.submit();
+          }, selector);
+          console.log(`Sesión ${idSession} submit formulario "${selector}"`);
+          break;
+        }
+        case 'press': {
+          if (!selector) throw new Error('Acción press requiere selector');
+          await page.press(selector, key || 'Enter');
+          console.log(`Sesión ${idSession} press "${key}" en "${selector}"`);
+          break;
+        }
+        case 'scroll': {
+          await page.evaluate(({ sx, sy }) => {
+            window.scrollTo(sx || 0, sy || 0);
+          }, { sx: x, sy: y });
+          console.log(`Sesión ${idSession} scroll a x=${x}, y=${y}`);
+          break;
+        }
+        default:
+          throw new Error(`Tipo de acción no soportado: "${type}"`);
+      }
+    } finally {
+      // Restaurar estado de grabación (si la página sigue viva)
+      try {
+        await page.evaluate((val) => { window.__pwRecording = val; }, wasRecording);
+      } catch (e) {
+        // Página cerrada o navegó, se ignora
+      }
+    }
+
     return { success: true, type, selector: selector || null };
   } catch (err) {
     console.log(`Error ejecutando ${type} en sesión ${idSession}:`, err.message);
