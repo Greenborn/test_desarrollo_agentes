@@ -284,10 +284,12 @@ router.get('/proyectos/:proyectoId/tickets', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const proyecto = await db('proyectos').where({ id: req.params.proyectoId }).first();
+    const wsIds = req.session.workspaceIds || [1];
+
+    const proyecto = await db('proyectos').where({ id: req.params.proyectoId }).whereIn('workspace_id', wsIds).first();
 
     if (!proyecto) {
-      res.json({ success: false, message: `Proyecto "${req.params.proyectoId}" no encontrado en la base local.` });
+      res.json({ success: false, message: `Proyecto "${req.params.proyectoId}" no encontrado en la base local para el workspace activo.` });
       return;
     }
 
@@ -296,7 +298,6 @@ router.get('/proyectos/:proyectoId/tickets', async (req, res) => {
       return;
     }
 
-    const wsIds = req.session.workspaceIds || [1];
     const wsId = wsIds[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
@@ -419,10 +420,11 @@ router.post('/proyectos/:proyectoId/importar-tickets', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const proyecto = await db('proyectos').where({ id: req.params.proyectoId }).first();
+    const wsIds = req.session.workspaceIds || [1];
+    const proyecto = await db('proyectos').where({ id: req.params.proyectoId }).whereIn('workspace_id', wsIds).first();
 
     if (!proyecto) {
-      res.json({ success: false, message: `Proyecto "${req.params.proyectoId}" no encontrado en la base local.` });
+      res.json({ success: false, message: `Proyecto "${req.params.proyectoId}" no encontrado en la base local para el workspace activo.` });
       return;
     }
 
@@ -431,7 +433,6 @@ router.post('/proyectos/:proyectoId/importar-tickets', async (req, res) => {
       return;
     }
 
-    const wsIds = req.session.workspaceIds || [1];
     const wsId = wsIds[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
@@ -567,6 +568,10 @@ router.get('/comments', async (req, res) => {
 
     if (req.query.estado && req.query.estado !== 'todos') {
       query.where({ estado: req.query.estado });
+    }
+
+    if (req.query.sessionId) {
+      query.where({ session_id: parseInt(req.query.sessionId, 10) });
     }
 
     const comentarios = await query.orderBy('created_at', 'asc');

@@ -7,13 +7,18 @@ export const useGitStore = defineStore('git', () => {
   const isGitRepo = ref(false)
   const repoPath = ref('')
   const cwd = ref('')
-  const currentBranch = ref(null)
+  const branchBySession = ref({})
   const branches = ref([])
   const tags = ref([])
   const structuredCommits = ref([])
   const gitZoom = ref(100)
   const chatZoom = ref(100)
   const loading = ref(false)
+
+  function getCurrentBranch(sessionId) {
+    if (!sessionId) return null
+    return branchBySession.value[sessionId] || null
+  }
 
   async function fetchRepoData(sessionId) {
     if (!sessionId) {
@@ -53,7 +58,7 @@ export const useGitStore = defineStore('git', () => {
         structuredCommits.value = structData.commits
         branches.value = structData.branches || []
         const current = structData.branches.find(b => b.isCurrent)
-        currentBranch.value = current ? current.name : null
+        branchBySession.value[sessionId] = current ? current.name : null
         tags.value = structData.tags || []
       }
     } catch (err) {
@@ -66,7 +71,6 @@ export const useGitStore = defineStore('git', () => {
 
   async function fetchGitBranch(sessionId) {
     if (!sessionId) {
-      currentBranch.value = null
       return
     }
     try {
@@ -78,7 +82,7 @@ export const useGitStore = defineStore('git', () => {
       })
       const verifyData = await verifyRes.json()
       if (!verifyData.isRepo) {
-        currentBranch.value = 'Sin repo'
+        branchBySession.value[sessionId] = 'Sin repo'
         return
       }
       const branchRes = await fetch(`${API}/command/git`, {
@@ -89,13 +93,13 @@ export const useGitStore = defineStore('git', () => {
       })
       const branchData = await branchRes.json()
       if (branchData.success && branchData.stdout) {
-        currentBranch.value = branchData.stdout.trim()
+        branchBySession.value[sessionId] = branchData.stdout.trim()
       } else {
-        currentBranch.value = 'HEAD'
+        branchBySession.value[sessionId] = 'HEAD'
       }
     } catch (err) {
       console.error('Error al obtener rama actual:', err.message)
-      currentBranch.value = 'Sin repo'
+      branchBySession.value[sessionId] = 'Sin repo'
     }
   }
 
@@ -180,8 +184,9 @@ export const useGitStore = defineStore('git', () => {
   }
 
   return {
-    isGitRepo, repoPath, cwd, currentBranch, branches, tags,
+    isGitRepo, repoPath, cwd, branchBySession, branches, tags,
     structuredCommits, gitZoom, chatZoom, loading,
+    getCurrentBranch,
     fetchRepoData, fetchGitBranch, runGitCommand, fetchBranches,
     loadZoom, saveZoom, zoomIn, zoomOut, resetZoom, setCwd,
   }

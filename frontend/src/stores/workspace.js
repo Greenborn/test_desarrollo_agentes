@@ -52,13 +52,13 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     return selectedIds.value[0] || 1
   }
 
-  async function createWorkspace(name) {
+  async function createWorkspace(name, color) {
     try {
       const res = await fetch(`${API}/workspaces`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, color }),
       })
       const data = await res.json()
       if (data.success) {
@@ -71,18 +71,23 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
-  async function updateWorkspace(id, name) {
+  async function updateWorkspace(id, name, color) {
     try {
+      const body = { name }
+      if (color !== undefined) body.color = color
       const res = await fetch(`${API}/workspaces/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       if (data.success) {
         const ws = workspaces.value.find(w => w.id === id)
-        if (ws) ws.name = name
+        if (ws) {
+          ws.name = name
+          if (color !== undefined) ws.color = color
+        }
       }
       return data
     } catch (err) {

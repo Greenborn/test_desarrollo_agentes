@@ -1,6 +1,6 @@
 <template>
   <div class="d-flex flex-column h-100 overflow-x-hidden" @click="closeCtxMenu">
-    <TicketInfoBar :ticket-info="ticketInfo" :active-session-id="activeSessionId" :dev-instance-running="devInstanceRunning" @clear-chat="clearChat" @generar-commit="generarCommit" @iniciar-instancia-dev="iniciarInstanciaDev" @detener-instancia-dev="detenerInstanciaDev" @iniciar-opencode="iniciarOpencode" />
+    <TicketInfoBar :ticket-info="ticketInfo" :active-session-id="activeSessionId" :dev-instance-running="devInstanceRunning" @clear-chat="clearChat" @generar-commit="generarCommit" @iniciar-instancia-dev="iniciarInstanciaDev" @detener-instancia-dev="detenerInstanciaDev" @iniciar-opencode="iniciarOpencode" @crear-ticket="crearTicket" />
     <div class="flex-grow-1 overflow-y-auto" ref="messagesContainer" style="min-height: 0;" :style="{ fontSize: gitStore.chatZoom + '%' }">
       <div v-if="!activeSessionId" class="text-center text-muted mt-5">
         <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
@@ -63,6 +63,7 @@ import { useSettingsStore } from '../stores/settings.js'
 import { useGitStore } from '../stores/git.js'
 import { useDevInstanceStore } from '../stores/devInstance.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
+import { useTicketStore } from '../stores/ticket.js'
 import { deteccionState, abortDeteccion } from '../composables/commands/deteccionFuncionalidades.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useProjectVariables } from '../composables/useProjectVariables.js'
@@ -136,6 +137,7 @@ export default {
         const data = await res.json()
         if (data.ticket) {
           ticketInfo.value = data.ticket
+          chat.setSessionTicket(activeSessionId.value, data.ticket)
         }
       } catch (err) {
         console.error('Error al cargar info del ticket:', err)
@@ -265,6 +267,11 @@ export default {
       if (!chat.activeSessionId) return
       await executeCommand('/despliegue_detener_instancia')
       await devInstanceStore.fetchStatus()
+    }
+
+    async function crearTicket() {
+      if (!chat.activeSessionId) return
+      await executeCommand('/redmine_crear_ticket')
     }
 
     async function clearChat() {
@@ -1082,11 +1089,32 @@ export default {
           })
           const data = await res.json()
           if (data.success) {
+            const ticketRedmineId = data.ticket.redmine_id
+            const sessionId = chat.activeSessionId
+
+            if (value.autoAssign && sessionId && ticketRedmineId) {
+              try {
+                await fetch('/api/tickets/session', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ sessionId, idTicketRedmine: ticketRedmineId }),
+                })
+                await chat.loadSessions()
+                await loadTicketInfo()
+              } catch (err) {
+                console.error('Error al asignar ticket a sesión:', err)
+              }
+            }
+
+            const ticketStore = useTicketStore()
+            ticketStore.loadTickets()
+
             const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
             if (idx >= 0) {
               chat.messages[idx] = {
                 role: 'result',
-                content: `✓ Ticket #${data.ticket.redmine_id} creado correctamente en el proyecto "${data.ticket.proyecto_id}".`,
+                content: `✓ Ticket #${ticketRedmineId} creado correctamente en el proyecto "${data.ticket.proyecto_id}".`,
                 _key: 'result-' + Date.now(),
               }
             }
@@ -1138,6 +1166,7 @@ export default {
           const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
           if (idx >= 0) {
             if (data.success) {
+              redmineComments.refreshComments(activeSessionId.value)
               chat.messages[idx] = {
                 role: 'result',
                 content: `✓ ${data.cantidad} comentario${data.cantidad !== 1 ? 's' : ''} enviado${data.cantidad !== 1 ? 's' : ''} al ticket #${data.ticket_id} correctamente.`,
@@ -2880,6 +2909,7 @@ export default {
       detenerInstanciaDev,
       devInstanceRunning,
       clearChat,
+      crearTicket,
       iniciarOpencode,
       deteccionState,
       abortDeteccion,

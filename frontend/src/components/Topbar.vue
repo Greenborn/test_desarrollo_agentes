@@ -3,7 +3,7 @@
     <a class="navbar-brand mb-0 h1 text-decoration-none" href="#" @click.prevent="openWorkspaceSwitcher">
       <span v-for="(ws, i) in selectedWorkspaces" :key="ws.id" class="d-inline-flex align-items-center">
         <span v-if="i > 0" class="mx-1 text-secondary" style="font-size: 0.6rem;">▸</span>
-        <span class="badge" :class="i === 0 ? 'bg-argentina' : 'bg-secondary'" style="font-size: 0.7rem;">{{ ws.name }}</span>
+        <span class="badge" :style="{ ...workspaceBadgeStyle(ws), fontSize: '0.7rem' }">{{ ws.name }}</span>
       </span>
       <span v-if="selectedWorkspaces.length === 0" class="text-muted small">Agent Orchestrator</span>
     </a>
@@ -35,6 +35,7 @@ import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { parseCommandArgs } from '../composables/parseCommandArgs.js'
 import { useChatStore } from '../stores/chat.js'
 import { useWorkspaceStore } from '../stores/workspace.js'
+import { contrastTextColor } from '../utils/color.js'
 import CommandInput from './CommandInput.vue'
 import LayoutControls from './LayoutControls.vue'
 import HelpContent from './HelpModal.vue'
@@ -61,6 +62,12 @@ export default {
       const ids = auth.getWorkspaceIds()
       return workspaces.value.filter(w => ids.includes(w.id))
     })
+
+    function workspaceBadgeStyle(ws) {
+      const bg = ws.color || '#75AADB'
+      return { backgroundColor: bg, color: contrastTextColor(bg) }
+    }
+
     const router = useRouter()
 
     register({
@@ -578,7 +585,7 @@ export default {
       router.push('/')
     }
 
-    return { user, logout, openSettings, openWorkspaceSwitcher, selectedWorkspaces }
+    return { user, logout, openSettings, openWorkspaceSwitcher, selectedWorkspaces, workspaceBadgeStyle }
   },
 }
 </script>

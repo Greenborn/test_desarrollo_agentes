@@ -56,7 +56,9 @@ export default {
     const redmineComments = useRedmineCommentsStore()
     const { rightPanelCollapsed, rightPanelWidth } = storeToRefs(ui)
     const { activeSessionId, sessions } = storeToRefs(chat)
-    const { comments, loading } = storeToRefs(redmineComments)
+
+    const comments = computed(() => redmineComments.commentsBySession[activeSessionId.value] || [])
+    const loading = computed(() => redmineComments.loadingBySession[activeSessionId.value] || false)
 
     const rightPanelTransitioning = ref(false)
     const activeTab = ref('comentarios')
@@ -91,7 +93,7 @@ export default {
       }
       const session = sessions.value.find(s => s.id === newId)
       if (session?.id_ticket_redmine) {
-        redmineComments.loadComments(session.id_ticket_redmine)
+        redmineComments.loadComments(session.id_ticket_redmine, newId)
       } else {
         redmineComments.clearComments()
       }

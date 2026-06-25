@@ -485,19 +485,20 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ### `GET /api/workspaces`
 - **Auth:** Requerida
-- **Respuesta:** `{ workspaces: [{ id, name, created_at }] }`
+- **Respuesta:** `{ workspaces: [{ id, name, color, created_at }] }`
 
 ### `POST /api/workspaces`
 - **Auth:** Requerida
-- **Body:** `{ name: string }`
+- **Body:** `{ name: string, color?: string }` — color en formato `#RRGGBB`, default `#75AADB`
 - **Descripción:** Crea un workspace y copia las settings del workspace con id=1
-- **Respuesta 201:** `{ success: true, workspace: { id, name, created_at } }`
+- **Respuesta 201:** `{ success: true, workspace: { id, name, color, created_at } }`
 - **Respuesta 400:** `{ error: "El nombre es requerido" }`
 
 ### `PUT /api/workspaces/:id`
 - **Auth:** Requerida
-- **Body:** `{ name: string }`
+- **Body:** `{ name: string, color?: string }` — color en formato `#RRGGBB`
 - **Respuesta:** `{ success: true }`
+- **Respuesta 400:** `{ error: "El nombre es requerido" }` o `{ error: "Color inválido. Use formato #RRGGBB" }`
 - **Respuesta 404:** `{ error: "Workspace no encontrado" }`
 
 ### `DELETE /api/workspaces/:id`

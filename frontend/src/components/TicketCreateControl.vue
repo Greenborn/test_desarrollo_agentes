@@ -2,6 +2,16 @@
   <div class="ticket-create-control">
     <div class="ticket-header mb-3">
       <span class="ticket-label">Nuevo Ticket</span>
+      <div class="form-check form-switch mb-0 ms-auto">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          role="switch"
+          id="autoAssignSwitch"
+          v-model="autoAssign"
+        />
+        <label class="form-check-label small" for="autoAssignSwitch">Asignar a sesión</label>
+      </div>
     </div>
 
     <div class="ticket-field mb-2">
@@ -88,11 +98,15 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useTicketFormStore } from '../stores/ticketForm.js'
 
 export default {
+  props: {
+    projectId: { type: String, default: '' },
+  },
   emits: ['confirm'],
   setup(props, { emit }) {
     const ticketFormStore = useTicketFormStore()
     const saving = ref(false)
     const errors = reactive({ subject: '', project_id: '' })
+    const autoAssign = ref(true)
     const allProjects = ref([])
     const options = ticketFormStore.options
     const selectedIds = reactive({
@@ -150,7 +164,7 @@ export default {
 
     async function loadProjects() {
       try {
-        const res = await fetch(`${API}/proyecto`, { credentials: 'include' })
+        const res = await fetch('/api/proyecto', { credentials: 'include' })
         const data = await res.json()
         allProjects.value = data.proyectos || []
       } catch (err) {
@@ -230,6 +244,7 @@ export default {
           tracker_id: selectedIds.tracker_id,
           assigned_to_id: selectedIds.assigned_to_id,
           done_ratio: form.done_ratio,
+          autoAssign: autoAssign.value,
         }
         emit('confirm', payload)
       } catch (err) {
@@ -246,14 +261,16 @@ export default {
     onMounted(async () => {
       await loadProjects()
       await loadOptions()
-      // If there is a default project selected after load, fetch its members
+      if (props.projectId) {
+        form.project_id = props.projectId
+      }
       if (form.project_id) {
         await loadProjectUsers(form.project_id)
       }
     })
 
     return {
-      form, options, allProjects, flattenedProjects, errors, saving, selectedIds,
+      form, options, allProjects, flattenedProjects, errors, saving, selectedIds, autoAssign,
       save, cancel, onProjectChange, onPriorityChange, onStatusChange, onTrackerChange, onUserChange, loadProjectUsers,
     }
   },
@@ -419,5 +436,22 @@ export default {
 .btn-outline-argentina:hover {
   background-color: #1a2744;
   color: #75AADB;
+}
+
+.form-check-input {
+  background-color: #374151;
+  border-color: #75AADB;
+  cursor: pointer;
+}
+
+.form-check-input:checked {
+  background-color: #75AADB;
+  border-color: #75AADB;
+}
+
+.form-check-label {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  cursor: pointer;
 }
 </style>

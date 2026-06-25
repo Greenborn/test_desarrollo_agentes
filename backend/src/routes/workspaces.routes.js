@@ -27,12 +27,13 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { name } = req.body;
+    const { name, color } = req.body;
     if (!name) {
       return res.status(400).json({ error: 'El nombre es requerido' });
     }
 
-    const [insertId] = await db('workspaces').insert({ name });
+    const hex = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#75AADB';
+    const [insertId] = await db('workspaces').insert({ name, color: hex });
 
     const defaultSettings = await db('settings').where({ workspace_id: 1 });
     if (defaultSettings.length > 0) {
@@ -67,7 +68,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { name } = req.body;
+    const { name, color } = req.body;
     if (!name) {
       return res.status(400).json({ error: 'El nombre es requerido' });
     }
@@ -77,7 +78,14 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Workspace no encontrado' });
     }
 
-    await db('workspaces').where({ id: req.params.id }).update({ name });
+    const updates = { name };
+    if (color !== undefined) {
+      if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+        return res.status(400).json({ error: 'Color inválido. Use formato #RRGGBB' });
+      }
+      updates.color = color;
+    }
+    await db('workspaces').where({ id: req.params.id }).update(updates);
     res.json({ success: true });
   } catch (err) {
     console.log('Error al actualizar workspace:', err.message);

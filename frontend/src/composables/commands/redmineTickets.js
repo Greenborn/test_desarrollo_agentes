@@ -65,7 +65,7 @@ register({
       return header + tableHeader + rows
     } catch (err) {
       console.error('Error en /redmine_listar_tickets:', err.message)
-      throw new Error('Error de conexión al obtener tickets de Redmine.')
+      throw err
     }
   },
 })

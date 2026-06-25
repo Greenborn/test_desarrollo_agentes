@@ -36,7 +36,8 @@
           </div>
           <span v-if="showWorkspaceBadges && workspaceMap[s.workspace_id]"
                 class="workspace-badge"
-                title="Espacio de trabajo">{{ workspaceMap[s.workspace_id] }}</span>
+                :style="workspaceBadgeStyle(workspaceMap[s.workspace_id])"
+                title="Espacio de trabajo">{{ workspaceMap[s.workspace_id].name }}</span>
           <span
             class="delete-btn"
             @click.stop="chat.deleteSession(s.id)"
@@ -60,6 +61,7 @@ import { useCommandStore } from '../stores/command.js'
 import { useUiStore } from '../stores/ui.js'
 import { useSettingsStore } from '../stores/settings.js'
 import { useWorkspaceStore } from '../stores/workspace.js'
+import { contrastTextColor } from '../utils/color.js'
 
 export default {
   setup() {
@@ -77,10 +79,15 @@ export default {
     const workspaceMap = computed(() => {
       const map = {}
       for (const w of workspaces.value) {
-        map[w.id] = w.name
+        map[w.id] = { name: w.name, color: w.color || '#75AADB' }
       }
       return map
     })
+
+    function workspaceBadgeStyle(ws) {
+      if (!ws || !ws.color) return {}
+      return { backgroundColor: ws.color, color: contrastTextColor(ws.color) }
+    }
 
     const sidebarTransitioning = ref(false)
     let transitionTimer = null
@@ -189,6 +196,7 @@ export default {
       selectSession,
       ticketPriorityClass,
       onResizeStart,
+      workspaceBadgeStyle,
     }
   },
 }
@@ -355,9 +363,6 @@ export default {
   display: inline-block;
   font-size: 9px;
   font-weight: 600;
-  color: #75AADB;
-  background: rgba(117, 170, 219, 0.12);
-  border: 1px solid rgba(117, 170, 219, 0.3);
   border-radius: 3px;
   padding: 0 5px;
   margin-left: 4px;

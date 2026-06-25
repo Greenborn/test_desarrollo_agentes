@@ -17,6 +17,7 @@ export const useChatStore = defineStore('chat', () => {
   const currentChunk = ref('')
   const currentThinking = ref('')
   const pendingNotifications = ref({})
+  const sessionTickets = ref({})
   const _sessionStreamCache = ref({})
   const _ocSessionStreamCache = ref({})
 
@@ -125,6 +126,18 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const result = await executeFn(loadingIdx, sid)
       await _saveCommandMessages(sid, raw, result)
+      if (sid && raw.startsWith('/')) {
+        try {
+          await fetch(`${API}/command/history`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: raw, sessionId: sid }),
+          })
+        } catch (err) {
+          console.error('Error al guardar en command_history:', err)
+        }
+      }
       if (Number(activeSessionId.value) === Number(sid)) {
         const idx = messages.value.findIndex(m => m._key === loadingKey)
         if (idx >= 0) {
@@ -149,6 +162,18 @@ export const useChatStore = defineStore('chat', () => {
       console.error('Error ejecutando comando:', err)
       const errorResult = 'Error: ' + (err.message || 'Error desconocido')
       await _saveCommandMessages(sid, raw, errorResult)
+      if (sid && raw.startsWith('/')) {
+        try {
+          await fetch(`${API}/command/history`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: raw, sessionId: sid }),
+          })
+        } catch (err) {
+          console.error('Error al guardar en command_history:', err)
+        }
+      }
       if (Number(activeSessionId.value) === Number(sid)) {
         const idx = messages.value.findIndex(m => m._key === loadingKey)
         if (idx >= 0) {
@@ -389,6 +414,7 @@ export const useChatStore = defineStore('chat', () => {
     delete _sessionStreamCache.value[sessionId]
     delete _ocSessionStreamCache.value[sessionId]
     delete pendingNotifications.value[sessionId]
+    delete sessionTickets.value[sessionId]
     await loadSessions()
       }
     } catch (err) {
@@ -428,6 +454,7 @@ export const useChatStore = defineStore('chat', () => {
     _ocStreamingSessions.value = {}
     sessionStatus.value = {}
     pendingNotifications.value = {}
+    sessionTickets.value = {}
     _sessionStreamCache.value = {}
     _ocSessionStreamCache.value = {}
   }
@@ -498,6 +525,20 @@ export const useChatStore = defineStore('chat', () => {
     if (sessionId) delete _ocSessionStreamCache.value[sessionId]
   }
 
+  function setSessionTicket(sessionId, ticket) {
+    if (!sessionId) return
+    sessionTickets.value[sessionId] = ticket
+  }
+
+  function clearSessionTicket(sessionId) {
+    if (sessionId) delete sessionTickets.value[sessionId]
+  }
+
+  const activeSessionTicket = computed(() => {
+    const sid = activeSessionId.value
+    return sid ? sessionTickets.value[sid] || null : null
+  })
+
   return {
     sessions, activeSessionId, messages,
     streaming, creating, executing, sessionStatus, currentChunk, currentThinking,
@@ -506,6 +547,7 @@ export const useChatStore = defineStore('chat', () => {
     sendMessage, deleteMessage, deleteSession, clearMessages, stopAllExecutions,
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
     setOcStreaming, updateOcStreamCache, clearOcStreamCache,
+    sessionTickets, activeSessionTicket, setSessionTicket, clearSessionTicket,
     _saveMessageToDb, clearPendingNotification,
   }
 })

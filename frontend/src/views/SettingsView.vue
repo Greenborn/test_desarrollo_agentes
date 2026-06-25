@@ -17,9 +17,14 @@
         >
           <option v-for="w in workspaces" :key="w.id" :value="w.id">{{ w.name }}</option>
         </select>
-        <button class="btn btn-sm btn-outline-argentina flex-shrink-0" @click="promptCreate">+ Nuevo</button>
-        <button class="btn btn-sm btn-outline-argentina flex-shrink-0" @click="promptRename" v-if="selectedWId !== 1">Editar</button>
-        <button class="btn btn-sm btn-outline-danger flex-shrink-0" @click="confirmDelete" v-if="selectedWId !== 1">Eliminar</button>
+        <button class="btn btn-sm btn-outline-argentina flex-shrink-0" @click="openCreateModal">+ Nuevo</button>
+        <button class="btn btn-sm btn-outline-argentina flex-shrink-0" @click="openEditModal">Editar</button>
+        <button class="btn btn-sm btn-outline-danger flex-shrink-0" @click="openDeleteConfirm" v-if="selectedWId !== 1">Eliminar</button>
+        <div v-if="deleteConfirmWs" class="d-flex align-items-center gap-2 ms-1">
+          <span class="small text-danger">¿Eliminar "{{ deleteConfirmWs.name }}"?</span>
+          <button class="btn btn-sm btn-outline-danger" @click="executeDelete" :disabled="deleting">Sí, eliminar</button>
+          <button class="btn btn-sm btn-outline-secondary" @click="cancelDelete">Cancelar</button>
+        </div>
         <button class="btn btn-sm btn-outline-argentina flex-shrink-0 ms-auto" @click="exportAllConfig">Exportar</button>
         <button class="btn btn-sm btn-outline-argentina flex-shrink-0" @click="triggerImport">Importar</button>
         <input type="file" ref="importInput" accept=".json" @change="handleImport" style="display:none" />
@@ -357,6 +362,7 @@ import { useChatStore } from '../stores/chat.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useModalStore } from '../stores/modal.js'
 import { useEnvironmentsStore } from '../stores/environments.js'
+import WorkspaceFormModal from '../components/WorkspaceFormModal.vue'
 
 export default {
   setup() {
@@ -516,39 +522,32 @@ export default {
       await envStore.load(newId)
     }
 
-    async function promptCreate() {
-      const name = prompt('Nombre del nuevo espacio de trabajo:')
-      if (!name || !name.trim()) return
-      wsMessage.value = 'Creando espacio de trabajo...'
-      const result = await wsStore.createWorkspace(name.trim())
-      if (result.success) {
-        wsMessage.value = 'Espacio de trabajo creado.'
-        wsStore.loadWorkspaces()
-        setTimeout(() => { wsMessage.value = '' }, 3000)
-      } else {
-        wsMessage.value = result.error || 'Error al crear espacio de trabajo.'
-      }
+    const deleteConfirmWs = ref(null)
+    const deleting = ref(false)
+
+    function openCreateModal() {
+      modal.open(WorkspaceFormModal, {}, { title: 'Nuevo espacio de trabajo' })
     }
 
-    async function promptRename() {
+    function openEditModal() {
       const ws = workspaces.value.find(w => w.id === selectedWId.value)
       if (!ws) return
-      const name = prompt('Nuevo nombre:', ws.name)
-      if (!name || !name.trim() || name.trim() === ws.name) return
-      const result = await wsStore.updateWorkspace(ws.id, name.trim())
-      if (result.success) {
-        wsMessage.value = 'Espacio de trabajo renombrado.'
-        setTimeout(() => { wsMessage.value = '' }, 3000)
-      } else {
-        wsMessage.value = result.error || 'Error al renombrar.'
-      }
+      modal.open(WorkspaceFormModal, { workspace: { id: ws.id, name: ws.name, color: ws.color } }, { title: 'Editar espacio de trabajo' })
     }
 
-    async function confirmDelete() {
+    function openDeleteConfirm() {
       const ws = workspaces.value.find(w => w.id === selectedWId.value)
-      if (!ws) return
-      const confirmed = confirm(`¿Está seguro de eliminar el espacio de trabajo "${ws.name}"?\n\nSe eliminarán todas las sesiones de chat, proyectos y tickets asociados.`)
-      if (!confirmed) return
+      if (ws) deleteConfirmWs.value = ws
+    }
+
+    function cancelDelete() {
+      deleteConfirmWs.value = null
+    }
+
+    async function executeDelete() {
+      if (!deleteConfirmWs.value) return
+      deleting.value = true
+      const ws = deleteConfirmWs.value
       wsMessage.value = 'Eliminando espacio de trabajo...'
       const result = await wsStore.deleteWorkspace(ws.id)
       if (result.success) {
@@ -567,6 +566,8 @@ export default {
       } else {
         wsMessage.value = result.error || 'Error al eliminar.'
       }
+      deleteConfirmWs.value = null
+      deleting.value = false
     }
 
     function saveKey() {
@@ -818,7 +819,7 @@ export default {
       saveLocale, savePriorityColor, saveReplayInterval,
       addResolution, removeResolution, resetResolutions, saveResolutions, matches,
       envStore, wsMessage,
-      onWorkspaceChange, promptCreate, promptRename, confirmDelete,
+      onWorkspaceChange, openCreateModal, openEditModal, openDeleteConfirm, cancelDelete, executeDelete, deleteConfirmWs, deleting,
       exportAllConfig, handleImport, triggerImport, importInput,
       exportFullState, handleImportState, triggerImportState, importStateInput,
     }

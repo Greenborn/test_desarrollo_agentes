@@ -81,7 +81,20 @@ register({
         return `No hay comentarios pendientes para el ticket #${ticketId}.`
       }
 
-      const combined = comentarios.map((c) => c.comentario.trim()).join('\n')
+      const ticketTag = `[#${ticketId}]`
+      function formatComment(comentario) {
+        const trimmed = comentario.trim()
+        const match = trimmed.match(/^([\s\S]*?)\n{2,}(https?:\/\/\S+)$/)
+        if (match) {
+          return `- ${ticketTag} ${match[1].trim()}: ${match[2]}`
+        }
+        if (trimmed.startsWith('- ')) {
+          return `- ${ticketTag} ${trimmed.slice(2)}`
+        }
+        return `- ${ticketTag} ${trimmed}`
+      }
+
+      const combined = comentarios.map((c) => formatComment(c.comentario)).join('\n')
 
       chatStore.pushMessage({
         role: 'opencode_control',

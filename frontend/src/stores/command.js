@@ -87,7 +87,7 @@ export const useCommandStore = defineStore('command', () => {
   }
 
   return {
-    currentDir, helpVisible, sessionHistory,
+    currentDir, helpVisible, sessionHistory, dbHistory,
     autocompleteOptions, autocompleteVisible, arrowIndex,
     loadLastDirectory, setDirectory,
     fetchAutocomplete, showAutocomplete, hideAutocomplete,

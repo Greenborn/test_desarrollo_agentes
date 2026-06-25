@@ -6,8 +6,9 @@
       <span class="ticket-sep text-muted">—</span>
       <span class="ticket-subject text-truncate">{{ ticketInfo.subject }}</span>
     </template>
-    <span v-if="gitStore.currentBranch && gitStore.currentBranch !== 'Sin repo'" class="branch-name ms-2">· rama: {{ gitStore.currentBranch }}</span>
+    <span v-if="currentBranchDisplay && currentBranchDisplay !== 'Sin repo'" class="branch-name ms-2">· rama: {{ currentBranchDisplay }}</span>
     <div class="ms-auto d-flex align-items-center gap-2">
+      <button class="btn btn-sm btn-outline-argentina px-2" @click="$emit('crear-ticket')" title="Crear ticket">🎫</button>
       <button v-if="!devInstanceRunning" class="btn btn-sm btn-outline-argentina px-2" @click="$emit('iniciar-instancia-dev')" title="Iniciar instancia desarrollo">▶️</button>
       <button v-else class="btn btn-sm btn-outline-danger px-2" @click="$emit('detener-instancia-dev')" title="Detener instancia desarrollo">⏹️</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="$emit('generar-commit')" title="Generar commit">💾</button>
@@ -23,6 +24,7 @@
 </template>
 
 <script>
+import { computed } from 'vue'
 import { useGitStore } from '../stores/git.js'
 
 export default {
@@ -31,9 +33,11 @@ export default {
     activeSessionId: { type: [Number, String], default: null },
     devInstanceRunning: { type: Boolean, default: false },
   },
-  emits: ['clear-chat', 'generar-commit', 'iniciar-instancia-dev', 'detener-instancia-dev', 'iniciar-opencode'],
-  setup() {
+  emits: ['clear-chat', 'generar-commit', 'iniciar-instancia-dev', 'detener-instancia-dev', 'iniciar-opencode', 'crear-ticket'],
+  setup(props) {
     const gitStore = useGitStore()
+
+    const currentBranchDisplay = computed(() => gitStore.getCurrentBranch(props.activeSessionId))
 
     function priorityClass(priorityId) {
       if (!priorityId) return 'priority-none'
@@ -53,7 +57,7 @@ export default {
       gitStore.zoomOut('chat')
     }
 
-    return { gitStore, priorityClass, zoomIn, zoomOut }
+    return { gitStore, currentBranchDisplay, priorityClass, zoomIn, zoomOut }
   },
 }
 </script>

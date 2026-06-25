@@ -2,30 +2,31 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useRedmineCommentsStore = defineStore('redmineComments', () => {
-  const comments = ref([])
-  const loading = ref(false)
-  const activeTicketId = ref(null)
+  const commentsBySession = ref({})
+  const loadingBySession = ref({})
+  const activeTicketBySession = ref({})
 
   async function loadComments(ticketRedmineId, sessionId) {
-    activeTicketId.value = ticketRedmineId
-    loading.value = true
+    if (!sessionId) return
+    activeTicketBySession.value[sessionId] = ticketRedmineId
+    loadingBySession.value[sessionId] = true
     try {
       let url = `/api/redmine/comments?ticket_redmine_id=${ticketRedmineId}&estado=todos`
       if (sessionId) url += `&sessionId=${sessionId}`
       const res = await fetch(url, { credentials: 'include' })
       const data = await res.json()
-      comments.value = data.comentarios || []
+      commentsBySession.value[sessionId] = data.comentarios || []
     } catch (err) {
       console.error('Error al cargar comentarios Redmine:', err)
-      comments.value = []
+      commentsBySession.value[sessionId] = []
     } finally {
-      loading.value = false
+      loadingBySession.value[sessionId] = false
     }
   }
 
-  async function refreshComments() {
-    if (activeTicketId.value) {
-      await loadComments(activeTicketId.value)
+  async function refreshComments(sessionId) {
+    if (sessionId && activeTicketBySession.value[sessionId]) {
+      await loadComments(activeTicketBySession.value[sessionId], sessionId)
     }
   }
 
@@ -44,10 +45,17 @@ export const useRedmineCommentsStore = defineStore('redmineComments', () => {
     return data
   }
 
-  function clearComments() {
-    comments.value = []
-    activeTicketId.value = null
+  function clearComments(sessionId) {
+    if (sessionId) {
+      delete commentsBySession.value[sessionId]
+      delete loadingBySession.value[sessionId]
+      delete activeTicketBySession.value[sessionId]
+    } else {
+      commentsBySession.value = {}
+      loadingBySession.value = {}
+      activeTicketBySession.value = {}
+    }
   }
 
-  return { comments, loading, activeTicketId, loadComments, refreshComments, queueComment, clearComments }
+  return { commentsBySession, loadingBySession, activeTicketBySession, loadComments, refreshComments, queueComment, clearComments }
 })
