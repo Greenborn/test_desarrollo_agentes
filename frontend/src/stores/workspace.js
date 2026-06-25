@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { useAuthStore } from './auth.js'
 
 const API = '/api'
 
@@ -14,6 +15,11 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       const data = await res.json()
       if (data.workspaces) {
         workspaces.value = data.workspaces
+      }
+      const auth = useAuthStore()
+      const ids = auth.getWorkspaceIds()
+      if (ids.length > 0) {
+        selectedIds.value = ids
       }
     } catch (err) {
       console.error('Error al cargar workspaces:', err)

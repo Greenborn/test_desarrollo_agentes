@@ -34,6 +34,9 @@
             <span class="text-truncate">{{ s.title }}</span>
             <span class="text-muted" style="font-size: 0.6rem; line-height: 1.2;">{{ formatDate(s.updated_at) }}</span>
           </div>
+          <span v-if="showWorkspaceBadges && workspaceMap[s.workspace_id]"
+                class="workspace-badge"
+                title="Espacio de trabajo">{{ workspaceMap[s.workspace_id] }}</span>
           <span
             class="delete-btn"
             @click.stop="chat.deleteSession(s.id)"
@@ -56,6 +59,7 @@ import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 import { useUiStore } from '../stores/ui.js'
 import { useSettingsStore } from '../stores/settings.js'
+import { useWorkspaceStore } from '../stores/workspace.js'
 
 export default {
   setup() {
@@ -63,9 +67,20 @@ export default {
     const cmd = useCommandStore()
     const ui = useUiStore()
     const settings = useSettingsStore()
+    const ws = useWorkspaceStore()
     const { sessions, activeSessionId, creating, sessionStatus, pendingNotifications } = storeToRefs(chat)
     const { sidebarCollapsed, sidebarWidth, omnifilter } = storeToRefs(ui)
     const { redmineUrl } = storeToRefs(settings)
+    const { workspaces, selectedIds } = storeToRefs(ws)
+
+    const showWorkspaceBadges = computed(() => selectedIds.value.length > 1)
+    const workspaceMap = computed(() => {
+      const map = {}
+      for (const w of workspaces.value) {
+        map[w.id] = w.name
+      }
+      return map
+    })
 
     const sidebarTransitioning = ref(false)
     let transitionTimer = null
@@ -167,6 +182,8 @@ export default {
       sessionTooltip,
       formatDate,
       redmineUrl,
+      showWorkspaceBadges,
+      workspaceMap,
       getSessionStatus,
       createSession,
       selectSession,
@@ -333,6 +350,20 @@ export default {
 .ticket-badge:hover {
   color: #93c5fd;
   text-decoration: underline;
+}
+.workspace-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  color: #75AADB;
+  background: rgba(117, 170, 219, 0.12);
+  border: 1px solid rgba(117, 170, 219, 0.3);
+  border-radius: 3px;
+  padding: 0 5px;
+  margin-left: 4px;
+  line-height: 1.5;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .ticket-priority-low {
   border-left: 3px solid var(--priority-low-color, #6b7280) !important;

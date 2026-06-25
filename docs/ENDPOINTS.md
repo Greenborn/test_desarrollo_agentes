@@ -28,7 +28,7 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 ### `GET /api/chat/sessions`
 - **Auth:** Requerida
 - **Workspace:** Filtra por `workspace_id` de la sesión
-- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion }] }`
+- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion, id_ticket_redmine, workspace_id, priority_id, priority_name }] }`
 
 ### `POST /api/chat/sessions`
 - **Auth:** Requerida

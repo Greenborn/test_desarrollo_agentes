@@ -43,7 +43,7 @@ router.post('/login', async (req, res) => {
     await new Promise((resolve) => req.session.save(resolve));
     res.json({
       success: true,
-      user: { id: user.id, username: user.username, role: user.role },
+      user: { id: user.id, username: user.username, role: user.role, workspaceIds: wsIds },
     });
   } catch (err) {
     console.log('Error en login:', err.message);

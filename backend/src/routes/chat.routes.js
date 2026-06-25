@@ -35,6 +35,7 @@ router.get('/sessions', async (req, res) => {
         'cwd',
         'chat_sessions.proyecto_id',
         'id_ticket_redmine',
+        'chat_sessions.workspace_id',
         'proyectos.descripcion as proyecto_descripcion',
         'tickets.priority_id',
         'tickets.priority_name'
