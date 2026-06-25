@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 import express from 'express';
 import knex from 'knex';
 import commandRoutes from './routes/command.routes.js';
@@ -38,6 +39,14 @@ const app = express();
 app.use(express.json());
 
 app.use('/api', commandRoutes);
+
+function killPort(port) {
+  try {
+    execSync(`fuser -k ${port}/tcp 2>/dev/null || lsof -ti :${port} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' });
+  } catch {
+  }
+}
+killPort(PORT);
 
 const server = app.listen(PORT, (err) => {
   if (err) {

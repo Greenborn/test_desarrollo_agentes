@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import http from 'http';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import express from 'express';
@@ -150,7 +150,19 @@ function startGastosService() {
   });
 }
 
+function killPort(port) {
+  try {
+    execSync(`fuser -k ${port}/tcp 2>/dev/null || lsof -ti :${port} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' });
+  } catch {
+  }
+}
+
 async function start() {
+  const ports = [process.env.PORT, process.env.SERVICIO_PLAYWRIGHT_PORT, process.env.SERVICIO_DOCUMENTAL_PORT, process.env.SERVICIO_GASTOS_PORT, process.env.OPENCODE_PORT].filter(Boolean);
+  for (const p of ports) {
+    killPort(p);
+  }
+
   try {
     console.log('[migrate] Ejecutando migraciones pendientes...');
     await db.migrate.latest();

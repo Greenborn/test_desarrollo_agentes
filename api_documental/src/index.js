@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import express from 'express';
 import documentacionRoutes from './routes/documentacion.routes.js';
 
@@ -11,6 +12,14 @@ const app = express();
 app.use(express.json());
 
 app.use('/api/documentacion', documentacionRoutes);
+
+function killPort(port) {
+  try {
+    execSync(`fuser -k ${port}/tcp 2>/dev/null || lsof -ti :${port} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' });
+  } catch {
+  }
+}
+killPort(PORT);
 
 const server = app.listen(PORT, (err) => {
   if (err) {
