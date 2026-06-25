@@ -6,6 +6,8 @@ Todos los comandos se escriben con prefijo `/` en el input del chat.
 
 Los comandos registrados en frontend tienen prioridad sobre los del backend.
 
+- **Los resultados de cada comando se muestran siempre en la sesión de chat que lo inició**, independientemente de la sesión actualmente seleccionada. Ver `docs/CRITERIOS_COMANDOS.md §16`.
+
 Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtra en vivo (con debounce configurable) las pestañas de chats y los proyectos del sidebar por los campos tooltip e ID respectivamente.
 
 ---

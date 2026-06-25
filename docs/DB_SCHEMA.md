@@ -51,10 +51,9 @@ Motor: **MariaDB** vía **Knex** (query builder).
 |---|---|---|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
 | `name` | VARCHAR(255) | NOT NULL |
-| `is_default` | BOOLEAN | DEFAULT `false` |
-| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+| `is_default` | BOOLEAN | DEFAULT `false` (sin uso actual) |
 
-**Seed:** `id=1, name='Por Defecto', is_default=true`
+**Seed:** `id=1, name='Por Defecto'`
 
 ---
 

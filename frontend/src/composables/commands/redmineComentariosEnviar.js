@@ -44,8 +44,7 @@ register({
       cmdStore.showAutocomplete(['--ticket_id='])
     }
   },
-  async execute(args, { chatStore }) {
-    const sessionId = chatStore.activeSessionId
+  async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
@@ -95,7 +94,7 @@ register({
           cantidad: comentarios.length,
         },
         _key: 'control-' + Date.now(),
-      })
+      }, sessionId)
     } catch (err) {
       console.error('Error en /dev_redmine_comentarios_enviar:', err.message)
       throw new Error('Error al preparar envío de comentarios: ' + err.message)

@@ -32,7 +32,8 @@ router.post('/test', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = wsIds[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
 
@@ -72,7 +73,8 @@ router.get('/proyectos', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = wsIds[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
 
@@ -126,7 +128,8 @@ router.post('/proyectos/import-all', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = wsIds[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
 
@@ -182,7 +185,8 @@ router.post('/proyectos/import-all', async (req, res) => {
         }
 
         const existing = await db('proyectos').where({ redmine_id: p.id }).first();
-        const wsId = req.session.workspaceId || 1;
+        const wsIds = req.session.workspaceIds || [1];
+        const wsId = wsIds[0] || 1;
 
         if (existing) {
           await db('proyectos').where({ redmine_id: p.id }).update({
@@ -246,7 +250,8 @@ router.post('/proyectos/import', async (req, res) => {
   }
 
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = wsIds[0] || 1;
 
     const existing = await db('proyectos').where({ redmine_id: id }).first();
 
@@ -291,7 +296,8 @@ router.get('/proyectos/:proyectoId/tickets', async (req, res) => {
       return;
     }
 
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = wsIds[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
 
@@ -425,7 +431,8 @@ router.post('/proyectos/:proyectoId/importar-tickets', async (req, res) => {
       return;
     }
 
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = wsIds[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
 
@@ -447,7 +454,8 @@ router.post('/proyectos/importar-tickets-all', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = wsIds[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
 
@@ -456,7 +464,7 @@ router.post('/proyectos/importar-tickets-all', async (req, res) => {
       return;
     }
 
-    const proyectos = await db('proyectos').where({ workspace_id: wsId }).whereNotNull('redmine_id').orderBy('id');
+    const proyectos = await db('proyectos').whereIn('workspace_id', wsIds).whereNotNull('redmine_id').orderBy('id');
 
     if (proyectos.length === 0) {
       res.json({ success: false, message: 'No hay proyectos con ID de Redmine asociado.' });
@@ -515,7 +523,9 @@ router.post('/comments', async (req, res) => {
   }
 
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const ticket = await db('tickets').where({ redmine_id: ticket_redmine_id }).select('workspace_id').first();
+    const wsId = (ticket && ticket.workspace_id) || wsIds[0] || 1;
     const [insertedId] = await db('redmine_comentarios').insert({
       session_id,
       ticket_redmine_id,
@@ -535,8 +545,8 @@ router.get('/comments', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const wsId = req.session.workspaceId || 1;
-    const query = db('redmine_comentarios').where({ workspace_id: wsId });
+    const wsIds = req.session.workspaceIds || [1];
+    const query = db('redmine_comentarios').whereIn('workspace_id', wsIds);
 
     if (req.query.estado && req.query.estado !== 'todos') {
       query.where({ estado: req.query.estado });
@@ -568,7 +578,8 @@ router.post('/comments/send', async (req, res) => {
   }
 
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = wsIds[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
 
@@ -578,7 +589,8 @@ router.post('/comments/send', async (req, res) => {
 
     const comentarios = await db('redmine_comentarios')
       .whereIn('id', comentarios_ids)
-      .andWhere({ workspace_id: wsId, estado: 'pendiente' });
+      .whereIn('workspace_id', wsIds)
+      .andWhere({ estado: 'pendiente' });
 
     if (comentarios.length === 0) {
       return res.status(400).json({ error: 'No se encontraron comentarios pendientes con los IDs especificados' });

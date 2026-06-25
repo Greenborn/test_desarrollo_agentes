@@ -20,6 +20,7 @@ import { ref } from 'vue'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 import { useProjectStore } from '../stores/project.js'
+import { useAuthStore } from '../stores/auth.js'
 
 export default {
   emits: ['close'],
@@ -33,11 +34,12 @@ export default {
     async function crear() {
       if (!proyectoId.value || !descripcion.value) return
       try {
+        const auth = useAuthStore()
         const res = await fetch('/api/proyecto', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ id: proyectoId.value, descripcion: descripcion.value }),
+          body: JSON.stringify({ id: proyectoId.value, descripcion: descripcion.value, workspace_id: auth.activeWorkspaceId }),
         })
         const data = await res.json()
         if (!data.success) {

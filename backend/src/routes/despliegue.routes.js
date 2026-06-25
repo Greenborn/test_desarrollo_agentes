@@ -173,10 +173,10 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
               .where({ user_id: req.session.userId, key: 'default_resolution' })
               .first();
             if (defaultResRow && defaultResRow.value) {
-              const wsId = req.session.workspaceId || 1;
+              const wsIds = req.session.workspaceIds || [1];
               const screenResRow = await db('settings')
                 .select('setting_value')
-                .where({ workspace_id: wsId, setting_key: 'screen_resolutions' })
+                .where({ workspace_id: wsIds[0] || 1, setting_key: 'screen_resolutions' })
                 .first();
               if (screenResRow && screenResRow.setting_value) {
                 const resolutions = JSON.parse(screenResRow.setting_value);

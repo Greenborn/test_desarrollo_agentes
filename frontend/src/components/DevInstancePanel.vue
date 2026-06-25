@@ -162,7 +162,7 @@
 </template>
 
 <script>
-import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import RepoView from './RepoView.vue'
 import TicketPanel from './TicketPanel.vue'
@@ -171,27 +171,17 @@ import NetworkLogPanel from './NetworkLogPanel.vue'
 import BrowserEventPanel from './BrowserEventPanel.vue'
 import { useProjectStore } from '../stores/project.js'
 import { useChatStore } from '../stores/chat.js'
+import { useDevInstanceStore } from '../stores/devInstance.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useCommandStore } from '../stores/command.js'
 
 export default {
   components: { RepoView, TicketPanel, ConsoleLogPanel, NetworkLogPanel, BrowserEventPanel },
   setup() {
-    const state = reactive({
-      processes: [],
-      frontendPorts: [],
-      browserSessions: [],
-      resolution: null,
-    })
-
+    const devStore = useDevInstanceStore()
     const activeTab = ref('instancias')
     const selectedProcess = ref(null)
-    const logsMap = reactive({})
-    const deteniendo = ref(false)
-    const errorMsg = ref('')
     const logContainerRef = ref(null)
-    let statusTimer = null
-    let logsTimer = null
 
     const projectStore = useProjectStore()
     const chatStore = useChatStore()
@@ -199,7 +189,6 @@ export default {
     const { find } = useCommandRegistry()
     const { projects, selectedProject, pinnedProjectId } = storeToRefs(projectStore)
     const projectFilter = ref('')
-    const startingInstancia = ref(false)
 
     const filteredProjects = computed(() => {
       const filter = projectFilter.value.toLowerCase().trim()
@@ -216,26 +205,23 @@ export default {
     }
 
     const activeSessionId = computed(() => chatStore.activeSessionId)
-    const hasProcesses = computed(() => state.processes.length > 0)
-
-    const processNames = computed(() => state.processes.map(p => p.name))
 
     function typeLabel(type) {
       return type === 'backend' ? 'nodemon' : 'npm run dev'
     }
 
     const displayText = computed(() => {
-      const names = processNames.value
+      const names = devStore.processNames
       if (names.length === 0) return ''
 
       if (selectedProcess.value) {
-        const lines = logsMap[selectedProcess.value]
+        const lines = devStore.logsMap[selectedProcess.value]
         return lines ? lines.join('\n') : ''
       }
 
       const combined = []
       for (const name of names) {
-        const lines = logsMap[name]
+        const lines = devStore.logsMap[name]
         if (lines && lines.length) {
           combined.push(`── ${name} ──`)
           combined.push(...lines)
@@ -253,51 +239,14 @@ export default {
       selectedProcess.value = selectedProcess.value === name ? null : name
     }
 
-    async function fetchStatus() {
-      try {
-        const res = await fetch('/api/despliegue/estado-instancia-dev', { credentials: 'include' })
-        const data = await res.json()
-        if (data.success) {
-          state.processes = data.processes || []
-          state.frontendPorts = data.frontendPorts || []
-          state.browserSessions = data.browserSessions || []
-          state.resolution = data.resolution || null
-          errorMsg.value = ''
-
-          const currentNames = new Set(processNames.value)
-          for (const key of Object.keys(logsMap)) {
-            if (!currentNames.has(key)) delete logsMap[key]
-          }
-        }
-      } catch (err) {
-        console.error('Error al obtener estado de dev instance:', err)
-        errorMsg.value = 'Error al conectar con el servidor.'
-      }
-    }
-
-    async function fetchLogs() {
-      const names = processNames.value
-      for (const name of names) {
-        try {
-          const res = await fetch(`/api/despliegue/logs?name=${encodeURIComponent(name)}`, { credentials: 'include' })
-          const data = await res.json()
-          if (data.success) {
-            logsMap[name] = data.logs || []
-          }
-        } catch (err) {
-          console.error(`Error al obtener logs para ${name}:`, err)
-        }
-      }
-    }
-
     async function iniciarInstancia() {
       if (!activeSessionId.value) return
-      startingInstancia.value = true
+      devStore.starting = true
       try {
         const cmd = find('/despliegue_iniciar_instancia')
-        await chatStore.runCommand('/despliegue_iniciar_instancia', async (loadingIdx) => {
+        await chatStore.runCommand('/despliegue_iniciar_instancia', async (loadingIdx, sid) => {
           if (cmd) {
-            return cmd.execute([], { cmdStore, chatStore, loadingIdx })
+            return cmd.execute([], { cmdStore, chatStore, loadingIdx, sessionId: sid })
           }
           const res = await fetch('/api/command/execute', {
             method: 'POST',
@@ -312,28 +261,7 @@ export default {
       } catch (err) {
         console.error('Error al iniciar instancia:', err)
       } finally {
-        startingInstancia.value = false
-      }
-    }
-
-    async function detener() {
-      deteniendo.value = true
-      try {
-        await fetch('/api/despliegue/detener-instancia-dev', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({}),
-        })
-        state.processes = []
-        state.frontendPorts = []
-        state.browserSessions = []
-        state.resolution = null
-        for (const key of Object.keys(logsMap)) delete logsMap[key]
-      } catch (err) {
-        console.error('Error al detener instancia:', err)
-      } finally {
-        deteniendo.value = false
+        devStore.starting = false
       }
     }
 
@@ -345,32 +273,29 @@ export default {
     })
 
     onMounted(() => {
-      fetchStatus().then(fetchLogs)
-      statusTimer = setInterval(fetchStatus, 5000)
-      logsTimer = setInterval(fetchLogs, 1500)
+      devStore.startPolling()
     })
 
     onBeforeUnmount(() => {
-      if (statusTimer) clearInterval(statusTimer)
-      if (logsTimer) clearInterval(logsTimer)
+      devStore.stopPolling()
     })
 
     return {
-      state,
+      state: devStore.state,
       activeTab,
       selectedProcess,
-      deteniendo,
-      errorMsg,
+      deteniendo: devStore.deteniendo,
+      errorMsg: devStore.errorMsg,
       logContainerRef,
-      hasProcesses,
+      hasProcesses: devStore.hasProcesses,
       activeSessionId,
-      startingInstancia,
+      startingInstancia: devStore.starting,
       iniciarInstancia,
       typeLabel,
       displayText,
       displayedLines,
       toggleProcess,
-      detener,
+      detener: devStore.detener,
       projectStore,
       selectedProject,
       pinnedProjectId,

@@ -81,8 +81,7 @@ register({
       cmdStore.hideAutocomplete()
     }
   },
-  async execute(args, { chatStore, cmdStore }) {
-    const sessionId = chatStore.activeSessionId
+  async execute(args, { chatStore, cmdStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
@@ -156,7 +155,7 @@ register({
 
         const preselectProvider = ocStore.savedProvider || providerList[0].value
 
-        chatStore.messages.push({
+        chatStore.pushMessage({
           role: 'opencode_control',
           controlData: {
             controlId: 'tn-provider-' + Date.now(),
@@ -171,7 +170,7 @@ register({
             diffData: data,
           },
           _key: 'control-' + Date.now(),
-        })
+        }, sessionId)
         return
       }
 
@@ -188,7 +187,7 @@ register({
         commentBody = lines.join('\n')
       }
 
-      chatStore.messages.push({
+      chatStore.pushMessage({
         role: 'opencode_control',
         controlData: {
           controlId: 'ambientes-diff-comment-' + Date.now(),
@@ -199,14 +198,14 @@ register({
           modo_envio: 'encolar',
         },
         _key: 'control-' + Date.now(),
-      })
+      }, sessionId)
     } catch (err) {
       console.error('Error en /ambientes_diff_comentar:', err.message)
-      chatStore.messages.push({
+      chatStore.pushMessage({
         role: 'result',
         content: `Error: ${err.message}`,
         _key: 'diff-err-' + Date.now(),
-      })
+      }, sessionId)
     }
   },
 })

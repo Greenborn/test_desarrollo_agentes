@@ -7,23 +7,23 @@
         <span class="ticket-sep text-muted">—</span>
         <span class="ticket-subject text-truncate">{{ ticketInfo.subject }}</span>
       </template>
-      <span v-if="currentGitBranch && currentGitBranch !== 'Sin repo'" class="branch-name ms-2">· rama: {{ currentGitBranch }}</span>
+      <span v-if="gitStore.currentBranch && gitStore.currentBranch !== 'Sin repo'" class="branch-name ms-2">· rama: {{ gitStore.currentBranch }}</span>
       <div class="ms-auto d-flex align-items-center gap-2">
         <button class="btn btn-sm btn-outline-danger px-2" @click="clearChat" title="Limpiar chat">🗑️</button>
         <div class="zoom-controls d-flex align-items-center gap-1">
-          <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomOut" :disabled="chatZoom <= 50" title="Alejar">−</button>
-          <span class="zoom-level small" @click="chatZoom = 100; saveZoom(100)" style="cursor:pointer; min-width:36px; text-align:center;" title="Restablecer zoom">{{ chatZoom }}%</span>
-          <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomIn" :disabled="chatZoom >= 200" title="Acercar">+</button>
+          <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomOut" :disabled="gitStore.chatZoom <= 50" title="Alejar">−</button>
+          <span class="zoom-level small" @click="gitStore.chatZoom = 100; gitStore.saveZoom('chat', 100)" style="cursor:pointer; min-width:36px; text-align:center;" title="Restablecer zoom">{{ gitStore.chatZoom }}%</span>
+          <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomIn" :disabled="gitStore.chatZoom >= 200" title="Acercar">+</button>
         </div>
       </div>
     </div>
-    <div class="flex-grow-1 overflow-y-auto p-3" ref="messagesContainer" style="min-height: 0;" :style="{ fontSize: chatZoom + '%' }">
-      <div v-if="!activeSessionId" class="text-center text-muted mt-5">
+    <div class="flex-grow-1 overflow-hidden position-relative" style="min-height: 0;">
+      <div v-if="!activeSessionId" class="text-center text-muted mt-5 p-3">
         <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
       </div>
-      <template v-else>
+      <div v-else class="messages-pages" ref="messagesContainer" :style="{ fontSize: gitStore.chatZoom + '%' }">
         <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
-        <div v-if="streaming" class="text-start mb-3">
+        <div v-if="streaming" class="messages-page-item streaming-msg-wrapper">
           <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 80%; background: #1a2744; border: 1px solid #374151; color: #e0e0e0;">
             <div v-if="currentThinking" class="mb-2">
               <button class="btn btn-sm w-100 text-start btn-outline-argentina" data-bs-toggle="collapse" data-bs-target="#think-stream">
@@ -36,7 +36,7 @@
             <div style="white-space: pre-wrap;">{{ currentChunk }}<span class="blink">▌</span></div>
           </div>
         </div>
-      </template>
+      </div>
     </div>
     <div v-if="deteccionState.running" class="border-top p-2" style="border-color: #75AADB; background: #0d1b2a;">
       <div class="d-flex align-items-center gap-2">
@@ -76,6 +76,7 @@ import { useCommandStore } from '../stores/command.js'
 import { useModalStore } from '../stores/modal.js'
 import { useOpencodeStore } from '../stores/opencode.js'
 import { useSettingsStore } from '../stores/settings.js'
+import { useGitStore } from '../stores/git.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
 import { deteccionState, abortDeteccion } from '../composables/commands/deteccionFuncionalidades.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
@@ -92,6 +93,7 @@ export default {
     const modal = useModalStore()
     const ocStore = useOpencodeStore()
     const redmineComments = useRedmineCommentsStore()
+    const gitStore = useGitStore()
     const { find } = useCommandRegistry()
     const { getVariables, interpolate } = useProjectVariables()
     const { activeSessionId, messages, streaming, executing, currentChunk, currentThinking, sessions } = storeToRefs(chat)
@@ -102,43 +104,9 @@ export default {
     const ocThinking = ref('')
     const _streamSessionId = ref(null)
     const ticketInfo = ref(null)
-    const chatZoom = ref(100)
-    const currentGitBranch = ref(null)
 
-    async function fetchGitBranch() {
-      const sessionId = chat.activeSessionId
-      if (!sessionId || !cmdStore.currentDir) {
-        currentGitBranch.value = null
-        return
-      }
-      try {
-        const verifyRes = await fetch('/api/command/git-verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ sessionId }),
-        })
-        const verifyData = await verifyRes.json()
-        if (!verifyData.isRepo) {
-          currentGitBranch.value = 'Sin repo'
-          return
-        }
-        const branchRes = await fetch('/api/command/git', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ command: 'rev-parse --abbrev-ref HEAD', sessionId }),
-        })
-        const branchData = await branchRes.json()
-        if (branchData.success && branchData.stdout) {
-          currentGitBranch.value = branchData.stdout.trim()
-        } else {
-          currentGitBranch.value = 'HEAD'
-        }
-      } catch (err) {
-        console.error('Error al obtener rama actual:', err.message)
-        currentGitBranch.value = 'Sin repo'
-      }
+    function fetchGitBranch() {
+      return gitStore.fetchGitBranch(chat.activeSessionId)
     }
 
     async function _getProyectoId() {
@@ -162,41 +130,20 @@ export default {
       return interpolate(text, variables)
     }
 
-    async function loadZoom() {
-      try {
-        const res = await fetch('/api/command/setting/chat_zoom', { credentials: 'include' })
-        const data = await res.json()
-        if (data.value !== null && data.value !== undefined) {
-          chatZoom.value = parseInt(data.value) || 100
-        }
-      } catch (err) {
-        console.error('Error al cargar zoom:', err)
-      }
+    function loadZoom() {
+      return gitStore.loadZoom('chat')
     }
 
-    async function saveZoom(val) {
-      try {
-        await fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'chat_zoom', value: String(val) }),
-        })
-      } catch (err) {
-        console.error('Error al guardar zoom:', err)
-      }
+    function saveZoom(val) {
+      return gitStore.saveZoom('chat', val)
     }
 
     function zoomIn() {
-      const next = Math.min(200, chatZoom.value + 10)
-      chatZoom.value = next
-      saveZoom(next)
+      gitStore.zoomIn('chat')
     }
 
     function zoomOut() {
-      const next = Math.max(50, chatZoom.value - 10)
-      chatZoom.value = next
-      saveZoom(next)
+      gitStore.zoomOut('chat')
     }
 
     function _isActiveSession(sid) {
@@ -2744,9 +2691,9 @@ export default {
       const known = find(cmdName)
 
       try {
-        await chat.runCommand(raw, async (loadingIdx) => {
+        await chat.runCommand(raw, async (loadingIdx, sid) => {
           if (known) {
-            return known.execute(parts.slice(1), { cmdStore, chatStore: chat, loadingIdx })
+            return known.execute(parts.slice(1), { cmdStore, chatStore: chat, loadingIdx, sessionId: sid })
           }
           const res = await fetch('/api/command/execute', {
             method: 'POST',
@@ -2771,11 +2718,11 @@ export default {
       await nextTick()
       await new Promise((resolve) => requestAnimationFrame(resolve))
       if (messagesContainer.value) {
-        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+        messagesContainer.value.scrollLeft = messagesContainer.value.scrollWidth
       }
       setTimeout(() => {
         if (messagesContainer.value) {
-          messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+          messagesContainer.value.scrollLeft = messagesContainer.value.scrollWidth
         }
       }, 100)
     }
@@ -2803,14 +2750,23 @@ export default {
       }
     )
 
+    let wheelHandler = null
     onMounted(() => {
       if (messagesContainer.value) {
         resizeObserver = new ResizeObserver(() => {
           if (messagesContainer.value) {
-            messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+            messagesContainer.value.scrollLeft = messagesContainer.value.scrollWidth
           }
         })
         resizeObserver.observe(messagesContainer.value)
+
+        wheelHandler = (e) => {
+          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            e.preventDefault()
+            messagesContainer.value.scrollLeft += e.deltaY
+          }
+        }
+        messagesContainer.value.addEventListener('wheel', wheelHandler, { passive: false })
       }
       loadTicketInfo()
       loadZoom()
@@ -2819,6 +2775,9 @@ export default {
 
     onUnmounted(() => {
       if (resizeObserver) resizeObserver.disconnect()
+      if (wheelHandler && messagesContainer.value) {
+        messagesContainer.value.removeEventListener('wheel', wheelHandler)
+      }
     })
 
     return {
@@ -2849,10 +2808,10 @@ export default {
       messagesContainer,
       ticketInfo,
       priorityClass,
-      chatZoom,
+      gitStore,
       zoomIn,
       zoomOut,
-      currentGitBranch,
+      saveZoom,
     }
   },
 }
@@ -3015,5 +2974,25 @@ html, body {
 }
 .zoom-level:hover {
   color: #e0e0e0;
+}
+
+/* --- Paginación horizontal --- */
+.messages-pages {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+}
+.messages-pages > * {
+  flex-shrink: 0;
+  width: calc(50% - 1.375rem);
+  margin-bottom: 0 !important;
 }
 </style>

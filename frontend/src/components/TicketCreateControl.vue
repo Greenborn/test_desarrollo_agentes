@@ -85,21 +85,16 @@
 
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
-
-const API = '/api'
+import { useTicketFormStore } from '../stores/ticketForm.js'
 
 export default {
   emits: ['confirm'],
   setup(props, { emit }) {
+    const ticketFormStore = useTicketFormStore()
     const saving = ref(false)
     const errors = reactive({ subject: '', project_id: '' })
-    const options = reactive({
-      statuses: [],
-      priorities: [],
-      trackers: [],
-      users: [],
-    })
     const allProjects = ref([])
+    const options = ticketFormStore.options
     const selectedIds = reactive({
       status_id: null,
       priority_id: null,
@@ -164,43 +159,7 @@ export default {
     }
 
     async function loadOptions() {
-      try {
-        const genRes = await fetch(`${API}/tickets/options`, { credentials: 'include' })
-        const genData = await genRes.json()
-        options.statuses = genData.statuses || []
-        options.priorities = genData.priorities || []
-        options.trackers = genData.trackers || []
-      } catch (err) {
-        console.error('Error al cargar opciones:', err)
-      }
-
-      if (options.statuses.length === 0) {
-        options.statuses = [
-          { id: null, name: 'Nuevo' },
-          { id: null, name: 'En Progreso' },
-          { id: null, name: 'Resuelto' },
-          { id: null, name: 'Feedback' },
-          { id: null, name: 'Cerrado' },
-          { id: null, name: 'Rechazado' },
-        ]
-      }
-      if (options.priorities.length === 0) {
-        options.priorities = [
-          { id: null, name: 'Baja' },
-          { id: null, name: 'Normal' },
-          { id: null, name: 'Alta' },
-          { id: null, name: 'Urgente' },
-          { id: null, name: 'Inmediata' },
-        ]
-      }
-      if (options.trackers.length === 0) {
-        options.trackers = [
-          { id: null, name: 'Bug' },
-          { id: null, name: 'Feature' },
-          { id: null, name: 'Support' },
-          { id: null, name: 'Task' },
-        ]
-      }
+      await ticketFormStore.loadOptions()
     }
 
     function onProjectChange() {
@@ -213,16 +172,7 @@ export default {
     }
 
     async function loadProjectUsers(projectId) {
-      if (!projectId) return
-      try {
-        const res = await fetch(`${API}/tickets/project-members/${projectId}`, { credentials: 'include' })
-        const data = await res.json()
-        if (data.users && data.users.length > 0) {
-          options.users = data.users
-        }
-      } catch (err) {
-        console.error('Error al cargar miembros del proyecto:', err)
-      }
+      await ticketFormStore.loadProjectUsers(projectId)
     }
 
     function onPriorityChange() {

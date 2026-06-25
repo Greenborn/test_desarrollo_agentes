@@ -14,9 +14,9 @@ function authGuard(req, res) {
 router.get('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
     const environments = await db('workspace_environments')
-      .where({ workspace_id: wsId })
+      .whereIn('workspace_id', wsIds)
       .select('id', 'name', 'branch', 'description', 'created_at', 'updated_at')
       .orderBy('id');
     res.json({ environments });
@@ -29,7 +29,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { name, branch, description } = req.body;
+    const { name, branch, description, workspace_id } = req.body;
     if (!name) {
       return res.status(400).json({ error: 'El nombre es requerido' });
     }
@@ -37,7 +37,8 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'La rama es requerida' });
     }
 
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = workspace_id && wsIds.includes(workspace_id) ? workspace_id : wsIds[0] || 1;
 
     const existing = await db('workspace_environments')
       .where({ workspace_id: wsId, name })
@@ -64,18 +65,22 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { name, branch, description } = req.body;
+    const { name, branch, description, workspace_id } = req.body;
+    const wsIds = req.session.workspaceIds || [1];
     const env = await db('workspace_environments').where({ id: req.params.id }).first();
     if (!env) {
       return res.status(404).json({ error: 'Ambiente no encontrado' });
     }
+    if (!wsIds.includes(env.workspace_id)) {
+      return res.status(403).json({ error: 'Ambiente no pertenece a un workspace seleccionado' });
+    }
 
+    const wsId = workspace_id && wsIds.includes(workspace_id) ? workspace_id : env.workspace_id;
     const updates = {};
     if (name !== undefined) {
       if (!name) {
         return res.status(400).json({ error: 'El nombre no puede estar vacío' });
       }
-      const wsId = req.session.workspaceId || 1;
       const duplicate = await db('workspace_environments')
         .where({ workspace_id: wsId, name })
         .whereNot({ id: req.params.id })
@@ -112,6 +117,10 @@ router.delete('/:id', async (req, res) => {
     const env = await db('workspace_environments').where({ id: req.params.id }).first();
     if (!env) {
       return res.status(404).json({ error: 'Ambiente no encontrado' });
+    }
+    const wsIds = req.session.workspaceIds || [1];
+    if (!wsIds.includes(env.workspace_id)) {
+      return res.status(403).json({ error: 'Ambiente no pertenece a un workspace seleccionado' });
     }
 
     await db('workspace_environments').where({ id: req.params.id }).del();

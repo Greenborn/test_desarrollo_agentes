@@ -90,150 +90,49 @@
 import { ref, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
+import { useGitStore } from '../stores/git.js'
 import GitGraphSvg from './GitGraphSvg.vue'
 
 export default {
   components: { GitGraphSvg },
   setup() {
     const chatStore = useChatStore()
+    const gitStore = useGitStore()
     const { activeSessionId, sessions } = storeToRefs(chatStore)
-
-    const loading = ref(true)
-    const isGitRepo = ref(false)
-    const repoPath = ref('')
     const cwd = ref('')
-    const currentBranch = ref(null)
-    const branches = ref([])
-    const tags = ref([])
-    const structuredCommits = ref([])
-    const zoom = ref(100)
-
-    async function fetchRepoData() {
-      const sessionId = activeSessionId.value
-      if (!sessionId) {
-        loading.value = false
-        isGitRepo.value = false
-        cwd.value = ''
-        return
-      }
-
-      loading.value = true
-
-      try {
-        const verifyRes = await fetch('/api/command/git-verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ sessionId }),
-        })
-        const verifyData = await verifyRes.json()
-
-        const session = sessions.value.find(s => s.id === sessionId)
-        cwd.value = session?.cwd || ''
-
-        if (!verifyData.isRepo) {
-          isGitRepo.value = false
-          loading.value = false
-          return
-        }
-
-        isGitRepo.value = true
-        repoPath.value = verifyData.rootPath || ''
-
-        const structRes = await fetch('/api/command/git-log-structured', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ sessionId, maxCount: 100 }),
-        })
-        const structData = await structRes.json()
-
-        if (structData.success) {
-          structuredCommits.value = structData.commits
-          branches.value = structData.branches || []
-          const current = structData.branches.find(b => b.isCurrent)
-          currentBranch.value = current ? current.name : null
-          tags.value = structData.tags || []
-        }
-      } catch (err) {
-        console.error('Error al obtener datos del repositorio:', err)
-        isGitRepo.value = false
-      } finally {
-        loading.value = false
-      }
-    }
-
-    async function loadZoom() {
-      try {
-        const res = await fetch('/api/command/setting/git_graph_zoom', { credentials: 'include' })
-        const data = await res.json()
-        if (data.value !== null && data.value !== undefined) {
-          zoom.value = parseInt(data.value, 10) || 100
-        }
-      } catch (err) {
-        console.error('Error al cargar zoom:', err)
-      }
-    }
-
-    async function saveZoom(val) {
-      try {
-        await fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'git_graph_zoom', value: String(val) }),
-        })
-      } catch (err) {
-        console.error('Error al guardar zoom:', err)
-      }
-    }
-
-    function zoomIn() {
-      const val = Math.min(200, zoom.value + 10)
-      zoom.value = val
-      saveZoom(val)
-    }
-
-    function zoomOut() {
-      const val = Math.max(50, zoom.value - 10)
-      zoom.value = val
-      saveZoom(val)
-    }
-
-    function resetZoom() {
-      zoom.value = 100
-      saveZoom(100)
-    }
 
     function refresh() {
-      fetchRepoData()
+      const sessionId = activeSessionId.value
+      const session = sessions.value.find(s => s.id === sessionId)
+      cwd.value = session?.cwd || ''
+      gitStore.fetchRepoData(sessionId)
     }
 
     watch(activeSessionId, (newId, oldId) => {
       if (newId !== oldId) {
-        fetchRepoData()
+        refresh()
       }
     })
 
     onMounted(() => {
-      fetchRepoData()
-      loadZoom()
+      refresh()
+      gitStore.loadZoom('git')
     })
 
     return {
-      loading,
-      isGitRepo,
-      repoPath,
+      loading: gitStore.loading,
+      isGitRepo: gitStore.isGitRepo,
+      repoPath: gitStore.repoPath,
       cwd,
-      currentBranch,
-      branches,
-      tags,
-      structuredCommits,
+      currentBranch: gitStore.currentBranch,
+      branches: gitStore.branches,
+      tags: gitStore.tags,
+      structuredCommits: gitStore.structuredCommits,
       activeSessionId,
-      zoom,
-      zoomIn,
-      zoomOut,
-      resetZoom,
+      zoom: gitStore.gitZoom,
+      zoomIn: () => gitStore.zoomIn('git'),
+      zoomOut: () => gitStore.zoomOut('git'),
+      resetZoom: () => gitStore.resetZoom('git'),
       refresh,
     }
   },

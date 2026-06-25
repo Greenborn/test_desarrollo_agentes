@@ -40,9 +40,11 @@ export const useSettingsStore = defineStore('settings', () => {
     root.style.setProperty('--priority-immediate-color', priorityColorImmediate.value)
   }
 
-  async function load() {
+  async function load(workspaceId) {
     try {
-      const res = await fetch(`${API}/settings`, { credentials: 'include' })
+      let url = `${API}/settings`
+      if (workspaceId) url += `?workspace_id=${workspaceId}`
+      const res = await fetch(url, { credentials: 'include' })
       const keys = await res.json()
       deepseekKey.value = keys.deepseek_key ? keys.deepseek_key : ''
       redmineToken.value = keys.redmine_token ? keys.redmine_token : ''
@@ -74,14 +76,16 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  async function save(key, value) {
+  async function save(key, value, workspaceId) {
     clearFeedback()
     try {
+      const payload = { key, value }
+      if (workspaceId) payload.workspace_id = workspaceId
       const res = await fetch(`${API}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ key, value }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (data.success) {

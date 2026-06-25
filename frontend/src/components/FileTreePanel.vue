@@ -38,8 +38,9 @@
 </template>
 
 <script>
-import { ref, computed, watch } from 'vue'
+import { watch } from 'vue'
 import { useModalStore } from '../stores/modal.js'
+import { useFileTreeStore } from '../stores/fileTree.js'
 import FileEditorModal from './FileEditorModal.vue'
 
 const FILE_ICONS = {
@@ -75,10 +76,7 @@ export default {
   },
   setup(props) {
     const modal = useModalStore()
-    const tree = ref(null)
-    const loading = ref(true)
-    const error = ref(null)
-    const expandedPaths = ref({})
+    const fileTreeStore = useFileTreeStore()
 
     function openFile(path) {
       const name = path.split('/').pop() || path
@@ -91,68 +89,21 @@ export default {
       return FILE_ICONS[ext] || '\u{1F4C4}'
     }
 
-    function isExpanded(path) {
-      return !!expandedPaths.value[path]
-    }
-
-    function toggleDirectory(path) {
-      const next = { ...expandedPaths.value }
-      if (next[path]) {
-        delete next[path]
-      } else {
-        next[path] = true
-      }
-      expandedPaths.value = next
-    }
-
-    function flattenNodes(nodes, depth) {
-      if (!nodes || !nodes.length) return []
-      const result = []
-      for (const node of nodes) {
-        result.push({ node, depth })
-        if (node.type === 'directory' && isExpanded(node.path) && node.children) {
-          result.push(...flattenNodes(node.children, depth + 1))
-        }
-      }
-      return result
-    }
-
-    const flatTree = computed(() => {
-      if (!tree.value || !tree.value.children) return []
-      return flattenNodes(tree.value.children, 1)
-    })
-
-    async function fetchTree() {
-      if (!props.sessionId) return
-      loading.value = true
-      error.value = null
-      tree.value = null
-      try {
-        const res = await fetch(`/api/command/arbol-directorios?sessionId=${props.sessionId}&useGitignore=true&showHidden=true`, {
-          credentials: 'include',
-        })
-        const data = await res.json()
-        if (data.success) {
-          tree.value = data.tree
-          expandedPaths.value = {}
-        } else {
-          error.value = data.error || 'Error al cargar el árbol'
-        }
-      } catch (err) {
-        error.value = err.message || 'Error de conexión'
-      } finally {
-        loading.value = false
-      }
-    }
-
     watch(() => props.sessionId, (newId) => {
-      if (newId) fetchTree()
+      if (newId) fileTreeStore.fetchTree(newId)
     }, { immediate: true })
 
     return {
-      tree, loading, error, expandedPaths,
-      flatTree, fetchTree,
-      getFileIcon, isExpanded, toggleDirectory, openFile,
+      tree: fileTreeStore.tree,
+      loading: fileTreeStore.loading,
+      error: fileTreeStore.error,
+      expandedPaths: fileTreeStore.expandedPaths,
+      flatTree: fileTreeStore.flatTree,
+      fetchTree: fileTreeStore.fetchTree,
+      getFileIcon,
+      isExpanded: fileTreeStore.isExpanded,
+      toggleDirectory: fileTreeStore.toggleDirectory,
+      openFile,
     }
   },
 }

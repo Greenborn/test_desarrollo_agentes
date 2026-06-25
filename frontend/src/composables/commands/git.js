@@ -7,13 +7,12 @@ register({
   category: 'Git',
   description: 'Ejecuta un comando de Git en el directorio de la sesión y muestra el resultado.',
   usage: '/git <comando>',
-  async execute(args, { cmdStore, chatStore }) {
+  async execute(args, { cmdStore, chatStore, sessionId }) {
     const command = args.join(' ');
     if (!command) {
       throw new Error('Debe especificar un comando git. Ej: /git status');
     }
 
-    const sessionId = chatStore.activeSessionId;
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.');
     }

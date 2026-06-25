@@ -85,8 +85,8 @@ export default {
       }
     }
 
-    watch(() => auth.user?.workspaceId, (newId, oldId) => {
-      if (newId && newId !== oldId) {
+    watch(() => JSON.stringify(auth.getWorkspaceIds()), (newVal, oldVal) => {
+      if (newVal && newVal !== oldVal) {
         projectStore.clearSelection()
         ticketStore.clearSelection()
         chat.stopAllExecutions()

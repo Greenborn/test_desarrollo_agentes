@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useTicketStore } from './ticket.js'
+import { useProjectStore } from './project.js'
 
 const API = '/api'
 
@@ -8,8 +10,13 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(true)
   const error = ref('')
 
-  function getWorkspaceId() {
-    return user.value?.workspaceId || 1
+  function getWorkspaceIds() {
+    return user.value?.workspaceIds || []
+  }
+
+  function getPrimaryWorkspaceId() {
+    const ids = getWorkspaceIds()
+    return ids.length > 0 ? ids[0] : 1
   }
 
   function forceLogout() {
@@ -18,11 +25,24 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
   }
 
-  function setWorkspaceId(id) {
+  function setWorkspaceIds(ids) {
     if (user.value) {
-      user.value = { ...user.value, workspaceId: id }
+      user.value = { ...user.value, workspaceIds: ids }
     }
   }
+
+  const activeWorkspaceId = computed(() => {
+    if (!user.value) return 1
+    const ticketStore = useTicketStore()
+    if (ticketStore.selectedTicket?.workspace_id) {
+      return ticketStore.selectedTicket.workspace_id
+    }
+    const projectStore = useProjectStore()
+    if (projectStore.selectedProject?.workspace_id) {
+      return projectStore.selectedProject.workspace_id
+    }
+    return getPrimaryWorkspaceId()
+  })
 
   async function checkSession() {
     try {
@@ -73,5 +93,5 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = false
   }
 
-  return { user, loading, error, getWorkspaceId, forceLogout, setWorkspaceId, login, logout, checkSession }
+  return { user, loading, error, getWorkspaceIds, getPrimaryWorkspaceId, activeWorkspaceId, forceLogout, setWorkspaceIds, login, logout, checkSession }
 })

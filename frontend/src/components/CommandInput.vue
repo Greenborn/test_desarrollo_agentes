@@ -141,9 +141,9 @@ export default {
 
       const known = find(cmdName)
 
-      await chatStore.runCommand(raw, async (loadingIdx) => {
+      await chatStore.runCommand(raw, async (loadingIdx, sid) => {
         if (known) {
-          return known.execute(parts.slice(1), { cmdStore, chatStore, projectStore, loadingIdx })
+          return known.execute(parts.slice(1), { cmdStore, chatStore, projectStore, loadingIdx, sessionId: sid })
         }
         if (!cmdName.startsWith('/')) return null
         const res = await fetch('/api/command/execute', {

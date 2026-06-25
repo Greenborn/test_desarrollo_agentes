@@ -236,6 +236,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { usePlaywrightLogsStore } from '../stores/playwrightLogs.js'
 import { useChatStore } from '../stores/chat.js'
 import { useProjectStore } from '../stores/project.js'
+import { useBrowserStore } from '../stores/browser.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useCommandStore } from '../stores/command.js'
 import { useSettingsStore } from '../stores/settings.js'
@@ -246,24 +247,20 @@ export default {
     const logsStore = usePlaywrightLogsStore()
     const chatStore = useChatStore()
     const projectStore = useProjectStore()
+    const browserStore = useBrowserStore()
     const cmdStore = useCommandStore()
     const settingsStore = useSettingsStore()
     const { find } = useCommandRegistry()
     const { selectedProject } = storeToRefs(projectStore)
+    const { hasBrowserSession, isRecording, currentRecordingId, selectedRecordingId, starting, stopping } = storeToRefs(browserStore)
 
     const containerRef = ref(null)
     const expandedId = ref(null)
     const clearing = ref(false)
-    const hasBrowserSession = ref(false)
     const newNameInputRef = ref(null)
     const contextMenu = ref({ show: false, x: 0, y: 0, event: null })
     const deletingEventId = ref(null)
 
-    const selectedRecordingId = ref(null)
-    const isRecording = ref(false)
-    const currentRecordingId = ref(null)
-    const starting = ref(false)
-    const stopping = ref(false)
     const recordError = ref('')
     const showNewRecordingInput = ref(false)
     const newRecordingName = ref('')
@@ -413,9 +410,9 @@ export default {
       startingInstancia.value = true
       try {
         const cmd = find('/despliegue_iniciar_instancia')
-        await chatStore.runCommand('/despliegue_iniciar_instancia', async (loadingIdx) => {
+        await chatStore.runCommand('/despliegue_iniciar_instancia', async (loadingIdx, sid) => {
           if (cmd) {
-            return cmd.execute([], { cmdStore, chatStore, loadingIdx })
+            return cmd.execute([], { cmdStore, chatStore, loadingIdx, sessionId: sid })
           }
           const res = await fetch('/api/command/execute', {
             method: 'POST',
@@ -437,60 +434,18 @@ export default {
     async function doStartRecording(recordingId) {
       const sessionId = activeSessionId.value
       if (!sessionId) return
-      starting.value = true
-      try {
-        const res = await fetch('/api/navegador/command', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            comando: 'start_event_recording',
-            parametros: { recording_id: recordingId },
-            sessionId,
-          }),
-        })
-        const data = await res.json()
-        if (data.error) {
-          recordError.value = data.error
-        } else {
-          isRecording.value = true
-          currentRecordingId.value = recordingId
-        }
-      } catch (err) {
-        console.error('Error al iniciar grabación:', err)
-        recordError.value = 'Error de conexión con el servicio de navegador'
-      } finally {
-        starting.value = false
+      const result = await browserStore.startRecording(recordingId, sessionId)
+      if (result.error) {
+        recordError.value = result.error
       }
     }
 
     async function stopRecording() {
       const sessionId = activeSessionId.value
       if (!sessionId) return
-      stopping.value = true
-      try {
-        const res = await fetch('/api/navegador/command', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            comando: 'stop_event_recording',
-            parametros: {},
-            sessionId,
-          }),
-        })
-        const data = await res.json()
-        if (data.error) {
-          recordError.value = data.error
-        } else {
-          isRecording.value = false
-          currentRecordingId.value = null
-        }
-      } catch (err) {
-        console.error('Error al detener grabación:', err)
-        recordError.value = 'Error de conexión con el servicio de navegador'
-      } finally {
-        stopping.value = false
+      const result = await browserStore.stopRecording(sessionId)
+      if (result.error) {
+        recordError.value = result.error
       }
     }
 
@@ -681,17 +636,7 @@ export default {
           const { action, event: evt } = actionEntries[i]
 
           try {
-            const execRes = await fetch('/api/navegador/command', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                comando: 'execute_action',
-                parametros: { action },
-                sessionId: activeSessionId.value,
-              }),
-            })
-            const execData = await execRes.json()
+            const execData = await browserStore.executeAction(action, activeSessionId.value)
             if (execData.error) throw new Error(execData.error)
 
             const desc = describeAction(evt)
@@ -758,14 +703,7 @@ export default {
     }
 
     async function fetchStatus() {
-      try {
-        const res = await fetch('/api/navegador/status', { credentials: 'include' })
-        const data = await res.json()
-        hasBrowserSession.value = !!data.hasActiveSession
-      } catch (err) {
-        console.error('Error al verificar estado del navegador:', err.message)
-        hasBrowserSession.value = false
-      }
+      await browserStore.fetchStatus()
     }
 
     async function pollRecordings() {

@@ -7,8 +7,7 @@ register({
   category: 'Navegador',
   description: 'Inicia la grabación de eventos de usuario en el navegador (clicks, inputs, keydown, scroll, focus, blur, submit, change).',
   usage: '/navegador_eventos_iniciar',
-  async execute(args, { chatStore }) {
-    const sessionId = chatStore.activeSessionId
+  async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }

@@ -7,8 +7,7 @@ register({
   category: 'Utilidades',
   description: 'Abre un formulario inline para crear un nuevo ticket en Redmine: seleccionar proyecto, asunto, descripción, estado, prioridad, asignado y % de avance.',
   usage: '/redmine_crear_ticket',
-  async execute(args, { chatStore }) {
-    const sessionId = chatStore.activeSessionId
+  async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }

@@ -7,8 +7,7 @@ register({
   category: 'Desarrollo',
   description: 'Crea una rama Git a partir del proyecto y ticket de la sesión, usando una rama base seleccionable. Requiere que el directorio de trabajo sea un repositorio Git.',
   usage: '/dev_git_crear_rama',
-  async execute(args, { chatStore }) {
-    const sessionId = chatStore.activeSessionId
+  async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }

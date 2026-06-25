@@ -7,8 +7,7 @@ register({
   category: 'Desarrollo',
   description: 'Cambia a la rama Git asociada al ticket de la sesión actual. Valida que no haya cambios sin comitear, que la sesión tenga ticket asignado y que la rama exista.',
   usage: '/dev_git_ir_rama_ticket',
-  async execute(args, { chatStore }) {
-    const sessionId = chatStore.activeSessionId
+  async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }

@@ -92,9 +92,6 @@ router.delete('/:id', async (req, res) => {
     if (!ws) {
       return res.status(404).json({ error: 'Workspace no encontrado' });
     }
-    if (ws.is_default) {
-      return res.status(400).json({ error: 'No se puede eliminar el workspace por defecto' });
-    }
 
     await db('chat_sessions').where({ workspace_id: req.params.id }).del();
     await db('tickets').where({ workspace_id: req.params.id }).del();
@@ -132,6 +129,51 @@ router.post('/stop-all', async (req, res) => {
   }
 });
 
+router.post('/select', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    let { workspaceIds } = req.body;
+    if (!Array.isArray(workspaceIds) || workspaceIds.length === 0) {
+      return res.status(400).json({ error: 'workspaceIds debe ser un array no vacío' });
+    }
+
+    const existingIds = new Set((await db('workspaces').select('id')).map(w => w.id));
+    const invalid = workspaceIds.filter(id => !existingIds.has(id));
+    if (invalid.length > 0) {
+      return res.status(400).json({ error: `Workspaces no encontrados: ${invalid.join(', ')}` });
+    }
+
+    const oldIds = req.session.workspaceIds || [1];
+    const removed = oldIds.filter(id => !workspaceIds.includes(id));
+
+    if (removed.length > 0) {
+      opencode.stopAllServers();
+      try {
+        await fetch(`${PW_URL}/api/command`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comando: 'close_all' }),
+        });
+      } catch (e) {
+        console.log('[workspaces] error al cerrar navegadores:', e.message);
+      }
+    }
+
+    req.session.workspaceIds = workspaceIds;
+    await new Promise((resolve) => req.session.save(resolve));
+
+    await db('user_settings')
+      .insert({ user_id: req.session.userId, key: 'selected_workspace_id', value: JSON.stringify(workspaceIds) })
+      .onConflict(['user_id', 'key'])
+      .merge();
+
+    res.json({ success: true, workspaceIds });
+  } catch (err) {
+    console.log('Error al seleccionar workspaces:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/switch', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
@@ -145,6 +187,11 @@ router.post('/switch', async (req, res) => {
       return res.status(400).json({ error: 'Workspace no encontrado' });
     }
 
+    const oldIds = req.session.workspaceIds || [1];
+    const newSet = new Set(oldIds);
+    newSet.add(workspaceId);
+    const newIds = Array.from(newSet);
+
     opencode.stopAllServers();
 
     try {
@@ -157,15 +204,15 @@ router.post('/switch', async (req, res) => {
       console.log('[workspaces] error al cerrar navegadores:', e.message);
     }
 
-    req.session.workspaceId = workspaceId;
+    req.session.workspaceIds = newIds;
     await new Promise((resolve) => req.session.save(resolve));
 
     await db('user_settings')
-      .insert({ user_id: req.session.userId, key: 'selected_workspace_id', value: String(workspaceId) })
+      .insert({ user_id: req.session.userId, key: 'selected_workspace_id', value: JSON.stringify(newIds) })
       .onConflict(['user_id', 'key'])
       .merge();
 
-    res.json({ success: true, workspaceId });
+    res.json({ success: true, workspaceId, workspaceIds: newIds });
   } catch (err) {
     console.log('Error al cambiar workspace:', err.message);
     res.status(500).json({ success: false, error: err.message });

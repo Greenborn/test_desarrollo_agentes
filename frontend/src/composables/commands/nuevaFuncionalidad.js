@@ -9,8 +9,7 @@ register({
   category: 'Desarrollo',
   description: 'Inicia el wizard para relevar y desarrollar una nueva funcionalidad',
   usage: '/dev_funcionalidad_crear',
-  async execute(args, { chatStore }) {
-    const sessionId = chatStore.activeSessionId;
+  async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.');
     }

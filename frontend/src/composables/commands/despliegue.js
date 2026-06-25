@@ -34,8 +34,7 @@ register({
   category: 'Despliegue',
   description: 'Lee deploy.json del directorio del proyecto y guarda la configuración de despliegue en la base de datos.',
   usage: '/despliegue_actualizar_config',
-  async execute(args, { chatStore }) {
-    const sessionId = chatStore.activeSessionId;
+  async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.');
     }
@@ -61,8 +60,7 @@ register({
   category: 'Despliegue',
   description: 'Muestra la configuración de despliegue guardada para el proyecto actual.',
   usage: '/despliegue_mostrar_config',
-  async execute(args, { chatStore }) {
-    const sessionId = chatStore.activeSessionId;
+  async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.');
     }
@@ -112,8 +110,7 @@ register({
       }))
     );
   },
-  async execute(args, { chatStore }) {
-    const sessionId = chatStore.activeSessionId;
+  async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.');
     }

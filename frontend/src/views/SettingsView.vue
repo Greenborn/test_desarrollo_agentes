@@ -322,12 +322,12 @@
         <div v-if="matches('ambientes entorno dev tst prd')" class="border-top border-secondary pt-3">
           <label class="form-label mb-2 fw-bold">Ambientes</label>
           <div class="small text-muted mb-2">Ambientes de trabajo con rama y descripción</div>
-          <div v-for="(env, i) in environmentsList" :key="env.id || i" class="d-flex gap-2 mb-1 align-items-center">
-            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 80px;" placeholder="nombre" v-model="environmentsList[i].name" />
-            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 100px;" placeholder="rama" v-model="environmentsList[i].branch" />
-            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" style="flex: 1;" placeholder="descripción" v-model="environmentsList[i].description" />
-            <button class="btn btn-sm btn-outline-argentina" @click="saveEnvironment(i)" title="Guardar">✓</button>
-            <button class="btn btn-sm btn-outline-danger" @click="deleteEnvironment(i)" title="Eliminar" v-if="environmentsList[i].id">✕</button>
+          <div v-for="(env, i) in envStore.list" :key="env.id || i" class="d-flex gap-2 mb-1 align-items-center">
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 80px;" placeholder="nombre" v-model="envStore.list[i].name" />
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 100px;" placeholder="rama" v-model="envStore.list[i].branch" />
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" style="flex: 1;" placeholder="descripción" v-model="envStore.list[i].description" />
+            <button class="btn btn-sm btn-outline-argentina" @click="envStore.save(i, selectedWId)" title="Guardar">✓</button>
+            <button class="btn btn-sm btn-outline-danger" @click="envStore.remove(i)" title="Eliminar" v-if="envStore.list[i].id">✕</button>
           </div>
           <div class="d-flex gap-2 mt-2 align-items-center">
             <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 80px;" placeholder="nombre" v-model="newEnvName" />
@@ -343,6 +343,7 @@
       <div v-if="settings.saveSuccess" class="alert alert-success py-2 small mb-0">{{ settings.saveSuccess }}</div>
       <div v-if="settings.saveError" class="alert alert-danger py-2 small mb-0">{{ settings.saveError }}</div>
       <div v-if="wsMessage" class="alert alert-info py-2 small mb-0">{{ wsMessage }}</div>
+      <div v-if="envStore.message" class="alert alert-info py-2 small mb-0">{{ envStore.message }}</div>
     </div>
   </div>
 </template>
@@ -355,6 +356,7 @@ import { useWorkspaceStore } from '../stores/workspace.js'
 import { useChatStore } from '../stores/chat.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useModalStore } from '../stores/modal.js'
+import { useEnvironmentsStore } from '../stores/environments.js'
 
 export default {
   setup() {
@@ -363,6 +365,7 @@ export default {
     const chatStore = useChatStore()
     const auth = useAuthStore()
     const modal = useModalStore()
+    const envStore = useEnvironmentsStore()
     const { workspaces } = storeToRefs(wsStore)
 
     const keyInput = ref('')
@@ -394,7 +397,6 @@ export default {
     const newResId = ref('')
     const newResWidth = ref(1920)
     const newResHeight = ref(1080)
-    const environmentsList = ref([])
     const replayIntervalInput = ref(1000)
     const newEnvName = ref('')
     const newEnvBranch = ref('')
@@ -426,12 +428,12 @@ export default {
 
     onMounted(async () => {
       await wsStore.loadWorkspaces()
-      selectedWId.value = auth.getWorkspaceId()
+      selectedWId.value = auth.getPrimaryWorkspaceId()
       if (!selectedWId.value || !workspaces.value.find(w => w.id === selectedWId.value)) {
         selectedWId.value = 1
       }
-      await settings.load()
-      await loadEnvironments()
+      await settings.load(selectedWId.value)
+      await envStore.load(selectedWId.value)
     })
 
     watch(() => settings.systemPrompt, (val) => {
@@ -504,37 +506,14 @@ export default {
 
     async function reloadSettings() {
       settings.clearFeedback()
-      await settings.load()
-      await loadEnvironments()
+      await settings.load(selectedWId.value)
+      await envStore.load(selectedWId.value)
     }
 
     async function onWorkspaceChange() {
       const newId = selectedWId.value
-      const oldId = auth.getWorkspaceId()
-      if (newId === oldId) return
-
-      const hasProcesses = chatStore.executing || chatStore.streaming
-      if (hasProcesses) {
-        const confirmed = confirm('Se detendrán todos los procesos en ejecución. ¿Desea cambiar de espacio de trabajo?')
-        if (!confirmed) {
-          selectedWId.value = oldId
-          return
-        }
-      }
-
-      wsMessage.value = 'Deteniendo procesos y cambiando espacio de trabajo...'
-      const result = await wsStore.selectWorkspace(newId)
-      if (result.success) {
-        auth.setWorkspaceId(newId)
-        chatStore.stopAllExecutions()
-        await wsStore.loadWorkspaces()
-        await reloadSettings()
-        wsMessage.value = 'Espacio de trabajo cambiado correctamente.'
-        setTimeout(() => { wsMessage.value = '' }, 3000)
-      } else {
-        wsMessage.value = 'Error al cambiar de espacio de trabajo.'
-        selectedWId.value = oldId
-      }
+      await settings.load(newId)
+      await envStore.load(newId)
     }
 
     async function promptCreate() {
@@ -575,12 +554,15 @@ export default {
       if (result.success) {
         workspaces.value = workspaces.value.filter(w => w.id !== ws.id)
         selectedWId.value = 1
-        auth.setWorkspaceId(1)
-        await wsStore.selectWorkspace(1)
+        const currentIds = auth.getWorkspaceIds()
+        auth.setWorkspaceIds(currentIds.filter(id => id !== ws.id))
+        if (currentIds.includes(ws.id)) {
+          await wsStore.selectWorkspaces(auth.getWorkspaceIds())
+        }
         chatStore.stopAllExecutions()
         await wsStore.loadWorkspaces()
         await reloadSettings()
-        wsMessage.value = 'Espacio de trabajo eliminado. Cambiado a "Por Defecto".'
+        wsMessage.value = 'Espacio de trabajo eliminado.'
         setTimeout(() => { wsMessage.value = '' }, 3000)
       } else {
         wsMessage.value = result.error || 'Error al eliminar.'
@@ -589,68 +571,68 @@ export default {
 
     function saveKey() {
       settings.clearFeedback()
-      settings.save('deepseek_key', keyInput.value)
+      settings.save('deepseek_key', keyInput.value, selectedWId.value)
     }
 
     function saveRedmineToken() {
       settings.clearFeedback()
-      settings.save('redmine_token', redmineTokenInput.value)
+      settings.save('redmine_token', redmineTokenInput.value, selectedWId.value)
     }
 
     function saveRedmineUrl() {
       settings.clearFeedback()
-      settings.save('redmine_url', redmineUrlInput.value)
+      settings.save('redmine_url', redmineUrlInput.value, selectedWId.value)
     }
 
     function savePrompt() {
       settings.clearFeedback()
-      settings.save('system_prompt', promptInput.value)
+      settings.save('system_prompt', promptInput.value, selectedWId.value)
     }
 
     function saveDoc(tipo) {
       settings.clearFeedback()
-      settings.save('documentacion_prompt_' + tipo, DOC_INPUTS[tipo].value)
+      settings.save('documentacion_prompt_' + tipo, DOC_INPUTS[tipo].value, selectedWId.value)
     }
 
     function saveOmnifilterDebounce() {
       settings.clearFeedback()
-      settings.save('omnifilter_debounce_ms', String(omnifilterDebounceInput.value))
+      settings.save('omnifilter_debounce_ms', String(omnifilterDebounceInput.value), selectedWId.value)
     }
 
     function saveDescripcionPrompt() {
       settings.clearFeedback()
-      settings.save('ticket_descripcion_prompt', descripcionPromptInput.value)
+      settings.save('ticket_descripcion_prompt', descripcionPromptInput.value, selectedWId.value)
     }
 
     function saveRepoAcronimo() {
       settings.clearFeedback()
-      settings.save('repo_acronimo', repoAcronimoInput.value)
+      settings.save('repo_acronimo', repoAcronimoInput.value, selectedWId.value)
     }
 
     function saveRefinarPrompt() {
       settings.clearFeedback()
-      settings.save('ticket_refinar_prompt', refinarPromptInput.value)
+      settings.save('ticket_refinar_prompt', refinarPromptInput.value, selectedWId.value)
     }
 
     function saveDeteccionPrompt() {
       settings.clearFeedback()
-      settings.save('deteccion_funcionalidades_prompt', deteccionPromptInput.value)
+      settings.save('deteccion_funcionalidades_prompt', deteccionPromptInput.value, selectedWId.value)
     }
 
     function saveCodeConfig() {
       settings.clearFeedback()
-      settings.save('code_file_extensions', codeExtensionsInput.value)
-      settings.save('code_file_max_size_kb', String(codeMaxSizeInput.value))
+      settings.save('code_file_extensions', codeExtensionsInput.value, selectedWId.value)
+      settings.save('code_file_max_size_kb', String(codeMaxSizeInput.value), selectedWId.value)
     }
 
     function saveLocale() {
       settings.clearFeedback()
-      settings.save('locale', localeInput.value)
+      settings.save('locale', localeInput.value, selectedWId.value)
     }
 
     function saveReplayInterval() {
       settings.clearFeedback()
-      settings.save('replay_interval_ms', String(replayIntervalInput.value))
+      settings.save('replay_interval_ms', String(replayIntervalInput.value), selectedWId.value)
     }
 
     function savePriorityColor(key) {
@@ -662,7 +644,7 @@ export default {
         priority_color_urgent: priorityColorUrgentInput,
         priority_color_immediate: priorityColorImmediateInput,
       }
-      settings.save(key, inputMap[key].value)
+      settings.save(key, inputMap[key].value, selectedWId.value)
     }
 
     function addResolution() {
@@ -701,102 +683,21 @@ export default {
     function saveResolutions() {
       const valid = resolutionsEdit.value.filter(r => r.id && r.id.trim() && r.width > 0 && r.height > 0)
       if (valid.length === 0) return
-      settings.save('screen_resolutions', JSON.stringify(valid))
-    }
-
-    async function loadEnvironments() {
-      try {
-        const res = await fetch('/api/environments', { credentials: 'include' })
-        const data = await res.json()
-        environmentsList.value = data.environments || []
-      } catch (err) {
-        console.error('Error al cargar ambientes:', err.message)
-      }
-    }
-
-    async function saveEnvironment(index) {
-      const env = environmentsList.value[index]
-      if (!env.name || !env.branch) {
-        wsMessage.value = 'Nombre y rama son requeridos'
-        setTimeout(() => { wsMessage.value = '' }, 3000)
-        return
-      }
-      try {
-        const res = await fetch(`/api/environments/${env.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ name: env.name, branch: env.branch, description: env.description }),
-        })
-        const data = await res.json()
-        if (data.success) {
-          wsMessage.value = 'Ambiente actualizado.'
-        } else {
-          wsMessage.value = data.error || 'Error al actualizar ambiente'
-        }
-      } catch (err) {
-        console.error('Error al guardar ambiente:', err.message)
-        wsMessage.value = 'Error al guardar ambiente'
-      }
-      setTimeout(() => { wsMessage.value = '' }, 3000)
+      settings.save('screen_resolutions', JSON.stringify(valid), selectedWId.value)
     }
 
     async function addEnvironment() {
-      if (!newEnvName.value.trim() || !newEnvBranch.value.trim()) {
-        wsMessage.value = 'Nombre y rama son requeridos'
-        setTimeout(() => { wsMessage.value = '' }, 3000)
-        return
+      await envStore.add({
+        name: newEnvName.value.trim(),
+        branch: newEnvBranch.value.trim(),
+        description: newEnvDescription.value.trim(),
+        workspaceId: selectedWId.value,
+      })
+      if (envStore.message === 'Ambiente creado.') {
+        newEnvName.value = ''
+        newEnvBranch.value = ''
+        newEnvDescription.value = ''
       }
-      try {
-        const res = await fetch('/api/environments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            name: newEnvName.value.trim(),
-            branch: newEnvBranch.value.trim(),
-            description: newEnvDescription.value.trim() || null,
-          }),
-        })
-        const data = await res.json()
-        if (data.success) {
-          environmentsList.value.push(data.environment)
-          newEnvName.value = ''
-          newEnvBranch.value = ''
-          newEnvDescription.value = ''
-          wsMessage.value = 'Ambiente creado.'
-        } else {
-          wsMessage.value = data.error || 'Error al crear ambiente'
-        }
-      } catch (err) {
-        console.error('Error al crear ambiente:', err.message)
-        wsMessage.value = 'Error al crear ambiente'
-      }
-      setTimeout(() => { wsMessage.value = '' }, 3000)
-    }
-
-    async function deleteEnvironment(index) {
-      const env = environmentsList.value[index]
-      if (!env.id) return
-      const confirmed = confirm(`¿Eliminar ambiente "${env.name}"?`)
-      if (!confirmed) return
-      try {
-        const res = await fetch(`/api/environments/${env.id}`, {
-          method: 'DELETE',
-          credentials: 'include',
-        })
-        const data = await res.json()
-        if (data.success) {
-          environmentsList.value.splice(index, 1)
-          wsMessage.value = 'Ambiente eliminado.'
-        } else {
-          wsMessage.value = data.error || 'Error al eliminar ambiente'
-        }
-      } catch (err) {
-        console.error('Error al eliminar ambiente:', err.message)
-        wsMessage.value = 'Error al eliminar ambiente'
-      }
-      setTimeout(() => { wsMessage.value = '' }, 3000)
     }
 
     function triggerImport() {
@@ -910,13 +811,13 @@ export default {
       priorityColorUrgentInput, priorityColorImmediateInput,
       settings, workspaces, selectedWId, wsMessage,
       resolutionsEdit, newResId, newResWidth, newResHeight,
-      environmentsList, newEnvName, newEnvBranch, newEnvDescription,
+      newEnvName, newEnvBranch, newEnvDescription,
       replayIntervalInput,
       saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
       saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveDeteccionPrompt, saveCodeConfig, saveRepoAcronimo,
       saveLocale, savePriorityColor, saveReplayInterval,
       addResolution, removeResolution, resetResolutions, saveResolutions, matches,
-      saveEnvironment, addEnvironment, deleteEnvironment,
+      envStore, wsMessage,
       onWorkspaceChange, promptCreate, promptRename, confirmDelete,
       exportAllConfig, handleImport, triggerImport, importInput,
       exportFullState, handleImportState, triggerImportState, importStateInput,

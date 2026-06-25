@@ -115,9 +115,8 @@ register({
     if (!hasUrl) suggestions.push('--url=')
     cmdStore.showAutocomplete(suggestions)
   },
-  async execute(args, { chatStore, loadingIdx }) {
+  async execute(args, { chatStore, loadingIdx, sessionId }) {
     const { navegador, url, resolutionId } = parseArgs(args)
-    const sessionId = chatStore.activeSessionId
 
     if (navegador !== 'chrome' && navegador !== 'firefox') {
       throw new Error(`Navegador no soportado: "${navegador}". Usa chrome o firefox.`)
@@ -175,11 +174,11 @@ register({
       const parts = [`${navegador} iniciado correctamente`]
       if (url) parts.push(`navegó a ${url}`)
       if (resolution) parts.push(`resolución: ${resolution.width}x${resolution.height}`)
-      chatStore.messages.push({
+      chatStore.pushMessage({
         role: 'result',
         content: parts.join(', '),
         _key: 'result-' + Date.now(),
-      })
+      }, sessionId)
     } catch (err) {
       console.error('Error en /navegador_iniciar:', err.message)
       throw err

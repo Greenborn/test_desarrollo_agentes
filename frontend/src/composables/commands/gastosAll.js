@@ -7,8 +7,7 @@ register({
   category: 'Gastos',
   description: 'Muestra todos los registros de gastos de tokens.',
   usage: '/gastos_listar',
-  async execute(args, { chatStore }) {
-    const sessionId = chatStore.activeSessionId;
+  async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.');
     }

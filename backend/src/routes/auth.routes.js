@@ -7,7 +7,7 @@ const router = Router();
 function getUser(req) {
   const userId = req.session?.userId;
   if (!userId) return null;
-  return { id: userId, username: req.session.username, role: req.session.role, workspaceId: req.session.workspaceId || 1 };
+  return { id: userId, username: req.session.username, role: req.session.role, workspaceIds: req.session.workspaceIds || [1] };
 }
 
 router.get('/me', (req, res) => {
@@ -30,7 +30,16 @@ router.post('/login', async (req, res) => {
     req.session.username = user.username;
     req.session.role = user.role;
     const userWs = await db('user_settings').where({ user_id: user.id, key: 'selected_workspace_id' }).first();
-    req.session.workspaceId = userWs ? parseInt(userWs.value, 10) : 1;
+    let wsIds = [1];
+    if (userWs) {
+      try {
+        const parsed = JSON.parse(userWs.value);
+        wsIds = Array.isArray(parsed) ? parsed : [parseInt(userWs.value, 10) || 1];
+      } catch {
+        wsIds = [parseInt(userWs.value, 10) || 1];
+      }
+    }
+    req.session.workspaceIds = wsIds;
     await new Promise((resolve) => req.session.save(resolve));
     res.json({
       success: true,

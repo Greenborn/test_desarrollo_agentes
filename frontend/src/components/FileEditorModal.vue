@@ -29,7 +29,8 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
+import { useFileEditorStore } from '../stores/fileEditor.js'
 
 export default {
   props: {
@@ -37,65 +38,23 @@ export default {
   },
   emits: ['close'],
   setup(props) {
-    const content = ref('')
-    const originalContent = ref('')
-    const loading = ref(true)
-    const saving = ref(false)
-    const saved = ref(false)
-    const error = ref(null)
+    const editorStore = useFileEditorStore()
 
-    const dirty = computed(() => content.value !== originalContent.value)
-
-    async function loadFile() {
-      loading.value = true
-      error.value = null
-      try {
-        const res = await fetch(`/api/command/read-file?path=${encodeURIComponent(props.filePath)}`, {
-          credentials: 'include',
-        })
-        const data = await res.json()
-        if (data.success) {
-          content.value = data.content
-          originalContent.value = data.content
-        } else {
-          error.value = data.error || 'Error al leer el archivo'
-        }
-      } catch (err) {
-        error.value = err.message || 'Error de conexión'
-      } finally {
-        loading.value = false
-      }
+    function save() {
+      editorStore.save(props.filePath)
     }
 
-    async function save() {
-      saving.value = true
-      saved.value = false
-      error.value = null
-      try {
-        const res = await fetch('/api/command/write-file', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ path: props.filePath, content: content.value }),
-        })
-        const data = await res.json()
-        if (data.success) {
-          originalContent.value = content.value
-          saved.value = true
-          setTimeout(() => { saved.value = false }, 2000)
-        } else {
-          error.value = data.error || 'Error al guardar el archivo'
-        }
-      } catch (err) {
-        error.value = err.message || 'Error de conexión'
-      } finally {
-        saving.value = false
-      }
+    onMounted(() => editorStore.loadFile(props.filePath))
+
+    return {
+      content: editorStore.content,
+      loading: editorStore.loading,
+      saving: editorStore.saving,
+      saved: editorStore.saved,
+      error: editorStore.error,
+      dirty: editorStore.dirty,
+      save,
     }
-
-    onMounted(loadFile)
-
-    return { content, loading, saving, saved, error, dirty, save }
   },
 }
 </script>

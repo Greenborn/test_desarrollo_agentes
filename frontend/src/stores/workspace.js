@@ -5,7 +5,7 @@ const API = '/api'
 
 export const useWorkspaceStore = defineStore('workspace', () => {
   const workspaces = ref([])
-  const selectedId = ref(1)
+  const selectedIds = ref([1])
   const loading = ref(false)
 
   async function loadWorkspaces() {
@@ -20,26 +20,30 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
-  async function selectWorkspace(id) {
+  async function selectWorkspaces(ids) {
     try {
       loading.value = true
-      const res = await fetch(`${API}/workspaces/switch`, {
+      const res = await fetch(`${API}/workspaces/select`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ workspaceId: id }),
+        body: JSON.stringify({ workspaceIds: ids }),
       })
       const data = await res.json()
       if (data.success) {
-        selectedId.value = id
+        selectedIds.value = data.workspaceIds
       }
       return data
     } catch (err) {
-      console.error('Error al cambiar workspace:', err)
+      console.error('Error al seleccionar workspaces:', err)
       return { success: false, error: err.message }
     } finally {
       loading.value = false
     }
+  }
+
+  function getPrimaryWorkspaceId() {
+    return selectedIds.value[0] || 1
   }
 
   async function createWorkspace(name) {
@@ -108,8 +112,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   return {
-    workspaces, selectedId, loading,
-    loadWorkspaces, selectWorkspace, createWorkspace,
+    workspaces, selectedIds, loading,
+    loadWorkspaces, selectWorkspaces, getPrimaryWorkspaceId, createWorkspace,
     updateWorkspace, deleteWorkspace, stopAllProcesses,
   }
 })

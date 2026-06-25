@@ -77,13 +77,12 @@ Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
 
 ### `GET /api/settings`
 - **Auth:** Requerida
-- **Workspace:** Filtra por `workspace_id` de la sesión
-- **Respuesta:** `{ deepseek_key: string (mascarado), system_prompt: string|null, omnifilter_debounce_ms: string|null, screen_resolutions: [{ id: string, width: number, height: number }] }`
+- **Query:** `?workspace_id=X` (opcional, default: primary workspace)
+- **Respuesta:** `{ deepseek_key: string (mascarado), system_prompt: string|null, ... }`
 
 ### `POST /api/settings`
 - **Auth:** Requerida
-- **Workspace:** Guarda con `workspace_id` de la sesión
-- **Body:** `{ key: string, value: string }`
+- **Body:** `{ key: string, value: string, workspace_id?: number }` — si no se envía `workspace_id`, usa el primary
 - Si `key === "deepseek_key"` se encripta con AES-256-CBC antes de almacenar
 - Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `omnifilter_debounce_ms`, `screen_resolutions`
 - **Respuesta:** `{ success: true }`
@@ -486,13 +485,13 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ### `GET /api/workspaces`
 - **Auth:** Requerida
-- **Respuesta:** `{ workspaces: [{ id, name, is_default, created_at }] }`
+- **Respuesta:** `{ workspaces: [{ id, name, created_at }] }`
 
 ### `POST /api/workspaces`
 - **Auth:** Requerida
 - **Body:** `{ name: string }`
-- **Descripción:** Crea un workspace y copia las settings del workspace por defecto (id=1)
-- **Respuesta 201:** `{ success: true, workspace: { id, name, is_default, created_at } }`
+- **Descripción:** Crea un workspace y copia las settings del workspace con id=1
+- **Respuesta 201:** `{ success: true, workspace: { id, name, created_at } }`
 - **Respuesta 400:** `{ error: "El nombre es requerido" }`
 
 ### `PUT /api/workspaces/:id`
@@ -503,21 +502,26 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ### `DELETE /api/workspaces/:id`
 - **Auth:** Requerida
-- **Descripción:** Elimina el workspace y sus datos asociados en cascada (chat_sessions, proyectos, tickets, settings). Rechaza si es el workspace por defecto.
+- **Descripción:** Elimina el workspace y sus datos asociados en cascada (chat_sessions, proyectos, tickets, settings, environments).
 - **Respuesta:** `{ success: true }`
-- **Respuesta 400:** `{ error: "No se puede eliminar el workspace por defecto" }`
 
 ### `POST /api/workspaces/stop-all`
 - **Auth:** Requerida
 - **Descripción:** Detiene servidores OpenCode y sesiones de navegador activas (sin cambiar de workspace)
 - **Respuesta:** `{ success: true }`
 
-### `POST /api/workspaces/switch`
+### `POST /api/workspaces/select`
+- **Auth:** Requerida
+- **Body:** `{ workspaceIds: number[] }` — array con al menos un ID
+- **Descripción:** Selecciona los workspaces activos. Detiene procesos si se deseleccionó alguno. Guarda array JSON en `user_settings`. Sin restricciones de selección.
+- **Respuesta:** `{ success: true, workspaceIds }`
+- **Respuesta 400:** `{ error: "workspaceIds debe ser un array no vacío" }` o si algún ID no existe
+
+### `POST /api/workspaces/switch` (deprecado, usar `/select`)
 - **Auth:** Requerida
 - **Body:** `{ workspaceId: number }`
-- **Descripción:** Detiene procesos activos, cambia `workspaceId` en la sesión HTTP
-- **Respuesta:** `{ success: true, workspaceId }`
-- **Respuesta 400:** `{ error: "workspaceId es requerido" }` o `{ error: "Workspace no encontrado" }`
+- **Descripción:** Compatibilidad hacia atrás. Agrega el workspaceId a la selección actual.
+- **Respuesta:** `{ success: true, workspaceId, workspaceIds }`
 
 ---
 
@@ -525,13 +529,14 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ### `GET /api/environments`
 - **Auth:** Requerida
-- **Workspace:** Filtra por `workspace_id` de la sesión
-- **Descripción:** Lista los ambientes configurados (DEV, TST, PRD, etc.) con su rama y descripción
-- **Respuesta 200:** `{ environments: [{ id, name, branch, description, created_at, updated_at }] }`
+- **Workspace:** Filtra por `workspace_id IN (session.workspaceIds)`
+- **Descripción:** Lista los ambientes de todos los workspaces seleccionados
+- **Respuesta 200:** `{ environments: [{ id, name, branch, description, created_at, updated_at, workspace_id }] }`
 
 ### `POST /api/environments`
 - **Auth:** Requerida
-- **Workspace:** Asigna `workspace_id` de la sesión
+- **Body:** `{ name, branch, description?, workspace_id? }` — si no se envía `workspace_id`, usa el primary
+- **Workspace:** Validado contra `session.workspaceIds`
 - **Body:** `{ name: string, branch: string, description?: string }`
 - **Descripción:** Crea un nuevo ambiente. El nombre y la rama son obligatorios. `(workspace_id, name)` debe ser único.
 - **Respuesta 201:** `{ success: true, environment: { id, name, branch, description, ... } }`

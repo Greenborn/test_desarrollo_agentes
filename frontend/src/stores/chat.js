@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useAuthStore } from './auth.js'
 
 const API = '/api'
 
@@ -45,12 +46,14 @@ export const useChatStore = defineStore('chat', () => {
   async function createSession(cwd) {
     creating.value = true
     try {
-      const body = cwd ? JSON.stringify({ cwd }) : undefined
+      const auth = useAuthStore()
+      const payload = { workspace_id: auth.activeWorkspaceId }
+      if (cwd) payload.cwd = cwd
       const res = await fetch(`${API}/chat/sessions`, {
         method: 'POST',
-        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body,
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (data.error) {
@@ -118,7 +121,7 @@ export const useChatStore = defineStore('chat', () => {
     messages.value.push({ role: 'result', content: '⏳ Ejecutando comando...', _key: loadingKey })
 
     try {
-      const result = await executeFn(loadingIdx)
+      const result = await executeFn(loadingIdx, sid)
       await _saveCommandMessages(sid, raw, result)
       if (Number(activeSessionId.value) === Number(sid)) {
         const idx = messages.value.findIndex(m => m._key === loadingKey)
@@ -413,11 +416,17 @@ export const useChatStore = defineStore('chat', () => {
     _sessionStreamCache.value = {}
   }
 
-  function pushMessage(msg) {
-    messages.value.push(msg)
+  async function pushMessage(msg, targetSessionId) {
+    const sid = targetSessionId || activeSessionId.value
+    if (!sid || Number(sid) === Number(activeSessionId.value)) {
+      messages.value.push(msg)
+    } else {
+      await _saveMessageToDb(sid, msg)
+    }
   }
 
-  function updateMessageByKey(key, updates) {
+  function updateMessageByKey(key, updates, targetSessionId) {
+    if (targetSessionId && Number(targetSessionId) !== Number(activeSessionId.value)) return -1
     const idx = messages.value.findIndex(m => (m.id || m._key) === key)
     if (idx >= 0) {
       messages.value[idx] = { ...messages.value[idx], ...updates }
@@ -425,7 +434,8 @@ export const useChatStore = defineStore('chat', () => {
     return idx
   }
 
-  function updateMessageAt(idx, msg) {
+  function updateMessageAt(idx, msg, targetSessionId) {
+    if (targetSessionId && Number(targetSessionId) !== Number(activeSessionId.value)) return
     if (idx >= 0 && idx < messages.value.length) {
       messages.value[idx] = msg
     }
@@ -439,7 +449,8 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  function findMessageIndex(key) {
+  function findMessageIndex(key, targetSessionId) {
+    if (targetSessionId && Number(targetSessionId) !== Number(activeSessionId.value)) return -1
     return messages.value.findIndex(m => (m.id || m._key) === key)
   }
 

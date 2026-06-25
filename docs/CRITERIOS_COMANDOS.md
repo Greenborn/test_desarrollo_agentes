@@ -407,3 +407,85 @@ Todo comando que implique un cambio de rama Git (crear, checkout, merge, etc.) *
 2. **Mecanismo:** usar el store o evento correspondiente para actualizar el estado, no recargar la página.
 3. **Validación:** antes del cambio de rama validar que no haya cambios sin comitear. Si los hay, informar al usuario y abortar (salvo que el comando documente explícitamente otro comportamiento).
 4. **Comandos passthrough `/git`:** al ser una puerta genérica a Git, no pueden actualizar componentes automáticamente. Después de ejecutar un `/git checkout`, `/git branch`, `/git merge`, etc., se debe refrescar la rama actual consultando el directorio de trabajo.
+
+---
+
+## 16. Enrutamiento de resultados a la sesión originadora
+
+Todo comando debe mostrar sus resultados en la sesión de chat que lo inició, independientemente de cuál sea la sesión actualmente seleccionada en la UI.
+
+### Reglas
+
+1. **Nunca usar `chatStore.activeSessionId` dentro de `execute()`** para obtener el ID de sesión. El ID de la sesión originadora debe obtenerse del contexto que `runCommand` provee.
+
+2. **Nunca llamar `chatStore.pushMessage()` ni `chatStore.messages.push()` directamente** desde un comando, porque esos métodos operan sobre la sesión actualmente activa, no sobre la sesión originadora.
+
+3. Para enviar mensajes a la sesión originadora, el comando debe retornar el resultado desde `execute()`. `runCommand` se encarga de enrutarlo a la sesión correcta: inline si sigue siendo la activa, o via notificación + persistencia en DB si cambió.
+
+4. Si un comando necesita emitir múltiples mensajes progresivos, debe usar `chatStore.pushMessage()` pero SOLO si recibe explícitamente el `sid` de la sesión originadora desde el contexto de `runCommand`, y `pushMessage` está modificado para aceptar un `sessionId` target opcional.
+
+### Comportamiento actual
+
+Actualmente `runCommand()` en `frontend/src/stores/chat.js` captura el `sid` al inicio de la ejecución (línea 108). Si la sesión activa sigue siendo la misma al finalizar, el resultado se muestra inline. Si el usuario cambió de sesión, el resultado se guarda en DB y se marca una notificación pendiente en la sesión originadora.
+
+### Pendiente
+
+Los comandos que actualmente usan `chatStore.activeSessionId` o `chatStore.pushMessage()` directamente deben refactorizarse para cumplir esta regla (ver §17).
+
+## 17. Comandos pendientes de refactorizar por sesión originadora
+
+Los siguientes comandos usan `chatStore.activeSessionId` dentro de `execute()` y/o llaman `chatStore.pushMessage()` directamente. Deben refactorizarse para cumplir la regla §16.
+
+### Comandos que usan `chatStore.activeSessionId`
+
+| Comando | Archivo |
+|---|---|
+| `/ambientes_diff` | `commands/ambientesDiff.js` |
+| `/ambientes_diff_comentar` | `commands/ambientesDiffComentar.js` |
+| `/ambientes_merge` | `commands/ambientesMerge.js` |
+| `/arbol_directorios` | `commands/arbolDirectorios.js` |
+| `/chat_get_ticket` | `commands/chatGetTicket.js` |
+| `/chat_set_ticket` | `commands/chatSetTicket.js` |
+| `/chat_edit_ticket` | `commands/chatTicketEdit.js` |
+| `/despliegue_*` | `commands/despliegue.js` |
+| `/deteccion_funcionalidades` | `commands/deteccionFuncionalidades.js` |
+| `/dev_documentacion_all` | `commands/documentacionAll.js` |
+| `/dev_documentacion_update` | `commands/documentacionUpdate.js` |
+| `/dev_funcionalidad_crear` | `commands/nuevaFuncionalidad.js` |
+| `/dev_funcionalidades_listar` | `commands/funcionalidadesListar.js` |
+| `/dev_generar_commit` | `commands/generarCommit.js` |
+| `/dev_git_crear_rama` | `commands/repoCrearRama.js` |
+| `/dev_git_ir_rama_ticket` | `commands/irRamaTicket.js` |
+| `/dev_redmine_comentarios_enviar` | `commands/redmineComentariosEnviar.js` |
+| `/dev_redmine_comentarios_listar` | `commands/redmineComentariosListar.js` |
+| `/extraer_formularios` | `commands/extraerFormularios.js` |
+| `/gastos_all` | `commands/gastosAll.js` |
+| `/gastos_proyecto` | `commands/gastosProyecto.js` |
+| `/git` | `commands/git.js` |
+| `/navegador_eventos_detener` | `commands/navegadorEventosDetener.js` |
+| `/navegador_eventos_iniciar` | `commands/navegadorEventosIniciar.js` |
+| `/navegador_grabacion_listar` | `commands/navegadorGrabacionListar.js` |
+| `/navegador_grabacion_reproducir` | `commands/navegadorGrabacionReproducir.js` |
+| `/navegador_iniciar` | `commands/iniciarNavegador.js` |
+| `/proyecto_var_actualizar` | `commands/proyectoVarActualizar.js` |
+| `/proyecto_var_crear` | `commands/proyectoVarCrear.js` |
+| `/proyecto_var_eliminar` | `commands/proyectoVarEliminar.js` |
+| `/proyecto_var_listar` | `commands/proyectoVarListar.js` |
+| `/redmine_crear_ticket` | `commands/redmineCrearTicket.js` |
+| `/redmine_importar_proyectos` | `commands/redmineImportarProyectos.js` |
+| `/redmine_importar_tickets` | `commands/redmineImportarTickets.js` |
+| `/redmine_listar_proyectos` | `commands/redmineProyectos.js` |
+| `/redmine_listar_tickets` | `commands/redmineTickets.js` |
+| `/redmine_test_conexion` | `commands/redmineTest.js` |
+
+### Comandos que usan `chatStore.pushMessage()` o `chatStore.messages.push()`
+
+| Comando | Archivo | Llamadas |
+|---|---|---|
+| `/deteccion_funcionalidades` | `commands/deteccionFuncionalidades.js` | 6× pushMessage |
+| `/ambientes_diff_comentar` | `commands/ambientesDiffComentar.js` | 3× messages.push |
+| `/dev_redmine_comentarios_enviar` | `commands/redmineComentariosEnviar.js` | 1× pushMessage |
+
+### Nota
+
+La refactorización de estos comandos es necesaria para garantizar que los resultados se muestren siempre en la sesión que inició el comando, independientemente de la sesión activa en la UI.

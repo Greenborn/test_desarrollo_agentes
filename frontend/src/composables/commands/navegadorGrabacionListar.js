@@ -16,12 +16,12 @@ register({
       cmdStore.hideAutocomplete()
     }
   },
-  async execute(args, { chatStore }) {
+  async execute(args, { chatStore, sessionId }) {
     const { params } = parseCommandArgs(args, { project_id: { required: false } })
 
     let projectId = params.project_id
     if (!projectId) {
-      const session = chatStore.sessions.find(s => s.id === chatStore.activeSessionId)
+      const session = chatStore.sessions.find(s => s.id === sessionId)
       projectId = session?.proyecto_id || null
     }
 

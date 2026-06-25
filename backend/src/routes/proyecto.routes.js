@@ -14,8 +14,8 @@ function authGuard(req, res) {
 router.get('/proyecto', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const wsId = req.session.workspaceId || 1;
-    const proyectos = await db('proyectos').where({ workspace_id: wsId }).select('*').orderBy('id');
+    const wsIds = req.session.workspaceIds || [1];
+    const proyectos = await db('proyectos').whereIn('workspace_id', wsIds).select('*').orderBy('id');
     const pinnedRow = await db('user_settings')
       .select('value')
       .where({ user_id: req.session.userId, key: 'pinned_project' })
@@ -42,7 +42,8 @@ router.post('/proyecto', async (req, res) => {
     return res.status(400).json({ error: 'id y descripcion son requeridos' });
   }
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = req.body.workspace_id && wsIds.includes(req.body.workspace_id) ? req.body.workspace_id : wsIds[0] || 1;
     await db('proyectos').insert({ id, descripcion, workspace_id: wsId });
     res.json({ success: true });
   } catch (err) {
@@ -112,9 +113,10 @@ router.put('/proyecto/repositorio', async (req, res) => {
     return res.status(400).json({ error: 'proyectoId es requerido' });
   }
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
     const updated = await db('proyectos')
-      .where({ id: proyectoId, workspace_id: wsId })
+      .where({ id: proyectoId })
+      .whereIn('workspace_id', wsIds)
       .update({ url_github: url_github || null });
     if (!updated) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
@@ -129,10 +131,11 @@ router.put('/proyecto/repositorio', async (req, res) => {
 router.get('/proyecto/repositorio/:proyectoId', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
     const proyecto = await db('proyectos')
       .select('url_github')
-      .where({ id: req.params.proyectoId, workspace_id: wsId })
+      .where({ id: req.params.proyectoId })
+      .whereIn('workspace_id', wsIds)
       .first();
     res.json({ url_github: proyecto?.url_github || null });
   } catch (err) {
@@ -146,10 +149,11 @@ router.get('/proyecto/repositorio/:proyectoId', async (req, res) => {
 router.get('/proyecto/:id/variables', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
     const proyecto = await db('proyectos')
       .select('id')
-      .where({ id: req.params.id, workspace_id: wsId })
+      .where({ id: req.params.id })
+      .whereIn('workspace_id', wsIds)
       .first();
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
@@ -175,10 +179,11 @@ router.post('/proyecto/:id/variables', async (req, res) => {
     return res.status(400).json({ error: 'value es requerido' });
   }
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
     const proyecto = await db('proyectos')
       .select('id')
-      .where({ id: req.params.id, workspace_id: wsId })
+      .where({ id: req.params.id })
+      .whereIn('workspace_id', wsIds)
       .first();
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
@@ -208,10 +213,11 @@ router.put('/proyecto/:id/variables/:key', async (req, res) => {
     return res.status(400).json({ error: 'value es requerido' });
   }
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
     const proyecto = await db('proyectos')
       .select('id')
-      .where({ id: req.params.id, workspace_id: wsId })
+      .where({ id: req.params.id })
+      .whereIn('workspace_id', wsIds)
       .first();
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
@@ -232,10 +238,11 @@ router.put('/proyecto/:id/variables/:key', async (req, res) => {
 router.delete('/proyecto/:id/variables/:key', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
     const proyecto = await db('proyectos')
       .select('id')
-      .where({ id: req.params.id, workspace_id: wsId })
+      .where({ id: req.params.id })
+      .whereIn('workspace_id', wsIds)
       .first();
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });

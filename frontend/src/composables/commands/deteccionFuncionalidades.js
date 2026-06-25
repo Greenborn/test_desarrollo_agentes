@@ -125,7 +125,7 @@ export async function startDeteccionProcessing(sessionId, chatStore, model, thin
         role: 'result',
         content: `${prefix} ${r.file.path} — ${desc}`,
         _key: 'desc-' + Date.now(),
-      })
+      }, sessionId)
     }
 
     if (escaneoId) {
@@ -170,7 +170,7 @@ export async function startDeteccionProcessing(sessionId, chatStore, model, thin
       role: 'result',
       content: '⏹ Proceso detenido por el usuario.',
       _key: 'abort-' + Date.now(),
-    })
+    }, sessionId)
   }
 
   deteccionState.running = false
@@ -180,7 +180,7 @@ export async function startDeteccionProcessing(sessionId, chatStore, model, thin
     role: 'result',
     content: JSON.stringify(tree, null, 2),
     _key: 'json-' + Date.now(),
-  })
+  }, sessionId)
 }
 
 register({
@@ -188,12 +188,11 @@ register({
   category: 'Detección',
   description: 'Analiza archivos de código del proyecto y genera descripciones vía DeepSeek. Permite elegir modelo y nivel de pensamiento.',
   usage: '/deteccion_funcionalidades [--escaneo-id=&lt;id&gt;]',
-  async execute(args, { chatStore }) {
+  async execute(args, { chatStore, sessionId }) {
     const { params } = parseCommandArgs(args, {
       'escaneo-id': { required: false },
     })
 
-    const sessionId = chatStore.activeSessionId
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
@@ -259,7 +258,7 @@ register({
         role: 'result',
         content: `📊 Total archivos de código: ${_deteccionFiles.length}`,
         _key: 'count-' + Date.now(),
-      })
+      }, sessionId)
 
       const ocStore = useOpencodeStore()
 
@@ -280,7 +279,7 @@ register({
           preselect: ocStore.savedModel || 'deepseek-chat',
         },
         _key: 'ctrl-model-' + Date.now(),
-      })
+      }, sessionId)
     } catch (err) {
       resetState()
       console.error('Error en /deteccion_funcionalidades:', err)

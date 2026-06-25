@@ -21,9 +21,10 @@ function generateTitle() {
 router.get('/sessions', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
     const sessions = await db('chat_sessions')
-      .where({ 'chat_sessions.user_id': req.session.userId, 'chat_sessions.workspace_id': wsId })
+      .where({ 'chat_sessions.user_id': req.session.userId })
+      .whereIn('chat_sessions.workspace_id', wsIds)
       .orderBy('updated_at', 'desc')
       .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
       .leftJoin('tickets', 'chat_sessions.id_ticket_redmine', 'tickets.redmine_id')
@@ -48,7 +49,8 @@ router.get('/sessions', async (req, res) => {
 router.post('/sessions', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = req.body.workspace_id && wsIds.includes(req.body.workspace_id) ? req.body.workspace_id : wsIds[0] || 1;
     const title = generateTitle();
     const cwd = req.body.cwd ? req.body.cwd : process.cwd();
     const [id] = await db('chat_sessions').insert({ user_id: req.session.userId, workspace_id: wsId, title, cwd });
@@ -102,7 +104,7 @@ router.post('/sessions/:id/messages', async (req, res) => {
     let fullResponse = '';
     let usageData = null;
 
-    const wsId = req.session.workspaceId || 1;
+    const wsId = session.workspace_id || (req.session.workspaceIds || [1])[0] || 1;
     for await (const chunk of streamChat(history, wsId)) {
       if (chunk.type === 'usage') {
         usageData = chunk;
@@ -219,7 +221,11 @@ router.post('/refine', async (req, res) => {
   if (!text) return res.status(400).json({ error: 'text requerido' });
   if (!systemPrompt) return res.status(400).json({ error: 'systemPrompt requerido' });
 
-  const wsId = req.session.workspaceId || 1;
+  let wsId = (req.session.workspaceIds || [1])[0] || 1;
+  if (sessionId) {
+    const sess = await db('chat_sessions').where({ id: sessionId }).select('workspace_id').first();
+    if (sess && sess.workspace_id) wsId = sess.workspace_id;
+  }
   const messages = [{ role: 'user', content: text }];
 
   res.writeHead(200, {
@@ -285,7 +291,11 @@ router.post('/summarize-file', async (req, res) => {
     const message = `Archivo: ${filePath || 'sin nombre'}\n\n\`\`\`\n${fileContent.slice(0, 8000)}\n\`\`\``;
     const messages = [{ role: 'user', content: message }];
 
-    const wsId = req.session.workspaceId || 1;
+    let wsId = (req.session.workspaceIds || [1])[0] || 1;
+    if (sessionId) {
+      const sess = await db('chat_sessions').where({ id: sessionId }).select('workspace_id').first();
+      if (sess && sess.workspace_id) wsId = sess.workspace_id;
+    }
     const streamOptions = {};
     if (model) streamOptions.model = model;
     if (thinking) streamOptions.reasoningEffort = thinking;
@@ -351,7 +361,11 @@ router.post('/summarize-files-batch', async (req, res) => {
     const message = `Respondé ÚNICAMENTE con un objeto JSON válido donde las claves sean las rutas de los archivos y los valores sean las descripciones. Sin explicaciones ni texto adicional.\n\n${parts.join('\n\n')}`;
     const messages = [{ role: 'user', content: message }];
 
-    const wsId = req.session.workspaceId || 1;
+    let wsId = (req.session.workspaceIds || [1])[0] || 1;
+    if (sessionId) {
+      const sess = await db('chat_sessions').where({ id: sessionId }).select('workspace_id').first();
+      if (sess && sess.workspace_id) wsId = sess.workspace_id;
+    }
     const streamOptions = {};
     if (model) streamOptions.model = model;
     if (thinking) streamOptions.reasoningEffort = thinking;

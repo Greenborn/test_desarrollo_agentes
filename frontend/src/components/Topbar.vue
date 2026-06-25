@@ -1,6 +1,12 @@
 <template>
   <nav class="navbar navbar-dark px-3" style="background: #1a2744; border-bottom: 2px solid #75AADB;">
-    <a class="navbar-brand mb-0 h1 text-decoration-none" href="#" @click.prevent="openWorkspaceSwitcher">{{ workspaceName }}</a>
+    <a class="navbar-brand mb-0 h1 text-decoration-none" href="#" @click.prevent="openWorkspaceSwitcher">
+      <span v-for="(ws, i) in selectedWorkspaces" :key="ws.id" class="d-inline-flex align-items-center">
+        <span v-if="i > 0" class="mx-1 text-secondary" style="font-size: 0.6rem;">▸</span>
+        <span class="badge" :class="i === 0 ? 'bg-argentina' : 'bg-secondary'" style="font-size: 0.7rem;">{{ ws.name }}</span>
+      </span>
+      <span v-if="selectedWorkspaces.length === 0" class="text-muted small">Agent Orchestrator</span>
+    </a>
     <LayoutControls />
     <CommandInput v-if="user" />
     <div class="dropdown" v-if="user">
@@ -17,13 +23,14 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/auth.js'
 import { useRouter } from 'vue-router'
 import { useCommandStore } from '../stores/command.js'
 import { useModalStore } from '../stores/modal.js'
 import { useOpencodeStore } from '../stores/opencode.js'
+import { useBrowserStore } from '../stores/browser.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { parseCommandArgs } from '../composables/parseCommandArgs.js'
 import { useChatStore } from '../stores/chat.js'
@@ -44,17 +51,17 @@ export default {
     const modal = useModalStore()
     const ocStore = useOpencodeStore()
     const wsStore = useWorkspaceStore()
+    const browserStore = useBrowserStore()
     const { user } = storeToRefs(auth)
     const { workspaces } = storeToRefs(wsStore)
     const { register } = useCommandRegistry()
 
-    const workspaceName = computed(() => {
-      if (!auth.user) return 'Agent Orchestrator'
-      const ws = workspaces.value.find(w => w.id === auth.user.workspaceId)
-      return ws ? ws.name : 'Por Defecto'
+    const selectedWorkspaces = computed(() => {
+      if (!auth.user || !workspaces.value.length) return []
+      const ids = auth.getWorkspaceIds()
+      return workspaces.value.filter(w => ids.includes(w.id))
     })
     const router = useRouter()
-    const navegadorSessionId = ref(null)
 
     register({
       name: '/help',
@@ -80,14 +87,13 @@ export default {
           cmdStore.showAutocomplete(['--dir='])
         }
       },
-      async execute(args, { cmdStore, chatStore }) {
+      async execute(args, { cmdStore, chatStore, sessionId }) {
         const { params, errors } = parseCommandArgs(args, { dir: { required: true } })
         if (errors.length > 0) {
           console.error('Error en /cd:', errors.join('. '))
           return
         }
         const dir = params.dir
-        const sessionId = chatStore.activeSessionId
         try {
           const res = await fetch('/api/command/execute', {
             method: 'POST',
@@ -123,7 +129,7 @@ export default {
           cmdStore.showAutocomplete(['--dir='])
         }
       },
-      async execute(args, { cmdStore, chatStore }) {
+      async execute(args, { cmdStore, chatStore, sessionId }) {
         const { params } = parseCommandArgs(args, { dir: { required: false } })
         const dir = params.dir || ''
         try {
@@ -131,7 +137,7 @@ export default {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ command: `/ls ${dir}`.trimEnd(), sessionId: chatStore.activeSessionId }),
+            body: JSON.stringify({ command: `/ls ${dir}`.trimEnd(), sessionId }),
           })
           const data = await res.json()
           if (!data.success) {
@@ -150,8 +156,7 @@ export default {
       category: 'Sistema',
       description: 'Muestra el historial de comandos ejecutados durante la sesión actual.',
       usage: '/history',
-      async execute(args, { cmdStore, chatStore }) {
-        const sessionId = chatStore.activeSessionId
+      async execute(args, { cmdStore, chatStore, sessionId }) {
         if (!sessionId) {
           console.error('Error en /history: no hay sesión de chat activa')
           return
@@ -188,8 +193,7 @@ export default {
           cmdStore.showAutocomplete(['--ticket-desc'])
         }
       },
-      async execute(args, { cmdStore, chatStore }) {
-        const sessionId = chatStore.activeSessionId
+      async execute(args, { cmdStore, chatStore, sessionId }) {
         if (!sessionId) {
           console.error('Error en /dev_opencode_iniciar: no hay sesión de chat activa')
           return
@@ -228,11 +232,11 @@ export default {
             console.error('Error al abortar sesión OpenCode previa:', err)
           }
           ocStore.finish()
-          chatStore.messages.push({
+          chatStore.pushMessage({
             role: 'opencode_info',
             content: JSON.stringify({ type: 'info', message: 'Sesión OpenCode anterior cerrada. Iniciando nueva sesión...' }),
             _key: 'info-' + Date.now(),
-          })
+          }, sessionId)
         }
 
         const data = await ocStore.start()
@@ -295,13 +299,13 @@ export default {
         }
         const url = params.url
         try {
-          const res = await navegadorFetch('go_to_url', { id_session: navegadorSessionId.value, url }, chatStore.activeSessionId)
+          const res = await navegadorFetch('go_to_url', { id_session: browserStore.navegadorSessionId, url }, sessionId)
           const data = await res.json()
           if (data.error) {
             console.error('Error en /navegador_ir_url:', data.error)
             return `Error: ${data.error}`
           }
-          if (data.id_session) navegadorSessionId.value = data.id_session
+          if (data.id_session) browserStore.navegadorSessionId = data.id_session
           return `Navegando a: ${url}`
         } catch (err) {
           console.error('Error en /navegador_ir_url:', err)
@@ -328,7 +332,7 @@ export default {
           cmdStore.showAutocomplete(['--mode='])
         }
       },
-      async execute(args, { cmdStore, chatStore }) {
+      async execute(args, { cmdStore, chatStore, sessionId }) {
         const { params, errors } = parseCommandArgs(args, { mode: { required: true } })
         if (errors.length > 0) {
           console.error('Error en /navegador_configurar_headless:', errors.join('. '))
@@ -340,13 +344,13 @@ export default {
           return
         }
         try {
-          const res = await navegadorFetch('set_headless', { headless: val }, chatStore.activeSessionId)
+          const res = await navegadorFetch('set_headless', { headless: val }, sessionId)
           const data = await res.json()
           if (data.error) {
             console.error('Error en /navegador_configurar_headless:', data.error)
             return `Error: ${data.error}`
           }
-          if (data.id_session) navegadorSessionId.value = data.id_session
+          if (data.id_session) browserStore.navegadorSessionId = data.id_session
           return `Headless ${val === '1' ? 'activado' : 'desactivado'}`
         } catch (err) {
           console.error('Error en /navegador_configurar_headless:', err)
@@ -359,7 +363,7 @@ export default {
       category: 'Navegador',
       description: 'Finaliza la sesión de navegador activa. Si no hay sesión iniciada, muestra error.',
       usage: '/navegador_finalizar',
-      async execute(args, { cmdStore, chatStore }) {
+      async execute(args, { cmdStore, chatStore, sessionId }) {
         if (!navegadorSessionId.value) {
           console.error('Error en /navegador_finalizar: no hay sesión de navegador activa')
           return 'Error: No hay sesión de navegador activa. Usá /navegador_iniciar primero.'
@@ -369,14 +373,14 @@ export default {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ id_session: navegadorSessionId.value, sessionId: chatStore.activeSessionId }),
+            body: JSON.stringify({ id_session: navegadorSessionId.value, sessionId }),
           })
           const data = await res.json()
           if (data.error) {
             console.error('Error en /navegador_finalizar:', data.error)
             return `Error: ${data.error}`
           }
-          navegadorSessionId.value = null
+          browserStore.navegadorSessionId = null
           return 'Sesión de navegador finalizada.'
         } catch (err) {
           console.error('Error en /navegador_finalizar:', err)
@@ -433,8 +437,7 @@ export default {
           cmdStore.showAutocomplete(['--id='])
         }
       },
-      async execute(args, { cmdStore, chatStore }) {
-        const sessionId = chatStore.activeSessionId
+      async execute(args, { cmdStore, chatStore, sessionId }) {
         if (!sessionId) {
           console.error('Error en /chat_set_proyecto: no hay sesión de chat activa')
           return
@@ -468,8 +471,7 @@ export default {
       category: 'Proyecto',
       description: 'Muestra el ID del proyecto asignado a la sesión actual.',
       usage: '/chat_get_proyecto',
-      async execute(args, { cmdStore, chatStore }) {
-        const sessionId = chatStore.activeSessionId
+      async execute(args, { cmdStore, chatStore, sessionId }) {
         if (!sessionId) {
           console.error('Error en /chat_get_proyecto: no hay sesión de chat activa')
           return
@@ -494,8 +496,7 @@ export default {
           cmdStore.showAutocomplete(['--url='])
         }
       },
-      async execute(args, { cmdStore, chatStore }) {
-        const sessionId = chatStore.activeSessionId
+      async execute(args, { cmdStore, chatStore, sessionId }) {
         if (!sessionId) {
           console.error('Error en /chat_set_repositorio: no hay sesión de chat activa')
           return
@@ -536,8 +537,7 @@ export default {
       category: 'Proyecto',
       description: 'Muestra la URL del repositorio configurada para el proyecto actual.',
       usage: '/chat_get_repositorio_url',
-      async execute(args, { cmdStore, chatStore }) {
-        const sessionId = chatStore.activeSessionId
+      async execute(args, { cmdStore, chatStore, sessionId }) {
         if (!sessionId) {
           console.error('Error en /chat_get_repositorio_url: no hay sesión de chat activa')
           return
@@ -578,7 +578,7 @@ export default {
       router.push('/')
     }
 
-    return { user, logout, openSettings, openWorkspaceSwitcher, workspaceName }
+    return { user, logout, openSettings, openWorkspaceSwitcher, selectedWorkspaces }
   },
 }
 </script>

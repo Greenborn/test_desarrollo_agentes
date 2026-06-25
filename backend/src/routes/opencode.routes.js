@@ -60,7 +60,8 @@ async function saveLongMessage(sessionId, role, content, extraFields = {}) {
 router.get('/start', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = wsIds[0] || 1;
     const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
     const providerData = await opencode.getModels(process.cwd(), locale);
@@ -111,7 +112,8 @@ router.post('/send', async (req, res) => {
       if (chatSession && chatSession.cwd) cwd = chatSession.cwd;
     }
 
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = wsIds[0] || 1;
     const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
     const server = await opencode.getOrStartServer(cwd, locale);

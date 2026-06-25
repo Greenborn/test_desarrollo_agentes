@@ -57,8 +57,7 @@ register({
       cmdStore.hideAutocomplete()
     }
   },
-  async execute(args, { chatStore }) {
-    const sessionId = chatStore.activeSessionId
+  async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
@@ -109,11 +108,11 @@ register({
       }
 
       if (data.hasConflicts) {
-        chatStore.messages.push({
+        chatStore.pushMessage({
           role: 'result',
           content: `**Merge con conflictos en ${data.targetBranch}**\n\nSe hizo checkout a "${data.targetBranch}" pero hay conflictos al mergear "${data.sourceBranch}".\n\n\`\`\`\n${data.mergeOutput}\n\`\`\`\n\n${data.instruction}`,
           _key: 'merge-' + Date.now(),
-        })
+        }, sessionId)
         return
       }
 
@@ -139,11 +138,11 @@ register({
         output += `ℹ Use --comentar=enviar o --comentar=encolar para notificar a Redmine.\n`
       }
 
-      chatStore.messages.push({
+      chatStore.pushMessage({
         role: 'result',
         content: output.trim(),
         _key: 'merge-' + Date.now(),
-      })
+      }, sessionId)
     } catch (err) {
       console.error('Error en /ambientes_merge:', err.message)
       throw err

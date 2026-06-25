@@ -46,7 +46,7 @@ register({
       cmdStore.hideAutocomplete()
     }
   },
-  async execute(args, { chatStore, loadingIdx }) {
+  async execute(args, { chatStore, loadingIdx, sessionId }) {
     const { params, errors } = parseCommandArgs(args, {
       id: { required: true, type: 'number' },
       intervalo: { required: false, type: 'number' },
@@ -83,8 +83,6 @@ register({
     const total = actions.length
     let ejecutadas = 0
     let errores = 0
-
-    const sessionId = chatStore.activeSessionId
 
     for (let i = 0; i < total; i++) {
       const a = actions[i]
@@ -135,7 +133,7 @@ register({
         ? { role: 'result', content: `✅ [${step}/${total}] ${label}` }
         : { role: 'result', content: `❌ [${step}/${total}] ${label} — Error: ${errorMsg}` }
 
-      chatStore.messages.push(stepMsg)
+      chatStore.pushMessage(stepMsg, sessionId)
       if (sessionId) {
         chatStore._saveMessageToDb(sessionId, stepMsg)
       }

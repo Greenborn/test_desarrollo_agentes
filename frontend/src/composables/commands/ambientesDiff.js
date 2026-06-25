@@ -69,8 +69,7 @@ register({
       cmdStore.hideAutocomplete()
     }
   },
-  async execute(args, { chatStore }) {
-    const sessionId = chatStore.activeSessionId
+  async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
@@ -106,13 +105,13 @@ register({
       }
 
       if (!data.commits || data.commits.length === 0) {
-        chatStore.messages.push({
+        chatStore.pushMessage({
           role: 'result',
           content: data.message
             ? `**${params.origen} ↔ ${params.destino}:** ${data.message}`
             : `**${params.origen} ↔ ${params.destino}:** No hay diferencias entre las ramas.`,
           _key: 'diff-' + Date.now(),
-        })
+        }, sessionId)
         return
       }
 
@@ -123,18 +122,18 @@ register({
         output += `- ${c.message}: ${url}\n`
       }
 
-      chatStore.messages.push({
+      chatStore.pushMessage({
         role: 'result',
         content: output,
         _key: 'diff-' + Date.now(),
-      })
+      }, sessionId)
     } catch (err) {
       console.error('Error en /ambientes_diff:', err.message)
-      chatStore.messages.push({
+      chatStore.pushMessage({
         role: 'result',
         content: `Error: ${err.message}`,
         _key: 'diff-err-' + Date.now(),
-      })
+      }, sessionId)
     }
   },
 })

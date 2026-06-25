@@ -23,7 +23,7 @@ register({
       cmdStore.showAutocomplete(suggestions)
     }
   },
-  async execute(args, { cmdStore, chatStore }) {
+  async execute(args, { cmdStore, chatStore, sessionId }) {
     const { params } = parseCommandArgs(args, {
       dir: { required: false },
       gitignore: { required: false },
@@ -32,7 +32,6 @@ register({
     const dir = params.dir || ''
     const useGitignore = params.gitignore === undefined ? true : params.gitignore !== 'false'
     const filterExtension = params['filter-extension'] || ''
-    const sessionId = chatStore.activeSessionId
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }

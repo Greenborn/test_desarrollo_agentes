@@ -8,9 +8,8 @@ register({
   category: 'Desarrollo',
   description: 'Genera un mensaje de commit de los cambios realizados usando OpenCode. Seleccioná proveedor, modelo y modo para obtener una propuesta de commit.',
   usage: '/dev_opencode_generar_commit',
-  async execute(args, { cmdStore, chatStore }) {
+  async execute(args, { cmdStore, chatStore, sessionId }) {
     const ocStore = useOpencodeStore()
-    const sessionId = chatStore.activeSessionId
     if (!sessionId) {
       console.error('Error en /dev_opencode_generar_commit: no hay sesión de chat activa')
       return
@@ -41,7 +40,7 @@ register({
 
     const preselectProvider = ocStore.savedProvider || providerList[0].value
 
-    chatStore.messages.push({
+    chatStore.pushMessage({
       role: 'opencode_control',
       controlData: {
         controlId: 'gc-provider-' + Date.now(),
@@ -53,6 +52,6 @@ register({
         preselect: preselectProvider,
       },
       _key: 'control-' + Date.now(),
-    })
+    }, sessionId)
   },
 })

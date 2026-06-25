@@ -15,7 +15,8 @@ function authGuard(req, res) {
 router.get('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = req.query.workspace_id ? parseInt(req.query.workspace_id, 10) : wsIds[0] || 1;
     const rows = await db('settings').where({ workspace_id: wsId }).select('setting_key', 'setting_value', 'encrypted');
     const keys = {};
     for (const row of rows) {
@@ -118,8 +119,9 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { key, value } = req.body;
-    const wsId = req.session.workspaceId || 1;
+    const { key, value, workspace_id } = req.body;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = workspace_id && wsIds.includes(workspace_id) ? workspace_id : wsIds[0] || 1;
     let toStore = value;
     let encrypted = false;
 

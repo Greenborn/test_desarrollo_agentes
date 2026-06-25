@@ -577,10 +577,11 @@ router.post('/git-merge', async (req, res) => {
       return res.status(400).json({ success: false, error: 'ambienteName es requerido' });
     }
 
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
 
     const env = await db('workspace_environments')
-      .where({ workspace_id: wsId, name: ambienteName })
+      .whereIn('workspace_id', wsIds)
+      .where({ name: ambienteName })
       .first();
     if (!env) {
       return res.status(400).json({ success: false, error: `Ambiente "${ambienteName}" no encontrado` });
@@ -676,6 +677,7 @@ router.post('/git-merge', async (req, res) => {
     let redmineComment = null;
     const ticketId = session.id_ticket_redmine;
 
+    const wsId = env.workspace_id || wsIds[0] || 1;
     if (ticketId && comentar) {
       const commentText = mensaje || `Se actualiza ambiente ${ambienteName}`;
       try {
@@ -748,17 +750,19 @@ router.post('/git-diff-branches', async (req, res) => {
       return res.status(400).json({ success: false, error: 'sourceEnv y targetEnv son requeridos' });
     }
 
-    const wsId = req.session.workspaceId || 1;
+    const wsIds = req.session.workspaceIds || [1];
 
     const source = await db('workspace_environments')
-      .where({ workspace_id: wsId, name: sourceEnv })
+      .whereIn('workspace_id', wsIds)
+      .where({ name: sourceEnv })
       .first();
     if (!source) {
       return res.status(400).json({ success: false, error: `Ambiente "${sourceEnv}" no encontrado` });
     }
 
     const target = await db('workspace_environments')
-      .where({ workspace_id: wsId, name: targetEnv })
+      .whereIn('workspace_id', wsIds)
+      .where({ name: targetEnv })
       .first();
     if (!target) {
       return res.status(400).json({ success: false, error: `Ambiente "${targetEnv}" no encontrado` });

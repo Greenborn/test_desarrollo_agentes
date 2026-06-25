@@ -124,15 +124,15 @@
 </template>
 
 <script>
-import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTicketStore } from '../stores/ticket.js'
+import { useAttachmentsStore } from '../stores/attachments.js'
 
 export default {
   setup() {
     const ticketStore = useTicketStore()
+    const attStore = useAttachmentsStore()
     const { selectedTicket } = storeToRefs(ticketStore)
-    const attachments = ref([])
 
     function goBack() {
       ticketStore.clearSelection()
@@ -167,24 +167,15 @@ export default {
       return (kb / 1024).toFixed(1) + ' MB'
     }
 
-    async function fetchAttachments() {
-      if (!selectedTicket.value?.redmine_id) return
-      try {
-        const res = await fetch(`/api/tickets/attachments/by-ticket/${selectedTicket.value.redmine_id}`, { credentials: 'include' })
-        const data = await res.json()
-        attachments.value = data.attachments || []
-      } catch (err) {
-        console.error('Error al obtener adjuntos:', err.message)
-      }
+    if (selectedTicket.value?.redmine_id) {
+      attStore.fetchByTicket(selectedTicket.value.redmine_id)
     }
-
-    fetchAttachments()
 
     return {
       ticket: selectedTicket,
       goBack,
       formatDate,
-      attachments,
+      attachments: attStore.items,
       isImage,
       formatSize,
     }

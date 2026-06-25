@@ -46,7 +46,8 @@
 </template>
 
 <script>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
+import { useFuncionalidadStore } from '../stores/funcionalidad.js';
 
 export default {
   props: {
@@ -63,73 +64,20 @@ export default {
       { key: 'documentacion', label: 'Documentación', placeholder: 'Documentación necesaria, manuales, comentarios...' },
     ];
 
-    const activeTab = ref('relevamiento');
-    const activeTabData = computed(() => tabs.find(t => t.key === activeTab.value));
-    const saving = ref(false);
-    const nombre = ref('');
-    const urlRedmine = ref('');
-    const formData = reactive({
-      relevamiento: '',
-      diseno: '',
-      implementacion: '',
-      testing: '',
-      documentacion: '',
-    });
+    const funcStore = useFuncionalidadStore();
 
-    async function load() {
-      try {
-        const res = await fetch(`/api/funcionalidad/${props.sessionId}`, { credentials: 'include' });
-        const data = await res.json();
-        if (data.funcionalidad) {
-          nombre.value = data.funcionalidad.nombre || '';
-          urlRedmine.value = data.funcionalidad.url_redmine || '';
-          if (data.funcionalidad.parametros) {
-            const p = data.funcionalidad.parametros;
-            if (p.relevamiento) formData.relevamiento = p.relevamiento;
-            if (p.diseno) formData.diseno = p.diseno;
-            if (p.implementacion) formData.implementacion = p.implementacion;
-            if (p.testing) formData.testing = p.testing;
-            if (p.documentacion) formData.documentacion = p.documentacion;
-            if (data.funcionalidad.etapa) activeTab.value = data.funcionalidad.etapa.toLowerCase();
-          }
-        }
-      } catch (err) {
-        console.error('Error al cargar funcionalidad:', err.message);
+    const activeTabData = computed(() => tabs.find(t => t.key === funcStore.activeTab));
+
+    async function handleSave() {
+      const data = await funcStore.save({ sessionId: props.sessionId, proyectoId: props.proyectoId });
+      if (data.success) {
+        emit('close');
       }
     }
 
-    async function save() {
-      saving.value = true;
-      try {
-        const res = await fetch('/api/funcionalidad', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            sessionId: props.sessionId,
-            proyectoId: props.proyectoId,
-            etapa: activeTab.value.toUpperCase(),
-            parametros: { ...formData },
-            nombre: nombre.value,
-            url_redmine: urlRedmine.value || null,
-          }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          emit('close');
-        } else {
-          console.error('Error al guardar:', data.error);
-        }
-      } catch (err) {
-        console.error('Error al guardar funcionalidad:', err.message);
-      } finally {
-        saving.value = false;
-      }
-    }
+    onMounted(() => funcStore.load(props.sessionId));
 
-    onMounted(load);
-
-    return { tabs, activeTab, activeTabData, formData, nombre, urlRedmine, saving, save };
+    return { tabs, activeTab: funcStore.activeTab, activeTabData, formData: funcStore.formData, nombre: funcStore.nombre, urlRedmine: funcStore.urlRedmine, saving: funcStore.saving, save: handleSave };
   },
 };
 </script>

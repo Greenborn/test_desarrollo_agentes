@@ -81,8 +81,7 @@
 
 <script>
 import { ref, reactive, onMounted, computed } from 'vue'
-
-const API = '/api'
+import { useTicketFormStore } from '../stores/ticketForm.js'
 
 export default {
   props: {
@@ -90,14 +89,10 @@ export default {
   },
   emits: ['confirm'],
   setup(props, { emit }) {
+    const ticketFormStore = useTicketFormStore()
     const saving = ref(false)
     const errors = reactive({ subject: '' })
-    const options = reactive({
-      statuses: [],
-      priorities: [],
-      users: [],
-    })
-    const allowedStatuses = ref([])
+    const options = ticketFormStore.options
     const selectedIds = reactive({
       status_id: null,
       priority_id: null,
@@ -105,7 +100,7 @@ export default {
     })
 
     const statusOptions = computed(() => {
-      const allowed = allowedStatuses.value
+      const allowed = ticketFormStore.allowedStatuses
       if (allowed.length > 0) {
         const currentStatus = props.ticket?.status_name
         const hasCurrent = currentStatus && allowed.some(s => s.name === currentStatus)
@@ -132,45 +127,8 @@ export default {
     })
 
     async function loadTicketOptions() {
-      try {
-        const genRes = await fetch(`${API}/tickets/options`, { credentials: 'include' })
-        const genData = await genRes.json()
-        options.statuses = genData.statuses || []
-        options.priorities = genData.priorities || []
-        options.users = genData.users || []
-      } catch (err) {
-        console.error('Error al cargar opciones generales:', err)
-      }
-
-      const redmineId = props.ticket?.redmine_id
-      if (!redmineId) return
-
-      try {
-        const res = await fetch(`${API}/tickets/ticket-options/${redmineId}`, { credentials: 'include' })
-        const data = await res.json()
-        if (data.statuses && data.statuses.length > 0) {
-          allowedStatuses.value = data.statuses
-        }
-        if (data.priorities && data.priorities.length > 0) {
-          options.priorities = data.priorities
-        }
-        if (data.users && data.users.length > 0) {
-          options.users = data.users
-        }
-      } catch (err) {
-        console.error('Error al cargar opciones del ticket:', err)
-      }
-
-      if (options.statuses.length === 0) {
-        options.statuses = [
-          { id: null, name: 'Nuevo' },
-          { id: null, name: 'En Progreso' },
-          { id: null, name: 'Resuelto' },
-          { id: null, name: 'Feedback' },
-          { id: null, name: 'Cerrado' },
-          { id: null, name: 'Rechazado' },
-        ]
-      }
+      await ticketFormStore.loadOptions()
+      await ticketFormStore.loadTicketOptions(props.ticket?.redmine_id)
     }
 
     function onStatusChange() {
@@ -242,7 +200,7 @@ export default {
     })
 
     return {
-      form, options, allowedStatuses, statusOptions, errors, saving, selectedIds,
+      form, options, allowedStatuses: ticketFormStore.allowedStatuses, statusOptions, errors, saving, selectedIds,
       save, cancel, onStatusChange, onPriorityChange, onUserChange,
     }
   },

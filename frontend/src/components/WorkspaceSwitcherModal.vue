@@ -3,28 +3,33 @@
     <div
       v-for="w in workspaces"
       :key="w.id"
+      class="d-flex align-items-center gap-2 px-2 py-1 rounded"
     >
-      <button
-        class="btn w-100 text-start d-flex align-items-center justify-content-between"
-        :class="w.id === currentWorkspaceId ? 'btn-secondary' : 'btn-outline-argentina'"
-        :disabled="w.id === currentWorkspaceId || switching"
-        @click="switchTo(w.id)"
-      >
-        <span>{{ w.name }}</span>
-        <span v-if="w.id === currentWorkspaceId" class="badge bg-info ms-2">Actual</span>
-      </button>
+      <input
+        type="checkbox"
+        :value="w.id"
+        :checked="isSelected(w.id)"
+        @change="toggleWorkspace(w.id)"
+        class="form-check-input"
+      />
+      <span class="flex-grow-1">{{ w.name }}</span>
     </div>
     <div v-if="workspaces.length === 0" class="text-muted text-center small py-3">
       No hay espacios de trabajo adicionales.
     </div>
-    <div v-if="switching" class="text-center text-info small mt-2">
-      Cambiando espacio de trabajo...
+    <div class="d-flex gap-2 mt-2">
+      <button class="btn btn-argentina flex-grow-1" :disabled="saving" @click="applySelection">
+        {{ saving ? 'Guardando...' : 'Aplicar' }}
+      </button>
+    </div>
+    <div v-if="saving" class="text-center text-info small mt-1">
+      Actualizando espacios de trabajo...
     </div>
   </div>
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWorkspaceStore } from '../stores/workspace.js'
 import { useAuthStore } from '../stores/auth.js'
@@ -37,32 +42,48 @@ export default {
     const auth = useAuthStore()
     const chatStore = useChatStore()
     const { workspaces } = storeToRefs(wsStore)
-    const switching = ref(false)
+    const saving = ref(false)
 
-    const currentWorkspaceId = computed(() => auth.getWorkspaceId())
+    const selected = ref([...auth.getWorkspaceIds()])
 
-    async function switchTo(id) {
-      if (id === currentWorkspaceId.value) return
+    function isSelected(id) {
+      return selected.value.includes(id)
+    }
 
-      const hasProcesses = chatStore.executing || chatStore.streaming
-      if (hasProcesses) {
-        const confirmed = confirm('Se detendrán todos los procesos en ejecución. ¿Desea cambiar de espacio de trabajo?')
-        if (!confirmed) return
-      }
-
-      switching.value = true
-      const result = await wsStore.selectWorkspace(id)
-      if (result.success) {
-        auth.setWorkspaceId(id)
-        chatStore.stopAllExecutions()
-        await wsStore.loadWorkspaces()
-        emit('close')
+    function toggleWorkspace(id) {
+      const idx = selected.value.indexOf(id)
+      if (idx >= 0) {
+        selected.value.splice(idx, 1)
       } else {
-        switching.value = false
+        selected.value.push(id)
       }
     }
 
-    return { workspaces, currentWorkspaceId, switching, switchTo }
+    async function applySelection() {
+      let ids = [...selected.value]
+      if (ids.length === 0) {
+        alert('Debe seleccionar al menos un espacio de trabajo.')
+        return
+      }
+
+      const hasProcesses = chatStore.executing || chatStore.streaming
+      if (hasProcesses && ids.length !== auth.getWorkspaceIds().length) {
+        const confirmed = confirm('Se detendrán todos los procesos en ejecución. ¿Desea cambiar los espacios de trabajo?')
+        if (!confirmed) return
+      }
+
+      saving.value = true
+      const result = await wsStore.selectWorkspaces(ids)
+      if (result.success) {
+        auth.setWorkspaceIds(result.workspaceIds)
+        chatStore.stopAllExecutions()
+        await wsStore.loadWorkspaces()
+        emit('close')
+      }
+      saving.value = false
+    }
+
+    return { workspaces, selected, saving, isSelected, toggleWorkspace, applySelection }
   },
 }
 </script>
