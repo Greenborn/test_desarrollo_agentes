@@ -26,18 +26,14 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
       const res = await fetch(`${API}/despliegue/estado-instancia-dev`, { credentials: 'include' })
       const data = await res.json()
       if (data.success) {
-        const procs = data.processes || []
-        console.log('[devInstance] fetchStatus retornó', procs.length, 'procesos:', procs.map(p => p.name).join(', '))
-        if (procs.length > 0) {
-          processes.value = procs
-          frontendPorts.value = data.frontendPorts || []
-          browserSessions.value = data.browserSessions || []
-          resolution.value = data.resolution || null
+        processes.value = data.processes || []
+        frontendPorts.value = data.frontendPorts || []
+        browserSessions.value = data.browserSessions || []
+        resolution.value = data.resolution || null
 
-          const currentNames = new Set(procs.map(p => p.name))
-          for (const key of Object.keys(logsMap)) {
-            if (!currentNames.has(key)) delete logsMap[key]
-          }
+        const currentNames = new Set(processes.value.map(p => p.name))
+        for (const key of Object.keys(logsMap)) {
+          if (!currentNames.has(key)) delete logsMap[key]
         }
         errorMsg.value = ''
       }

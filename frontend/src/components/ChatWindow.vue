@@ -53,7 +53,7 @@
 </template>
 
 <script>
-import { ref, reactive, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
@@ -88,8 +88,8 @@ export default {
     const ocStreaming = ref(false)
     const ocChunk = ref('')
     const ocThinking = ref('')
-    const devInstanceRunning = ref(false)
     const devInstanceStore = useDevInstanceStore()
+    const devInstanceRunning = computed(() => devInstanceStore.hasProcesses)
     const _streamSessionId = ref(null)
     const ticketInfo = ref(null)
 
@@ -259,14 +259,12 @@ export default {
       if (!chat.activeSessionId) return
       await executeCommand('/despliegue_iniciar_instancia')
       await devInstanceStore.fetchStatus()
-      devInstanceRunning.value = devInstanceStore.hasProcesses
     }
 
     async function detenerInstanciaDev() {
       if (!chat.activeSessionId) return
       await executeCommand('/despliegue_detener_instancia')
       await devInstanceStore.fetchStatus()
-      devInstanceRunning.value = devInstanceStore.hasProcesses
     }
 
     async function clearChat() {
@@ -2811,7 +2809,6 @@ export default {
       loadZoom()
       fetchGitBranch()
       await devInstanceStore.fetchStatus()
-      devInstanceRunning.value = devInstanceStore.hasProcesses
     })
 
     onUnmounted(() => {
