@@ -6,6 +6,17 @@
         class="form-control form-control-sm ticket-filter"
         placeholder="Filtrar tickets..."
       />
+      <div class="form-check form-switch mb-0" style="white-space: nowrap;">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          role="switch"
+          id="projectFilterSwitch"
+          v-model="projectFilterEnabled"
+          :disabled="!sessionProjectId"
+        />
+        <label class="form-check-label small" for="projectFilterSwitch">Proyecto</label>
+      </div>
       <span class="text-secondary small text-nowrap">{{ filteredTickets.length }} tickets</span>
     </div>
 
@@ -34,12 +45,14 @@
 <script>
 import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useChatStore } from '../stores/chat.js'
 import { useTicketStore } from '../stores/ticket.js'
 import { useUiStore } from '../stores/ui.js'
 import { useProjectStore } from '../stores/project.js'
 
 export default {
   setup() {
+    const chatStore = useChatStore()
     const ticketStore = useTicketStore()
     const ui = useUiStore()
     const projectStore = useProjectStore()
@@ -48,6 +61,12 @@ export default {
     const { pinnedProjectId } = storeToRefs(projectStore)
 
     const localFilter = ref('')
+    const projectFilterEnabled = ref(false)
+
+    const sessionProjectId = computed(() => {
+      const session = chatStore.sessions.find(s => s.id === chatStore.activeSessionId)
+      return session?.proyecto_id || null
+    })
 
     function selectTicket(t) {
       ticketStore.selectTicket(t)
@@ -110,6 +129,10 @@ export default {
         })
       }
 
+      if (projectFilterEnabled.value && sessionProjectId.value) {
+        list = list.filter(t => t.proyecto_id === sessionProjectId.value)
+      }
+
       return list
     })
 
@@ -121,6 +144,8 @@ export default {
       priorityName,
       ticketPriorityClass,
       priorityTextClass,
+      projectFilterEnabled,
+      sessionProjectId,
     }
   },
 }

@@ -331,12 +331,6 @@ router.post('/git', async (req, res) => {
       success = false;
     }
 
-    if (sessionId) {
-      await db('chat_messages').insert({ session_id: sessionId, role: 'command', content: `[${cwd}] /git ${command}` });
-      await db('chat_messages').insert({ session_id: sessionId, role: 'result', content: success ? (stdout || '(sin salida)') : stderr });
-      await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
-    }
-
     res.json({ success, stdout, stderr });
   } catch (err) {
     console.log('Error en /git:', err.message);
