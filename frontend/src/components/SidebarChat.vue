@@ -24,7 +24,12 @@
         >
           <span class="status-led" :class="getSessionStatus(s.id)"></span>
           <span v-if="pendingNotifications[s.id]" class="notification-dot" title="Novedades pendientes"></span>
-          <span v-if="s.id_ticket_redmine" class="ticket-badge">#{{ s.id_ticket_redmine }}</span>
+          <a v-if="s.id_ticket_redmine"
+             class="ticket-badge"
+             :href="`${redmineUrl}/issues/${s.id_ticket_redmine}`"
+             target="_blank" rel="noopener noreferrer"
+             @click.stop
+             title="Abrir ticket en Redmine">#{{ s.id_ticket_redmine }}</a>
           <div class="d-flex flex-column flex-grow-1 min-width-0">
             <span class="text-truncate">{{ s.title }}</span>
             <span class="text-muted" style="font-size: 0.6rem; line-height: 1.2;">{{ formatDate(s.updated_at) }}</span>
@@ -50,14 +55,17 @@ import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 import { useUiStore } from '../stores/ui.js'
+import { useSettingsStore } from '../stores/settings.js'
 
 export default {
   setup() {
     const chat = useChatStore()
     const cmd = useCommandStore()
     const ui = useUiStore()
+    const settings = useSettingsStore()
     const { sessions, activeSessionId, creating, sessionStatus, pendingNotifications } = storeToRefs(chat)
     const { sidebarCollapsed, sidebarWidth, omnifilter } = storeToRefs(ui)
+    const { redmineUrl } = storeToRefs(settings)
 
     const sidebarTransitioning = ref(false)
     let transitionTimer = null
@@ -158,6 +166,7 @@ export default {
       sidebarTransitioning,
       sessionTooltip,
       formatDate,
+      redmineUrl,
       getSessionStatus,
       createSession,
       selectSession,
@@ -318,6 +327,12 @@ export default {
   color: #60a5fa;
   margin-right: 4px;
   flex-shrink: 0;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ticket-badge:hover {
+  color: #93c5fd;
+  text-decoration: underline;
 }
 .ticket-priority-low {
   border-left: 3px solid var(--priority-low-color, #6b7280) !important;

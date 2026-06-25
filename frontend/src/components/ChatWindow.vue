@@ -348,14 +348,25 @@ export default {
       _streamSessionId.value = sessionId
       if (sessionId) chat.setSessionStatus(sessionId, 'executing')
 
+      const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
+      streamMsg._key = 'stream-' + Date.now()
+
       const _buildStartTime = mode === 'Build' ? new Date().toISOString() : null
 
       await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
         onChunk(content) {
-          if (_isActiveSession(sessionId)) ocChunk.value += content
+          if (_isActiveSession(sessionId)) {
+            ocChunk.value += content
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) chat.messages[idx].content = ocChunk.value
+          }
         },
         onThinking(content) {
-          if (_isActiveSession(sessionId)) ocThinking.value += content
+          if (_isActiveSession(sessionId)) {
+            ocThinking.value += content
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+          }
         },
         onControl(control) {
           const controlMsg = {
@@ -377,79 +388,84 @@ export default {
           const content = json.fullResponse || fullText || '(sin respuesta)'
           const thinking = json.thinking || ocThinking.value || null
           chat._saveMessageToDb(sessionId, { role: 'opencode_result', content, thinking })
-          if (_isActiveSession(sessionId)) {
-            chat.pushMessage({
+          if (!_isActiveSession(sessionId)) {
+            chat.pendingNotifications[sessionId] = Date.now()
+            return
+          }
+
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) {
+            chat.messages[idx] = {
               role: 'opencode_result',
               content,
               thinking,
               _key: 'result-' + Date.now(),
-            })
-            fetchGitBranch()
-
-            if (mode === 'Build' && _buildStartTime) {
-              try {
-                const sinceParam = _buildStartTime
-                const res = await fetch(`/api/playwright-logs/console?chat_session_id=${sessionId}&since=${encodeURIComponent(sinceParam)}&types=error,warn&limit=20`, { credentials: 'include' })
-                const newLogs = await res.json()
-                if (Array.isArray(newLogs) && newLogs.length > 0) {
-                  const errors = newLogs.filter(l => l.type === 'error')
-                  const warnings = newLogs.filter(l => l.type === 'warn')
-                  chat.pushMessage({
-                    role: 'opencode_info',
-                    content: JSON.stringify({
-                      type: 'console_errors',
-                      errors: newLogs,
-                      summary: `Se detectaron ${errors.length} error(es) y ${warnings.length} advertencia(s) en la consola del navegador`,
-                    }),
-                    _key: 'console-err-' + Date.now(),
-                  })
-                }
-              } catch (err) {
-                console.error('Error al verificar console logs:', err.message)
-              }
             }
-
-            const next = ocStore.messageQueue.shift()
-            if (next && _isActiveSession(sessionId)) {
-              const queueMsg = chat.messages.find((m) => m.role === 'opencode_info' && m.content?.includes('encolado'))
-              if (queueMsg) {
-                const qIdx = chat.messages.indexOf(queueMsg)
-                if (qIdx >= 0) chat.messages.splice(qIdx, 1)
-              }
-              sendToOpencode(next)
-              return
-            }
-            chat.pushMessage({
-              role: 'opencode_control',
-              controlData: {
-                controlId: 'followup-' + Date.now(),
-                controlType: 'opencode_form',
-                models: ocStore.getModelsForProvider(ocStore.selectedProvider),
-                modelValue: ocStore.selectedModel || '',
-                thinkingOptions: ocStore.thinkingOptions,
-                thinkingValue: ocStore.selectedThinking || '',
-                temperatureOptions: ocStore.temperatureOptions,
-                temperatureValue: ocStore.selectedTemperature || ocStore.savedTemperature || '0.7',
-                modeValue: ocStore.selectedMode || 'Build',
-                placeholder: 'Escribe otro mensaje para OpenCode...',
-                rows: 3,
-              },
-              _key: 'control-' + Date.now(),
-            })
-          } else {
-            chat.pendingNotifications[sessionId] = Date.now()
           }
+          fetchGitBranch()
+
+          if (mode === 'Build' && _buildStartTime) {
+            try {
+              const sinceParam = _buildStartTime
+              const res = await fetch(`/api/playwright-logs/console?chat_session_id=${sessionId}&since=${encodeURIComponent(sinceParam)}&types=error,warn&limit=20`, { credentials: 'include' })
+              const newLogs = await res.json()
+              if (Array.isArray(newLogs) && newLogs.length > 0) {
+                const errors = newLogs.filter(l => l.type === 'error')
+                const warnings = newLogs.filter(l => l.type === 'warn')
+                chat.pushMessage({
+                  role: 'opencode_info',
+                  content: JSON.stringify({
+                    type: 'console_errors',
+                    errors: newLogs,
+                    summary: `Se detectaron ${errors.length} error(es) y ${warnings.length} advertencia(s) en la consola del navegador`,
+                  }),
+                  _key: 'console-err-' + Date.now(),
+                })
+              }
+            } catch (err) {
+              console.error('Error al verificar console logs:', err.message)
+            }
+          }
+
+          const next = ocStore.messageQueue.shift()
+          if (next && _isActiveSession(sessionId)) {
+            const queueMsg = chat.messages.find((m) => m.role === 'opencode_info' && m.content?.includes('encolado'))
+            if (queueMsg) {
+              const qIdx = chat.messages.indexOf(queueMsg)
+              if (qIdx >= 0) chat.messages.splice(qIdx, 1)
+            }
+            sendToOpencode(next)
+            return
+          }
+          chat.pushMessage({
+            role: 'opencode_control',
+            controlData: {
+              controlId: 'followup-' + Date.now(),
+              controlType: 'opencode_form',
+              models: ocStore.getModelsForProvider(ocStore.selectedProvider),
+              modelValue: ocStore.selectedModel || '',
+              thinkingOptions: ocStore.thinkingOptions,
+              thinkingValue: ocStore.selectedThinking || '',
+              temperatureOptions: ocStore.temperatureOptions,
+              temperatureValue: ocStore.selectedTemperature || ocStore.savedTemperature || '0.7',
+              modeValue: ocStore.selectedMode || 'Build',
+              placeholder: 'Escribe otro mensaje para OpenCode...',
+              rows: 3,
+            },
+            _key: 'control-' + Date.now(),
+          })
         },
         onError(msg) {
           ocStreaming.value = false
           if (sessionId) chat.setSessionStatus(sessionId, 'error')
           chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
           if (_isActiveSession(sessionId)) {
-            chat.pushMessage({
-              role: 'opencode_result',
-              content: `[Error: ${msg}]`,
-              _key: 'error-' + Date.now(),
-            })
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) {
+              chat.messages[idx].streaming = false
+              chat.messages[idx].role = 'opencode_result'
+              chat.messages[idx].content = '[Error: ' + msg + ']'
+            }
           } else {
             chat.pendingNotifications[sessionId] = Date.now()
           }
@@ -2182,6 +2198,7 @@ export default {
         await ocStore.select('provider', value)
         ocStore.selectedProvider = value
         const models = ocStore.getModelsForProvider(value)
+        const prefill = controlMsg.controlData.prefill || ''
         chat.pushMessage({
           role: 'opencode_control',
             controlData: {
@@ -2196,8 +2213,9 @@ export default {
               temperatureOptions: ocStore.temperatureOptions,
               temperatureValue: ocStore.savedTemperature || '0.7',
               modeValue: ocStore.savedMode || 'Build',
-              placeholder: 'Describe qué quieres que OpenCode haga...',
-              rows: 5,
+              placeholder: prefill ? 'Revisa la descripción del ticket y modifícala si es necesario antes de enviar...' : 'Describe qué quieres que OpenCode haga...',
+              rows: prefill ? 8 : 5,
+              prefill,
             },
             _key: 'control-' + Date.now(),
           })
@@ -2216,6 +2234,16 @@ export default {
           ocStore.selectedThinking = thinking || ''
           ocStore.selectedMode = mode
           ocStore.selectedTemperature = temperature || ''
+
+          const formIdx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (formIdx >= 0) {
+            chat.messages[formIdx] = {
+              role: 'opencode_confirmed',
+              content: typeof value === 'object' ? JSON.stringify(value) : String(value),
+              _key: 'confirmed-' + Date.now(),
+            }
+          }
+
           await opencodeStreamPrompt(
             chat.activeSessionId,
             prompt,

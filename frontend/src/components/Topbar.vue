@@ -178,13 +178,42 @@ export default {
     register({
       name: '/dev_opencode_iniciar',
       category: 'Desarrollo',
-      description: 'Inicia una sesión con OpenCode: seleccionar proveedor, modelo, modo y enviar prompt. Si ya hay una sesión activa, la cierra y abre una nueva.',
-      usage: '/dev_opencode_iniciar',
+      description: 'Inicia una sesión con OpenCode: seleccionar proveedor, modelo, modo y enviar prompt. Si ya hay una sesión activa, la cierra y abre una nueva. Con --ticket-desc precarga el textarea con la descripción del ticket de la sesión.',
+      usage: '/dev_opencode_iniciar [--ticket-desc]',
+      async autocomplete(args, cmdStore) {
+        const usedFlags = args.filter(a => a.startsWith('--')).map(a => a.split('=')[0])
+        if (usedFlags.includes('--ticket-desc')) {
+          cmdStore.hideAutocomplete()
+        } else {
+          cmdStore.showAutocomplete(['--ticket-desc'])
+        }
+      },
       async execute(args, { cmdStore, chatStore }) {
         const sessionId = chatStore.activeSessionId
         if (!sessionId) {
           console.error('Error en /dev_opencode_iniciar: no hay sesión de chat activa')
           return
+        }
+
+        const { params } = parseCommandArgs(args, { 'ticket-desc': { required: false } })
+        const useTicketDesc = params['ticket-desc'] === 'true'
+
+        let prefill = ''
+        if (useTicketDesc) {
+          try {
+            const res = await fetch(`/api/tickets/session/${sessionId}`, { credentials: 'include' })
+            const data = await res.json()
+            if (data.ticket && data.ticket.description) {
+              prefill = data.ticket.description
+            } else if (data.idTicketRedmine) {
+              prefill = '*(El ticket asignado no tiene descripción)*'
+            } else {
+              prefill = '*(No hay ticket asignado a esta sesión)*'
+            }
+          } catch (err) {
+            console.error('Error al obtener ticket para --ticket-desc:', err.message)
+            prefill = '*(Error al obtener la descripción del ticket)*'
+          }
         }
 
         if (ocStore.ocSessionId) {
@@ -227,6 +256,7 @@ export default {
             options: providerList,
             placeholder: 'Selecciona proveedor...',
             preselect: preselectProvider,
+            prefill: prefill,
           },
           _key: 'control-' + Date.now(),
         })

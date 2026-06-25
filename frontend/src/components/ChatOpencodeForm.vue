@@ -64,6 +64,7 @@ export default {
     modeValue: { type: String, default: 'Build' },
     placeholder: { type: String, default: '' },
     rows: { type: Number, default: 3 },
+    prefill: { type: String, default: '' },
   },
   emits: ['confirm'],
   setup(props, { emit }) {
@@ -71,7 +72,7 @@ export default {
     const selectedThinking = ref(props.thinkingValue || '')
     const selectedTemperature = ref(props.temperatureValue || '')
     const selectedMode = ref(props.modeValue || 'Build')
-    const text = ref('')
+    const text = ref(props.prefill || '')
 
     const showThinking = computed(() => {
       if (!selectedModel.value) return false
