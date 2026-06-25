@@ -17,13 +17,13 @@
         </div>
       </div>
     </div>
-    <div class="flex-grow-1 overflow-hidden position-relative" style="min-height: 0;">
-      <div v-if="!activeSessionId" class="text-center text-muted mt-5 p-3">
+    <div class="flex-grow-1 overflow-y-auto" ref="messagesContainer" style="min-height: 0;" :style="{ fontSize: gitStore.chatZoom + '%' }">
+      <div v-if="!activeSessionId" class="text-center text-muted mt-5">
         <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
       </div>
-      <div v-else class="messages-pages" ref="messagesContainer" :style="{ fontSize: gitStore.chatZoom + '%' }">
+      <div v-else class="messages-list p-3">
         <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
-        <div v-if="streaming" class="messages-page-item streaming-msg-wrapper">
+        <div v-if="streaming" class="text-start mb-3">
           <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 80%; background: #1a2744; border: 1px solid #374151; color: #e0e0e0;">
             <div v-if="currentThinking" class="mb-2">
               <button class="btn btn-sm w-100 text-start btn-outline-argentina" data-bs-toggle="collapse" data-bs-target="#think-stream">
@@ -2718,11 +2718,11 @@ export default {
       await nextTick()
       await new Promise((resolve) => requestAnimationFrame(resolve))
       if (messagesContainer.value) {
-        messagesContainer.value.scrollLeft = messagesContainer.value.scrollWidth
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
       }
       setTimeout(() => {
         if (messagesContainer.value) {
-          messagesContainer.value.scrollLeft = messagesContainer.value.scrollWidth
+          messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
         }
       }, 100)
     }
@@ -2750,23 +2750,14 @@ export default {
       }
     )
 
-    let wheelHandler = null
     onMounted(() => {
       if (messagesContainer.value) {
         resizeObserver = new ResizeObserver(() => {
           if (messagesContainer.value) {
-            messagesContainer.value.scrollLeft = messagesContainer.value.scrollWidth
+            messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
           }
         })
         resizeObserver.observe(messagesContainer.value)
-
-        wheelHandler = (e) => {
-          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-            e.preventDefault()
-            messagesContainer.value.scrollLeft += e.deltaY
-          }
-        }
-        messagesContainer.value.addEventListener('wheel', wheelHandler, { passive: false })
       }
       loadTicketInfo()
       loadZoom()
@@ -2775,9 +2766,6 @@ export default {
 
     onUnmounted(() => {
       if (resizeObserver) resizeObserver.disconnect()
-      if (wheelHandler && messagesContainer.value) {
-        messagesContainer.value.removeEventListener('wheel', wheelHandler)
-      }
     })
 
     return {
@@ -2976,23 +2964,8 @@ html, body {
   color: #e0e0e0;
 }
 
-/* --- Paginación horizontal --- */
-.messages-pages {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  gap: 0.75rem;
+/* --- Lista simple de mensajes --- */
+.messages-list {
   padding: 1rem;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth;
-}
-.messages-pages > * {
-  flex-shrink: 0;
-  width: calc(50% - 1.375rem);
-  margin-bottom: 0 !important;
 }
 </style>
