@@ -1,8 +1,5 @@
 import 'dotenv/config';
 import http from 'http';
-import { spawn, execSync } from 'child_process';
-import { fileURLToPath } from 'url';
-import path from 'path';
 import express from 'express';
 import sessionMiddleware from './middlewares/memoriaSession.js';
 import authRoutes from './routes/auth.routes.js';
@@ -57,144 +54,7 @@ app.use('/api/environments', environmentsRoutes);
 app.use('/api/playwright-logs', playwrightLogsRoutes);
 app.use('/api/state', stateRoutes);
 
-let pwProcess = null;
-let docProcess = null;
-let gastosProcess = null;
-let memProcess = null;
-
-function startPlaywrightService() {
-  const pwPort = process.env.SERVICIO_PLAYWRIGHT_PORT || 4098;
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const pwPath = path.resolve(__dirname, '../../playwright/src/index.js');
-  pwProcess = spawn('node', [pwPath], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env },
-  });
-
-  pwProcess.stdout.on('data', (data) => {
-    const text = data.toString().trim();
-    if (text) console.log('[playwright]', text);
-  });
-
-  pwProcess.stderr.on('data', (data) => {
-    const text = data.toString().trim();
-    if (text) console.log('[playwright]', text);
-  });
-
-  pwProcess.on('exit', (code) => {
-    console.log('[playwright] proceso terminado, código:', code);
-    pwProcess = null;
-  });
-
-  pwProcess.on('error', (err) => {
-    console.log('[playwright] error al iniciar:', err.message);
-    pwProcess = null;
-  });
-}
-
-function startDocumentalService() {
-  const docPort = process.env.SERVICIO_DOCUMENTAL_PORT || 4099;
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const docPath = path.resolve(__dirname, '../../api_documental/src/index.js');
-  docProcess = spawn('node', [docPath], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env },
-  });
-
-  docProcess.stdout.on('data', (data) => {
-    const text = data.toString().trim();
-    if (text) console.log('[documental]', text);
-  });
-
-  docProcess.stderr.on('data', (data) => {
-    const text = data.toString().trim();
-    if (text) console.log('[documental]', text);
-  });
-
-  docProcess.on('exit', (code) => {
-    console.log('[documental] proceso terminado, código:', code);
-    docProcess = null;
-  });
-
-  docProcess.on('error', (err) => {
-    console.log('[documental] error al iniciar:', err.message);
-    docProcess = null;
-  });
-}
-
-function startGastosService() {
-  const gastosPort = process.env.SERVICIO_GASTOS_PORT || 4100;
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const gastosPath = path.resolve(__dirname, '../../api_gastos/src/index.js');
-  gastosProcess = spawn('node', [gastosPath], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env },
-  });
-
-  gastosProcess.stdout.on('data', (data) => {
-    const text = data.toString().trim();
-    if (text) console.log('[gastos]', text);
-  });
-
-  gastosProcess.stderr.on('data', (data) => {
-    const text = data.toString().trim();
-    if (text) console.log('[gastos]', text);
-  });
-
-  gastosProcess.on('exit', (code) => {
-    console.log('[gastos] proceso terminado, código:', code);
-    gastosProcess = null;
-  });
-
-  gastosProcess.on('error', (err) => {
-    console.log('[gastos] error al iniciar:', err.message);
-    gastosProcess = null;
-  });
-}
-
-function startMemoriaService() {
-  const memPort = process.env.SERVICIO_MEMORIA_PORT || 4101;
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const memPath = path.resolve(__dirname, '../../api_memoria/src/index.js');
-  memProcess = spawn('node', [memPath], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env },
-  });
-
-  memProcess.stdout.on('data', (data) => {
-    const text = data.toString().trim();
-    if (text) console.log('[memoria]', text);
-  });
-
-  memProcess.stderr.on('data', (data) => {
-    const text = data.toString().trim();
-    if (text) console.log('[memoria]', text);
-  });
-
-  memProcess.on('exit', (code) => {
-    console.log('[memoria] proceso terminado, código:', code);
-    memProcess = null;
-  });
-
-  memProcess.on('error', (err) => {
-    console.log('[memoria] error al iniciar:', err.message);
-    memProcess = null;
-  });
-}
-
-function killPort(port) {
-  try {
-    execSync(`fuser -k ${port}/tcp 2>/dev/null || lsof -ti :${port} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' });
-  } catch {
-  }
-}
-
 async function start() {
-  const ports = [process.env.PORT, process.env.SERVICIO_PLAYWRIGHT_PORT, process.env.SERVICIO_DOCUMENTAL_PORT, process.env.SERVICIO_GASTOS_PORT, process.env.SERVICIO_MEMORIA_PORT, process.env.OPENCODE_PORT].filter(Boolean);
-  for (const p of ports) {
-    killPort(p);
-  }
-
   try {
     console.log('[migrate] Ejecutando migraciones pendientes...');
     await db.migrate.latest();
@@ -211,10 +71,6 @@ async function start() {
       process.exit(1);
     }
     console.log(`Server listening on port ${PORT}`);
-    startPlaywrightService();
-    startDocumentalService();
-    startGastosService();
-    startMemoriaService();
   });
 }
 
@@ -223,26 +79,14 @@ start();
 process.on('exit', () => {
   devInstanceManager.stopAll();
   opencode.stopAllServers();
-  if (pwProcess) pwProcess.kill();
-  if (docProcess) docProcess.kill();
-  if (gastosProcess) gastosProcess.kill();
-  if (memProcess) memProcess.kill();
 });
 process.on('SIGTERM', () => {
   devInstanceManager.stopAll();
   opencode.stopAllServers();
-  if (pwProcess) pwProcess.kill();
-  if (docProcess) docProcess.kill();
-  if (gastosProcess) gastosProcess.kill();
-  if (memProcess) memProcess.kill();
   process.exit(0);
 });
 process.on('SIGINT', () => {
   devInstanceManager.stopAll();
   opencode.stopAllServers();
-  if (pwProcess) pwProcess.kill();
-  if (docProcess) docProcess.kill();
-  if (gastosProcess) gastosProcess.kill();
-  if (memProcess) memProcess.kill();
   process.exit(0);
 });

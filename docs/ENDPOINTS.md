@@ -1,7 +1,17 @@
 # ENDPOINTS — API REST
 
-Servidor Express principal en puerto `4000` (configurable vía `PORT` en `.env`).
-Todas las rutas protegidas requieren sesión activa (cookie `session_token` almacenada en el servicio de memoria `api_memoria`).
+- **api_gestor_servicios:** Puerto `4200` (configurable vía `SERVICIO_GESTOR_PORT`). Punto de entrada que orquesta el resto de servicios.
+- **Backend Express principal:** Puerto `4000` (configurable vía `PORT` en `.env`).
+- Todas las rutas protegidas requieren sesión activa (cookie `session_token` almacenada en el servicio de memoria `api_memoria`).
+
+---
+
+## Gestor de Servicios (`/api/gestor`)
+
+### `GET /api/gestor/keepalive`
+- **Auth:** No
+- **Respuesta:** `{ status: "ok", timestamp: "2026-06-26T..." }`
+- **Descripción:** Endpoint de salud del orquestador. Confirma que `api_gestor_servicios` está funcionando.
 
 ---
 

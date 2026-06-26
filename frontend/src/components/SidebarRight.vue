@@ -49,10 +49,12 @@
         <span>No hay variables definidas para este proyecto</span>
       </div>
       <div v-else class="variables-list flex-grow-1 overflow-y-auto px-2 py-1">
-        <div v-for="v in variables" :key="v.key" class="variable-item d-flex align-items-start px-2 py-2 mb-1 rounded">
+        <div v-for="v in variables" :key="v.key" class="variable-item d-flex align-items-start px-2 py-2 mb-1 rounded"
+          @click="openVariableDetail(v)" role="button">
           <span class="variable-key text-nowrap">{{ v.key }}</span>
           <span class="variable-sep mx-1 text-muted">=</span>
-          <span class="variable-value text-break small">{{ v.value }}</span>
+          <span class="variable-value text-break small">{{ truncateValue(v.value) }}</span>
+          <span v-if="v.type === 'memory'" class="badge bg-info ms-1" style="font-size: 0.55rem; line-height: 1.2; align-self: center;">mem</span>
         </div>
       </div>
     </template>
@@ -69,6 +71,8 @@ import { useUiStore } from '../stores/ui.js'
 import { useChatStore } from '../stores/chat.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
 import { useProjectVariablesStore } from '../stores/projectVariables.js'
+import { useModalStore } from '../stores/modal.js'
+import VariableDetailModal from './VariableDetailModal.vue'
 import FileTreePanel from './FileTreePanel.vue'
 
 export default {
@@ -76,12 +80,20 @@ export default {
   setup() {
     const ui = useUiStore()
     const chat = useChatStore()
+    const modal = useModalStore()
     const redmineComments = useRedmineCommentsStore()
     const projectVariables = useProjectVariablesStore()
     const { rightPanelCollapsed, rightPanelWidth } = storeToRefs(ui)
     const { activeSessionId, sessions } = storeToRefs(chat)
 
-    const comments = computed(() => redmineComments.commentsBySession[activeSessionId.value] || [])
+    const comments = computed(() => {
+      const list = redmineComments.commentsBySession[activeSessionId.value] || []
+      return [...list].sort((a, b) => {
+        if (a.estado === 'pendiente' && b.estado !== 'pendiente') return -1
+        if (a.estado !== 'pendiente' && b.estado === 'pendiente') return 1
+        return new Date(a.created_at) - new Date(b.created_at)
+      })
+    })
     const loading = computed(() => redmineComments.loadingBySession[activeSessionId.value] || false)
 
     const proyectoId = computed(() => activeSession.value?.proyecto_id || null)
@@ -104,6 +116,16 @@ export default {
       if (!dateStr) return ''
       const d = new Date(dateStr)
       return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+    }
+
+    function truncateValue(val) {
+      if (!val) return ''
+      const str = String(val)
+      return str.length > 255 ? str.substring(0, 255) + '…' : str
+    }
+
+    function openVariableDetail(variable) {
+      modal.open(VariableDetailModal, { variable }, { title: variable.key })
     }
 
     function badgeClass(estado) {
@@ -180,6 +202,8 @@ export default {
       loadingVariables,
       formatDate,
       badgeClass,
+      truncateValue,
+      openVariableDetail,
       onResizeStart,
     }
   },
@@ -271,6 +295,7 @@ export default {
 .variable-item {
   background: #1a2744;
   border: 1px solid #374151;
+  cursor: pointer;
 }
 .variable-item:hover {
   background: #1e3050;

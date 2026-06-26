@@ -31,11 +31,12 @@ router.post('/command', async (req, res) => {
         const url = parametros?.url;
         const resolution = parametros?.resolution;
         const chatSessionId = parametros?.chat_session_id;
-        const idSession = await browserManager.startSession(navegador, headless, resolution, chatSessionId);
+        const instanceName = parametros?.instance_name;
+        const idSession = await browserManager.startSession(navegador, headless, resolution, chatSessionId, instanceName);
         if (url) {
           await browserManager.goToUrl(idSession, url);
         }
-        return res.json({ id_session: idSession, headless: !!headless, url: url || null, resolution: resolution || null, chat_session_id: chatSessionId || null });
+        return res.json({ id_session: idSession, headless: !!headless, url: url || null, resolution: resolution || null, chat_session_id: chatSessionId || null, instance_name: instanceName || null });
       } catch (err) {
         return res.status(500).json({ error: err.message });
       }
@@ -73,12 +74,11 @@ router.post('/command', async (req, res) => {
       const value = headless === true || headless === '1' || headless === 1;
       browserManager.setDefaultHeadless(value);
 
-      // If there's an active session, restart it with the new headless mode
       const active = browserManager.getActiveSession();
       if (active) {
-        const { id, navegador, chatSessionId } = active;
+        const { id, navegador, chatSessionId, instanceName } = active;
         await browserManager.closeSession(id);
-        const newId = await browserManager.startSession(navegador, value, null, chatSessionId);
+        const newId = await browserManager.startSession(navegador, value, null, chatSessionId, instanceName);
         return res.json({ success: true, reiniciado: true, id_session: newId, headless: value });
       }
 

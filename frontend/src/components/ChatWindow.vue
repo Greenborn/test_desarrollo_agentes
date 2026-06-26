@@ -63,6 +63,7 @@ import { useOpencodeStore } from '../stores/opencode.js'
 import { useSettingsStore } from '../stores/settings.js'
 import { useGitStore } from '../stores/git.js'
 import { useDevInstanceStore } from '../stores/devInstance.js'
+import { useProjectVariablesStore } from '../stores/projectVariables.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
 import { useTicketStore } from '../stores/ticket.js'
 import { deteccionState, abortDeteccion } from '../composables/commands/deteccionFuncionalidades.js'
@@ -93,6 +94,7 @@ export default {
     const ocChunk = ref('')
     const ocThinking = ref('')
     const devInstanceStore = useDevInstanceStore()
+    const projectVarStore = useProjectVariablesStore()
     const devInstanceRunning = computed(() => devInstanceStore.hasProcesses)
     const streamSessionId = ref(null)
     const ticketInfo = ref(null)
@@ -104,9 +106,20 @@ export default {
         (streamingConsole.value || devInstanceStore.browserSessions.length > 0)
       )
     })
+
+    function refreshVariablesOnConsoleLog() {
+      const sid = chat.activeSessionId
+      if (!sid) return
+      const session = chat.sessions.find(s => s.id === sid)
+      if (session?.proyecto_id) {
+        projectVarStore.loadVariables(session.proyecto_id)
+      }
+    }
+
     useConsoleLogStream(
       () => chat.activeSessionId,
       shouldStreamConsole,
+      refreshVariablesOnConsoleLog,
     )
     useNetworkLogStream(
       () => chat.activeSessionId,

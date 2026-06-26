@@ -517,7 +517,7 @@ function notifyNetworkError(data) {
   }).catch(() => {});
 }
 
-function setupPageListeners(page, sessionId, chatSessionId) {
+function setupPageListeners(page, sessionId, chatSessionId, instanceName) {
   page.on('response', async (response) => {
     const req = response.request();
     const resourceType = req.resourceType();
@@ -642,14 +642,13 @@ function setupPageListeners(page, sessionId, chatSessionId) {
         location: locationStr,
       });
 
-      if (type === 'error' || type === 'warn') {
-        notifyBackend({
-          chat_session_id: chatSessionId,
-          type,
-          text: msg.text(),
-          location: locationStr,
-        });
-      }
+      notifyBackend({
+        chat_session_id: chatSessionId,
+        type,
+        text: msg.text(),
+        location: locationStr,
+        instance_name: instanceName,
+      });
     } catch (err) {
       console.log(`[browserManager] Error al guardar console log:`, err.message);
     }
@@ -673,6 +672,7 @@ function setupPageListeners(page, sessionId, chatSessionId) {
         type: 'error',
         text: stack,
         location: null,
+        instance_name: instanceName,
       });
     } catch (err) {
       console.log(`[browserManager] Error al guardar pageerror:`, err.message);
@@ -680,7 +680,7 @@ function setupPageListeners(page, sessionId, chatSessionId) {
   });
 }
 
-async function startSession(navegador, headless, resolution, chatSessionId) {
+async function startSession(navegador, headless, resolution, chatSessionId, instanceName) {
   if (!navegador) {
     throw new Error('Parámetro "navegador" es requerido');
   }
@@ -722,9 +722,10 @@ async function startSession(navegador, headless, resolution, chatSessionId) {
 
   const id = generateId();
   const safeChatSessionId = chatSessionId || null;
-  sessions.set(id, { browser, context, page, navegador, headless: headlessMode, resolution: resolution || null, chatSessionId: safeChatSessionId });
+  const safeInstanceName = instanceName || null;
+  sessions.set(id, { browser, context, page, navegador, headless: headlessMode, resolution: resolution || null, chatSessionId: safeChatSessionId, instanceName: safeInstanceName });
 
-  setupPageListeners(page, id, safeChatSessionId);
+  setupPageListeners(page, id, safeChatSessionId, safeInstanceName);
 
   const resInfo = resolution ? `, resolución: ${resolution.width}x${resolution.height}` : '';
   const chatInfo = safeChatSessionId ? `, chat_session: ${safeChatSessionId}` : '';

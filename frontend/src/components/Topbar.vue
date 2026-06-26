@@ -257,6 +257,40 @@ export default {
 
         const preselectProvider = ocStore.savedProvider || providerList[0].value
 
+        ;(async () => {
+          try {
+            const projRes = await fetch(`/api/proyecto/session/${sessionId}`, { credentials: 'include' })
+            const projData = await projRes.json()
+            if (projData.proyectoId) {
+              const varRes = await fetch(`/api/proyecto/${encodeURIComponent(projData.proyectoId)}/variables`, { credentials: 'include' })
+              const varData = await varRes.json()
+              const existingKeys = new Set((varData.variables || []).map(v => v.key))
+              const consoleVars = ['NAVEGADOR_CONSOLE_ERRORS', 'NAVEGADOR_CONSOLE_WARNS', 'NAVEGADOR_CONSOLE_LOGS']
+              const created = []
+              for (const varKey of consoleVars) {
+                if (!existingKeys.has(varKey)) {
+                  await fetch(`/api/proyecto/${encodeURIComponent(projData.proyectoId)}/variables`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ key: varKey, value: '{}', type: 'memory' }),
+                  })
+                  created.push(varKey)
+                }
+              }
+              if (created.length > 0) {
+                chatStore.pushMessage({
+                  role: 'opencode_info',
+                  content: JSON.stringify({ type: 'info', message: `Variables creadas: ${created.join(', ')} (memoria) para registrar logs de consola del navegador.` }),
+                  _key: 'info-' + Date.now(),
+                }, sessionId)
+              }
+            }
+          } catch (err) {
+            console.error('Error al gestionar variables de consola:', err.message)
+          }
+        })()
+
         chatStore.messages.push({
           role: 'opencode_control',
           controlData: {
@@ -412,6 +446,29 @@ export default {
           console.error('Error en /dev_opencode_finalizar:', err)
         }
         ocStore.finish()
+
+        try {
+          const sessionRes = await fetch(`/api/proyecto/session/${chatStore.activeSessionId}`, { credentials: 'include' })
+          const sessionData = await sessionRes.json()
+          if (sessionData.proyectoId) {
+            const consoleVars = ['NAVEGADOR_CONSOLE_ERRORS', 'NAVEGADOR_CONSOLE_WARNS', 'NAVEGADOR_CONSOLE_LOGS']
+            for (const varKey of consoleVars) {
+              try {
+                await fetch(`/api/proyecto/${encodeURIComponent(sessionData.proyectoId)}/variables/${varKey}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ value: '{}' }),
+                })
+              } catch (err) {
+                console.error(`Error al limpiar ${varKey}:`, err.message)
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error al limpiar variables de consola:', err.message)
+        }
+
         return 'Sesión OpenCode finalizada.'
       },
     })

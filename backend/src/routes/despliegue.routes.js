@@ -190,7 +190,7 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
 
           for (const fe of frontendPorts) {
             try {
-              const parametros = { navegador: 'chrome', url: fe.url, chat_session_id: sessionId };
+              const parametros = { navegador: 'chrome', url: fe.url, chat_session_id: sessionId, instance_name: fe.name };
               if (resolution) parametros.resolution = resolution;
 
               const pwRes = await fetch(`http://localhost:${PW_PORT}/api/command`, {

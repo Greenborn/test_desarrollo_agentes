@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import db from '../config/db.js';
+import memoriaClient from '../services/memoriaClient.js';
 
 const router = Router();
 
@@ -168,8 +169,8 @@ router.get('/console/stream', (req, res) => {
   addSSEConnection(chatSessionId, res);
 });
 
-router.post('/console/notify', (req, res) => {
-  const { chat_session_id, type, text, location } = req.body;
+router.post('/console/notify', async (req, res) => {
+  const { chat_session_id, type, text, location, instance_name } = req.body;
   if (!chat_session_id) {
     return res.status(400).json({ error: 'chat_session_id es requerido' });
   }
@@ -177,13 +178,59 @@ router.post('/console/notify', (req, res) => {
   const key = parseInt(chat_session_id);
   const conns = sseConnections.get(key);
   if (conns) {
-    const payload = { type: 'console', chat_session_id: key, console_type: type, text, location };
+    const payload = { type: 'console', chat_session_id: key, console_type: type, text, location, instance_name };
     for (const res of conns) {
       try {
         sendSSE(res, payload);
       } catch (err) {
         console.log('Error al enviar SSE:', err.message);
       }
+    }
+  }
+
+  if (instance_name) {
+    try {
+      const session = await db('chat_sessions')
+        .select('proyecto_id')
+        .where({ id: key })
+        .first();
+
+      if (session && session.proyecto_id) {
+        const proyectoId = session.proyecto_id;
+        const memNamespace = `proyecto:${proyectoId}`;
+
+        const logType = type === 'error' ? 'error' : type === 'warn' ? 'warn' : 'log';
+        const varKey = logType === 'error' ? 'NAVEGADOR_CONSOLE_ERRORS'
+          : logType === 'warn' ? 'NAVEGADOR_CONSOLE_WARNS'
+          : 'NAVEGADOR_CONSOLE_LOGS';
+
+        let currentValue = {};
+
+        try {
+          const memResult = await memoriaClient.get(memNamespace, varKey);
+          currentValue = typeof memResult.value === 'string' ? JSON.parse(memResult.value) : memResult.value;
+        } catch (err) {
+          currentValue = {};
+        }
+
+        if (typeof currentValue !== 'object' || currentValue === null) {
+          currentValue = {};
+        }
+        if (!Array.isArray(currentValue[instance_name])) {
+          currentValue[instance_name] = [];
+        }
+
+        currentValue[instance_name].push({
+          type,
+          text,
+          location,
+          timestamp: Date.now(),
+        });
+
+        await memoriaClient.set(memNamespace, varKey, JSON.stringify(currentValue));
+      }
+    } catch (err) {
+      console.log('[playwrightLogs] Error al actualizar variable de consola:', err.message);
     }
   }
 

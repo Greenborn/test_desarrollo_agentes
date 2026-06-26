@@ -5,7 +5,7 @@ const DEBOUNCE_MS = 2000
 const RECONNECT_DELAY = 3000
 const MAX_ERRORS_PER_BATCH = 50
 
-export function useConsoleLogStream(sessionIdRef, enabledRef) {
+export function useConsoleLogStream(sessionIdRef, enabledRef, onBatch) {
   const chat = useChatStore()
   let abortController = null
   let buffer = []
@@ -34,6 +34,10 @@ export function useConsoleLogStream(sessionIdRef, enabledRef) {
       }),
       _key: 'console-err-' + Date.now(),
     })
+
+    if (typeof onBatch === 'function') {
+      onBatch(batch)
+    }
   }
 
   function pushToBuffer(event) {

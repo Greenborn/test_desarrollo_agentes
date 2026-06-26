@@ -38,12 +38,12 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 
 ```
 /
-├── backend/               # Express + Knex
+├── backend/               # Express + Knex (iniciado por api_gestor_servicios)
 │   ├── migrations/        # Migraciones Knex
 │   ├── seeds/             # Seeds Knex (admin/admin)
 │   ├── scripts/           # setup-db.js
 │   └── src/
-│       ├── index.js       # Entrypoint (Express)
+│       ├── index.js       # Express (puerto 4000)
 │       ├── config/db.js   # Conexión Knex
 │       ├── routes/        # auth.routes.js, chat.routes.js, settings.routes.js, workspaces.routes.js
 │       ├── services/      # crypto.js, deepseek.js, redmine.js
@@ -56,6 +56,10 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 │       ├── stores/         # Pinia (auth, chat, settings, workspace)
 │       ├── views/          # Login, Dashboard, Settings
 │       └── components/     # Topbar, SidebarChat, ChatWindow, ChatMessage
+├── api_gestor_servicios/  # Punto de entrada — orquestador de servicios (spawn + keepalive)
+│   └── src/
+│       ├── index.js       # Entrypoint (Express, puerto 4200)
+│       └── routes/        # gestor.routes.js
 ├── api_gastos/            # Servicio de registro de gastos de tokens
 │   └── src/
 │       ├── index.js       # Entrypoint (Express)
@@ -81,6 +85,13 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 
 ## Comandos de desarrollo
 
+### API Gestor Servicios (`api_gestor_servicios/`) — Punto de entrada
+
+```bash
+npm run dev               # Iniciar servidor con --watch (puerto 4200)
+npm start                 # Iniciar servidor en producción
+```
+
 ### Backend (`backend/`)
 
 ```bash
@@ -89,10 +100,9 @@ npm run migrate           # Ejecutar migraciones
 npm run seed              # Ejecutar seeds (admin/admin)
 npm run dev               # Iniciar servidor con --watch (puerto 4000)
 npm start                 # Iniciar servidor en producción
-npm run dev:all           # Inicia backend + frontend juntos
 ```
 
-Orden inicial obligatorio: `sudo setup-db → migrate → seed → dev`
+Orden inicial obligatorio: `sudo setup-db → migrate → seed → dev` (luego iniciar con `npm run dev` desde `api_gestor_servicios/`)
 
 ### Frontend (`frontend/`)
 
@@ -105,6 +115,13 @@ npm run build             # Build producción
 
 ```bash
 npm run dev               # Iniciar servidor con --watch (puerto 4100)
+npm start                 # Iniciar servidor en producción
+```
+
+### API Documental (`api_documental/`)
+
+```bash
+npm run dev               # Iniciar servidor con --watch (puerto 4099)
 npm start                 # Iniciar servidor en producción
 ```
 
