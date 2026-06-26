@@ -47,6 +47,7 @@
     <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu"></div>
     <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
       <div class="context-menu-item" @click="toggleRawView(ctxMenu.msg)">{{ rawMsgKeys.has(msgKey(ctxMenu.msg)) ? '🎨 Vista formateada' : '📄 Vista texto plano' }}</div>
+      <div class="context-menu-item" @click="copyPlainText(ctxMenu.msg)">📋 Copiar texto plano</div>
       <div class="context-menu-item text-danger" @click="deleteMessage(ctxMenu.msg)">🗑️ Eliminar mensaje</div>
     </div>
   </div>
@@ -237,6 +238,17 @@ export default {
       } else {
         rawMsgKeys.add(key)
       }
+    }
+
+    async function copyPlainText(msg) {
+      const text = msg.content || ''
+      if (!text) return
+      try {
+        await navigator.clipboard.writeText(text)
+      } catch (err) {
+        console.error('Error al copiar al portapapeles:', err.message)
+      }
+      closeCtxMenu()
     }
 
     function closeCtxMenu() {
@@ -2931,6 +2943,7 @@ export default {
       rawMsgKeys,
       msgKey,
       toggleRawView,
+      copyPlainText,
       generarCommit,
       iniciarInstanciaDev,
       detenerInstanciaDev,
