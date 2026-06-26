@@ -31,7 +31,14 @@ export default {
   },
 
   async get(namespace, key) {
-    return request('GET', `/get/${encodeURIComponent(namespace)}/${encodeURIComponent(key)}`);
+    try {
+      return await request('GET', `/get/${encodeURIComponent(namespace)}/${encodeURIComponent(key)}`);
+    } catch (err) {
+      if (err.message.includes('404')) {
+        return null;
+      }
+      throw err;
+    }
   },
 
   async del(namespace, key) {

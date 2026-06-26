@@ -45,6 +45,9 @@ export function useConsoleLogStream(sessionIdRef, enabledRef, onBatch) {
     if (debounceTimer) {
       clearTimeout(debounceTimer)
     }
+    if (typeof onBatch === 'function') {
+      onBatch([event])
+    }
     debounceTimer = setTimeout(flushBuffer, DEBOUNCE_MS)
   }
 

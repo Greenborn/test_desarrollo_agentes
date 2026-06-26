@@ -265,7 +265,7 @@ export default {
               const varRes = await fetch(`/api/proyecto/${encodeURIComponent(projData.proyectoId)}/variables`, { credentials: 'include' })
               const varData = await varRes.json()
               const existingKeys = new Set((varData.variables || []).map(v => v.key))
-              const consoleVars = ['NAVEGADOR_CONSOLE_ERRORS', 'NAVEGADOR_CONSOLE_WARNS', 'NAVEGADOR_CONSOLE_LOGS']
+              const consoleVars = ['NAVEGADOR_CONSOLE_ERRORS', 'NAVEGADOR_CONSOLE_WARNS', 'NAVEGADOR_CONSOLE_LOGS', 'NAVEGADOR_NETWORK_ERRORS']
               const created = []
               for (const varKey of consoleVars) {
                 if (!existingKeys.has(varKey)) {
@@ -451,7 +451,7 @@ export default {
           const sessionRes = await fetch(`/api/proyecto/session/${chatStore.activeSessionId}`, { credentials: 'include' })
           const sessionData = await sessionRes.json()
           if (sessionData.proyectoId) {
-            const consoleVars = ['NAVEGADOR_CONSOLE_ERRORS', 'NAVEGADOR_CONSOLE_WARNS', 'NAVEGADOR_CONSOLE_LOGS']
+            const consoleVars = ['NAVEGADOR_CONSOLE_ERRORS', 'NAVEGADOR_CONSOLE_WARNS', 'NAVEGADOR_CONSOLE_LOGS', 'NAVEGADOR_NETWORK_ERRORS']
             for (const varKey of consoleVars) {
               try {
                 await fetch(`/api/proyecto/${encodeURIComponent(sessionData.proyectoId)}/variables/${varKey}`, {

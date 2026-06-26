@@ -85,7 +85,7 @@ router.get('/network/stream', (req, res) => {
 });
 
 router.post('/network/notify', (req, res) => {
-  const { chat_session_id, method, url, status_code, error, resource_type } = req.body;
+  const { chat_session_id, method, url, status_code, error, resource_type, instance_name } = req.body;
   if (!chat_session_id) {
     return res.status(400).json({ error: 'chat_session_id es requerido' });
   }
@@ -101,6 +101,7 @@ router.post('/network/notify', (req, res) => {
       status_code: status_code || null,
       error,
       resource_type: resource_type || null,
+      instance_name,
     };
     for (const res of conns) {
       try {
@@ -114,59 +115,56 @@ router.post('/network/notify', (req, res) => {
   res.json({ success: true });
 });
 
-router.get('/console', async (req, res) => {
-  if (!authGuard(req, res)) return;
-
-  const chatSessionId = req.query.chat_session_id;
-  if (!chatSessionId) {
+router.post('/network/store', async (req, res) => {
+  const { chat_session_id, method, url, status_code, error, resource_type, instance_name } = req.body;
+  if (!chat_session_id) {
     return res.status(400).json({ error: 'chat_session_id es requerido' });
   }
 
-  try {
-    let query = db('playwright_console_logs')
-      .where({ chat_session_id: parseInt(chatSessionId) });
+  if (instance_name) {
+    try {
+      const session = await db('chat_sessions')
+        .select('proyecto_id')
+        .where({ id: parseInt(chat_session_id) })
+        .first();
 
-    const since = req.query.since;
-    if (since) {
-      query = query.where('created_at', '>', since);
-    }
+      if (session && session.proyecto_id) {
+        const proyectoId = session.proyecto_id;
+        const memNamespace = `proyecto:${proyectoId}`;
+        const varKey = 'NAVEGADOR_NETWORK_ERRORS';
+        let currentValue = {};
 
-    const types = req.query.types;
-    if (types) {
-      const typeList = types.split(',').map(t => t.trim()).filter(Boolean);
-      if (typeList.length > 0) {
-        query = query.whereIn('type', typeList);
+        try {
+          const memResult = await memoriaClient.get(memNamespace, varKey);
+          currentValue = typeof memResult.value === 'string' ? JSON.parse(memResult.value) : memResult.value;
+        } catch (err) {
+          currentValue = {};
+        }
+
+        if (typeof currentValue !== 'object' || currentValue === null) {
+          currentValue = {};
+        }
+        if (!Array.isArray(currentValue[instance_name])) {
+          currentValue[instance_name] = [];
+        }
+
+        currentValue[instance_name].push({
+          method,
+          url,
+          status_code: status_code || null,
+          error: error || null,
+          resource_type: resource_type || null,
+          timestamp: Date.now(),
+        });
+
+        await memoriaClient.set(memNamespace, varKey, JSON.stringify(currentValue));
       }
+    } catch (err) {
+      console.log('[playwrightLogs] Error al almacenar petición en NAVEGADOR_NETWORK_ERRORS:', err.message);
     }
-
-    const limit = req.query.limit ? Math.min(parseInt(req.query.limit), 500) : 500;
-
-    const logs = await query
-      .orderBy('created_at', 'desc')
-      .limit(limit);
-    res.json(logs);
-  } catch (err) {
-    console.log('Error al obtener console logs:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.get('/console/stream', (req, res) => {
-  if (!authGuard(req, res)) return;
-
-  const chatSessionId = req.query.chat_session_id;
-  if (!chatSessionId) {
-    return res.status(400).json({ error: 'chat_session_id es requerido' });
   }
 
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-  });
-
-  sendSSE(res, { type: 'connected', chat_session_id: parseInt(chatSessionId) });
-  addSSEConnection(chatSessionId, res);
+  res.json({ success: true });
 });
 
 router.post('/console/notify', async (req, res) => {

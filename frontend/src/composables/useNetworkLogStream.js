@@ -5,7 +5,7 @@ const DEBOUNCE_MS = 2000
 const RECONNECT_DELAY = 3000
 const MAX_ERRORS_PER_BATCH = 50
 
-export function useNetworkLogStream(sessionIdRef, enabledRef) {
+export function useNetworkLogStream(sessionIdRef, enabledRef, onBatch) {
   const chat = useChatStore()
   let abortController = null
   let buffer = []
@@ -34,12 +34,19 @@ export function useNetworkLogStream(sessionIdRef, enabledRef) {
       }),
       _key: 'network-err-' + Date.now(),
     })
+
+    if (typeof onBatch === 'function') {
+      onBatch(batch)
+    }
   }
 
   function pushToBuffer(event) {
     buffer.push(event)
     if (debounceTimer) {
       clearTimeout(debounceTimer)
+    }
+    if (typeof onBatch === 'function') {
+      onBatch([event])
     }
     debounceTimer = setTimeout(flushBuffer, DEBOUNCE_MS)
   }

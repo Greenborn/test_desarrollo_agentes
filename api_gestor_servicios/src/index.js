@@ -2,7 +2,9 @@ import { execSync, spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import express from 'express';
+import authMiddleware from './authMiddleware.js';
 import gestorRoutes from './routes/gestor.routes.js';
+import servicesRoutes from './routes/services.routes.js';
 
 const PORT = process.env.SERVICIO_GESTOR_PORT;
 if (!PORT) {
@@ -12,16 +14,59 @@ if (!PORT) {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-let pwProcess = null;
-let docProcess = null;
-let gastosProcess = null;
-let memProcess = null;
-let backendProcess = null;
+const processes = {};
 
-function spawnService(name, relativeScriptPath, logTag, cwd) {
-  const scriptPath = path.resolve(__dirname, relativeScriptPath);
+const serviceConfig = {
+  backend: {
+    script: '../../backend/src/index.js',
+    cwd: path.resolve(__dirname, '../../backend'),
+    port: process.env.PORT,
+  },
+  playwright: {
+    script: '../../playwright/src/index.js',
+    cwd: path.resolve(__dirname, '../../playwright'),
+    port: process.env.SERVICIO_PLAYWRIGHT_PORT,
+  },
+  documental: {
+    script: '../../api_documental/src/index.js',
+    cwd: path.resolve(__dirname, '../../api_documental'),
+    port: process.env.SERVICIO_DOCUMENTAL_PORT,
+  },
+  gastos: {
+    script: '../../api_gastos/src/index.js',
+    cwd: path.resolve(__dirname, '../../api_gastos'),
+    port: process.env.SERVICIO_GASTOS_PORT,
+  },
+  memoria: {
+    script: '../../api_memoria/src/index.js',
+    cwd: path.resolve(__dirname, '../../api_memoria'),
+    port: process.env.SERVICIO_MEMORIA_PORT,
+  },
+};
+
+export function getProcess(name) {
+  return processes[name] || null;
+}
+
+export function isRunning(name) {
+  const proc = processes[name];
+  return !!proc && !proc.killed;
+}
+
+export function getServiceConfig() {
+  return serviceConfig;
+}
+
+function spawnService(name, logTag) {
+  const config = serviceConfig[name];
+  if (!config) {
+    console.log(`[gestor] servicio desconocido: ${name}`);
+    return null;
+  }
+
+  const scriptPath = path.resolve(__dirname, config.script);
   const proc = spawn('node', [scriptPath], {
-    cwd: cwd || undefined,
+    cwd: config.cwd,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env },
   });
@@ -38,38 +83,35 @@ function spawnService(name, relativeScriptPath, logTag, cwd) {
 
   proc.on('exit', (code) => {
     console.log(`[${logTag}] proceso terminado, código:`, code);
+    if (processes[name] === proc) {
+      processes[name] = null;
+    }
   });
 
   proc.on('error', (err) => {
     console.log(`[${logTag}] error al iniciar:`, err.message);
+    if (processes[name] === proc) {
+      processes[name] = null;
+    }
   });
 
+  processes[name] = proc;
   return proc;
 }
 
-function startBackendService() {
-  const cwd = path.resolve(__dirname, '../../backend');
-  backendProcess = spawnService('backend', '../../backend/src/index.js', 'backend', cwd);
+export function restartService(name) {
+  const current = processes[name];
+  if (current && !current.killed) {
+    current.kill('SIGTERM');
+    processes[name] = null;
+  }
+  return spawnService(name, name);
 }
 
-function startPlaywrightService() {
-  const cwd = path.resolve(__dirname, '../../playwright');
-  pwProcess = spawnService('playwright', '../../playwright/src/index.js', 'playwright', cwd);
-}
-
-function startDocumentalService() {
-  const cwd = path.resolve(__dirname, '../../api_documental');
-  docProcess = spawnService('documental', '../../api_documental/src/index.js', 'documental', cwd);
-}
-
-function startGastosService() {
-  const cwd = path.resolve(__dirname, '../../api_gastos');
-  gastosProcess = spawnService('gastos', '../../api_gastos/src/index.js', 'gastos', cwd);
-}
-
-function startMemoriaService() {
-  const cwd = path.resolve(__dirname, '../../api_memoria');
-  memProcess = spawnService('memoria', '../../api_memoria/src/index.js', 'memoria', cwd);
+function startAllServices() {
+  for (const name of Object.keys(serviceConfig)) {
+    spawnService(name, name);
+  }
 }
 
 function killPort(port) {
@@ -80,21 +122,18 @@ function killPort(port) {
 }
 
 function cleanup() {
-  if (backendProcess) backendProcess.kill();
-  if (pwProcess) pwProcess.kill();
-  if (docProcess) docProcess.kill();
-  if (gastosProcess) gastosProcess.kill();
-  if (memProcess) memProcess.kill();
+  for (const name of Object.keys(processes)) {
+    const proc = processes[name];
+    if (proc && !proc.killed) {
+      proc.kill();
+    }
+  }
 }
 
 function start() {
   const ports = [
     PORT,
-    process.env.SERVICIO_PLAYWRIGHT_PORT,
-    process.env.SERVICIO_DOCUMENTAL_PORT,
-    process.env.SERVICIO_GASTOS_PORT,
-    process.env.SERVICIO_MEMORIA_PORT,
-    process.env.PORT,
+    ...Object.values(serviceConfig).map(c => c.port),
     process.env.OPENCODE_PORT,
   ].filter(Boolean);
 
@@ -104,7 +143,8 @@ function start() {
 
   const app = express();
   app.use(express.json());
-  app.use('/api/gestor', gestorRoutes);
+  app.use('/api/gestor', authMiddleware, gestorRoutes);
+  app.use('/api/gestor', authMiddleware, servicesRoutes);
 
   const server = app.listen(PORT, (err) => {
     if (err) {
@@ -113,11 +153,7 @@ function start() {
     }
     console.log(`Gestor de servicios listening on port ${PORT}`);
 
-    startBackendService();
-    startPlaywrightService();
-    startDocumentalService();
-    startGastosService();
-    startMemoriaService();
+    startAllServices();
   });
 }
 

@@ -20,6 +20,7 @@ import templatesRoutes from './routes/templates.routes.js';
 import environmentsRoutes from './routes/environments.routes.js';
 import playwrightLogsRoutes from './routes/playwrightLogs.routes.js';
 import stateRoutes from './routes/state.routes.js';
+import gestorRoutes from './routes/gestor.routes.js';
 import opencode from './services/opencode.js';
 import * as devInstanceManager from './services/devInstanceManager.js';
 import memoriaClient from './services/memoriaClient.js';
@@ -53,6 +54,7 @@ app.use('/api/templates', templatesRoutes);
 app.use('/api/environments', environmentsRoutes);
 app.use('/api/playwright-logs', playwrightLogsRoutes);
 app.use('/api/state', stateRoutes);
+app.use('/api/gestor', gestorRoutes);
 
 async function start() {
   try {

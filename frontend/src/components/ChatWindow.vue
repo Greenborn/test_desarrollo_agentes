@@ -124,7 +124,19 @@ export default {
     useNetworkLogStream(
       () => chat.activeSessionId,
       shouldStreamConsole,
+      refreshVariablesOnConsoleLog,
     )
+
+    let variablesPollTimer = null
+    watch(shouldStreamConsole, (enabled) => {
+      if (variablesPollTimer) {
+        clearInterval(variablesPollTimer)
+        variablesPollTimer = null
+      }
+      if (enabled) {
+        variablesPollTimer = setInterval(refreshVariablesOnConsoleLog, 2000)
+      }
+    })
 
     function fetchGitBranch() {
       return gitStore.fetchGitBranch(chat.activeSessionId)

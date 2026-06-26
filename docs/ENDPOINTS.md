@@ -1,17 +1,42 @@
 # ENDPOINTS — API REST
 
-- **api_gestor_servicios:** Puerto `4200` (configurable vía `SERVICIO_GESTOR_PORT`). Punto de entrada que orquesta el resto de servicios.
-- **Backend Express principal:** Puerto `4000` (configurable vía `PORT` en `.env`).
+- **api_gestor_servicios:** Puerto `4200` (configurable vía `SERVICIO_GESTOR_PORT`). Punto de entrada que orquesta el resto de servicios. Los endpoints operativos requieren `GESTOR_API_KEY`. El frontend no lo llama directamente.
+- **Backend Express principal:** Puerto `4000` (configurable vía `PORT` en `.env`). Actúa como proxy para `api_gestor_servicios` (inyecta la API key automáticamente).
 - Todas las rutas protegidas requieren sesión activa (cookie `session_token` almacenada en el servicio de memoria `api_memoria`).
 
 ---
 
 ## Gestor de Servicios (`/api/gestor`)
 
+Endpoints del orquestador `api_gestor_servicios`. Los endpoints operativos (`/services`, `/services/:name/restart`) requieren autenticación vía `GESTOR_API_KEY` (header `X-API-Key` o `Authorization: Bearer`). El frontend accede a través del backend (proxy, puerto 4000) que inyecta la API key automáticamente.
+
 ### `GET /api/gestor/keepalive`
 - **Auth:** No
 - **Respuesta:** `{ status: "ok", timestamp: "2026-06-26T..." }`
 - **Descripción:** Endpoint de salud del orquestador. Confirma que `api_gestor_servicios` está funcionando.
+
+### `GET /api/gestor/services`
+- **Auth:** GESTOR_API_KEY
+- **Respuesta:**
+```json
+{
+  "services": [
+    { "name": "backend", "port": 4000, "running": true },
+    { "name": "playwright", "port": 4098, "running": true },
+    { "name": "documental", "port": 4099, "running": false },
+    { "name": "gastos", "port": 4100, "running": true },
+    { "name": "memoria", "port": 4101, "running": true }
+  ]
+}
+```
+- **Descripción:** Lista todos los servicios gestionados por el orquestador con su puerto y estado de ejecución.
+
+### `POST /api/gestor/services/:name/restart`
+- **Auth:** GESTOR_API_KEY
+- **Params:** `name` — nombre del servicio (`backend`, `playwright`, `documental`, `gastos`, `memoria`)
+- **Respuesta 200:** `{ success: true, message: "Servicio \"backend\" reiniciado", running: true }`
+- **Respuesta 404:** `{ error: "Servicio \"...\" no encontrado" }`
+- **Descripción:** Mata el proceso del servicio y lo vuelve a spawnear.
 
 ---
 

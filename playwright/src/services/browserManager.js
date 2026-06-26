@@ -517,6 +517,17 @@ function notifyNetworkError(data) {
   }).catch(() => {});
 }
 
+function notifyNetworkRequest(data) {
+  if (!data.chat_session_id) return;
+  const backendPort = process.env.PORT || 4000;
+  const backendUrl = `http://localhost:${backendPort}`;
+  fetch(`${backendUrl}/api/playwright-logs/network/store`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).catch(() => {});
+}
+
 function setupPageListeners(page, sessionId, chatSessionId, instanceName) {
   page.on('response', async (response) => {
     const req = response.request();
@@ -568,6 +579,18 @@ function setupPageListeners(page, sessionId, chatSessionId, instanceName) {
     }
 
     const statusCode = response.status();
+
+    if (instanceName) {
+      notifyNetworkRequest({
+        chat_session_id: chatSessionId,
+        method: req.method(),
+        url: req.url().substring(0, 2000),
+        status_code: statusCode,
+        resource_type: resourceType,
+        instance_name: instanceName,
+      });
+    }
+
     if (statusCode >= 400) {
       const errorText = statusCode >= 500 ? `Error del servidor (${statusCode})` : `Error del cliente (${statusCode})`;
       notifyNetworkError({
@@ -577,6 +600,7 @@ function setupPageListeners(page, sessionId, chatSessionId, instanceName) {
         status_code: statusCode,
         error: errorText,
         resource_type: resourceType,
+        instance_name: instanceName,
       });
     }
   });
@@ -617,6 +641,19 @@ function setupPageListeners(page, sessionId, chatSessionId, instanceName) {
     }
 
     const errorText = request.failure()?.errorText || 'Unknown error';
+
+    if (instanceName) {
+      notifyNetworkRequest({
+        chat_session_id: chatSessionId,
+        method: request.method(),
+        url: request.url().substring(0, 2000),
+        status_code: null,
+        error: errorText,
+        resource_type: resourceType,
+        instance_name: instanceName,
+      });
+    }
+
     notifyNetworkError({
       chat_session_id: chatSessionId,
       method: request.method(),
@@ -624,6 +661,7 @@ function setupPageListeners(page, sessionId, chatSessionId, instanceName) {
       status_code: null,
       error: errorText,
       resource_type: resourceType,
+      instance_name: instanceName,
     });
   });
 

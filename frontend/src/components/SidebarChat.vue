@@ -6,9 +6,10 @@
   >
     <!-- Tab bar -->
     <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
-      <span class="tab-label">Chats</span>
+      <button class="tab-btn" :class="{ active: activeTab === 'chats' }" @click="activeTab = 'chats'">Chats</button>
+      <button class="tab-btn ms-3" :class="{ active: activeTab === 'servicios' }" @click="activeTab = 'servicios'">Servicios</button>
     </div>
-    <div class="d-flex flex-column flex-grow-1" style="min-height: 0;">
+    <div v-if="activeTab === 'chats'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
     <button class="btn btn-sm mb-2 flex-shrink-0 btn-argentina" @click="createSession" :disabled="creating">
       {{ creating ? 'Creando...' : '＋ Nuevo chat' }}
     </button>
@@ -47,6 +48,7 @@
       </div>
     </div>
     </div>
+    <ServiciosPanel v-if="activeTab === 'servicios'" class="flex-grow-1" style="min-height: 0;" />
     <div class="sidebar-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-resize-handle-bar"></div>
     </div>
@@ -62,9 +64,12 @@ import { useUiStore } from '../stores/ui.js'
 import { useSettingsStore } from '../stores/settings.js'
 import { useWorkspaceStore } from '../stores/workspace.js'
 import { contrastTextColor } from '../utils/color.js'
+import ServiciosPanel from './ServiciosPanel.vue'
 
 export default {
+  components: { ServiciosPanel },
   setup() {
+    const activeTab = ref('chats')
     const chat = useChatStore()
     const cmd = useCommandStore()
     const ui = useUiStore()
@@ -178,6 +183,7 @@ export default {
     })
 
     return {
+      activeTab,
       chat,
       filteredSessions,
       activeSessionId,
