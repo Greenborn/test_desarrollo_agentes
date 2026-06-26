@@ -37,6 +37,22 @@
           >Build</button>
         </div>
       </div>
+      <div style="min-width: 180px; flex: 1;" class="d-flex align-items-end pb-1">
+        <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            role="switch"
+            id="useTicketDesc"
+            v-model="useTicketDesc"
+            :disabled="loadingDesc"
+          >
+          <label class="form-check-label small text-light-emphasis" for="useTicketDesc">
+            Usar descripción del ticket
+            <span v-if="loadingDesc" class="spinner-border spinner-border-sm ms-1" role="status"></span>
+          </label>
+        </div>
+      </div>
     </div>
     <textarea
       v-model="text"
@@ -51,7 +67,7 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 export default {
   props: {
@@ -65,6 +81,7 @@ export default {
     placeholder: { type: String, default: '' },
     rows: { type: Number, default: 3 },
     prefill: { type: String, default: '' },
+    sessionId: { type: String, default: '' },
   },
   emits: ['confirm'],
   setup(props, { emit }) {
@@ -73,11 +90,44 @@ export default {
     const selectedTemperature = ref(props.temperatureValue || '')
     const selectedMode = ref(props.modeValue || 'Build')
     const text = ref(props.prefill || '')
+    const useTicketDesc = ref(!!props.prefill)
+    const loadingDesc = ref(false)
 
     const showThinking = computed(() => {
       if (!selectedModel.value) return false
       const m = props.models.find((o) => o.value === selectedModel.value)
       return m ? m.reasoning : false
+    })
+
+    let previousText = ''
+
+    watch(useTicketDesc, async (enabled) => {
+      if (enabled) {
+        if (!props.sessionId) {
+          text.value = '*(No hay sesión activa para obtener el ticket)*'
+          return
+        }
+        loadingDesc.value = true
+        try {
+          const res = await fetch(`/api/tickets/session/${props.sessionId}`, { credentials: 'include' })
+          const data = await res.json()
+          if (data.ticket && data.ticket.description) {
+            text.value = data.ticket.description
+            previousText = ''
+          } else if (data.idTicketRedmine) {
+            text.value = '*(El ticket asignado no tiene descripción)*'
+          } else {
+            text.value = '*(No hay ticket asignado a esta sesión)*'
+          }
+        } catch (err) {
+          console.error('Error al obtener descripción del ticket:', err.message)
+          text.value = '*(Error al obtener la descripción del ticket)*'
+        } finally {
+          loadingDesc.value = false
+        }
+      } else {
+        text.value = previousText
+      }
     })
 
     function onModelChange() {
@@ -97,7 +147,7 @@ export default {
       })
     }
 
-    return { selectedModel, selectedThinking, selectedTemperature, selectedMode, text, showThinking, onModelChange, confirm }
+    return { selectedModel, selectedThinking, selectedTemperature, selectedMode, text, showThinking, onModelChange, confirm, useTicketDesc, loadingDesc }
   },
 }
 </script>

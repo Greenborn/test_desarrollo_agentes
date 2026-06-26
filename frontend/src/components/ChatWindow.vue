@@ -1118,6 +1118,36 @@ export default {
                 _key: 'result-' + Date.now(),
               }
             }
+
+            if (value.createBranch) {
+              try {
+                if (value.project_id) {
+                  await fetch('/api/proyecto/session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ sessionId: chat.activeSessionId, proyectoId: value.project_id, cwd: '' }),
+                  })
+                }
+                if (!value.autoAssign && ticketRedmineId) {
+                  await fetch('/api/tickets/session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ sessionId: chat.activeSessionId, idTicketRedmine: ticketRedmineId }),
+                  })
+                }
+                await chat.loadSessions()
+
+                const settingsRes = await fetch('/api/settings', { credentials: 'include' })
+                const settingsData = await settingsRes.json()
+                const repoAcronimo = settingsData.repo_acronimo || 'TKT'
+
+                await showBranchSelector(chat.activeSessionId, repoAcronimo, value.project_id, ticketRedmineId)
+              } catch (err) {
+                console.error('Error al preparar creación de rama:', err)
+              }
+            }
           } else {
             const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
             if (idx >= 0) {
@@ -1506,7 +1536,7 @@ export default {
 
         if (updatedSession && updatedSession.id_ticket_redmine) {
           repoCrearRamaData.ticketRedmineId = updatedSession.id_ticket_redmine
-          await showBranchSelector(controlMsg.controlData.sessionId, repoCrearRamaData.repoAcronimo, updatedSession.proyecto_id, updatedSession.id_ticket_redmine)
+          await showBranchSelector(controlMsg.controlData.sessionId, repoCrearRamaData.repoAcronimo, updatedSession.proyecto_id, updatedSession.id_ticket_redmine, controlMsg.controlData.baseBranch)
         } else {
           const ticketRes = await fetch('/api/tickets', { credentials: 'include' })
           const ticketData = await ticketRes.json()
@@ -1530,6 +1560,7 @@ export default {
               proyectoId: value,
               sessionId: controlMsg.controlData.sessionId,
               repoAcronimo: repoCrearRamaData.repoAcronimo,
+              baseBranch: controlMsg.controlData.baseBranch,
             },
             _key: 'control-' + Date.now(),
           })
@@ -1562,76 +1593,25 @@ export default {
         await chat.loadSessions()
         const updatedSession = chat.sessions.find(s => s.id === chat.activeSessionId)
 
-        await showBranchSelector(controlMsg.controlData.sessionId, repoCrearRamaData.repoAcronimo, repoCrearRamaData.proyectoId || updatedSession?.proyecto_id, parseInt(value))
+        await showBranchSelector(controlMsg.controlData.sessionId, repoCrearRamaData.repoAcronimo, repoCrearRamaData.proyectoId || updatedSession?.proyecto_id, parseInt(value), controlMsg.controlData.baseBranch)
       } else if (subStepType === 'branch') {
         repoCrearRamaData.baseBranch = value
         const proyectoId = controlMsg.controlData.proyectoId || repoCrearRamaData.proyectoId
         const ticketRedmineId = controlMsg.controlData.ticketRedmineId || repoCrearRamaData.ticketRedmineId
         const repoAcronimo = controlMsg.controlData.repoAcronimo || repoCrearRamaData.repoAcronimo || 'TKT'
         const sessionId = controlMsg.controlData.sessionId || chat.activeSessionId
-        const branchName = repoAcronimo + '-' + ticketRedmineId
 
-        try {
-          const checkoutRes = await fetch('/api/command/git', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ command: 'checkout ' + value, sessionId }),
-          })
-          const checkoutData = await checkoutRes.json()
-
-          if (!checkoutData.success) {
-            const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
-            if (idx >= 0) {
-              chat.messages[idx] = {
-                role: 'result',
-                content: 'Error al cambiar a rama base "' + value + '": ' + (checkoutData.stderr || checkoutData.error || 'Error desconocido'),
-                _key: 'err-' + Date.now(),
-              }
-            }
-            return
-          }
-
-          const branchRes = await fetch('/api/command/git', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ command: 'checkout -b ' + branchName, sessionId }),
-          })
-          const branchData = await branchRes.json()
-
-          const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
-          if (idx >= 0) {
-            if (branchData.success) {
-              chat.messages[idx] = {
-                role: 'result',
-                content: 'Rama creada correctamente: `' + branchName + '` (base: `' + value + '`)',
-                _key: 'result-' + Date.now(),
-              }
-            } else {
-              chat.messages[idx] = {
-                role: 'result',
-                content: 'Error al crear rama "' + branchName + '": ' + (branchData.stderr || branchData.error || 'Error desconocido'),
-                _key: 'err-' + Date.now(),
-              }
-            }
-          }
-        } catch (err) {
-          console.error('Error en repo:crear_rama:', err.message)
-          const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
-          if (idx >= 0) {
-            chat.messages[idx] = {
-              role: 'result',
-              content: 'Error de conexión: ' + err.message,
-              _key: 'err-' + Date.now(),
-            }
-          }
-        }
+        await performBranchCreation(sessionId, value, proyectoId, ticketRedmineId, repoAcronimo, controlId)
       }
       fetchGitBranch()
     }
 
-    async function showBranchSelector(sessionId, repoAcronimo, proyectoId, ticketRedmineId) {
+    async function showBranchSelector(sessionId, repoAcronimo, proyectoId, ticketRedmineId, baseBranch) {
+      if (baseBranch) {
+        await performBranchCreation(sessionId, baseBranch, proyectoId, ticketRedmineId, repoAcronimo)
+        return
+      }
+
       try {
         const branchRes = await fetch('/api/command/git-list-branches', {
           method: 'POST',
@@ -1667,6 +1647,52 @@ export default {
           content: 'Error al listar ramas Git: ' + err.message,
           _key: 'err-' + Date.now(),
         })
+      }
+    }
+
+    async function performBranchCreation(sessionId, baseBranch, proyectoId, ticketRedmineId, repoAcronimo, controlId) {
+      const branchName = repoAcronimo + '-' + ticketRedmineId
+
+      const updateMsg = (content, type) => {
+        if (controlId) {
+          const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = { role: 'result', content, _key: type + '-' + Date.now() }
+          }
+        } else {
+          chat.pushMessage({ role: 'result', content, _key: type + '-' + Date.now() })
+        }
+      }
+
+      try {
+        const checkoutRes = await fetch('/api/command/git', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ command: 'checkout ' + baseBranch, sessionId }),
+        })
+        const checkoutData = await checkoutRes.json()
+        if (!checkoutData.success) {
+          updateMsg('Error al cambiar a rama base "' + baseBranch + '": ' + (checkoutData.stderr || checkoutData.error || 'Error desconocido'), 'err')
+          return
+        }
+
+        const branchRes = await fetch('/api/command/git', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ command: 'checkout -b ' + branchName, sessionId }),
+        })
+        const branchData = await branchRes.json()
+
+        if (branchData.success) {
+          updateMsg('Rama creada correctamente: `' + branchName + '` (base: `' + baseBranch + '`)', 'result')
+        } else {
+          updateMsg('Error al crear rama "' + branchName + '": ' + (branchData.stderr || branchData.error || 'Error desconocido'), 'err')
+        }
+      } catch (err) {
+        console.error('Error en repo:crear_rama:', err.message)
+        updateMsg('Error de conexión: ' + err.message, 'err')
       }
     }
 
@@ -2243,6 +2269,7 @@ export default {
               placeholder: prefill ? 'Revisa la descripción del ticket y modifícala si es necesario antes de enviar...' : 'Describe qué quieres que OpenCode haga...',
               rows: prefill ? 8 : 5,
               prefill,
+              sessionId: chat.activeSessionId,
             },
             _key: 'control-' + Date.now(),
           })

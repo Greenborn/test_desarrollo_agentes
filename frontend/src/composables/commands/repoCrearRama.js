@@ -1,4 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
+import { parseCommandArgs } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
@@ -6,7 +7,7 @@ register({
   name: '/dev_git_crear_rama',
   category: 'Desarrollo',
   description: 'Crea una rama Git a partir del proyecto y ticket de la sesión, usando una rama base seleccionable. Requiere que el directorio de trabajo sea un repositorio Git.',
-  usage: '/dev_git_crear_rama',
+  usage: '/dev_git_crear_rama [--base=<rama_base>]',
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
@@ -16,6 +17,9 @@ register({
     if (!session) {
       throw new Error('No se encontró la sesión de chat.')
     }
+
+    const { params } = parseCommandArgs(args)
+    const baseBranch = params.base || null
 
     const verifyRes = await fetch('/api/command/git-verify', {
       method: 'POST',
@@ -50,6 +54,7 @@ register({
           placeholder: 'Selecciona proyecto...',
           sessionId,
           repoAcronimo,
+          baseBranch,
         },
       }
     }
@@ -77,7 +82,38 @@ register({
           proyectoId: session.proyecto_id,
           sessionId,
           repoAcronimo,
+          baseBranch,
         },
+      }
+    }
+
+    if (baseBranch) {
+      const checkoutRes = await fetch('/api/command/git', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ command: 'checkout ' + baseBranch, sessionId }),
+      })
+      const checkoutData = await checkoutRes.json()
+      if (!checkoutData.success) {
+        throw new Error('Error al cambiar a rama base "' + baseBranch + '": ' + (checkoutData.stderr || checkoutData.error || 'Error desconocido'))
+      }
+
+      const branchName = repoAcronimo + '-' + session.id_ticket_redmine
+      const branchRes = await fetch('/api/command/git', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ command: 'checkout -b ' + branchName, sessionId }),
+      })
+      const branchData = await branchRes.json()
+      if (!branchData.success) {
+        throw new Error('Error al crear rama "' + branchName + '": ' + (branchData.stderr || branchData.error || 'Error desconocido'))
+      }
+
+      return {
+        role: 'result',
+        content: '✓ Rama creada correctamente: `' + branchName + '` (base: `' + baseBranch + '`)',
       }
     }
 
@@ -105,6 +141,7 @@ register({
         ticketRedmineId: session.id_ticket_redmine,
         sessionId,
         repoAcronimo,
+        baseBranch,
       },
     }
   },

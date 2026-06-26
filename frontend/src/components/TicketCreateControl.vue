@@ -12,6 +12,16 @@
         />
         <label class="form-check-label small" for="autoAssignSwitch">Asignar a sesión</label>
       </div>
+      <div class="form-check form-switch mb-0 ms-2">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          role="switch"
+          id="createBranchSwitch"
+          v-model="createBranch"
+        />
+        <label class="form-check-label small" for="createBranchSwitch">Crear rama Git</label>
+      </div>
     </div>
 
     <div class="ticket-field mb-2">
@@ -107,6 +117,7 @@ export default {
     const saving = ref(false)
     const errors = reactive({ subject: '', project_id: '' })
     const autoAssign = ref(true)
+    const createBranch = ref(true)
     const allProjects = ref([])
     const options = ticketFormStore.options
     const selectedIds = reactive({
@@ -245,6 +256,7 @@ export default {
           assigned_to_id: selectedIds.assigned_to_id,
           done_ratio: form.done_ratio,
           autoAssign: autoAssign.value,
+          createBranch: createBranch.value,
         }
         emit('confirm', payload)
       } catch (err) {
@@ -270,7 +282,7 @@ export default {
     })
 
     return {
-      form, options, allProjects, flattenedProjects, errors, saving, selectedIds, autoAssign,
+      form, options, allProjects, flattenedProjects, errors, saving, selectedIds, autoAssign, createBranch,
       save, cancel, onProjectChange, onPriorityChange, onStatusChange, onTrackerChange, onUserChange, loadProjectUsers,
     }
   },
