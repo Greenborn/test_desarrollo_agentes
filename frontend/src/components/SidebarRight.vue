@@ -7,6 +7,7 @@
     <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
       <button class="tab-btn" :class="{ active: activeTab === 'comentarios' }" @click="activeTab = 'comentarios'">Comentarios</button>
       <button class="tab-btn" :class="{ active: activeTab === 'archivos' }" @click="activeTab = 'archivos'">Archivos</button>
+      <button class="tab-btn" :class="{ active: activeTab === 'variables' }" @click="activeTab = 'variables'">Variables</button>
     </div>
 
     <template v-if="activeTab === 'comentarios'">
@@ -34,6 +35,27 @@
     <template v-else-if="activeTab === 'archivos'">
       <FileTreePanel :session-id="activeSessionId" />
     </template>
+    <template v-else-if="activeTab === 'variables'">
+      <div v-if="!activeSession" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
+        <span>Seleccione una sesión de chat</span>
+      </div>
+      <div v-else-if="!proyectoId" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
+        <span>Sin proyecto asignado a esta sesión</span>
+      </div>
+      <div v-else-if="loadingVariables" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small">
+        <span>Cargando variables…</span>
+      </div>
+      <div v-else-if="variables.length === 0" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
+        <span>No hay variables definidas para este proyecto</span>
+      </div>
+      <div v-else class="variables-list flex-grow-1 overflow-y-auto px-2 py-1">
+        <div v-for="v in variables" :key="v.key" class="variable-item d-flex align-items-start px-2 py-2 mb-1 rounded">
+          <span class="variable-key text-nowrap">{{ v.key }}</span>
+          <span class="variable-sep mx-1 text-muted">=</span>
+          <span class="variable-value text-break small">{{ v.value }}</span>
+        </div>
+      </div>
+    </template>
     <div class="sidebar-right-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-right-resize-handle-bar"></div>
     </div>
@@ -46,6 +68,7 @@ import { storeToRefs } from 'pinia'
 import { useUiStore } from '../stores/ui.js'
 import { useChatStore } from '../stores/chat.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
+import { useProjectVariablesStore } from '../stores/projectVariables.js'
 import FileTreePanel from './FileTreePanel.vue'
 
 export default {
@@ -54,11 +77,16 @@ export default {
     const ui = useUiStore()
     const chat = useChatStore()
     const redmineComments = useRedmineCommentsStore()
+    const projectVariables = useProjectVariablesStore()
     const { rightPanelCollapsed, rightPanelWidth } = storeToRefs(ui)
     const { activeSessionId, sessions } = storeToRefs(chat)
 
     const comments = computed(() => redmineComments.commentsBySession[activeSessionId.value] || [])
     const loading = computed(() => redmineComments.loadingBySession[activeSessionId.value] || false)
+
+    const proyectoId = computed(() => activeSession.value?.proyecto_id || null)
+    const variables = computed(() => projectVariables.variablesByProject[proyectoId.value] || [])
+    const loadingVariables = computed(() => projectVariables.loadingByProject[proyectoId.value] || false)
 
     const rightPanelTransitioning = ref(false)
     const activeTab = ref('comentarios')
@@ -97,6 +125,14 @@ export default {
       } else {
         redmineComments.clearComments()
       }
+    })
+
+    watch(proyectoId, (newId) => {
+      if (!newId) {
+        projectVariables.clearVariables()
+        return
+      }
+      projectVariables.loadVariables(newId)
     })
 
     function onResizeStart(e) {
@@ -139,6 +175,9 @@ export default {
       sessionWithTicket,
       comments,
       loading,
+      proyectoId,
+      variables,
+      loadingVariables,
       formatDate,
       badgeClass,
       onResizeStart,
@@ -225,5 +264,31 @@ export default {
 }
 .sidebar-right-resize-handle:hover .sidebar-right-resize-handle-bar {
   background: #75AADB;
+}
+.variables-list {
+  background: #16213e;
+}
+.variable-item {
+  background: #1a2744;
+  border: 1px solid #374151;
+}
+.variable-item:hover {
+  background: #1e3050;
+}
+.variable-key {
+  color: #75AADB;
+  font-size: 0.75rem;
+  font-family: monospace;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.variable-value {
+  color: #cbd5e1;
+  font-family: monospace;
+  word-break: break-all;
+}
+.variable-sep {
+  font-family: monospace;
+  font-size: 0.75rem;
 }
 </style>

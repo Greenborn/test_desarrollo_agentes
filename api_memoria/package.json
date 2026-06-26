@@ -1,0 +1,13 @@
+{
+  "name": "api-memoria",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=../backend/.env --watch src/index.js",
+    "start": "node --env-file=../backend/.env src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

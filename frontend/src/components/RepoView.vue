@@ -87,7 +87,7 @@
 </template>
 
 <script>
-import { ref, computed, watch, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useGitStore } from '../stores/git.js'
@@ -99,21 +99,16 @@ export default {
     const chatStore = useChatStore()
     const gitStore = useGitStore()
     const { activeSessionId, sessions } = storeToRefs(chatStore)
-    const cwd = ref('')
+    const cwd = computed(() => {
+      const sessionId = activeSessionId.value
+      const session = sessions.value.find(s => s.id === sessionId)
+      return session?.cwd || ''
+    })
     const currentBranch = computed(() => gitStore.getCurrentBranch(activeSessionId.value))
 
     function refresh() {
-      const sessionId = activeSessionId.value
-      const session = sessions.value.find(s => s.id === sessionId)
-      cwd.value = session?.cwd || ''
-      gitStore.fetchRepoData(sessionId)
+      gitStore.fetchRepoData(activeSessionId.value)
     }
-
-    watch(activeSessionId, (newId, oldId) => {
-      if (newId !== oldId) {
-        refresh()
-      }
-    })
 
     onMounted(() => {
       refresh()

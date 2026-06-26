@@ -1,5 +1,6 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { parseCommandArgs } from '../parseCommandArgs.js';
+import { useProjectVariablesStore } from '../../stores/projectVariables.js';
 
 const { register } = useCommandRegistry();
 
@@ -60,6 +61,8 @@ register({
         const errData = await res.json()
         throw new Error(errData.error || 'Error al crear variable')
       }
+      const pvStore = useProjectVariablesStore()
+      await pvStore.loadVariables(proyectoId)
       return `Variable "${params.key}" creada correctamente en "${proyectoId}"`
     } catch (err) {
       console.error('Error en /proyecto_var_crear:', err.message)

@@ -1,5 +1,6 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { parseCommandArgs } from '../parseCommandArgs.js';
+import { useProjectVariablesStore } from '../../stores/projectVariables.js';
 
 const { register } = useCommandRegistry();
 
@@ -63,6 +64,8 @@ register({
         const errData = await res.json()
         throw new Error(errData.error || 'Error al actualizar variable')
       }
+      const pvStore = useProjectVariablesStore()
+      await pvStore.loadVariables(proyectoId)
       return `Variable "${params.key}" actualizada correctamente en "${proyectoId}"`
     } catch (err) {
       console.error('Error en /proyecto_var_actualizar:', err.message)

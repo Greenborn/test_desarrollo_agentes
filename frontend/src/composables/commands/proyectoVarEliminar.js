@@ -1,5 +1,6 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { parseCommandArgs } from '../parseCommandArgs.js';
+import { useProjectVariablesStore } from '../../stores/projectVariables.js';
 
 const { register } = useCommandRegistry();
 
@@ -58,6 +59,8 @@ register({
         const errData = await res.json()
         throw new Error(errData.error || 'Error al eliminar variable')
       }
+      const pvStore = useProjectVariablesStore()
+      await pvStore.loadVariables(proyectoId)
       return `Variable "${params.key}" eliminada correctamente de "${proyectoId}"`
     } catch (err) {
       console.error('Error en /proyecto_var_eliminar:', err.message)

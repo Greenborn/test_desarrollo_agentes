@@ -351,6 +351,7 @@ router.post('/git-verify', async (req, res) => {
       const rootPath = execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf-8' }).trim();
       res.json({ isRepo: true, rootPath, error: null });
     } catch (err) {
+      console.log(`[git-verify] cwd="${cwd}" error:`, err.message, '| stderr:', (err.stderr || '').toString().trim(), '| code:', err.status);
       res.json({ isRepo: false, rootPath: null, error: 'El directorio no es un repositorio Git.' });
     }
   } catch (err) {
@@ -590,6 +591,7 @@ router.post('/git-merge', async (req, res) => {
     try {
       execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf-8' });
     } catch (e) {
+      console.log(`[git-merge] cwd="${cwd}" error:`, e.message, '| stderr:', (e.stderr || '').toString().trim(), '| code:', e.status);
       return res.status(400).json({ success: false, error: 'El directorio no es un repositorio Git.' });
     }
 
@@ -780,6 +782,7 @@ router.post('/git-diff-branches', async (req, res) => {
     try {
       execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf-8' });
     } catch (e) {
+      console.log(`[git-diff-env] cwd="${cwd}" error:`, e.message, '| stderr:', (e.stderr || '').toString().trim(), '| code:', e.status);
       return res.status(400).json({ success: false, error: 'El directorio no es un repositorio Git.' });
     }
 

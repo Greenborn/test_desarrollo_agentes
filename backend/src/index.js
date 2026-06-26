@@ -25,6 +25,7 @@ import playwrightLogsRoutes from './routes/playwrightLogs.routes.js';
 import stateRoutes from './routes/state.routes.js';
 import opencode from './services/opencode.js';
 import * as devInstanceManager from './services/devInstanceManager.js';
+import memoriaClient from './services/memoriaClient.js';
 import db from './config/db.js';
 
 const PORT = process.env.PORT;
@@ -59,6 +60,7 @@ app.use('/api/state', stateRoutes);
 let pwProcess = null;
 let docProcess = null;
 let gastosProcess = null;
+let memProcess = null;
 
 function startPlaywrightService() {
   const pwPort = process.env.SERVICIO_PLAYWRIGHT_PORT || 4098;
@@ -150,6 +152,36 @@ function startGastosService() {
   });
 }
 
+function startMemoriaService() {
+  const memPort = process.env.SERVICIO_MEMORIA_PORT || 4101;
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const memPath = path.resolve(__dirname, '../../api_memoria/src/index.js');
+  memProcess = spawn('node', [memPath], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env },
+  });
+
+  memProcess.stdout.on('data', (data) => {
+    const text = data.toString().trim();
+    if (text) console.log('[memoria]', text);
+  });
+
+  memProcess.stderr.on('data', (data) => {
+    const text = data.toString().trim();
+    if (text) console.log('[memoria]', text);
+  });
+
+  memProcess.on('exit', (code) => {
+    console.log('[memoria] proceso terminado, código:', code);
+    memProcess = null;
+  });
+
+  memProcess.on('error', (err) => {
+    console.log('[memoria] error al iniciar:', err.message);
+    memProcess = null;
+  });
+}
+
 function killPort(port) {
   try {
     execSync(`fuser -k ${port}/tcp 2>/dev/null || lsof -ti :${port} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' });
@@ -158,7 +190,7 @@ function killPort(port) {
 }
 
 async function start() {
-  const ports = [process.env.PORT, process.env.SERVICIO_PLAYWRIGHT_PORT, process.env.SERVICIO_DOCUMENTAL_PORT, process.env.SERVICIO_GASTOS_PORT, process.env.OPENCODE_PORT].filter(Boolean);
+  const ports = [process.env.PORT, process.env.SERVICIO_PLAYWRIGHT_PORT, process.env.SERVICIO_DOCUMENTAL_PORT, process.env.SERVICIO_GASTOS_PORT, process.env.SERVICIO_MEMORIA_PORT, process.env.OPENCODE_PORT].filter(Boolean);
   for (const p of ports) {
     killPort(p);
   }
@@ -182,6 +214,7 @@ async function start() {
     startPlaywrightService();
     startDocumentalService();
     startGastosService();
+    startMemoriaService();
   });
 }
 
@@ -193,6 +226,7 @@ process.on('exit', () => {
   if (pwProcess) pwProcess.kill();
   if (docProcess) docProcess.kill();
   if (gastosProcess) gastosProcess.kill();
+  if (memProcess) memProcess.kill();
 });
 process.on('SIGTERM', () => {
   devInstanceManager.stopAll();
@@ -200,6 +234,7 @@ process.on('SIGTERM', () => {
   if (pwProcess) pwProcess.kill();
   if (docProcess) docProcess.kill();
   if (gastosProcess) gastosProcess.kill();
+  if (memProcess) memProcess.kill();
   process.exit(0);
 });
 process.on('SIGINT', () => {
@@ -208,5 +243,6 @@ process.on('SIGINT', () => {
   if (pwProcess) pwProcess.kill();
   if (docProcess) docProcess.kill();
   if (gastosProcess) gastosProcess.kill();
+  if (memProcess) memProcess.kill();
   process.exit(0);
 });

@@ -114,7 +114,7 @@
     </template>
 
     <template v-if="activeTab === 'repositorio'">
-      <RepoView class="flex-grow-1" />
+      <RepoView class="flex-grow-1" :key="activeSessionId" />
     </template>
 
     <template v-if="activeTab === 'tickets'">

@@ -464,6 +464,7 @@ export default {
           })
           const data = await res.json()
           if (data.success) {
+            await chatStore.loadSessions()
             return `Proyecto "${proyectoId}" seleccionado.`
           }
           return `Error: ${data.error}`

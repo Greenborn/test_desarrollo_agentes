@@ -59,6 +59,11 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 │   └── src/
 │       ├── index.js       # Entrypoint (Express)
 │       └── routes/        # gastos.routes.js
+├── api_memoria/           # Servicio de memoria en caché centralizada
+│   └── src/
+│       ├── index.js       # Entrypoint (Express)
+│       ├── authMiddleware.js  # API key auth
+│       └── routes/        # memoria.routes.js (set/get/del/keys/clear/expire)
 ├── playwright/            # Servicio Playwright (Express wrapper)
 │   └── src/
 │       ├── index.js       # Entrypoint (Express)
@@ -107,6 +112,13 @@ npm start                 # Iniciar servidor en producción
 ```bash
 npm run setup             # npm install + instalar navegadores chromium y firefox
 npm run dev               # Iniciar servidor con --watch (puerto 4098)
+npm start                 # Iniciar servidor en producción
+```
+
+### API Memoria (`api_memoria/`)
+
+```bash
+npm run dev               # Iniciar servidor con --watch (puerto 4101)
 npm start                 # Iniciar servidor en producción
 ```
 
