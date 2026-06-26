@@ -348,7 +348,7 @@ export default {
           if (sessionId) chat.setSessionStatus(sessionId, 'idle')
           const content = json.fullResponse || fullText || '(sin respuesta)'
           const thinking = json.thinking || ocThinking.value || null
-          chat._saveMessageToDb(sessionId, { role: 'opencode_result', content, thinking })
+          await chat._saveMessageToDb(sessionId, { role: 'opencode_result', content, thinking })
           if (!isActiveSession(sessionId)) {
             chat.pendingNotifications[sessionId] = Date.now()
             return

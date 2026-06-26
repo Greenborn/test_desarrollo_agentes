@@ -119,7 +119,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
         let errMsg = 'Error en conexión con OpenCode'
         try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch (e) { console.error('Error al parsear error response:', e) }
         streaming.value = false
-        if (callbacks?.onError) callbacks.onError(errMsg)
+        if (callbacks?.onError) await callbacks.onError(errMsg)
         return
       }
 
@@ -152,10 +152,10 @@ export const useOpencodeStore = defineStore('opencode', () => {
             } else if (j.type === 'done') {
               ocSessionId.value = j.ocSessionId || j.hash || null
               streaming.value = false
-              if (callbacks?.onDone) callbacks.onDone(j, streamText.value)
+              if (callbacks?.onDone) await callbacks.onDone(j, streamText.value)
             } else if (j.type === 'error') {
               streaming.value = false
-              if (callbacks?.onError) callbacks.onError(j.content)
+              if (callbacks?.onError) await callbacks.onError(j.content)
             }
           } catch (e) { console.error('Error al parsear SSE JSON en opencode:', e) }
         }
@@ -163,11 +163,17 @@ export const useOpencodeStore = defineStore('opencode', () => {
 
       if (streaming.value) {
         streaming.value = false
+        if (callbacks?.onDone) {
+          await callbacks.onDone(
+            { type: 'done', ocSessionId: ocSessionId.value, fullResponse: streamText.value, thinking: streamThinking.value },
+            streamText.value
+          )
+        }
       }
     } catch (err) {
       console.error('Error en streamPrompt:', err)
       streaming.value = false
-      if (callbacks?.onError) callbacks.onError(err.message)
+      if (callbacks?.onError) await callbacks.onError(err.message)
     }
   }
 

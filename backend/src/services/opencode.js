@@ -113,57 +113,87 @@ class OpenCodeServer {
       parts: Array.isArray(parts) ? parts : [{ type: 'text', text: parts }],
       ...options,
     };
-    await fetch(`${this.baseUrl()}/session/${sessionId}/prompt_async`, {
+    const res = await fetch(`${this.baseUrl()}/session/${sessionId}/prompt_async`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Error al enviar prompt a sesión ${sessionId}: ${res.status} ${text}`);
+    }
   }
 
   async* streamSession(sessionId, parts, options = {}) {
-    const eventRes = await fetch(`${this.baseUrl()}/event`);
-    if (!eventRes.ok || !eventRes.body) {
-      throw new Error('No se pudo conectar al stream de eventos de OpenCode');
-    }
+    const TIMEOUT_MS = 120000;
+    const abortController = new AbortController();
+    let timeoutId = null;
 
-    await this.sendPromptAsync(sessionId, parts, options);
+    const resetTimeout = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        console.log(`[opencode ${this.port}] timeout ${TIMEOUT_MS}ms sin eventos, abortando`);
+        abortController.abort();
+      }, TIMEOUT_MS);
+    };
 
-    const reader = eventRes.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let done = false;
-
-    while (!done) {
-      let readerResult;
-      try {
-        readerResult = await reader.read();
-      } catch (readErr) {
-        console.log(`[opencode ${this.port}] error leyendo evento:`, readErr.message);
-        break;
+    try {
+      const eventRes = await fetch(`${this.baseUrl()}/event`, {
+        signal: abortController.signal,
+      });
+      if (!eventRes.ok || !eventRes.body) {
+        throw new Error('No se pudo conectar al stream de eventos de OpenCode');
       }
-      const { done: readerDone, value } = readerResult;
-      if (readerDone) break;
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      const last = lines.pop();
-      buffer = last !== undefined ? last : '';
+      await this.sendPromptAsync(sessionId, parts, options);
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      const reader = eventRes.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let done = false;
+
+      resetTimeout();
+
+      while (!done) {
+        let readerResult;
         try {
-          const event = JSON.parse(trimmed.slice(6));
-          yield event;
-          if (event.type === 'session.status' && event.properties?.status?.type === 'idle') {
-            done = true;
+          readerResult = await reader.read();
+        } catch (readErr) {
+          if (abortController.signal.aborted) {
+            console.log(`[opencode ${this.port}] lectura abortada por timeout`);
+          } else {
+            console.log(`[opencode ${this.port}] error leyendo evento:`, readErr.message);
           }
-        } catch (parseErr) {
-          console.log(`[opencode ${this.port}] error parseando evento SSE:`, parseErr.message);
+          break;
+        }
+        const { done: readerDone, value } = readerResult;
+        if (readerDone) break;
+
+        resetTimeout();
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        const last = lines.pop();
+        buffer = last !== undefined ? last : '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(trimmed.slice(6));
+            yield event;
+            if (event.type === 'session.status' && event.properties?.status?.type === 'idle') {
+              done = true;
+            }
+          } catch (parseErr) {
+            console.log(`[opencode ${this.port}] error parseando evento SSE:`, parseErr.message);
+          }
         }
       }
+      reader.cancel();
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+      abortController.abort();
     }
-    reader.cancel();
   }
 
   async respondToPermission(sessionId, permissionId, response, remember) {
