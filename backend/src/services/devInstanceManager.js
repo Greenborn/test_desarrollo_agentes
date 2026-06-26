@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
@@ -233,6 +233,42 @@ export function getStatus() {
 export function getLogs(name) {
   const entry = instances.get(name);
   return entry ? entry.logs.slice() : [];
+}
+
+export function killPorts(ports) {
+  if (!Array.isArray(ports) || ports.length === 0) return [];
+
+  const results = [];
+
+  for (const port of ports) {
+    const portNum = parseInt(port, 10);
+    if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+      results.push({ port, status: 'error', message: 'Puerto inválido' });
+      continue;
+    }
+
+    try {
+      const output = execSync(`fuser -k ${portNum}/tcp 2>&1`, { timeout: 10000 });
+      const stdout = output.toString().trim();
+
+      for (const [key, entry] of instances) {
+        if (entry.detectedPort === portNum) {
+          entry.process = null;
+          entry.status = 'stopped';
+          instances.delete(key);
+        }
+      }
+
+      results.push({ port: portNum, status: 'ok', message: stdout || `Puerto ${portNum} liberado` });
+    } catch (err) {
+      const stderr = err.stderr ? err.stderr.toString().trim() : '';
+      results.push({ port: portNum, status: 'not_found', message: stderr || `No hay procesos en puerto ${portNum}` });
+    }
+  }
+
+  lastFrontendPorts = lastFrontendPorts.filter(fp => !ports.includes(fp.port));
+
+  return results;
 }
 
 export async function waitForFrontendPorts(timeout = 20000) {

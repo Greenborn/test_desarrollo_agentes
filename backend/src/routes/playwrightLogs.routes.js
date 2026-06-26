@@ -3,6 +3,40 @@ import db from '../config/db.js';
 
 const router = Router();
 
+const sseConnections = new Map();
+
+function sendSSE(res, data) {
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+function addSSEConnection(chatSessionId, res) {
+  if (!chatSessionId) return;
+  const key = parseInt(chatSessionId);
+  if (!sseConnections.has(key)) {
+    sseConnections.set(key, new Set());
+  }
+  sseConnections.get(key).add(res);
+
+  const keepAlive = setInterval(() => {
+    try {
+      res.write(':ping\n\n');
+    } catch {
+      clearInterval(keepAlive);
+    }
+  }, 30000);
+
+  res.on('close', () => {
+    clearInterval(keepAlive);
+    const conns = sseConnections.get(key);
+    if (conns) {
+      conns.delete(res);
+      if (conns.size === 0) {
+        sseConnections.delete(key);
+      }
+    }
+  });
+}
+
 function authGuard(req, res) {
   if (!req.session?.userId) {
     res.status(401).json({ error: 'Sesión no válida' });
@@ -29,6 +63,54 @@ router.get('/network', async (req, res) => {
     console.log('Error al obtener network logs:', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+router.get('/network/stream', (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const chatSessionId = req.query.chat_session_id;
+  if (!chatSessionId) {
+    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+
+  sendSSE(res, { type: 'connected', chat_session_id: parseInt(chatSessionId) });
+  addSSEConnection(chatSessionId, res);
+});
+
+router.post('/network/notify', (req, res) => {
+  const { chat_session_id, method, url, status_code, error, resource_type } = req.body;
+  if (!chat_session_id) {
+    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  }
+
+  const key = parseInt(chat_session_id);
+  const conns = sseConnections.get(key);
+  if (conns) {
+    const payload = {
+      type: 'network_error',
+      chat_session_id: key,
+      method,
+      url,
+      status_code: status_code || null,
+      error,
+      resource_type: resource_type || null,
+    };
+    for (const res of conns) {
+      try {
+        sendSSE(res, payload);
+      } catch (err) {
+        console.log('Error al enviar SSE de network:', err.message);
+      }
+    }
+  }
+
+  res.json({ success: true });
 });
 
 router.get('/console', async (req, res) => {
@@ -66,6 +148,46 @@ router.get('/console', async (req, res) => {
     console.log('Error al obtener console logs:', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+router.get('/console/stream', (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const chatSessionId = req.query.chat_session_id;
+  if (!chatSessionId) {
+    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+
+  sendSSE(res, { type: 'connected', chat_session_id: parseInt(chatSessionId) });
+  addSSEConnection(chatSessionId, res);
+});
+
+router.post('/console/notify', (req, res) => {
+  const { chat_session_id, type, text, location } = req.body;
+  if (!chat_session_id) {
+    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  }
+
+  const key = parseInt(chat_session_id);
+  const conns = sseConnections.get(key);
+  if (conns) {
+    const payload = { type: 'console', chat_session_id: key, console_type: type, text, location };
+    for (const res of conns) {
+      try {
+        sendSSE(res, payload);
+      } catch (err) {
+        console.log('Error al enviar SSE:', err.message);
+      }
+    }
+  }
+
+  res.json({ success: true });
 });
 
 router.delete('/network', async (req, res) => {

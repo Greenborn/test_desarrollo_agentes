@@ -139,6 +139,8 @@ Cuando se provee `chat_session_id`, el servicio registra automáticamente en BD:
 | `playwright_console_logs` | Mensajes de consola del navegador con tipo (`log`, `warn`, `error`, etc.), texto y ubicación |
 | `playwright_events` | Eventos de usuario del navegador capturados con `start_event_recording` (clicks, inputs, keydown, scroll, etc.) |
 
+Además del almacenamiento en BD, los errores de red (peticiones fallidas + respuestas 4xx/5xx) se notifican en tiempo real al backend vía `POST /api/playwright-logs/network/notify` y se reenvían a los clientes SSE conectados a `GET /api/playwright-logs/network/stream` (ver [`ENDPOINTS.md`](ENDPOINTS.md)). De igual forma, los console errors/warnings se notifican a `POST /api/playwright-logs/console/notify` y se reenvían por `GET /api/playwright-logs/console/stream`.
+
 ---
 
 ### 4.2 `go_to_url`

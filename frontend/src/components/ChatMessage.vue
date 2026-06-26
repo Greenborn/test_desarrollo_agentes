@@ -61,13 +61,29 @@
     <div v-else-if="msg.role === 'opencode_info'" class="d-block w-100 rounded-3 p-2 text-start small" style="background: #1a2744; border: 1px solid #374151; color: #9ca3af;">
       <template v-if="parsedInfoContent">
         <div class="mb-1 fw-semibold" style="color: #f0f0f0; font-size: 0.75rem;">{{ parsedInfoContent.summary }}</div>
-        <div v-for="(log, i) in parsedInfoContent.errors" :key="i" class="d-flex align-items-start gap-2 py-1" style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-          <span class="badge flex-shrink-0 mt-1" :class="log.type === 'error' ? 'bg-danger' : 'bg-warning text-dark'" style="font-size: 0.55rem;">{{ log.type }}</span>
-          <div class="min-w-0 flex-grow-1">
-            <div :style="{ color: log.type === 'error' ? '#ef4444' : '#eab308' }" style="word-break: break-all; white-space: pre-wrap; font-size: 0.7rem;">{{ log.text }}</div>
-            <div v-if="log.location" class="mt-1" style="color: #6b7280; font-size: 0.6rem;">{{ log.location }}</div>
+
+        <template v-if="parsedInfoContent.type === 'network_errors'">
+          <div v-for="(log, i) in parsedInfoContent.errors" :key="i" class="d-flex align-items-start gap-2 py-1" style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+            <span class="badge flex-shrink-0 mt-1" :class="log.type === 'error' ? 'bg-danger' : 'bg-warning text-dark'" style="font-size: 0.55rem; font-family: monospace;">{{ log.method || 'REQ' }}</span>
+            <span v-if="log.status_code" class="badge flex-shrink-0 mt-1" :class="log.status_code >= 500 ? 'bg-danger' : 'bg-warning text-dark'" style="font-size: 0.55rem;">{{ log.status_code }}</span>
+            <span v-else class="badge flex-shrink-0 mt-1 bg-danger" style="font-size: 0.55rem;">ERR</span>
+            <div class="min-w-0 flex-grow-1">
+              <div :style="{ color: log.type === 'error' ? '#ef4444' : '#eab308' }" style="word-break: break-all; white-space: pre-wrap; font-size: 0.7rem;">{{ log.url }}</div>
+              <div v-if="log.error" class="mt-1" style="color: #f59e0b; font-size: 0.6rem;">{{ log.error }}</div>
+            </div>
           </div>
-        </div>
+        </template>
+
+        <template v-else>
+          <div v-for="(log, i) in parsedInfoContent.errors" :key="i" class="d-flex align-items-start gap-2 py-1" style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+            <span class="badge flex-shrink-0 mt-1" :class="log.type === 'error' ? 'bg-danger' : 'bg-warning text-dark'" style="font-size: 0.55rem;">{{ log.type }}</span>
+            <div class="min-w-0 flex-grow-1">
+              <div :style="{ color: log.type === 'error' ? '#ef4444' : '#eab308' }" style="word-break: break-all; white-space: pre-wrap; font-size: 0.7rem;">{{ log.text }}</div>
+              <div v-if="log.location" class="mt-1" style="color: #6b7280; font-size: 0.6rem;">{{ log.location }}</div>
+            </div>
+          </div>
+        </template>
+
         <div v-if="parsedInfoContent.errors.length === 0" style="color: #9ca3af; font-size: 0.7rem;">Sin errores o advertencias nuevos.</div>
       </template>
       <pre v-else class="mb-0" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
@@ -165,7 +181,7 @@ export default {
       if (this.msg.role !== 'opencode_info') return null
       try {
         const data = JSON.parse(this.msg.content)
-        if (data && data.type === 'console_errors') return data
+        if (data && (data.type === 'console_errors' || data.type === 'network_errors')) return data
       } catch {}
       return null
     },

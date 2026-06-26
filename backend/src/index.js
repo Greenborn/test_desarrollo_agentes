@@ -4,7 +4,7 @@ import { spawn, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import express from 'express';
-import sessionMiddleware from './middlewares/sessionAuth.js';
+import sessionMiddleware from './middlewares/memoriaSession.js';
 import authRoutes from './routes/auth.routes.js';
 import chatRoutes from './routes/chat.routes.js';
 import settingsRoutes from './routes/settings.routes.js';

@@ -15,7 +15,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 - **Backend:** Node.js + Express + Knex + mysql2 + MariaDB — JavaScript puro (NO TypeScript)
 - **Frontend:** Vue 3 + Vite + Bootstrap 5 — JavaScript puro (NO TypeScript)
 - **Comunicación:** HTTP REST + SSE streaming (no WebSockets)
-- **Autenticación:** Sesiones con cookies (express-session)
+- **Autenticación:** Sesiones con cookies (api_memoria — sesiones almacenadas en servicio de memoria centralizado)
 - **Agente chat:** DeepSeek API con streaming (thinking + respuesta en vivo)
 - **Encriptación:** AES-256-CBC con clave desde `.env`
 
@@ -47,7 +47,8 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 │       ├── config/db.js   # Conexión Knex
 │       ├── routes/        # auth.routes.js, chat.routes.js, settings.routes.js, workspaces.routes.js
 │       ├── services/      # crypto.js, deepseek.js, redmine.js
-│       └── middlewares/   # sessionAuth.js
+│       ├── middlewares/   # memoriaSession.js
+│       └── services/      # memoriaClient.js
 ├── frontend/              # Vue 3 + Vite + Bootstrap
 │   └── src/
 │       ├── main.js

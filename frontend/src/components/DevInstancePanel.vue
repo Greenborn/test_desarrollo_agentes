@@ -111,6 +111,25 @@
           <pre ref="logContainerRef" class="log-output flex-grow-1 mb-0 p-2">{{ displayText }}</pre>
         </div>
       </div>
+
+      <div class="port-killer d-flex align-items-center px-2 py-1 border-top border-secondary flex-shrink-0" style="gap: 6px;">
+        <input
+          v-model="portsInput"
+          type="text"
+          class="form-control form-control-sm"
+          placeholder="Puertos a cerrar (ej: 5173, 3000, 3001)"
+          style="background: #0d1117; border-color: #374151; color: #e0e0e0; font-size: 0.7rem; max-width: 280px;"
+          @keyup.enter="cerrarPuertosAction"
+        />
+        <button
+          class="btn btn-sm py-0 px-2"
+          style="font-size: 0.7rem; border-color: #dc3545; color: #dc3545;"
+          :disabled="!portsInput.trim() || cerrandoPuertosRef"
+          @click="cerrarPuertosAction"
+        >
+          {{ cerrandoPuertosRef ? 'Cerrando…' : '✕ Cerrar Puertos' }}
+        </button>
+      </div>
     </template>
 
     <template v-if="activeTab === 'repositorio'">
@@ -198,9 +217,12 @@ export default {
     } = storeToRefs(devStore)
     const devFetchStatus = devStore.fetchStatus
     const devDetener = devStore.detener
+    const devCerrarPuertos = devStore.cerrarPuertos
     const activeTab = ref('instancias')
     const selectedProcess = ref(null)
     const logContainerRef = ref(null)
+    const portsInput = ref('')
+    const cerrandoPuertosRef = ref(false)
 
     const projectStore = useProjectStore()
     const chatStore = useChatStore()
@@ -292,6 +314,25 @@ export default {
       await devFetchStatus()
     }
 
+    async function cerrarPuertosAction() {
+      if (!portsInput.value.trim()) return
+      const ports = portsInput.value
+        .split(',')
+        .map(p => p.trim())
+        .filter(p => p.length > 0 && !isNaN(parseInt(p, 10)))
+        .map(p => parseInt(p, 10))
+      if (ports.length === 0) return
+      cerrandoPuertosRef.value = true
+      try {
+        await devCerrarPuertos(ports)
+        portsInput.value = ''
+      } catch (err) {
+        console.error('[DevInstancePanel] Error al cerrar puertos:', err)
+      } finally {
+        cerrandoPuertosRef.value = false
+      }
+    }
+
     watch(displayText, async () => {
       await nextTick()
       if (logContainerRef.value) {
@@ -320,6 +361,9 @@ export default {
       startingInstancia,
       iniciarInstancia,
       refrescar,
+      cerrarPuertosAction,
+      portsInput,
+      cerrandoPuertosRef,
       typeLabel,
       displayText,
       displayedLines,

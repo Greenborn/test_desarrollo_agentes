@@ -9,7 +9,7 @@ Plataforma de orquestación de agentes de IA con interfaz de chat, integración 
 | Backend | Node.js 21+ / Express 4 / Knex 3 / MariaDB 10+ |
 | Frontend | Vue 3 / Vite 6 / Bootstrap 5.3 / Pinia |
 | Chat IA | DeepSeek API con streaming SSE |
-| Autenticación | Sesiones con cookies (express-session) |
+| Autenticación | Sesiones con cookies (api_memoria) |
 | Automatización | Playwright 1.52+ |
 | Encriptación | AES-256-CBC |
 

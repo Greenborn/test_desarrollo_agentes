@@ -2,14 +2,11 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import db from '../config/db.js';
-import sessionAuth from '../middlewares/sessionAuth.js';
 import * as devInstanceManager from '../services/devInstanceManager.js';
 import playwrightManager from '../services/playwrightManager.js';
 
 const PW_PORT = process.env.SERVICIO_PLAYWRIGHT_PORT || 4098;
 const router = express.Router();
-
-router.use(sessionAuth);
 
 router.post('/upd-config', async (req, res) => {
   try {
@@ -234,6 +231,22 @@ router.post('/detener-instancia-dev', async (req, res) => {
   } catch (err) {
     console.log('Error en POST /api/despliegue/detener-instancia-dev:', err);
     res.status(500).json({ success: false, error: 'Error al detener instancia de desarrollo.' });
+  }
+});
+
+router.post('/cerrar-puertos', async (req, res) => {
+  try {
+    const { ports } = req.body;
+
+    if (!ports || !Array.isArray(ports) || ports.length === 0) {
+      return res.status(400).json({ success: false, error: 'Se requiere un array de puertos.' });
+    }
+
+    const results = devInstanceManager.killPorts(ports);
+    res.json({ success: true, results });
+  } catch (err) {
+    console.log('Error en POST /api/despliegue/cerrar-puertos:', err);
+    res.status(500).json({ success: false, error: 'Error al cerrar puertos.' });
   }
 });
 

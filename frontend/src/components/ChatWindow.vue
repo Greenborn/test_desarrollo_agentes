@@ -68,6 +68,8 @@ import { useTicketStore } from '../stores/ticket.js'
 import { deteccionState, abortDeteccion } from '../composables/commands/deteccionFuncionalidades.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useProjectVariables } from '../composables/useProjectVariables.js'
+import { useConsoleLogStream } from '../composables/useConsoleLogStream.js'
+import { useNetworkLogStream } from '../composables/useNetworkLogStream.js'
 import TicketInfoBar from './TicketInfoBar.vue'
 import ChatMessage from './ChatMessage.vue'
 import HelpContent from './HelpModal.vue'
@@ -94,6 +96,22 @@ export default {
     const devInstanceRunning = computed(() => devInstanceStore.hasProcesses)
     const streamSessionId = ref(null)
     const ticketInfo = ref(null)
+
+    const streamingConsole = ref(false)
+    const shouldStreamConsole = computed(() => {
+      return !!(
+        chat.activeSessionId &&
+        (streamingConsole.value || devInstanceStore.browserSessions.length > 0)
+      )
+    })
+    useConsoleLogStream(
+      () => chat.activeSessionId,
+      shouldStreamConsole,
+    )
+    useNetworkLogStream(
+      () => chat.activeSessionId,
+      shouldStreamConsole,
+    )
 
     function fetchGitBranch() {
       return gitStore.fetchGitBranch(chat.activeSessionId)
@@ -308,7 +326,9 @@ export default {
       const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
       streamMsg._key = 'stream-' + Date.now()
 
-      const _buildStartTime = mode === 'Build' ? new Date().toISOString() : null
+      if (mode === 'Build') {
+        streamingConsole.value = true
+      }
 
       await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
         onChunk(content) {
@@ -364,29 +384,7 @@ export default {
             }
           }
           fetchGitBranch()
-
-          if (mode === 'Build' && _buildStartTime) {
-            try {
-              const sinceParam = _buildStartTime
-              const res = await fetch(`/api/playwright-logs/console?chat_session_id=${sessionId}&since=${encodeURIComponent(sinceParam)}&types=error,warn&limit=20`, { credentials: 'include' })
-              const newLogs = await res.json()
-              if (Array.isArray(newLogs) && newLogs.length > 0) {
-                const errors = newLogs.filter(l => l.type === 'error')
-                const warnings = newLogs.filter(l => l.type === 'warn')
-                chat.pushMessage({
-                  role: 'opencode_info',
-                  content: JSON.stringify({
-                    type: 'console_errors',
-                    errors: newLogs,
-                    summary: `Se detectaron ${errors.length} error(es) y ${warnings.length} advertencia(s) en la consola del navegador`,
-                  }),
-                  _key: 'console-err-' + Date.now(),
-                })
-              }
-            } catch (err) {
-              console.error('Error al verificar console logs:', err.message)
-            }
-          }
+          streamingConsole.value = false
 
           const next = ocStore.messageQueue.shift()
           if (next && isActiveSession(sessionId)) {
@@ -418,6 +416,7 @@ export default {
         },
         onError(msg) {
           ocStreaming.value = false
+          streamingConsole.value = false
           chat.setOcStreaming(sessionId, false)
           chat.clearOcStreamCache(sessionId)
           if (sessionId) chat.setSessionStatus(sessionId, 'error')

@@ -1,7 +1,7 @@
 # ENDPOINTS — API REST
 
 Servidor Express principal en puerto `4000` (configurable vía `PORT` en `.env`).
-Todas las rutas protegidas requieren sesión activa (cookie `connect.sid`).
+Todas las rutas protegidas requieren sesión activa (cookie `session_token` almacenada en el servicio de memoria `api_memoria`).
 
 ---
 
@@ -663,6 +663,38 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
   - `limit` (number, opcional, default 500, max 500) — Número máximo de logs a devolver
 - **Descripción:** Obtiene entradas de console log registradas para la sesión de chat, ordenadas por fecha descendente.
 - **Respuesta 200:** `[{ id, chat_session_id, playwright_session_id, type, text, location, created_at }]`
+
+### `GET /api/playwright-logs/console/stream`
+- **Auth:** Requerida
+- **Query:** `chat_session_id` (number, requerido)
+- **Descripción:** Endpoint SSE (Server-Sent Events) que transmite en tiempo real los console errors/warnings del navegador Playwright a medida que ocurren. Envía keepalive `:ping` cada 30s.
+- **Formato de eventos SSE:**
+  - `data: {"type":"connected","chat_session_id":123}` — conexión establecida
+  - `data: {"type":"console","chat_session_id":123,"console_type":"error","text":"...","location":"url:line:col"}` — nuevo evento de consola
+- **Respuesta:** `text/event-stream`
+
+### `POST /api/playwright-logs/console/notify`
+- **Auth:** No (endpoint interno, llamado por el servicio Playwright)
+- **Body:** `{ chat_session_id: number, type: string, text: string, location?: string|null }`
+- **Descripción:** Endpoint interno que recibe notificaciones de eventos de consola desde el servicio Playwright y los reenvía a los clientes conectados vía SSE. No requiere autenticación de sesión.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 400:** `{ error: "chat_session_id es requerido" }`
+
+### `GET /api/playwright-logs/network/stream`
+- **Auth:** Requerida
+- **Query:** `chat_session_id` (number, requerido)
+- **Descripción:** Endpoint SSE (Server-Sent Events) que transmite en tiempo real los errores de red (peticiones fallidas + respuestas 4xx/5xx) del navegador Playwright a medida que ocurren. Envía keepalive `:ping` cada 30s.
+- **Formato de eventos SSE:**
+  - `data: {"type":"connected","chat_session_id":123}` — conexión establecida
+  - `data: {"type":"network_error","chat_session_id":123,"method":"GET","url":"https://...","status_code":404,"error":"Error del cliente (404)","resource_type":"fetch"}` — nuevo error de red
+- **Respuesta:** `text/event-stream`
+
+### `POST /api/playwright-logs/network/notify`
+- **Auth:** No (endpoint interno, llamado por el servicio Playwright)
+- **Body:** `{ chat_session_id: number, method: string, url: string, status_code: number|null, error: string, resource_type?: string|null }`
+- **Descripción:** Endpoint interno que recibe notificaciones de errores de red desde el servicio Playwright y los reenvía a los clientes conectados vía SSE. No requiere autenticación de sesión.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 400:** `{ error: "chat_session_id es requerido" }`
 
 ### `DELETE /api/playwright-logs/network`
 - **Auth:** Requerida

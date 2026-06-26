@@ -495,6 +495,28 @@ function stopEventRecording(page) {
   }
 }
 
+function notifyBackend(data) {
+  if (!data.chat_session_id) return;
+  const backendPort = process.env.PORT || 4000;
+  const backendUrl = `http://localhost:${backendPort}`;
+  fetch(`${backendUrl}/api/playwright-logs/console/notify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).catch(() => {});
+}
+
+function notifyNetworkError(data) {
+  if (!data.chat_session_id) return;
+  const backendPort = process.env.PORT || 4000;
+  const backendUrl = `http://localhost:${backendPort}`;
+  fetch(`${backendUrl}/api/playwright-logs/network/notify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).catch(() => {});
+}
+
 function setupPageListeners(page, sessionId, chatSessionId) {
   page.on('response', async (response) => {
     const req = response.request();
@@ -544,6 +566,19 @@ function setupPageListeners(page, sessionId, chatSessionId) {
     } catch (err) {
       console.log(`[browserManager] Error al guardar network log:`, err.message);
     }
+
+    const statusCode = response.status();
+    if (statusCode >= 400) {
+      const errorText = statusCode >= 500 ? `Error del servidor (${statusCode})` : `Error del cliente (${statusCode})`;
+      notifyNetworkError({
+        chat_session_id: chatSessionId,
+        method: req.method(),
+        url: req.url().substring(0, 2000),
+        status_code: statusCode,
+        error: errorText,
+        resource_type: resourceType,
+      });
+    }
   });
 
   page.on('requestfailed', async (request) => {
@@ -580,23 +615,67 @@ function setupPageListeners(page, sessionId, chatSessionId) {
     } catch (err) {
       console.log(`[browserManager] Error al guardar request failed:`, err.message);
     }
+
+    const errorText = request.failure()?.errorText || 'Unknown error';
+    notifyNetworkError({
+      chat_session_id: chatSessionId,
+      method: request.method(),
+      url: request.url().substring(0, 2000),
+      status_code: null,
+      error: errorText,
+      resource_type: resourceType,
+    });
   });
 
   page.on('console', async (msg) => {
     try {
       if (!db) return;
+      const type = msg.type();
       const location = msg.location();
       const locationStr = location ? `${location.url}:${location.lineNumber}:${location.columnNumber}` : null;
 
       await db('playwright_console_logs').insert({
         chat_session_id: chatSessionId,
         playwright_session_id: sessionId,
-        type: msg.type(),
+        type,
         text: msg.text(),
         location: locationStr,
       });
+
+      if (type === 'error' || type === 'warn') {
+        notifyBackend({
+          chat_session_id: chatSessionId,
+          type,
+          text: msg.text(),
+          location: locationStr,
+        });
+      }
     } catch (err) {
       console.log(`[browserManager] Error al guardar console log:`, err.message);
+    }
+  });
+
+  page.on('pageerror', async (error) => {
+    try {
+      if (!db) return;
+      const stack = (error.stack || error.message || String(error)).substring(0, 5000);
+
+      await db('playwright_console_logs').insert({
+        chat_session_id: chatSessionId,
+        playwright_session_id: sessionId,
+        type: 'error',
+        text: stack,
+        location: null,
+      });
+
+      notifyBackend({
+        chat_session_id: chatSessionId,
+        type: 'error',
+        text: stack,
+        location: null,
+      });
+    } catch (err) {
+      console.log(`[browserManager] Error al guardar pageerror:`, err.message);
     }
   });
 }

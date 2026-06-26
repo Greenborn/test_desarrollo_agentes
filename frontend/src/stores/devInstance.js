@@ -13,6 +13,8 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
   const logsMap = reactive({})
   const starting = ref(false)
   const deteniendo = ref(false)
+  const cerrandoPuertos = ref(false)
+  const ultimoResultadoPuertos = ref(null)
   const errorMsg = ref('')
 
   const hasProcesses = computed(() => processes.value.length > 0)
@@ -79,6 +81,32 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
     }
   }
 
+  async function cerrarPuertos(portsArray) {
+    if (!Array.isArray(portsArray) || portsArray.length === 0) return []
+    cerrandoPuertos.value = true
+    ultimoResultadoPuertos.value = null
+    try {
+      const res = await fetch(`${API}/despliegue/cerrar-puertos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ports: portsArray }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        await fetchStatus()
+        ultimoResultadoPuertos.value = data.results
+        return data.results
+      }
+      throw new Error(data.error || 'Error al cerrar puertos')
+    } catch (err) {
+      console.error('[devInstance] Error al cerrar puertos:', err)
+      throw err
+    } finally {
+      cerrandoPuertos.value = false
+    }
+  }
+
   function startPolling() {
     stopPolling()
     fetchStatus()
@@ -106,6 +134,8 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
     errorMsg.value = ''
     starting.value = false
     deteniendo.value = false
+    cerrandoPuertos.value = false
+    ultimoResultadoPuertos.value = null
     stopPolling()
   }
 
@@ -119,10 +149,13 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
     hasProcesses,
     starting,
     deteniendo,
+    cerrandoPuertos,
+    ultimoResultadoPuertos,
     errorMsg,
     fetchStatus,
     fetchLogs,
     detener,
+    cerrarPuertos,
     startPolling,
     stopPolling,
     reset,

@@ -15,7 +15,7 @@ Orquestador de agentes IA. En su fase inicial, ofrece un chat con un agente de p
 | Frontend | Vue 3 + Vite | 3.5+ / 6+ |
 | Estilos | Bootstrap | 5.3+ |
 | Comunicación | Socket.IO | 4.8+ |
-| Autenticación | express-session (cookies) | — |
+| Autenticación | api_memoria (sesiones en servicio centralizado in-memory) | — |
 | Chat IA | DeepSeek API (streaming) | — |
 | Encriptación | crypto (AES-256-CBC) | nativo Node |
 | **Prohibido** | TypeScript | — |
@@ -36,7 +36,7 @@ Orquestador de agentes IA. En su fase inicial, ofrece un chat con un agente de p
 
 - Frontend SPA se comunica **exclusivamente** por Socket.IO (sin HTTP REST)
 - Express sirve como base HTTP para montar Socket.IO y servir estáticos en producción
-- Sesiones manejadas con cookies vía express-session
+- Sesiones manejadas con cookies vía api_memoria (servicio centralizado in-memory key-value con TTL)
 - Socket.IO middleware verifica sesión en cada conexión
 
 ## 4. Estructura del proyecto
@@ -72,7 +72,8 @@ Orquestador de agentes IA. En su fase inicial, ofrece un chat con un agente de p
 │       │   ├── crypto.js        # Encriptación AES-256-CBC
 │       │   └── deepseek.js      # Cliente DeepSeek API (streaming)
 │       └── middlewares/
-│           └── sessionAuth.js   # express-session + middleware socket
+│           ├── memoriaSession.js  # Middleware de sesión vía api_memoria
+│           └── sessionAuth.js   # (Eliminado — reemplazado por memoriaSession.js)
 ├── frontend/
 │   ├── package.json
 │   ├── index.html
@@ -239,6 +240,8 @@ CREATE TABLE settings (
 ```
 PORT=4000
 SESSION_SECRET=cambiar_en_produccion
+SERVICIO_MEMORIA_PORT=4101
+MEMORIA_API_KEY=sk-mem-...
 
 DB_HOST=localhost
 DB_PORT=3306
