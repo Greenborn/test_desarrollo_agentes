@@ -751,11 +751,7 @@ async function startSession(navegador, headless, resolution, chatSessionId, inst
     throw new Error(`No se pudo iniciar ${navegador}: ${err.message}`);
   }
 
-  const contextOptions = {};
-  if (resolution && resolution.width && resolution.height) {
-    contextOptions.viewport = { width: resolution.width, height: resolution.height };
-  }
-  const context = await browser.newContext(contextOptions);
+  const context = await browser.newContext({ viewport: null });
   const page = await context.newPage();
 
   const id = generateId();
