@@ -39,6 +39,9 @@
                 class="workspace-badge"
                 :style="workspaceBadgeStyle(workspaceMap[s.workspace_id])"
                 title="Espacio de trabajo">{{ workspaceMap[s.workspace_id].name }}</span>
+          <span v-if="s.proyecto_id"
+                class="project-badge"
+                title="Proyecto">{{ s.proyecto_id }}</span>
           <span
             class="delete-btn"
             @click.stop="chat.deleteSession(s.id)"
@@ -380,6 +383,20 @@ export default {
   line-height: 1.5;
   flex-shrink: 0;
   white-space: nowrap;
+}
+.project-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 0 5px;
+  margin-left: 4px;
+  line-height: 1.5;
+  flex-shrink: 0;
+  white-space: nowrap;
+  background-color: #2d3748;
+  color: #a0aec0;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 }
 .ticket-priority-low {
   border-left: 3px solid var(--priority-low-color, #6b7280) !important;

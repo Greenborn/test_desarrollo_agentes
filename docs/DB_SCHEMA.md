@@ -200,6 +200,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `comentario` | TEXT | NOT NULL |
 | `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` — FK lógica → `workspaces(id)` |
 | `estado` | ENUM(`'pendiente'`, `'enviado'`, `'error'`) | DEFAULT `'pendiente'` |
+| `tipo` | ENUM(`'comentario_commit'`, `'ticket_edit'`) | NOT NULL, DEFAULT `'comentario_commit'` |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 
