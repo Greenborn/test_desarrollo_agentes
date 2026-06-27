@@ -5,12 +5,13 @@
     :style="rightPanelCollapsed ? {} : { width: rightPanelWidth + 'px', minWidth: rightPanelWidth + 'px' }"
   >
     <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
-      <button class="tab-btn" :class="{ active: activeTab === 'comentarios' }" @click="activeTab = 'comentarios'">Comentarios</button>
-      <button class="tab-btn" :class="{ active: activeTab === 'archivos' }" @click="activeTab = 'archivos'">Archivos</button>
-      <button class="tab-btn" :class="{ active: activeTab === 'variables' }" @click="activeTab = 'variables'">Variables</button>
+      <button class="tab-btn" :class="{ active: tab === 'comentarios' }" @click="selectTab('comentarios')">Comentarios</button>
+      <button class="tab-btn" :class="{ active: tab === 'archivos' }" @click="selectTab('archivos')">Archivos</button>
+      <button class="tab-btn" :class="{ active: tab === 'variables' }" @click="selectTab('variables')">Variables</button>
+      <button class="tab-btn" :class="{ active: tab === 'comandos' }" @click="selectTab('comandos')">Comandos</button>
     </div>
 
-    <template v-if="activeTab === 'comentarios'">
+    <template v-if="tab === 'comentarios'">
       <div v-if="!sessionWithTicket" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
         <span v-if="!activeSession">Seleccione una sesión de chat</span>
         <span v-else>Sin ticket vinculado a esta sesión</span>
@@ -33,10 +34,10 @@
         </div>
       </div>
     </template>
-    <template v-else-if="activeTab === 'archivos'">
+    <template v-else-if="tab === 'archivos'">
       <FileTreePanel :session-id="activeSessionId" />
     </template>
-    <template v-else-if="activeTab === 'variables'">
+    <template v-else-if="tab === 'variables'">
       <div v-if="!activeSession" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
         <span>Seleccione una sesión de chat</span>
       </div>
@@ -59,6 +60,33 @@
         </div>
       </div>
     </template>
+    <template v-else-if="tab === 'comandos'">
+      <div v-if="!activeSession" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
+        <span>Seleccione una sesión de chat</span>
+      </div>
+      <div v-else-if="!proyectoId" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
+        <span>Sin proyecto asignado a esta sesión</span>
+      </div>
+      <div v-else-if="loadingComandos" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small">
+        <span>Cargando comandos…</span>
+      </div>
+      <div v-else-if="comandos.length === 0" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
+        <span>No hay comandos personalizados para este proyecto</span>
+      </div>
+      <div v-else class="comandos-list flex-grow-1 overflow-y-auto px-2 py-1">
+        <div v-for="c in comandos" :key="c.id" class="comando-item d-flex flex-column px-2 py-2 mb-1 rounded">
+          <div class="d-flex align-items-center gap-1 mb-1">
+            <span class="comando-label small fw-semibold text-truncate">{{ c.label }}</span>
+          </div>
+          <div v-if="c.descripcion" class="comando-desc text-muted small text-truncate mb-2">{{ c.descripcion }}</div>
+          <div class="d-flex gap-1 justify-content-end">
+            <button class="btn btn-sm btn-outline-success py-0 px-2" style="font-size: 0.65rem;" @click.stop="ejecutarComando(c)">▶ Ejecutar</button>
+            <button class="btn btn-sm btn-outline-info py-0 px-2" style="font-size: 0.65rem;" @click.stop="editarComando(c)">✏</button>
+            <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.65rem;" @click.stop="eliminarComando(c)">🗑</button>
+          </div>
+        </div>
+      </div>
+    </template>
     <div class="sidebar-right-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-right-resize-handle-bar"></div>
     </div>
@@ -72,7 +100,9 @@ import { useUiStore } from '../stores/ui.js'
 import { useChatStore } from '../stores/chat.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
 import { useProjectVariablesStore } from '../stores/projectVariables.js'
+import { useComandosPersonalizadosStore } from '../stores/comandosPersonalizados.js'
 import { useModalStore } from '../stores/modal.js'
+import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import VariableDetailModal from './VariableDetailModal.vue'
 import FileTreePanel from './FileTreePanel.vue'
 
@@ -84,8 +114,11 @@ export default {
     const modal = useModalStore()
     const redmineComments = useRedmineCommentsStore()
     const projectVariables = useProjectVariablesStore()
-    const { rightPanelCollapsed, rightPanelWidth } = storeToRefs(ui)
+    const comandosStore = useComandosPersonalizadosStore()
+    const { rightPanelCollapsed, rightPanelWidth, sidebarRightTab } = storeToRefs(ui)
     const { activeSessionId, sessions } = storeToRefs(chat)
+    const tab = ref('comentarios')
+    const stopTabSync = watch(sidebarRightTab, (v) => { tab.value = v; stopTabSync() })
 
     const comments = computed(() => {
       const list = redmineComments.commentsBySession[activeSessionId.value] || []
@@ -100,9 +133,10 @@ export default {
     const proyectoId = computed(() => activeSession.value?.proyecto_id || null)
     const variables = computed(() => projectVariables.variablesByProject[proyectoId.value] || [])
     const loadingVariables = computed(() => projectVariables.loadingByProject[proyectoId.value] || false)
+    const comandos = computed(() => comandosStore.getCommandsForProject(proyectoId.value))
+    const loadingComandos = computed(() => comandosStore.loadingByProject[proyectoId.value] || false)
 
     const rightPanelTransitioning = ref(false)
-    const activeTab = ref('comentarios')
     let transitionTimer = null
 
     const activeSession = computed(() => {
@@ -112,6 +146,12 @@ export default {
     const sessionWithTicket = computed(() => {
       return activeSession.value?.id_ticket_redmine || null
     })
+
+    function selectTab(val) {
+      tab.value = val
+      sidebarRightTab.value = val
+      ui.saveLayoutPrefs()
+    }
 
     function formatDate(dateStr) {
       if (!dateStr) return ''
@@ -162,10 +202,130 @@ export default {
     watch(proyectoId, (newId) => {
       if (!newId) {
         projectVariables.clearVariables()
+        comandosStore.clearCommands()
         return
       }
       projectVariables.loadVariables(newId)
+      comandosStore.loadCommands(newId)
     })
+
+    async function ejecutarComando(c) {
+      const sid = activeSessionId.value
+      if (!sid) return
+      const streamKey = 'stream-sb-' + Date.now()
+      if (Number(chat.activeSessionId) === Number(sid)) {
+        chat.pushMessage({ role: 'command', content: `$ ${c.label}`, _key: 'cmd-sb-' + Date.now() })
+        chat.pushMessage({ role: 'result', content: '⏳ Ejecutando...', _key: streamKey })
+      }
+
+      let fullOutput = ''
+      try {
+        const res = await fetch(`/api/comandos-personalizados/${c.id}/execute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ sessionId: sid }),
+        })
+        if (!res.ok) {
+          const errData = await res.json()
+          throw new Error(errData.error || 'Error al ejecutar comando')
+        }
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buf = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buf += decoder.decode(value, { stream: true })
+          const lines = buf.split('\n')
+          buf = lines.pop() || ''
+
+          for (const line of lines) {
+            const t = line.trim()
+            if (!t || t === 'data: [DONE]') continue
+            if (!t.startsWith('data: ')) continue
+            try {
+              const json = JSON.parse(t.slice(6))
+              if (json.type === 'stdout' || json.type === 'stderr') {
+                fullOutput += json.content
+                if (Number(chat.activeSessionId) === Number(sid)) {
+                  const idx = chat.findMessageIndex(streamKey)
+                  if (idx >= 0) chat.updateMessageAt(idx, { role: 'result', content: fullOutput })
+                }
+              } else if (json.type === 'error') {
+                fullOutput += '\n[Error: ' + json.content + ']'
+              }
+            } catch {}
+          }
+        }
+
+        const finalContent = fullOutput || '(sin salida)'
+        await fetch(`/api/chat/sessions/${sid}/save-messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            messages: [
+              { role: 'command', content: `$ ${c.label}` },
+              { role: 'result', content: finalContent },
+            ],
+          }),
+        })
+        if (Number(chat.activeSessionId) === Number(sid)) {
+          const idx = chat.findMessageIndex(streamKey)
+          if (idx >= 0) chat.updateMessageAt(idx, { role: 'result', content: finalContent })
+        }
+      } catch (err) {
+        console.error('Error ejecutando comando:', err)
+        if (Number(chat.activeSessionId) === Number(sid)) {
+          const idx = chat.findMessageIndex(streamKey)
+          if (idx >= 0) chat.updateMessageAt(idx, { role: 'result', content: 'Error: ' + err.message })
+        }
+      }
+    }
+
+    async function editarComando(c) {
+      const sid = activeSessionId.value
+      if (!sid) return
+      chat.pushMessage({
+        role: 'opencode_control',
+        content: JSON.stringify({
+          controlId: 'comando-edit-update-' + Date.now(),
+          controlType: 'comando_edit',
+          mode: 'update',
+          id: c.id,
+          proyectoId: c.id_proyecto,
+          label: c.label,
+          descripcion: c.descripcion || '',
+          comando: c.comando,
+        }),
+        controlData: {
+          controlId: 'comando-edit-update-' + Date.now(),
+          controlType: 'comando_edit',
+          mode: 'update',
+          id: c.id,
+          proyectoId: c.id_proyecto,
+          label: c.label,
+          descripcion: c.descripcion || '',
+          comando: c.comando,
+        },
+        _key: 'ctrl-comando-' + Date.now(),
+      })
+    }
+
+    async function eliminarComando(c) {
+      if (!confirm(`¿Eliminar el comando "${c.label}"?`)) return
+      try {
+        await comandosStore.deleteCommand(c.id, proyectoId.value)
+        if (Number(chat.activeSessionId) === Number(activeSessionId.value) && activeSessionId.value) {
+          chat.pushMessage({ role: 'result', content: `✓ Comando "${c.label}" eliminado.`, _key: 'del-' + Date.now() })
+        }
+      } catch (err) {
+        console.error('Error al eliminar comando:', err)
+      }
+    }
 
     function onResizeStart(e) {
       rightPanelTransitioning.value = false
@@ -201,7 +361,8 @@ export default {
       rightPanelCollapsed,
       rightPanelWidth,
       rightPanelTransitioning,
-      activeTab,
+      tab,
+      selectTab,
       activeSessionId,
       activeSession,
       sessionWithTicket,
@@ -210,11 +371,16 @@ export default {
       proyectoId,
       variables,
       loadingVariables,
+      comandos,
+      loadingComandos,
       formatDate,
       badgeClass,
       deleteComment,
       truncateValue,
       openVariableDetail,
+      ejecutarComando,
+      editarComando,
+      eliminarComando,
       onResizeStart,
     }
   },
@@ -352,5 +518,23 @@ export default {
 .variable-sep {
   font-family: monospace;
   font-size: 0.75rem;
+}
+.comandos-list {
+  background: #16213e;
+}
+.comando-item {
+  background: #1a2744;
+  border: 1px solid #374151;
+  position: relative;
+}
+.comando-item:hover {
+  background: #1e3050;
+}
+.comando-label {
+  color: #75AADB;
+}
+.comando-desc {
+  font-size: 0.65rem;
+  line-height: 1.2;
 }
 </style>

@@ -22,6 +22,12 @@ const serviceConfig = {
     cwd: path.resolve(__dirname, '../../backend'),
     port: process.env.PORT,
   },
+  frontend: {
+    script: '../../frontend/node_modules/.bin/vite',
+    cwd: path.resolve(__dirname, '../../frontend'),
+    port: process.env.SERVICIO_FRONTEND_PORT || 5173,
+    env: { VITE_DISABLE_HMR: 'true' },
+  },
   playwright: {
     script: '../../playwright/src/index.js',
     cwd: path.resolve(__dirname, '../../playwright'),
@@ -65,10 +71,11 @@ function spawnService(name, logTag) {
   }
 
   const scriptPath = path.resolve(__dirname, config.script);
-  const proc = spawn('node', [scriptPath], {
+  const args = [scriptPath, ...(config.args || [])];
+  const proc = spawn('node', args, {
     cwd: config.cwd,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env },
+    env: { ...process.env, ...(config.env || {}) },
   });
 
   proc.stdout.on('data', (data) => {

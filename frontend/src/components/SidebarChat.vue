@@ -6,10 +6,10 @@
   >
     <!-- Tab bar -->
     <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
-      <button class="tab-btn" :class="{ active: activeTab === 'chats' }" @click="activeTab = 'chats'">Chats</button>
-      <button class="tab-btn ms-3" :class="{ active: activeTab === 'servicios' }" @click="activeTab = 'servicios'">Servicios</button>
+      <button class="tab-btn" :class="{ active: tab === 'chats' }" @click="selectChatTab('chats')">Chats</button>
+      <button class="tab-btn ms-3" :class="{ active: tab === 'servicios' }" @click="selectChatTab('servicios')">Servicios</button>
     </div>
-    <div v-if="activeTab === 'chats'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
+    <div v-if="tab === 'chats'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
     <button class="btn btn-sm mb-2 flex-shrink-0 btn-argentina" @click="createSession" :disabled="creating">
       {{ creating ? 'Creando...' : '＋ Nuevo chat' }}
     </button>
@@ -51,7 +51,7 @@
       </div>
     </div>
     </div>
-    <ServiciosPanel v-if="activeTab === 'servicios'" class="flex-grow-1" style="min-height: 0;" />
+    <ServiciosPanel v-if="tab === 'servicios'" class="flex-grow-1" style="min-height: 0;" />
     <div class="sidebar-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-resize-handle-bar"></div>
     </div>
@@ -59,7 +59,7 @@
 </template>
 
 <script>
-import { computed, watch, ref } from 'vue'
+import { computed, watch, ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
@@ -72,14 +72,15 @@ import ServiciosPanel from './ServiciosPanel.vue'
 export default {
   components: { ServiciosPanel },
   setup() {
-    const activeTab = ref('chats')
     const chat = useChatStore()
     const cmd = useCommandStore()
     const ui = useUiStore()
     const settings = useSettingsStore()
     const ws = useWorkspaceStore()
     const { sessions, activeSessionId, creating, sessionStatus, pendingNotifications } = storeToRefs(chat)
-    const { sidebarCollapsed, sidebarWidth, omnifilter } = storeToRefs(ui)
+    const { sidebarCollapsed, sidebarWidth, omnifilter, sidebarChatTab } = storeToRefs(ui)
+    const tab = ref('chats')
+    const stopTabSync = watch(sidebarChatTab, (v) => { tab.value = v; stopTabSync() })
     const { redmineUrl } = storeToRefs(settings)
     const { workspaces, selectedIds } = storeToRefs(ws)
 
@@ -141,6 +142,12 @@ export default {
       chat.loadMessages(id)
     }
 
+    function selectChatTab(val) {
+      tab.value = val
+      sidebarChatTab.value = val
+      ui.saveLayoutPrefs()
+    }
+
     function ticketPriorityClass(priorityId) {
       if (!priorityId) return ''
       if (priorityId <= 1) return 'ticket-priority-low'
@@ -187,7 +194,8 @@ export default {
     })
 
     return {
-      activeTab,
+      tab,
+      selectChatTab,
       chat,
       filteredSessions,
       activeSessionId,

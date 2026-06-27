@@ -6,7 +6,7 @@
         <button
           class="btn btn-sm btn-restart-all"
           :disabled="restartingAll"
-          @click="confirmRestartAll"
+          @click="store.restartAllServices()"
           title="Reiniciar todos (excepto memoria)"
         >
           <span v-if="restartingAll" class="spinner-border spinner-border-sm" role="status"></span>
@@ -29,7 +29,7 @@
           <button
             class="btn btn-sm btn-restart ms-1"
             :disabled="restarting === svc.name"
-            @click="confirmRestart(svc.name)"
+            @click="store.restartService(svc.name)"
             :title="`Reiniciar ${svc.name}`"
           >
             <span v-if="restarting === svc.name" class="spinner-border spinner-border-sm" role="status"></span>
@@ -58,18 +58,6 @@ export default {
       return servicios.value.length > 0 && servicios.value.every(s => s.running)
     })
 
-    function confirmRestart(name) {
-      const confirmed = confirm(`¿Estás seguro de reiniciar el servicio "${name}"?`)
-      if (!confirmed) return
-      store.restartService(name)
-    }
-
-    function confirmRestartAll() {
-      const confirmed = confirm('¿Estás seguro de reiniciar todos los servicios (excepto memoria)?')
-      if (!confirmed) return
-      store.restartAllServices()
-    }
-
     onMounted(() => {
       store.startPolling()
     })
@@ -78,7 +66,7 @@ export default {
       store.stopPolling()
     })
 
-    return { servicios, loading, restarting, restartingAll, allRunning, confirmRestart, confirmRestartAll }
+    return { servicios, loading, restarting, restartingAll, allRunning, store }
   },
 }
 </script>

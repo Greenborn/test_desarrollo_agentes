@@ -119,7 +119,7 @@ Endpoints del orquestador `api_gestor_servicios`. Los endpoints operativos (`/se
 - **Auth:** Requerida
 - **Body:** `{ key: string, value: string, workspace_id?: number }` — si no se envía `workspace_id`, usa el primary
 - Si `key === "deepseek_key"` se encripta con AES-256-CBC antes de almacenar
-- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `omnifilter_debounce_ms`, `screen_resolutions`
+- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `omnifilter_debounce_ms`, `screen_resolutions`, `request_response_max_size_kb`
 - **Respuesta:** `{ success: true }`
 
 ### `GET /api/settings/export-all`
@@ -189,6 +189,54 @@ Endpoints del orquestador `api_gestor_servicios`. Los endpoints operativos (`/se
 - **Respuesta 200 (éxito):** `{ success: true, hasConflicts: false, mergeOutput, pushOutput, targetBranch, sourceBranch, redmineComment?: { action, ticketId } }`
 - **Respuesta 200 (conflictos):** `{ success: true, hasConflicts: true, mergeOutput, checkoutOutput, targetBranch, sourceBranch, instruction }`
 - **Respuesta 400 (error):** `{ success: false, error: "..." }` (cambios pendientes, no es repositorio, ambiente no encontrado, etc.)
+
+### `POST /api/proxy/request`
+- **Auth:** Requerida
+- **Body:** `{ url: string (requerido), method: string (default "GET"), headers?: [{ key: string, value: string }], body?: string }`
+- **Descripción:** Proxy para realizar peticiones HTTP desde el servidor (evita CORS). Lee `request_response_max_size_kb` de la configuración del workspace para limitar el tamaño del body de respuesta. Si se excede el límite, el body se trunca sin error. Timeout de 30 segundos.
+- **Métodos permitidos:** `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS`
+- **Header restringido:** `Host` no puede sobrescribirse.
+- **Respuesta 200:**
+```json
+{
+  "status": 200,
+  "statusText": "OK",
+  "headers": { "content-type": "application/json", ... },
+  "body": "... (contenido truncado si excede el límite) ...",
+  "truncated": false,
+  "originalSize": 12345,
+  "bodySize": 12345,
+  "elapsed": 234
+}
+```
+- **Respuesta 200 (error de red/redirección inválida/name resolution):**
+```json
+{
+  "status": 0,
+  "statusText": "Error",
+  "headers": {},
+  "body": "",
+  "truncated": false,
+  "originalSize": 0,
+  "bodySize": 0,
+  "elapsed": 0,
+  "error": "getaddrinfo ENOTFOUND dominioinexistente"
+}
+```
+- **Respuesta 200 (timeout):**
+```json
+{
+  "status": 0,
+  "statusText": "Timeout",
+  "headers": {},
+  "body": "",
+  "truncated": false,
+  "originalSize": 0,
+  "bodySize": 0,
+  "elapsed": 30000,
+  "error": "La petición excedió el tiempo de espera (30s)."
+}
+```
 
 ### `POST /api/command/execute`
 - **Auth:** Requerida
@@ -686,6 +734,60 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Devuelve el buffer de logs en tiempo real del proceso especificado (últimas 200 líneas).
 - **Respuesta 200:** `{ success: true, name: string, logs: string[] }`
 - **Respuesta 400:** `{ success: false, error: "Se requiere el parámetro name." }`
+
+---
+
+## Comandos Personalizados (`/api/comandos-personalizados`)
+
+### `GET /api/comandos-personalizados/:proyectoId`
+- **Auth:** Requerida
+- **Params:** `proyectoId` — slug del proyecto
+- **Descripción:** Lista todos los comandos personalizados de un proyecto, ordenados por label ascendente.
+- **Respuesta 200:** `{ comandos: [{ id, label, descripcion, id_proyecto, comando, created_at, updated_at }] }`
+- **Respuesta 404:** `{ error: "Proyecto no encontrado" }`
+
+### `GET /api/comandos-personalizados/detail/:id`
+- **Auth:** Requerida
+- **Params:** `id` — ID del comando
+- **Descripción:** Obtiene un comando personalizado por su ID.
+- **Respuesta 200:** `{ comando: { id, label, descripcion, id_proyecto, comando, ... } }`
+- **Respuesta 404:** `{ error: "Comando no encontrado" }`
+
+### `POST /api/comandos-personalizados`
+- **Auth:** Requerida
+- **Body:** `{ label: string, descripcion?: string, id_proyecto: string, comando: string }`
+- **Descripción:** Crea un nuevo comando personalizado. `comando` no puede exceder 512 caracteres.
+- **Respuesta 201:** `{ comando: { id, label, descripcion, id_proyecto, comando, ... } }`
+- **Respuesta 400:** `{ error: "label es requerido" }`, `{ error: "comando es requerido" }`, `{ error: "comando no puede exceder 512 caracteres" }`
+- **Respuesta 404:** `{ error: "Proyecto no encontrado" }`
+
+### `PUT /api/comandos-personalizados/:id`
+- **Auth:** Requerida
+- **Params:** `id` — ID del comando
+- **Body:** `{ label: string, descripcion?: string, comando: string }`
+- **Descripción:** Actualiza un comando personalizado existente. `comando` no puede exceder 512 caracteres.
+- **Respuesta 200:** `{ comando: { id, label, descripcion, id_proyecto, comando, ... } }`
+- **Respuesta 400:** `{ error: "label es requerido" }`, `{ error: "comando es requerido" }`
+- **Respuesta 404:** `{ error: "Comando no encontrado" }` o `{ error: "Proyecto no encontrado" }`
+
+### `DELETE /api/comandos-personalizados/:id`
+- **Auth:** Requerida
+- **Params:** `id` — ID del comando
+- **Descripción:** Elimina un comando personalizado.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 404:** `{ error: "Comando no encontrado" }`
+
+### `POST /api/comandos-personalizados/:id/execute`
+- **Auth:** Requerida
+- **Body:** `{ sessionId?: number }`
+- **Descripción:** Ejecuta el comando shell del registro via `/bin/sh -c` en el directorio de trabajo de la sesión (campo `cwd` de `chat_sessions`). Responde con SSE streaming.
+- **Respuesta:** `text/event-stream`
+  - `data: {"type":"stdout","content":"..."}` — salida estándar
+  - `data: {"type":"stderr","content":"..."}` — salida de error
+  - `data: {"type":"exit","code":0}` — proceso terminado
+  - `data: {"type":"error","content":"..."}` — error de ejecución
+  - `data: [DONE]` — fin del stream
+- **Nota:** Si el cliente cierra la conexión, el proceso hijo recibe SIGTERM.
 
 ---
 

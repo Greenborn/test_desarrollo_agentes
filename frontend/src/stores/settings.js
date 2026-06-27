@@ -28,6 +28,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const priorityColorImmediate = ref('#ef4444')
   const screenResolutions = ref([])
   const replayIntervalMs = ref(1000)
+  const requestResponseMaxSizeKb = ref(100)
   const saveError = ref('')
   const saveSuccess = ref('')
 
@@ -70,6 +71,7 @@ export const useSettingsStore = defineStore('settings', () => {
       priorityColorImmediate.value = keys.priority_color_immediate || '#ef4444'
       screenResolutions.value = keys.screen_resolutions || []
       replayIntervalMs.value = keys.replay_interval_ms ? parseInt(keys.replay_interval_ms, 10) : 1000
+      requestResponseMaxSizeKb.value = keys.request_response_max_size_kb ? parseInt(keys.request_response_max_size_kb, 10) : 100
       applyPriorityColors()
     } catch (err) {
       console.error('Error al cargar settings:', err)
@@ -127,6 +129,7 @@ export const useSettingsStore = defineStore('settings', () => {
         try { screenResolutions.value = JSON.parse(value) } catch { screenResolutions.value = [] }
         break
       case 'replay_interval_ms': replayIntervalMs.value = parseInt(value, 10) || 1000; break
+      case 'request_response_max_size_kb': requestResponseMaxSizeKb.value = parseInt(value, 10) || 100; break
     }
   }
 
@@ -142,5 +145,6 @@ export const useSettingsStore = defineStore('settings', () => {
            documentacionPromptFuncionalidades, ticketDescripcionPrompt, ticketRefinarPrompt,
            deteccionFuncionalidadesPrompt, codeFileExtensions, codeFileMaxSizeKb,
            priorityColorLow, priorityColorNormal, priorityColorHigh, priorityColorUrgent, priorityColorImmediate,
-           saveError, saveSuccess, clearFeedback, load, save, applyPriorityColors }
+            saveError, saveSuccess, clearFeedback, load, save, applyPriorityColors,
+            requestResponseMaxSizeKb }
 })

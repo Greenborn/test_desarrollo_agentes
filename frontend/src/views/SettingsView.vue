@@ -303,6 +303,21 @@
           <button class="btn btn-sm mt-2 btn-argentina" @click="saveReplayInterval">Guardar</button>
         </div>
 
+        <div v-if="matches('limite respuesta peticion http')" class="border-top border-secondary pt-3">
+          <label class="form-label">Límite de respuesta — Peticiones HTTP (KB)</label>
+          <div class="small text-muted mb-2">Tamaño máximo del body al usar /peticion. Si se excede, la respuesta se trunca (nunca se rechaza).</div>
+          <input
+            type="number"
+            class="form-control bg-dark text-light border-secondary"
+            v-model.number="requestResponseMaxSizeInput"
+            min="1"
+            step="10"
+            placeholder="100"
+            style="max-width: 200px;"
+          />
+          <button class="btn btn-sm mt-2 btn-argentina" @click="saveRequestResponseMaxSize">Guardar</button>
+        </div>
+
         <div v-if="matches('resoluciones pantalla resolucion')" class="border-top border-secondary pt-3">
           <label class="form-label mb-2 fw-bold">Resoluciones de Pantalla</label>
           <div class="small text-muted mb-2">Usadas por /navegador_iniciar --resolution=ID</div>
@@ -404,6 +419,7 @@ export default {
     const newResWidth = ref(1920)
     const newResHeight = ref(1080)
     const replayIntervalInput = ref(1000)
+    const requestResponseMaxSizeInput = ref(100)
     const newEnvName = ref('')
     const newEnvBranch = ref('')
     const newEnvDescription = ref('')
@@ -482,6 +498,10 @@ export default {
 
     watch(() => settings.replayIntervalMs, (val) => {
       replayIntervalInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.requestResponseMaxSizeKb, (val) => {
+      requestResponseMaxSizeInput.value = val
     }, { immediate: true })
 
     watch(() => settings.ticketDescripcionPrompt, (val) => {
@@ -634,6 +654,11 @@ export default {
     function saveReplayInterval() {
       settings.clearFeedback()
       settings.save('replay_interval_ms', String(replayIntervalInput.value), selectedWId.value)
+    }
+
+    function saveRequestResponseMaxSize() {
+      settings.clearFeedback()
+      settings.save('request_response_max_size_kb', String(requestResponseMaxSizeInput.value), selectedWId.value)
     }
 
     function savePriorityColor(key) {
@@ -814,9 +839,10 @@ export default {
       resolutionsEdit, newResId, newResWidth, newResHeight,
       newEnvName, newEnvBranch, newEnvDescription,
       replayIntervalInput,
+      requestResponseMaxSizeInput,
       saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
       saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveDeteccionPrompt, saveCodeConfig, saveRepoAcronimo,
-      saveLocale, savePriorityColor, saveReplayInterval,
+      saveLocale, savePriorityColor, saveReplayInterval, saveRequestResponseMaxSize,
       addResolution, removeResolution, resetResolutions, saveResolutions, matches,
       envStore, wsMessage,
       onWorkspaceChange, openCreateModal, openEditModal, openDeleteConfirm, cancelDelete, executeDelete, deleteConfirmWs, deleting,

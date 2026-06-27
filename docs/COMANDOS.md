@@ -41,6 +41,7 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/redmine_listar_tickets` | Obtiene la lista de tickets de Redmine para un proyecto importado. Usa Tab para autocompletar con los proyectos disponibles | `/redmine_listar_tickets --id=<id_proyecto>` |
 | `/redmine_importar_tickets` | Importa todos los tickets de Redmine de un proyecto o de todos los proyectos a la base de datos local. Usa Tab para autocompletar | `/redmine_importar_tickets [--id=<id_proyecto> \| --all]` |
 | `/redmine_crear_ticket` | Abre un formulario inline para crear un nuevo ticket en Redmine: seleccionar proyecto, asunto, descripción, estado, prioridad, asignado y % de avance | `/redmine_crear_ticket` |
+| `/peticion` | Abre un formulario inline tipo Postman para simular una petición HTTP. Permite elegir método, URL, headers (clave/valor dinámicos) y body. La respuesta se muestra en el chat con código de estado, headers y body. Si el body excede el límite configurado (`request_response_max_size_kb`, default 100KB), se trunca — nunca se rechaza. | `/peticion` |
 
 ---
 
@@ -165,6 +166,26 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 | Comando | Descripción | Uso |
 |---|---|---|
 | `/deteccion_funcionalidades` | Obtiene el listado de archivos de código del proyecto filtrado por extensiones configurables, los resume uno por uno vía DeepSeek y entrega el JSON completo con descripciones. Por defecto reutiliza el último escaneo de la sesión (si existe), sobrescribiendo sus archivos. Con `--escaneo-id` reutiliza un escaneo específico. | `/deteccion_funcionalidades [--escaneo-id=<id>]` |
+
+---
+
+---
+
+## Comandos Personalizados
+
+| Comando | Descripción | Uso |
+|---------|-------------|-----|
+| `/comando_listar` | Lista los comandos personalizados del proyecto de la sesión o del especificado | `/comando_listar [--id=proyecto]` |
+| `/comando_crear` | Abre un formulario inline para crear un nuevo comando personalizado (label, descripción, comando shell) | `/comando_crear` |
+| `/comando_editar` | Abre un formulario inline precargado para editar un comando existente | `/comando_editar --id=ID` |
+| `/comando_eliminar` | Elimina un comando personalizado | `/comando_eliminar --id=ID` |
+| `/comando_ejecutar` | Ejecuta un comando personalizado por su ID. Los resultados parciales se muestran en vivo vía SSE | `/comando_ejecutar --id=ID` |
+
+Los comandos personalizados se gestionan desde:
+- **Panel lateral derecho** → pestaña **Comandos**: lista, ejecuta, edita y elimina comandos del proyecto asociado a la sesión activa.
+- **Chat**: mediante los comandos `/comando_*` listados arriba.
+
+Cada comando se guarda en la tabla `comandos_personalizados_proyectos` y se ejecuta como comando shell (`/bin/sh -c`) en el directorio de trabajo de la sesión.
 
 ---
 

@@ -68,6 +68,8 @@ router.get('/', async (req, res) => {
         keys[row.setting_key] = row.setting_value;
       } else if (row.setting_key === 'replay_interval_ms') {
         keys.replay_interval_ms = row.setting_value;
+      } else if (row.setting_key === 'request_response_max_size_kb') {
+        keys.request_response_max_size_kb = row.setting_value;
       }
     }
     const defaults = {
@@ -89,6 +91,7 @@ router.get('/', async (req, res) => {
       priority_color_urgent: '#ef4444',
       priority_color_immediate: '#ef4444',
       replay_interval_ms: '1000',
+      request_response_max_size_kb: '100',
       screen_resolutions: [
         { id: 'fullhd', width: 1920, height: 1080 },
         { id: 'hd', width: 1366, height: 768 },

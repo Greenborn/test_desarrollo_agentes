@@ -65,6 +65,7 @@ import { useGitStore } from '../stores/git.js'
 import { useDevInstanceStore } from '../stores/devInstance.js'
 import { useProjectVariablesStore } from '../stores/projectVariables.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
+import { useComandosPersonalizadosStore } from '../stores/comandosPersonalizados.js'
 import { useTicketStore } from '../stores/ticket.js'
 import { deteccionState, abortDeteccion } from '../composables/commands/deteccionFuncionalidades.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
@@ -421,23 +422,27 @@ export default {
             sendToOpencode(next)
             return
           }
-          chat.pushMessage({
+          const controlData = {
+            controlId: 'followup-' + Date.now(),
+            controlType: 'opencode_form',
+            models: ocStore.getModelsForProvider(ocStore.selectedProvider),
+            modelValue: ocStore.selectedModel || '',
+            thinkingOptions: ocStore.thinkingOptions,
+            thinkingValue: ocStore.selectedThinking || '',
+            temperatureOptions: ocStore.temperatureOptions,
+            temperatureValue: ocStore.selectedTemperature || ocStore.savedTemperature || '0.7',
+            modeValue: ocStore.selectedMode || 'Build',
+            placeholder: 'Escribe otro mensaje para OpenCode...',
+            rows: 3,
+          }
+          const followupMsg = {
             role: 'opencode_control',
-            controlData: {
-              controlId: 'followup-' + Date.now(),
-              controlType: 'opencode_form',
-              models: ocStore.getModelsForProvider(ocStore.selectedProvider),
-              modelValue: ocStore.selectedModel || '',
-              thinkingOptions: ocStore.thinkingOptions,
-              thinkingValue: ocStore.selectedThinking || '',
-              temperatureOptions: ocStore.temperatureOptions,
-              temperatureValue: ocStore.selectedTemperature || ocStore.savedTemperature || '0.7',
-              modeValue: ocStore.selectedMode || 'Build',
-              placeholder: 'Escribe otro mensaje para OpenCode...',
-              rows: 3,
-            },
+            content: JSON.stringify(controlData),
+            controlData,
             _key: 'control-' + Date.now(),
-          })
+          }
+          chat.pushMessage(followupMsg)
+          chat._saveMessageToDb(sessionId, followupMsg)
         },
         onError(msg) {
           ocStreaming.value = false
@@ -1258,6 +1263,112 @@ export default {
           }
         }
         return
+      } else if (controlType === 'comando_edit') {
+        if (value === null) {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Edición cancelada.',
+              _key: 'result-' + Date.now(),
+            }
+          }
+          return
+        }
+        const controlMsg = chat.messages.find((m) => m.controlData && m.controlData.controlId === controlId)
+        const mode = controlMsg?.controlData?.mode || 'create'
+        const proyectoId = controlMsg?.controlData?.proyectoId
+        const id = controlMsg?.controlData?.id
+
+        try {
+          const store = useComandosPersonalizadosStore()
+          if (mode === 'create') {
+            await store.createCommand({
+              label: value.label,
+              descripcion: value.descripcion || '',
+              id_proyecto: proyectoId,
+              comando: value.comando,
+            })
+          } else if (mode === 'update' && id) {
+            await store.updateCommand(id, {
+              label: value.label,
+              descripcion: value.descripcion || '',
+              comando: value.comando,
+            })
+          }
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: `✓ Comando "${value.label}" ${mode === 'create' ? 'creado' : 'actualizado'} correctamente.`,
+              _key: 'result-' + Date.now(),
+            }
+          }
+        } catch (err) {
+          console.error('Error al guardar comando personalizado:', err)
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Error: ' + err.message,
+              _key: 'err-' + Date.now(),
+            }
+          }
+        }
+        return
+      } else if (controlType === 'peticion') {
+        if (value === null) {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = { role: 'result', content: 'Petición cancelada.', _key: 'result-' + Date.now() }
+          }
+          return
+        }
+
+        const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+        if (idx >= 0) {
+          chat.messages[idx].controlData.sending = true
+        }
+
+        let payload
+        try {
+          const res = await fetch('/api/proxy/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(value),
+          })
+          if (!res.ok) {
+            const errData = await res.json()
+            throw new Error(errData.error || 'Error del servidor proxy')
+          }
+          payload = await res.json()
+        } catch (err) {
+          console.error('Error en petición proxy:', err)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'opencode_control',
+              controlData: {
+                controlType: 'peticion_result',
+                payload: { status: 0, statusText: 'Error', headers: {}, body: '', truncated: false, bodySize: 0, elapsed: 0, error: err.message },
+              },
+              _key: 'result-' + Date.now(),
+            }
+          }
+          return
+        }
+
+        if (idx >= 0) {
+          chat.messages[idx] = {
+            role: 'opencode_control',
+            controlData: {
+              controlType: 'peticion_result',
+              payload,
+            },
+            _key: 'result-' + Date.now(),
+          }
+        }
+        return
       } else if (controlType === 'followup') {
         let { model, thinking, temperature, prompt } = value
         if (!prompt) return
@@ -1801,23 +1912,27 @@ export default {
               },
               _key: 'control-' + Date.now(),
             })
-            chat.pushMessage({
+            const controlData = {
+              controlId: 'followup-' + Date.now(),
+              controlType: 'opencode_form',
+              stepType: 'ticket_descripcion',
+              ticket,
+              models: ocStore.getModelsForProvider(ocStore.selectedProvider),
+              modelValue: ocStore.selectedModel || '',
+              thinkingOptions: ocStore.thinkingOptions,
+              thinkingValue: ocStore.selectedThinking || '',
+              modeValue: ocStore.selectedMode || 'Plan',
+              placeholder: 'Escribe otro mensaje para OpenCode...',
+              rows: 3,
+            }
+            const followupMsg = {
               role: 'opencode_control',
-              controlData: {
-                controlId: 'followup-' + Date.now(),
-                controlType: 'opencode_form',
-                stepType: 'ticket_descripcion',
-                ticket,
-                models: ocStore.getModelsForProvider(ocStore.selectedProvider),
-                modelValue: ocStore.selectedModel || '',
-                thinkingOptions: ocStore.thinkingOptions,
-                thinkingValue: ocStore.selectedThinking || '',
-                modeValue: ocStore.selectedMode || 'Plan',
-                placeholder: 'Escribe otro mensaje para OpenCode...',
-                rows: 3,
-              },
+              content: JSON.stringify(controlData),
+              controlData,
               _key: 'control-' + Date.now(),
-            })
+            }
+            chat.pushMessage(followupMsg)
+            chat._saveMessageToDb(sessionId, followupMsg)
           } else {
             chat.pendingNotifications[sessionId] = Date.now()
           }
@@ -1934,23 +2049,27 @@ export default {
               }
             }
             // Add new followup control to continue the conversation
-            chat.pushMessage({
+            const controlData = {
+              controlId: 'followup-' + Date.now(),
+              controlType: 'opencode_form',
+              stepType: 'ticket_descripcion',
+              ticket,
+              models: ocStore.getModelsForProvider(ocStore.selectedProvider),
+              modelValue: ocStore.selectedModel || '',
+              thinkingOptions: ocStore.thinkingOptions,
+              thinkingValue: ocStore.selectedThinking || '',
+              modeValue: ocStore.selectedMode || 'Plan',
+              placeholder: 'Escribe otro mensaje para OpenCode...',
+              rows: 3,
+            }
+            const followupMsg = {
               role: 'opencode_control',
-              controlData: {
-                controlId: 'followup-' + Date.now(),
-                controlType: 'opencode_form',
-                stepType: 'ticket_descripcion',
-                ticket,
-                models: ocStore.getModelsForProvider(ocStore.selectedProvider),
-                modelValue: ocStore.selectedModel || '',
-                thinkingOptions: ocStore.thinkingOptions,
-                thinkingValue: ocStore.selectedThinking || '',
-                modeValue: ocStore.selectedMode || 'Plan',
-                placeholder: 'Escribe otro mensaje para OpenCode...',
-                rows: 3,
-              },
+              content: JSON.stringify(controlData),
+              controlData,
               _key: 'control-' + Date.now(),
-            })
+            }
+            chat.pushMessage(followupMsg)
+            chat._saveMessageToDb(sessionId, followupMsg)
           } else {
             chat.pendingNotifications[sessionId] = Date.now()
           }
@@ -2288,28 +2407,32 @@ export default {
         ocStore.selectedProvider = value
         const models = ocStore.getModelsForProvider(value)
         const prefill = controlMsg.controlData.prefill || ''
-        chat.pushMessage({
+        const controlData = {
+          controlId: 'opencode-form-' + Date.now(),
+          controlType: 'opencode_form',
+          stepType: 'opencode_setup',
+          subStepType: 'form',
+          models,
+          modelValue: ocStore.savedModel || '',
+          thinkingOptions: ocStore.thinkingOptions,
+          thinkingValue: ocStore.savedThinking || '',
+          temperatureOptions: ocStore.temperatureOptions,
+          temperatureValue: ocStore.savedTemperature || '0.7',
+          modeValue: ocStore.savedMode || 'Build',
+          placeholder: prefill ? 'Revisa la descripción del ticket y modifícala si es necesario antes de enviar...' : 'Describe qué quieres que OpenCode haga...',
+          rows: prefill ? 8 : 5,
+          prefill,
+          sessionId: chat.activeSessionId,
+        }
+        const formMsg = {
           role: 'opencode_control',
-            controlData: {
-              controlId: 'opencode-form-' + Date.now(),
-              controlType: 'opencode_form',
-              stepType: 'opencode_setup',
-              subStepType: 'form',
-              models,
-              modelValue: ocStore.savedModel || '',
-              thinkingOptions: ocStore.thinkingOptions,
-              thinkingValue: ocStore.savedThinking || '',
-              temperatureOptions: ocStore.temperatureOptions,
-              temperatureValue: ocStore.savedTemperature || '0.7',
-              modeValue: ocStore.savedMode || 'Build',
-              placeholder: prefill ? 'Revisa la descripción del ticket y modifícala si es necesario antes de enviar...' : 'Describe qué quieres que OpenCode haga...',
-              rows: prefill ? 8 : 5,
-              prefill,
-              sessionId: chat.activeSessionId,
-            },
-            _key: 'control-' + Date.now(),
-          })
-        } else if (subStepType === 'form') {
+          content: JSON.stringify(controlData),
+          controlData,
+          _key: 'control-' + Date.now(),
+        }
+        chat.pushMessage(formMsg)
+        chat._saveMessageToDb(chat.activeSessionId, formMsg)
+      } else if (subStepType === 'form') {
           const { model, thinking, mode, temperature, prompt } = value
           ocSetupData.model = model
           ocSetupData.thinking = thinking

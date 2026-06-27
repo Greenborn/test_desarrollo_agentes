@@ -21,6 +21,8 @@ import environmentsRoutes from './routes/environments.routes.js';
 import playwrightLogsRoutes from './routes/playwrightLogs.routes.js';
 import stateRoutes from './routes/state.routes.js';
 import gestorRoutes from './routes/gestor.routes.js';
+import comandosPersonalizadosRoutes from './routes/comandosPersonalizados.routes.js';
+import proxyRoutes from './routes/proxy.routes.js';
 import opencode from './services/opencode.js';
 import * as devInstanceManager from './services/devInstanceManager.js';
 import memoriaClient from './services/memoriaClient.js';
@@ -55,6 +57,8 @@ app.use('/api/environments', environmentsRoutes);
 app.use('/api/playwright-logs', playwrightLogsRoutes);
 app.use('/api/state', stateRoutes);
 app.use('/api/gestor', gestorRoutes);
+app.use('/api/comandos-personalizados', comandosPersonalizadosRoutes);
+app.use('/api/proxy', proxyRoutes);
 
 async function start() {
   try {

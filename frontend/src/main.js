@@ -50,6 +50,8 @@ import './composables/commands/navegadorGrabacionAcciones.js'
 import './composables/commands/navegadorGrabacionListar.js'
 import './composables/commands/navegadorGrabacionReproducir.js'
 import './composables/commands/deteccionFuncionalidades.js'
+import './composables/commands/comandosPersonalizados.js'
+import './composables/commands/peticion.js'
 
 const app = createApp(App)
 const pinia = createPinia()

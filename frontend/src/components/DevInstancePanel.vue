@@ -3,54 +3,54 @@
     <div class="tab-bar d-flex align-items-center px-3 pt-2 pb-0 flex-shrink-0">
       <button
         class="tab-btn"
-        :class="{ active: activeTab === 'instancias' }"
-        @click="activeTab = 'instancias'"
+        :class="{ active: tab === 'instancias' }"
+        @click="selectDevTab('instancias')"
       >
         Instancias de Desarrollo
       </button>
       <button
         class="tab-btn ms-3"
-        :class="{ active: activeTab === 'repositorio' }"
-        @click="activeTab = 'repositorio'"
+        :class="{ active: tab === 'repositorio' }"
+        @click="selectDevTab('repositorio')"
       >
         Repositorio
       </button>
       <button
         class="tab-btn ms-3"
-        :class="{ active: activeTab === 'tickets' }"
-        @click="activeTab = 'tickets'"
+        :class="{ active: tab === 'tickets' }"
+        @click="selectDevTab('tickets')"
       >
         Tickets
       </button>
       <button
         class="tab-btn ms-3"
-        :class="{ active: activeTab === 'proyectos' }"
-        @click="activeTab = 'proyectos'"
+        :class="{ active: tab === 'proyectos' }"
+        @click="selectDevTab('proyectos')"
       >
         Proyectos
       </button>
       <button
         class="tab-btn ms-3"
-        :class="{ active: activeTab === 'console_logs' }"
-        @click="activeTab = 'console_logs'"
+        :class="{ active: tab === 'console_logs' }"
+        @click="selectDevTab('console_logs')"
       >
         Console Log Navegador
       </button>
       <button
         class="tab-btn ms-3"
-        :class="{ active: activeTab === 'events' }"
-        @click="activeTab = 'events'"
+        :class="{ active: tab === 'events' }"
+        @click="selectDevTab('events')"
       >
         Eventos del Navegador
       </button>
       <button
         class="tab-btn ms-3"
-        :class="{ active: activeTab === 'network_logs' }"
-        @click="activeTab = 'network_logs'"
+        :class="{ active: tab === 'network_logs' }"
+        @click="selectDevTab('network_logs')"
       >
         Actividad de Red
       </button>
-      <div v-if="activeTab === 'instancias'" class="ms-auto d-flex align-items-center gap-1">
+      <div v-if="tab === 'instancias'" class="ms-auto d-flex align-items-center gap-1">
         <button
           class="btn btn-sm py-0 px-1"
           style="font-size: 0.7rem; color: #6b7280; background: none; border: none; line-height: 1;"
@@ -69,7 +69,7 @@
       </div>
     </div>
 
-    <template v-if="activeTab === 'instancias'">
+    <template v-if="tab === 'instancias'">
       <div v-if="!hasProcesses" class="flex-grow-1 d-flex flex-column align-items-center justify-content-center text-muted small" style="gap: 10px;">
         <span v-if="errorMsg">{{ errorMsg }}</span>
         <template v-else>
@@ -132,15 +132,15 @@
       </div>
     </template>
 
-    <template v-if="activeTab === 'repositorio'">
+    <template v-if="tab === 'repositorio'">
       <RepoView class="flex-grow-1" :key="activeSessionId" />
     </template>
 
-    <template v-if="activeTab === 'tickets'">
+    <template v-if="tab === 'tickets'">
       <TicketPanel class="flex-grow-1" />
     </template>
 
-    <template v-if="activeTab === 'proyectos'">
+    <template v-if="tab === 'proyectos'">
       <div class="proyectos-panel d-flex flex-column flex-grow-1" style="min-height: 0;">
         <div class="px-3 py-2 flex-shrink-0">
           <input
@@ -174,15 +174,15 @@
       </div>
     </template>
 
-    <template v-if="activeTab === 'console_logs'">
+    <template v-if="tab === 'console_logs'">
       <ConsoleLogPanel class="flex-grow-1" />
     </template>
 
-    <template v-if="activeTab === 'events'">
+    <template v-if="tab === 'events'">
       <BrowserEventPanel class="flex-grow-1" />
     </template>
 
-    <template v-if="activeTab === 'network_logs'">
+    <template v-if="tab === 'network_logs'">
       <NetworkLogPanel class="flex-grow-1" />
     </template>
   </div>
@@ -202,6 +202,7 @@ import { useDevInstanceStore } from '../stores/devInstance.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useCommandStore } from '../stores/command.js'
 import { useProjectVariablesStore } from '../stores/projectVariables.js'
+import { useUiStore } from '../stores/ui.js'
 
 export default {
   components: { RepoView, TicketPanel, ConsoleLogPanel, NetworkLogPanel, BrowserEventPanel },
@@ -219,7 +220,10 @@ export default {
     const devFetchStatus = devStore.fetchStatus
     const devDetener = devStore.detener
     const devCerrarPuertos = devStore.cerrarPuertos
-    const activeTab = ref('instancias')
+    const ui = useUiStore()
+    const { devPanelTab } = storeToRefs(ui)
+    const tab = ref('instancias')
+    const stopTabSync = watch(devPanelTab, (v) => { tab.value = v; stopTabSync() })
     const selectedProcess = ref(null)
     const logContainerRef = ref(null)
     const portsInput = ref('')
@@ -277,6 +281,12 @@ export default {
       if (!displayText.value) return 0
       return displayText.value.split('\n').length
     })
+
+    function selectDevTab(val) {
+      tab.value = val
+      devPanelTab.value = val
+      ui.saveLayoutPrefs()
+    }
 
     function toggleProcess(name) {
       selectedProcess.value = selectedProcess.value === name ? null : name
@@ -368,7 +378,8 @@ export default {
     return {
       devProcesses,
       devResolution,
-      activeTab,
+      tab,
+      selectDevTab,
       selectedProcess,
       deteniendo,
       errorMsg,

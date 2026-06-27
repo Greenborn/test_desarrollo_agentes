@@ -88,6 +88,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `code_file_max_size_kb` | `100` | Tamaño máximo en KB para incluir archivos en el árbol de código |
 | `documentacion_prompt_*` | *(default interno)* | Prompts de documentación por tipo |
 | `screen_resolutions` | `[{ id, width, height }, ...]` | Array JSON de resoluciones de pantalla para Playwright. Configurable desde Settings. Default: 14 resoluciones comunes (desktop + mobile) |
+| `request_response_max_size_kb` | `'100'` | Límite en KB del body de respuesta del comando `/peticion`. Si se excede, la respuesta se trunca (nunca se rechaza). Configurable desde Settings → Límite de respuesta — Peticiones HTTP |
 
 ---
 
@@ -113,6 +114,9 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `panel_height` | `'250'` | Alto del panel inferior (px o %) |
 | `right_panel_collapsed` | `'true'` / `'false'` | Panel lateral derecho colapsado |
 | `right_panel_width` | `'220'` | Ancho del panel derecho (px o %) |
+| `sidebar_chat_tab` | `'chats'` / `'servicios'` | Pestaña activa del sidebar izquierdo |
+| `sidebar_right_tab` | `'comentarios'` / `'archivos'` / `'variables'` / `'comandos'` | Pestaña activa del panel derecho |
+| `dev_panel_tab` | `'instancias'` / `'repositorio'` / `'tickets'` / `'proyectos'` / `'console_logs'` / `'events'` / `'network_logs'` | Pestaña activa del panel inferior de desarrollo |
 
 ---
 
@@ -362,7 +366,21 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
-## 20. `playwright_console_logs`
+## 20. `comandos_personalizados_proyectos`
+
+| Columna | Tipo | Restricciones |
+|---------|------|---------------|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `label` | VARCHAR(255) | NOT NULL — nombre visible del comando |
+| `descripcion` | TEXT | nullable — descripción opcional |
+| `id_proyecto` | VARCHAR(255) | NOT NULL — FK lógica → `proyectos(id)` |
+| `comando` | VARCHAR(512) | NOT NULL — comando shell a ejecutar |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+---
+
+## 21. `playwright_console_logs`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -396,6 +414,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `playwright_console_logs` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 | `playwright_event_recordings` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 | `documentacion_escaneo` | `session_id` | `chat_sessions` | `id` | CASCADE |
+| `comandos_personalizados_proyectos` | `id_proyecto` | `proyectos` | `id` | — (FK lógica) |
 | `documentacion_archivo` | `escaneo_id` | `documentacion_escaneo` | `id` | CASCADE |
 
 ---
