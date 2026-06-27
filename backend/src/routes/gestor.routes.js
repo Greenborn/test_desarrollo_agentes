@@ -23,6 +23,18 @@ router.get('/services', async (req, res) => {
   }
 });
 
+router.post('/services/restart-all', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const data = await gestorClient.restartAllServices();
+    res.json(data);
+  } catch (err) {
+    console.log('[gestor] Error al reiniciar todos los servicios:', err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
 router.post('/services/:name/restart', async (req, res) => {
   if (!authGuard(req, res)) return;
 

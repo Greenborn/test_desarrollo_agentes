@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAuthStore } from './auth.js'
 
 const API = '/api'
+const SESSION_KEY = 'oc_active_session_id'
 
 export const useChatStore = defineStore('chat', () => {
   const sessions = ref([])
@@ -20,6 +21,8 @@ export const useChatStore = defineStore('chat', () => {
   const sessionTickets = ref({})
   const _sessionStreamCache = ref({})
   const _ocSessionStreamCache = ref({})
+  const ledFlash = ref({})
+  const ledFlashTimers = {}
 
   const streaming = computed(() => {
     const sid = activeSessionId.value
@@ -41,6 +44,17 @@ export const useChatStore = defineStore('chat', () => {
         return
       }
       sessions.value = data.sessions
+
+      // Restore active session from sessionStorage
+      const savedId = sessionStorage.getItem(SESSION_KEY)
+      if (savedId) {
+        const exists = data.sessions.some(s => Number(s.id) === Number(savedId))
+        if (exists) {
+          loadMessages(Number(savedId))
+        } else {
+          sessionStorage.removeItem(SESSION_KEY)
+        }
+      }
     } catch (err) {
       console.error('Error al cargar sesiones:', err)
     }
@@ -120,8 +134,10 @@ export const useChatStore = defineStore('chat', () => {
     const loadingKey = 'loading-' + Date.now()
 
     messages.value.push({ role: 'command', content: raw, _key: 'cmd-' + Date.now() })
+    flashLed(sid)
     const loadingIdx = messages.value.length
     messages.value.push({ role: 'result', content: '⏳ Ejecutando comando...', _key: loadingKey })
+    flashLed(sid)
 
     try {
       const result = await executeFn(loadingIdx, sid)
@@ -150,6 +166,7 @@ export const useChatStore = defineStore('chat', () => {
           } else {
             messages.value.splice(idx, 1)
           }
+          flashLed(sid)
         }
       } else if (sid) {
         pendingNotifications.value[sid] = Date.now()
@@ -178,6 +195,7 @@ export const useChatStore = defineStore('chat', () => {
         const idx = messages.value.findIndex(m => m._key === loadingKey)
         if (idx >= 0) {
           messages.value[idx] = { role: 'result', content: errorResult, _key: 'err-' + Date.now() }
+          flashLed(sid)
         }
       } else if (sid) {
         pendingNotifications.value[sid] = Date.now()
@@ -207,6 +225,30 @@ export const useChatStore = defineStore('chat', () => {
     if (sessionId) {
       delete pendingNotifications.value[sessionId]
     }
+  }
+
+  let _saveTimer = null
+  function saveUiState() {
+    // Sync to sessionStorage (instant, survives F5)
+    if (activeSessionId.value) {
+      sessionStorage.setItem(SESSION_KEY, String(activeSessionId.value))
+    } else {
+      sessionStorage.removeItem(SESSION_KEY)
+    }
+    // Async save to backend (debounced, for cross-tab)
+    if (_saveTimer) clearTimeout(_saveTimer)
+    _saveTimer = setTimeout(async () => {
+      try {
+        await fetch(`${API}/state/ui`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ state: { activeSessionId: activeSessionId.value } }),
+        })
+      } catch (err) {
+        console.error('Error saving UI state:', err)
+      }
+    }, 1000)
   }
 
   async function loadMessages(sessionId) {
@@ -256,6 +298,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function sendMessage(sessionId, message) {
     messages.value.push({ role: 'user', content: message })
+    flashLed(sessionId)
     _streamingSessions.value[sessionId] = true
     currentChunk.value = ''
     currentThinking.value = ''
@@ -331,6 +374,7 @@ export const useChatStore = defineStore('chat', () => {
                   content: currentChunk.value,
                   thinking: currentThinking.value || null,
                 })
+                flashLed(sessionId)
                 currentChunk.value = ''
                 currentThinking.value = ''
               } else {
@@ -360,6 +404,7 @@ export const useChatStore = defineStore('chat', () => {
             content: currentChunk.value,
             thinking: currentThinking.value || null,
           })
+          flashLed(sessionId)
           currentChunk.value = ''
           currentThinking.value = ''
         } else {
@@ -449,6 +494,7 @@ export const useChatStore = defineStore('chat', () => {
     currentChunk.value = ''
     currentThinking.value = ''
     activeSessionId.value = null
+    clearTimeout(_saveTimer)
     _sessionCmdCount.value = {}
     _streamingSessions.value = {}
     _ocStreamingSessions.value = {}
@@ -461,6 +507,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function pushMessage(msg, targetSessionId) {
     const sid = targetSessionId || activeSessionId.value
+    flashLed(sid)
     if (!sid || Number(sid) === Number(activeSessionId.value)) {
       messages.value.push(msg)
     } else {
@@ -525,6 +572,15 @@ export const useChatStore = defineStore('chat', () => {
     if (sessionId) delete _ocSessionStreamCache.value[sessionId]
   }
 
+  function flashLed(sessionId) {
+    if (!sessionId) return
+    ledFlash.value[sessionId] = true
+    if (ledFlashTimers[sessionId]) clearTimeout(ledFlashTimers[sessionId])
+    ledFlashTimers[sessionId] = setTimeout(() => {
+      ledFlash.value[sessionId] = false
+    }, 250)
+  }
+
   function setSessionTicket(sessionId, ticket) {
     if (!sessionId) return
     sessionTickets.value[sessionId] = ticket
@@ -539,6 +595,10 @@ export const useChatStore = defineStore('chat', () => {
     return sid ? sessionTickets.value[sid] || null : null
   })
 
+  watch(activeSessionId, () => {
+    saveUiState()
+  })
+
   return {
     sessions, activeSessionId, messages,
     streaming, creating, executing, sessionStatus, currentChunk, currentThinking,
@@ -548,6 +608,7 @@ export const useChatStore = defineStore('chat', () => {
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
     setOcStreaming, updateOcStreamCache, clearOcStreamCache,
     sessionTickets, activeSessionTicket, setSessionTicket, clearSessionTicket,
-    _saveMessageToDb, clearPendingNotification,
+    _saveMessageToDb, clearPendingNotification, ledFlash, flashLed,
+    saveUiState,
   }
 })

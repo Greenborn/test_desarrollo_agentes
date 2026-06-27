@@ -53,7 +53,7 @@
           @click="openVariableDetail(v)" role="button">
           <span class="variable-key text-nowrap">{{ v.key }}</span>
           <span class="variable-sep mx-1 text-muted">=</span>
-          <span class="variable-value text-break small">{{ truncateValue(v.value) }}</span>
+          <span class="variable-value small">{{ truncateValue(v.value) }}</span>
           <span v-if="v.type === 'memory'" class="badge bg-info ms-1" style="font-size: 0.55rem; line-height: 1.2; align-self: center;">mem</span>
         </div>
       </div>
@@ -121,7 +121,7 @@ export default {
     function truncateValue(val) {
       if (!val) return ''
       const str = String(val)
-      return str.length > 255 ? str.substring(0, 255) + '…' : str
+      return str.length > 50 ? str.substring(0, 50) + '…' : str
     }
 
     function openVariableDetail(variable) {
@@ -310,7 +310,11 @@ export default {
 .variable-value {
   color: #cbd5e1;
   font-family: monospace;
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  line-height: 1.4;
 }
 .variable-sep {
   font-family: monospace;

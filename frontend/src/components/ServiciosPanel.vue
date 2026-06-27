@@ -2,7 +2,18 @@
   <div class="servicios-panel d-flex flex-column h-100">
     <div class="px-2 pt-2 pb-1 flex-shrink-0 d-flex align-items-center justify-content-between">
       <span class="text-white-50" style="font-size: 0.7rem;">Servicios del sistema</span>
-      <span class="status-dot" :class="allRunning ? 'running' : 'degraded'" :title="allRunning ? 'Todos en ejecución' : 'Algún servicio detenido'"></span>
+      <div class="d-flex align-items-center gap-1">
+        <button
+          class="btn btn-sm btn-restart-all"
+          :disabled="restartingAll"
+          @click="confirmRestartAll"
+          title="Reiniciar todos (excepto memoria)"
+        >
+          <span v-if="restartingAll" class="spinner-border spinner-border-sm" role="status"></span>
+          <span v-else>&#x21bb; Todos</span>
+        </button>
+        <span class="status-dot" :class="allRunning ? 'running' : 'degraded'" :title="allRunning ? 'Todos en ejecución' : 'Algún servicio detenido'"></span>
+      </div>
     </div>
     <div class="overflow-y-auto flex-grow-1 px-2" style="min-height: 0;">
       <div v-if="loading && servicios.length === 0" class="text-center text-white-50 py-3" style="font-size: 0.7rem;">
@@ -41,7 +52,7 @@ import { useServiciosStore } from '../stores/servicios.js'
 export default {
   setup() {
     const store = useServiciosStore()
-    const { services: servicios, loading, restarting } = storeToRefs(store)
+    const { services: servicios, loading, restarting, restartingAll } = storeToRefs(store)
 
     const allRunning = computed(() => {
       return servicios.value.length > 0 && servicios.value.every(s => s.running)
@@ -53,6 +64,12 @@ export default {
       store.restartService(name)
     }
 
+    function confirmRestartAll() {
+      const confirmed = confirm('¿Estás seguro de reiniciar todos los servicios (excepto memoria)?')
+      if (!confirmed) return
+      store.restartAllServices()
+    }
+
     onMounted(() => {
       store.startPolling()
     })
@@ -61,7 +78,7 @@ export default {
       store.stopPolling()
     })
 
-    return { servicios, loading, restarting, allRunning, confirmRestart }
+    return { servicios, loading, restarting, restartingAll, allRunning, confirmRestart, confirmRestartAll }
   },
 }
 </script>
@@ -118,6 +135,23 @@ export default {
   border-color: #75AADB;
 }
 .btn-restart:disabled {
+  opacity: 0.5;
+}
+.btn-restart-all {
+  background: transparent;
+  color: #6b7280;
+  border: 1px solid #374151;
+  font-size: 0.65rem;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 3px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.btn-restart-all:hover:not(:disabled) {
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+.btn-restart-all:disabled {
   opacity: 0.5;
 }
 .status-dot {

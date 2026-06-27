@@ -5,6 +5,7 @@ export const useServiciosStore = defineStore('servicios', () => {
   const services = ref([])
   const loading = ref(false)
   const restarting = ref(null)
+  const restartingAll = ref(false)
 
   let pollingTimer = null
 
@@ -44,6 +45,25 @@ export const useServiciosStore = defineStore('servicios', () => {
     }
   }
 
+  async function restartAllServices() {
+    restartingAll.value = true
+    try {
+      const res = await fetch('/api/gestor/services/restart-all', {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (data.success) {
+        setTimeout(() => fetchServices(), 1500)
+      }
+      return data
+    } catch (err) {
+      console.error('[servicios] Error al reiniciar todos los servicios:', err.message)
+    } finally {
+      restartingAll.value = false
+    }
+  }
+
   function startPolling() {
     fetchServices()
     pollingTimer = setInterval(fetchServices, 5000)
@@ -56,5 +76,5 @@ export const useServiciosStore = defineStore('servicios', () => {
     }
   }
 
-  return { services, loading, restarting, fetchServices, restartService, startPolling, stopPolling }
+  return { services, loading, restarting, restartingAll, fetchServices, restartService, restartAllServices, startPolling, stopPolling }
 })

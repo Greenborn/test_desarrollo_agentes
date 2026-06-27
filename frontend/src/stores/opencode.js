@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 const API = '/api'
+const SESSION_KEY = 'oc_opencode_state'
 
 const thinkingOptions = [
   { label: 'Low — mínimo esfuerzo de razonamiento', value: 'low' },
@@ -36,6 +37,27 @@ export const useOpencodeStore = defineStore('opencode', () => {
   const streaming = ref(false)
   const streamText = ref('')
   const streamThinking = ref('')
+
+  function _persist() {
+    const state = {
+      ocStep: step.value,
+      ocSessionId: ocSessionId.value,
+      ocProvider: selectedProvider.value,
+      ocModel: selectedModel.value,
+      ocThinking: selectedThinking.value,
+      ocMode: selectedMode.value,
+      ocTemperature: selectedTemperature.value,
+    }
+    if (state.ocSessionId || (state.ocStep && state.ocStep !== 'idle')) {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(state))
+    } else {
+      sessionStorage.removeItem(SESSION_KEY)
+    }
+  }
+
+  function saveUiState() {
+    _persist()
+  }
 
   function getAvailableProviders() {
     return providers.value.map((p) => ({
@@ -153,6 +175,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
               ocSessionId.value = j.ocSessionId || j.hash || null
               streaming.value = false
               if (callbacks?.onDone) await callbacks.onDone(j, streamText.value)
+              saveUiState()
             } else if (j.type === 'error') {
               streaming.value = false
               if (callbacks?.onError) await callbacks.onError(j.content)
@@ -168,6 +191,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
             { type: 'done', ocSessionId: ocSessionId.value, fullResponse: streamText.value, thinking: streamThinking.value },
             streamText.value
           )
+          saveUiState()
         }
       }
     } catch (err) {
@@ -190,6 +214,33 @@ export const useOpencodeStore = defineStore('opencode', () => {
     selectedTemperature.value = ''
     messageQueue.value = []
     processing.value = false
+    sessionStorage.removeItem(SESSION_KEY)
+  }
+
+  function restoreFromState(savedState) {
+    if (!savedState) return false
+    const ocStep = savedState.ocStep
+    const ocSid = savedState.ocSessionId
+    if (!ocSid && (!ocStep || ocStep === 'idle')) return false
+    step.value = ocStep || 'idle'
+    ocSessionId.value = ocSid || null
+    selectedProvider.value = savedState.ocProvider || ''
+    selectedModel.value = savedState.ocModel || ''
+    selectedThinking.value = savedState.ocThinking || ''
+    selectedMode.value = savedState.ocMode || ''
+    selectedTemperature.value = savedState.ocTemperature || ''
+    return true
+  }
+
+  function restoreFromSession() {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY)
+      if (!raw) return false
+      return restoreFromState(JSON.parse(raw))
+    } catch (e) {
+      console.error('Error restoring opencode from sessionStorage:', e)
+      return false
+    }
   }
 
   return {
@@ -200,6 +251,6 @@ export const useOpencodeStore = defineStore('opencode', () => {
     thinkingOptions, temperatureOptions,
     messageQueue, processing,
     getAvailableProviders, getModelsForProvider, modelSupportsReasoning,
-    start, select, streamPrompt, finish,
+    start, select, streamPrompt, finish, restoreFromState, restoreFromSession, saveUiState,
   }
 })

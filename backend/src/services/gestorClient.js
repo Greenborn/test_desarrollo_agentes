@@ -33,4 +33,8 @@ export default {
   restartService(name) {
     return request('POST', `/services/${encodeURIComponent(name)}/restart`);
   },
+
+  restartAllServices() {
+    return request('POST', '/services/restart-all');
+  },
 };

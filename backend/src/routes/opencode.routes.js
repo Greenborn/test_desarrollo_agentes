@@ -51,7 +51,7 @@ async function saveLongMessage(sessionId, role, content, extraFields = {}) {
     content: parts.length > 1
       ? `[Parte ${i + 1}/${parts.length}]\n${part}`
       : part,
-    ...extraFields,
+    ...(i === 0 ? extraFields : {}),
   }));
 
   await db('chat_messages').insert(inserts);

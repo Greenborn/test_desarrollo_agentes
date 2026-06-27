@@ -25,17 +25,22 @@ router.get('/sessions', async (req, res) => {
     const sessions = await db('chat_sessions')
       .where({ 'chat_sessions.user_id': req.session.userId })
       .whereIn('chat_sessions.workspace_id', wsIds)
-      .orderBy('updated_at', 'desc')
+      .orderBy('chat_sessions.updated_at', 'desc')
       .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
       .leftJoin('tickets', 'chat_sessions.id_ticket_redmine', 'tickets.redmine_id')
+      .leftJoin('settings as ws_redmine', function () {
+        this.on('chat_sessions.workspace_id', '=', 'ws_redmine.workspace_id')
+          .andOn('ws_redmine.setting_key', '=', db.raw('?', ['redmine_url']));
+      })
       .select(
         'chat_sessions.id',
         'title',
-        'updated_at',
+        'chat_sessions.updated_at',
         'cwd',
         'chat_sessions.proyecto_id',
         'id_ticket_redmine',
         'chat_sessions.workspace_id',
+        'ws_redmine.setting_value as session_redmine_url',
         'proyectos.descripcion as proyecto_descripcion',
         'tickets.priority_id',
         'tickets.priority_name'

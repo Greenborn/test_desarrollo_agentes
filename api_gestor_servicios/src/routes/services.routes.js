@@ -14,6 +14,25 @@ router.get('/services', (req, res) => {
   res.json({ services });
 });
 
+router.post('/services/restart-all', (req, res) => {
+  const config = getServiceConfig();
+  const results = [];
+
+  for (const name of Object.keys(config)) {
+    if (name === 'memoria') continue;
+    try {
+      restartService(name);
+      const running = isRunning(name);
+      results.push({ name, success: true, running });
+    } catch (err) {
+      console.log(`[gestor] Error al reiniciar ${name}:`, err.message);
+      results.push({ name, success: false, error: err.message });
+    }
+  }
+
+  res.json({ success: true, results });
+});
+
 router.post('/services/:name/restart', (req, res) => {
   const { name } = req.params;
 

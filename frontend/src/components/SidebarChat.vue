@@ -25,12 +25,12 @@
         >
           <span class="status-led" :class="getSessionStatus(s.id)"></span>
           <span v-if="pendingNotifications[s.id]" class="notification-dot" title="Novedades pendientes"></span>
-          <a v-if="s.id_ticket_redmine"
-             class="ticket-badge"
-             :href="`${redmineUrl}/issues/${s.id_ticket_redmine}`"
-             target="_blank" rel="noopener noreferrer"
-             @click.stop
-             title="Abrir ticket en Redmine">#{{ s.id_ticket_redmine }}</a>
+            <a v-if="s.id_ticket_redmine"
+               class="ticket-badge"
+               :href="`${s.session_redmine_url || redmineUrl}/issues/${s.id_ticket_redmine}`"
+               target="_blank" rel="noopener noreferrer"
+               @click.stop
+               title="Abrir ticket en Redmine">#{{ s.id_ticket_redmine }}</a>
           <div class="d-flex flex-column flex-grow-1 min-width-0">
             <span class="text-truncate">{{ s.title }}</span>
             <span class="text-muted" style="font-size: 0.6rem; line-height: 1.2;">{{ formatDate(s.updated_at) }}</span>
@@ -149,6 +149,7 @@ export default {
     }
 
     function getSessionStatus(id) {
+      if (chat.ledFlash?.[id]) return 'flash'
       return sessionStatus.value[id] || 'idle'
     }
 
@@ -335,6 +336,10 @@ export default {
 .status-led.error {
   background-color: #ef4444;
   box-shadow: 0 0 6px #ef4444;
+}
+.status-led.flash {
+  background-color: #3b82f6;
+  box-shadow: 0 0 6px #3b82f6;
 }
 .notification-dot {
   display: inline-block;

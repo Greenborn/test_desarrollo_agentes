@@ -36,6 +36,7 @@ import DevInstancePanel from '../components/DevInstancePanel.vue'
 import { useAuthStore } from '../stores/auth.js'
 import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
+import { useOpencodeStore } from '../stores/opencode.js'
 import { useProjectStore } from '../stores/project.js'
 import { useTicketStore } from '../stores/ticket.js'
 import { useUiStore } from '../stores/ui.js'
@@ -77,11 +78,14 @@ export default {
       document.body.style.userSelect = 'none'
     }
 
-    function load() {
+    const ocStore = useOpencodeStore()
+
+    async function load() {
       if (auth.user) {
-        chat.loadSessions()
+        await chat.loadSessions()
         projectStore.loadProjects()
         ticketStore.loadTickets()
+        ocStore.restoreFromSession()
       }
     }
 

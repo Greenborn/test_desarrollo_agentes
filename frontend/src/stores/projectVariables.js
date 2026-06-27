@@ -36,5 +36,38 @@ export const useProjectVariablesStore = defineStore('projectVariables', () => {
     }
   }
 
-  return { variablesByProject, loadingByProject, loadVariables, clearVariables }
+  async function saveVariable(proyectoId, key, value) {
+    if (!proyectoId) return
+    const existing = (variablesByProject.value[proyectoId] || []).find(v => v.key === key)
+    const url = existing
+      ? `/api/proyecto/${encodeURIComponent(proyectoId)}/variables/${encodeURIComponent(key)}`
+      : `/api/proyecto/${encodeURIComponent(proyectoId)}/variables`
+    const method = existing ? 'PUT' : 'POST'
+    const payload = existing ? { value } : { key, value, type: 'db' }
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.error || 'Error al guardar variable')
+      }
+      if (existing) {
+        const idx = variablesByProject.value[proyectoId].findIndex(v => v.key === key)
+        if (idx !== -1) {
+          variablesByProject.value[proyectoId][idx].value = value
+        }
+      } else {
+        variablesByProject.value[proyectoId].push({ key, value, type: 'db' })
+      }
+    } catch (err) {
+      console.error('Error en saveVariable:', err.message)
+      throw err
+    }
+  }
+
+  return { variablesByProject, loadingByProject, loadVariables, clearVariables, saveVariable }
 })

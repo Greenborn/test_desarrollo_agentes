@@ -201,6 +201,7 @@ import { useChatStore } from '../stores/chat.js'
 import { useDevInstanceStore } from '../stores/devInstance.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useCommandStore } from '../stores/command.js'
+import { useProjectVariablesStore } from '../stores/projectVariables.js'
 
 export default {
   components: { RepoView, TicketPanel, ConsoleLogPanel, NetworkLogPanel, BrowserEventPanel },
@@ -227,6 +228,7 @@ export default {
     const projectStore = useProjectStore()
     const chatStore = useChatStore()
     const cmdStore = useCommandStore()
+    const projectVarsStore = useProjectVariablesStore()
     const { find } = useCommandRegistry()
     const { projects, selectedProject, pinnedProjectId } = storeToRefs(projectStore)
     const projectFilter = ref('')
@@ -325,6 +327,13 @@ export default {
       cerrandoPuertosRef.value = true
       try {
         await devCerrarPuertos(ports)
+        if (pinnedProjectId.value) {
+          try {
+            await projectVarsStore.saveVariable(pinnedProjectId.value, 'ports_to_close', portsInput.value)
+          } catch (err) {
+            console.error('[DevInstancePanel] Error al guardar puertos en variable del proyecto:', err)
+          }
+        }
         portsInput.value = ''
       } catch (err) {
         console.error('[DevInstancePanel] Error al cerrar puertos:', err)
@@ -332,6 +341,14 @@ export default {
         cerrandoPuertosRef.value = false
       }
     }
+
+    watch(pinnedProjectId, async (newId) => {
+      if (!newId) return
+      await projectVarsStore.loadVariables(newId)
+      const vars = projectVarsStore.variablesByProject[newId] || []
+      const portsVar = vars.find(v => v.key === 'ports_to_close')
+      portsInput.value = portsVar ? portsVar.value : ''
+    }, { immediate: true })
 
     watch(displayText, async () => {
       await nextTick()

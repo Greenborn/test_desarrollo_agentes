@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db from '../config/db.js';
 import { encrypt, decrypt } from '../services/crypto.js';
+import memoriaClient from '../services/memoriaClient.js';
 
 const router = Router();
 
@@ -156,6 +157,35 @@ router.post('/import', async (req, res) => {
     await trx.rollback();
     console.log('[state:import] Error:', err.message);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/ui', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const data = await memoriaClient.get('ui_state', `user_${req.session.userId}`);
+    res.json({ state: data?.value || null });
+  } catch (err) {
+    console.log('[state:ui] Error al leer estado UI:', err.message);
+    res.json({ state: null });
+  }
+});
+
+router.post('/ui', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { state } = req.body;
+    if (!state || typeof state !== 'object') {
+      return res.status(400).json({ error: 'state debe ser un objeto' });
+    }
+    const key = `user_${req.session.userId}`;
+    const existing = await memoriaClient.get('ui_state', key);
+    const merged = { ...(existing?.value || {}), ...state };
+    await memoriaClient.set('ui_state', key, merged, 86400);
+    res.json({ success: true });
+  } catch (err) {
+    console.log('[state:ui] Error al guardar estado UI:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
