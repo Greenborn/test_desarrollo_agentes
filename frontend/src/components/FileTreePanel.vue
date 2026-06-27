@@ -19,10 +19,13 @@
           v-for="item in flatTree"
           :key="item.node.path"
            class="tree-node d-flex align-items-center py-0"
-          :class="{ 'tree-directory': item.node.type === 'directory' }"
+          :class="{
+            'tree-directory': item.node.type === 'directory',
+            'tree-selected': item.node.type === 'file' && selectedFile === item.node.path,
+          }"
           :style="{ paddingLeft: (item.depth * 20) + 'px' }"
           :title="item.node.path"
-          @click="item.node.type === 'directory' ? handleToggleDirectory(item.node.path) : null"
+          @click="item.node.type === 'directory' ? handleToggleDirectory(item.node.path) : handleSelectFile(item.node.path, item.node.name)"
           @dblclick="item.node.type === 'file' ? openFile(item.node.path) : null"
         >
           <span v-if="item.node.type === 'directory'" class="tree-toggle flex-shrink-0">
@@ -38,7 +41,7 @@
 </template>
 
 <script>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useModalStore } from '../stores/modal.js'
 import { useFileTreeStore } from '../stores/fileTree.js'
 import FileEditorModal from './FileEditorModal.vue'
@@ -74,17 +77,26 @@ export default {
   props: {
     sessionId: { type: Number, default: null },
   },
-  setup(props) {
+  emits: ['file-selected'],
+  setup(props, { emit }) {
     const modal = useModalStore()
     const fileTreeStore = useFileTreeStore()
+
+    const selectedFile = ref(null)
 
     const tree = computed(() => props.sessionId ? fileTreeStore.getTree(props.sessionId) : null)
     const loading = computed(() => props.sessionId ? fileTreeStore.getLoading(props.sessionId) : false)
     const error = computed(() => props.sessionId ? fileTreeStore.getError(props.sessionId) : null)
     const flatTree = computed(() => props.sessionId ? fileTreeStore.getFlatTree(props.sessionId) : [])
 
+    function handleSelectFile(path, name) {
+      selectedFile.value = path
+      emit('file-selected', { path, name })
+    }
+
     function openFile(path) {
       const name = path.split('/').pop() || path
+      selectedFile.value = path
       modal.open(FileEditorModal, { filePath: path }, { title: `Editar: ${name}`, wide: true })
     }
 
@@ -111,9 +123,9 @@ export default {
     }, { immediate: true })
 
     return {
-      tree, loading, error, flatTree,
+      tree, loading, error, flatTree, selectedFile,
       getFileIcon, reloadTree, handleToggleDirectory, handleIsExpanded,
-      openFile,
+      handleSelectFile, openFile,
     }
   },
 }
@@ -139,6 +151,9 @@ export default {
 }
 .tree-node:hover {
   background: rgba(117, 170, 219, 0.08);
+}
+.tree-node.tree-selected {
+  background: rgba(117, 170, 219, 0.18);
 }
 .tree-node.tree-directory {
   cursor: pointer;

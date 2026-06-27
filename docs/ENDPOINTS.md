@@ -482,8 +482,8 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ### `POST /api/redmine/comments`
 - **Auth:** Requerida
-- **Body:** `{ session_id: number, ticket_redmine_id: number, comentario: string }`
-- **Descripción:** Encola un comentario en la tabla `redmine_comentarios` con estado `pendiente`. Se usa desde el flujo de commit cuando el modo de envío es "encolar".
+- **Body:** `{ session_id: number, ticket_redmine_id: number, comentario: string, tipo?: string }`
+- **Descripción:** Encola un comentario en la tabla `redmine_comentarios` con estado `pendiente`. `tipo` es opcional (default `'comentario_commit'`). Usar `'ticket_comment'` para comentarios directos del usuario que deben enviarse sin formato adicional.
 - **Respuesta 200:** `{ success: true, id: number }`
 - **Respuesta 400:** `{ error: "..." }` (campos requeridos faltantes)
 
@@ -500,6 +500,13 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Respuesta 200:** `{ success: true, ticket_id: number, cantidad: number }`
 - **Respuesta 400:** `{ error: "..." }` (IDs inválidos, mensaje vacío, comentarios de distintos tickets, etc.)
 - **Respuesta 500:** `{ error: "..." }` (error de API Redmine)
+
+### `DELETE /api/redmine/comments/sent`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number }`
+- **Descripción:** Elimina todos los comentarios con estado `enviado` de la sesión de chat indicada. Verifica que la sesión pertenezca a un workspace accesible por el usuario.
+- **Respuesta 200:** `{ success: true, deletedCount: number }`
+- **Respuesta 400:** `{ error: "sessionId es requerido" }`
 
 ### `DELETE /api/redmine/comments/:id`
 - **Auth:** Requerida

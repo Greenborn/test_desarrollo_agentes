@@ -167,7 +167,8 @@ export default {
       sidebarTransitioning.value = false
 
       function onMouseMove(e) {
-        sidebarWidth.value = Math.max(window.innerWidth * 0.05, Math.min(600, e.clientX))
+        const maxAllowed = Math.max(window.innerWidth * 0.05, window.innerWidth - (ui.rightPanelCollapsed ? 0 : ui.rightPanelWidth) - window.innerWidth * 0.05)
+        sidebarWidth.value = Math.max(window.innerWidth * 0.05, Math.min(maxAllowed, e.clientX))
       }
 
       function onMouseUp() {

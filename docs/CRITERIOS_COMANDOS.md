@@ -447,6 +447,7 @@ Los siguientes comandos usan `chatStore.activeSessionId` dentro de `execute()` y
 | `/chat_get_ticket` | `commands/chatGetTicket.js` |
 | `/chat_set_ticket` | `commands/chatSetTicket.js` |
 | `/chat_edit_ticket` | `commands/chatTicketEdit.js` |
+| `/chat_ticket_comentar` | `commands/chatTicketComentar.js` |
 | `/despliegue_*` | `commands/despliegue.js` |
 | `/deteccion_funcionalidades` | `commands/deteccionFuncionalidades.js` |
 | `/dev_documentacion_all` | `commands/documentacionAll.js` |

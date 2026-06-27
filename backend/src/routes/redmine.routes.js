@@ -511,7 +511,7 @@ router.post('/proyectos/importar-tickets-all', async (req, res) => {
 router.post('/comments', async (req, res) => {
   if (!authGuard(req, res)) return;
 
-  const { session_id, ticket_redmine_id, comentario } = req.body;
+  const { session_id, ticket_redmine_id, comentario, tipo } = req.body;
 
   if (!session_id) {
     return res.status(400).json({ error: 'session_id es requerido' });
@@ -532,6 +532,7 @@ router.post('/comments', async (req, res) => {
       comentario: comentario.trim(),
       workspace_id: wsId,
       estado: 'pendiente',
+      tipo: tipo || 'comentario_commit',
     });
 
     res.json({ success: true, id: insertedId });
@@ -646,6 +647,31 @@ router.post('/comments/send', async (req, res) => {
     res.json({ success: true, ticket_id: ticketRedmineId, cantidad: comentarios.length });
   } catch (err) {
     console.log('Error al enviar comentarios Redmine:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/comments/sent', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId es requerido' });
+    }
+
+    const wsIds = req.session.workspaceIds || [];
+
+    const deletedCount = await db('redmine_comentarios')
+      .join('chat_sessions', 'redmine_comentarios.session_id', 'chat_sessions.id')
+      .where('redmine_comentarios.session_id', sessionId)
+      .where('redmine_comentarios.estado', 'enviado')
+      .whereIn('chat_sessions.workspace_id', wsIds.length > 0 ? wsIds : [0])
+      .del();
+
+    res.json({ success: true, deletedCount });
+  } catch (err) {
+    console.log('Error al eliminar comentarios enviados:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

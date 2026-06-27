@@ -3,6 +3,14 @@ import { spawn } from 'child_process';
 import db from '../config/db.js';
 
 const router = Router();
+const runningProcesses = new Set();
+
+export function stopAll() {
+  for (const proc of runningProcesses) {
+    try { proc.kill('SIGTERM'); } catch {}
+  }
+  runningProcesses.clear();
+}
 
 function authGuard(req, res) {
   if (!req.session?.userId) {
@@ -184,11 +192,18 @@ router.post('/:id/execute', async (req, res) => {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
+    runningProcesses.add(proc);
+
     let aborted = false;
-    req.on('close', () => {
-      aborted = true;
-      proc.kill('SIGTERM');
-    });
+    const cleanup = () => {
+      if (!aborted) {
+        aborted = true;
+        proc.kill('SIGTERM');
+      }
+      runningProcesses.delete(proc);
+    };
+
+    req.on('close', cleanup);
 
     proc.stdout.on('data', (data) => {
       if (aborted) return;
@@ -207,6 +222,7 @@ router.post('/:id/execute', async (req, res) => {
     });
 
     proc.on('exit', (code) => {
+      runningProcesses.delete(proc);
       if (!aborted) {
         res.write(`data: ${JSON.stringify({ type: 'exit', code })}\n\n`);
         res.write('data: [DONE]\n\n');
@@ -215,6 +231,7 @@ router.post('/:id/execute', async (req, res) => {
     });
 
     proc.on('error', (err) => {
+      runningProcesses.delete(proc);
       if (!aborted) {
         res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
         res.write('data: [DONE]\n\n');

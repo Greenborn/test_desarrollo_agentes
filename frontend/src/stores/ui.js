@@ -143,7 +143,7 @@ export const useUiStore = defineStore('ui', () => {
         if (raw <= 95) {
           sidebarWidth.value = Math.max(window.innerWidth * 0.05, (raw / 100) * window.innerWidth)
         } else {
-          sidebarWidth.value = Math.max(window.innerWidth * 0.05, Math.min(600, raw))
+          sidebarWidth.value = Math.max(window.innerWidth * 0.05, raw)
         }
       }
       if (panelData.value !== null) {
@@ -165,7 +165,7 @@ export const useUiStore = defineStore('ui', () => {
         if (raw <= 95) {
           rightPanelWidth.value = Math.max(window.innerWidth * 0.05, (raw / 100) * window.innerWidth)
         } else {
-          rightPanelWidth.value = Math.max(window.innerWidth * 0.05, Math.min(600, raw))
+          rightPanelWidth.value = Math.max(window.innerWidth * 0.05, raw)
         }
       }
       if (recordingListData.value !== null) {

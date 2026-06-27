@@ -23,6 +23,9 @@
         <span>No hay comentarios encolados para este ticket</span>
       </div>
       <div v-else class="comments-list flex-grow-1 overflow-y-auto px-2 py-1">
+        <div v-if="hasSentComments" class="d-flex px-1 pb-1">
+          <button class="btn btn-sm btn-outline-secondary ms-auto py-0 px-2" style="font-size: 0.65rem;" @click="deleteSentComments">Limpiar enviados</button>
+        </div>
         <div v-for="c in comments" :key="c.id" class="comment-item d-flex flex-column px-2 py-2 mb-1 rounded">
           <button class="delete-btn" @click.stop="deleteComment(c)" title="Eliminar comentario">×</button>
           <div class="d-flex align-items-center gap-1 mb-1">
@@ -35,7 +38,13 @@
       </div>
     </template>
     <template v-else-if="tab === 'archivos'">
-      <FileTreePanel :session-id="activeSessionId" />
+      <div class="archivos-container d-flex flex-grow-1 overflow-hidden" style="min-height: 0;">
+        <div class="archivos-tree-panel flex-shrink-0 overflow-hidden" :style="{ width: archivosTreeWidth + 'px' }">
+          <FileTreePanel :session-id="activeSessionId" @file-selected="onFileSelected" />
+        </div>
+        <div class="archivos-splitter" @mousedown.prevent="onArchivosSplitStart"></div>
+        <FilePreviewPanel class="flex-grow-1 overflow-hidden" :file-path="selectedFilePath" />
+      </div>
     </template>
     <template v-else-if="tab === 'variables'">
       <div v-if="!activeSession" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
@@ -72,15 +81,18 @@
       </div>
       <div v-else-if="comandos.length === 0" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
         <span>No hay comandos personalizados para este proyecto</span>
+        <button class="btn btn-sm btn-outline-argentina mt-2" style="font-size: 0.7rem;" @click.stop="crearComando">+ Crear comando</button>
       </div>
       <div v-else class="comandos-list flex-grow-1 overflow-y-auto px-2 py-1">
+        <button class="btn btn-sm btn-outline-argentina w-100 mb-2" style="font-size: 0.7rem;" @click.stop="crearComando">+ Crear comando</button>
         <div v-for="c in comandos" :key="c.id" class="comando-item d-flex flex-column px-2 py-2 mb-1 rounded">
           <div class="d-flex align-items-center gap-1 mb-1">
             <span class="comando-label small fw-semibold text-truncate">{{ c.label }}</span>
           </div>
           <div v-if="c.descripcion" class="comando-desc text-muted small text-truncate mb-2">{{ c.descripcion }}</div>
           <div class="d-flex gap-1 justify-content-end">
-            <button class="btn btn-sm btn-outline-success py-0 px-2" style="font-size: 0.65rem;" @click.stop="ejecutarComando(c)">▶ Ejecutar</button>
+            <button v-if="!executingCommands.has(c.id)" class="btn btn-sm btn-outline-success py-0 px-2" style="font-size: 0.65rem;" @click.stop="ejecutarComando(c)">▶ Ejecutar</button>
+            <button v-else class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size: 0.65rem;" @click.stop="detenerComando(c)">⏹ Detener</button>
             <button class="btn btn-sm btn-outline-info py-0 px-2" style="font-size: 0.65rem;" @click.stop="editarComando(c)">✏</button>
             <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.65rem;" @click.stop="eliminarComando(c)">🗑</button>
           </div>
@@ -105,9 +117,10 @@ import { useModalStore } from '../stores/modal.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import VariableDetailModal from './VariableDetailModal.vue'
 import FileTreePanel from './FileTreePanel.vue'
+import FilePreviewPanel from './FilePreviewPanel.vue'
 
 export default {
-  components: { FileTreePanel },
+  components: { FileTreePanel, FilePreviewPanel },
   setup() {
     const ui = useUiStore()
     const chat = useChatStore()
@@ -129,6 +142,7 @@ export default {
       })
     })
     const loading = computed(() => redmineComments.loadingBySession[activeSessionId.value] || false)
+    const hasSentComments = computed(() => comments.value.some(c => c.estado === 'enviado'))
 
     const proyectoId = computed(() => activeSession.value?.proyecto_id || null)
     const variables = computed(() => projectVariables.variablesByProject[proyectoId.value] || [])
@@ -138,6 +152,39 @@ export default {
 
     const rightPanelTransitioning = ref(false)
     let transitionTimer = null
+
+    const selectedFilePath = ref(null)
+    const archivosTreeWidth = ref(140)
+
+    function onFileSelected({ path, name }) {
+      selectedFilePath.value = path
+    }
+
+    function onArchivosSplitStart(e) {
+      const startX = e.clientX
+      const startWidth = archivosTreeWidth.value
+      const container = e.target.closest('.archivos-container')
+
+      function onMouseMove(e) {
+        const delta = e.clientX - startX
+        const containerWidth = container ? container.getBoundingClientRect().width : 400
+        const minWidth = 80
+        const maxWidth = containerWidth - 80
+        archivosTreeWidth.value = Math.max(minWidth, Math.min(maxWidth, startWidth + delta))
+      }
+
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
 
     const activeSession = computed(() => {
       return sessions.value.find(s => s.id === activeSessionId.value) || null
@@ -178,6 +225,15 @@ export default {
       }
     }
 
+    async function deleteSentComments() {
+      if (!confirm('¿Eliminar todos los comentarios ya enviados?')) return
+      try {
+        await redmineComments.deleteSentComments(activeSessionId.value)
+      } catch (err) {
+        console.error('Error al eliminar comentarios enviados:', err)
+      }
+    }
+
     function badgeClass(estado) {
       return {
         pendiente: 'bg-warning text-dark',
@@ -209,13 +265,37 @@ export default {
       comandosStore.loadCommands(newId)
     })
 
+    const executingCommands = ref(new Map())
+
+    function _updateStreamMsg(streamKey, content) {
+      const idx = chat.messages.findIndex(m => m._key === streamKey)
+      if (idx >= 0) {
+        chat.messages[idx].content = content
+      }
+    }
+
     async function ejecutarComando(c) {
       const sid = activeSessionId.value
-      if (!sid) return
+      if (!sid || executingCommands.value.has(c.id)) return
+
+      const abortController = new AbortController()
+      executingCommands.value.set(c.id, abortController)
+
+      const cmdKey = 'cmd-sb-' + Date.now()
       const streamKey = 'stream-sb-' + Date.now()
-      if (Number(chat.activeSessionId) === Number(sid)) {
-        chat.pushMessage({ role: 'command', content: `$ ${c.label}`, _key: 'cmd-sb-' + Date.now() })
-        chat.pushMessage({ role: 'result', content: '⏳ Ejecutando...', _key: streamKey })
+      const isActive = () => Number(chat.activeSessionId) === Number(sid)
+
+      if (isActive()) {
+        chat.messages.push({ role: 'command', content: `$ ${c.label}`, _key: cmdKey })
+        chat.flashLed(sid)
+        chat.messages.push({ role: 'result', content: '⏳ Ejecutando...', _key: streamKey })
+        chat.flashLed(sid)
+      }
+      chat.setSessionStatus(sid, 'executing')
+
+      const done = () => {
+        executingCommands.value.delete(c.id)
+        chat.setSessionStatus(sid, 'idle')
       }
 
       let fullOutput = ''
@@ -225,6 +305,7 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ sessionId: sid }),
+          signal: abortController.signal,
         })
         if (!res.ok) {
           const errData = await res.json()
@@ -250,10 +331,7 @@ export default {
               const json = JSON.parse(t.slice(6))
               if (json.type === 'stdout' || json.type === 'stderr') {
                 fullOutput += json.content
-                if (Number(chat.activeSessionId) === Number(sid)) {
-                  const idx = chat.findMessageIndex(streamKey)
-                  if (idx >= 0) chat.updateMessageAt(idx, { role: 'result', content: fullOutput })
-                }
+                if (isActive()) _updateStreamMsg(streamKey, fullOutput)
               } else if (json.type === 'error') {
                 fullOutput += '\n[Error: ' + json.content + ']'
               }
@@ -273,17 +351,58 @@ export default {
             ],
           }),
         })
-        if (Number(chat.activeSessionId) === Number(sid)) {
-          const idx = chat.findMessageIndex(streamKey)
-          if (idx >= 0) chat.updateMessageAt(idx, { role: 'result', content: finalContent })
-        }
+        if (isActive()) _updateStreamMsg(streamKey, finalContent)
       } catch (err) {
-        console.error('Error ejecutando comando:', err)
-        if (Number(chat.activeSessionId) === Number(sid)) {
-          const idx = chat.findMessageIndex(streamKey)
-          if (idx >= 0) chat.updateMessageAt(idx, { role: 'result', content: 'Error: ' + err.message })
+        if (err.name === 'AbortError') {
+          const finalContent = '(ejecución detenida)'
+          await fetch(`/api/chat/sessions/${sid}/save-messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              messages: [
+                { role: 'command', content: `$ ${c.label}` },
+                { role: 'result', content: finalContent },
+              ],
+            }),
+          })
+          if (isActive()) _updateStreamMsg(streamKey, finalContent)
+        } else {
+          console.error('Error ejecutando comando:', err)
+          chat.setSessionStatus(sid, 'error')
+          if (isActive()) _updateStreamMsg(streamKey, 'Error: ' + err.message)
         }
+      } finally {
+        done()
       }
+    }
+
+    function detenerComando(c) {
+      const abortController = executingCommands.value.get(c.id)
+      if (abortController) {
+        abortController.abort()
+      }
+    }
+
+    function crearComando() {
+      const sid = activeSessionId.value
+      if (!sid || !proyectoId.value) return
+      chat.pushMessage({
+        role: 'opencode_control',
+        content: JSON.stringify({
+          controlId: 'comando-edit-create-' + Date.now(),
+          controlType: 'comando_edit',
+          mode: 'create',
+          proyectoId: proyectoId.value,
+        }),
+        controlData: {
+          controlId: 'comando-edit-create-' + Date.now(),
+          controlType: 'comando_edit',
+          mode: 'create',
+          proyectoId: proyectoId.value,
+        },
+        _key: 'ctrl-comando-' + Date.now(),
+      })
     }
 
     async function editarComando(c) {
@@ -331,7 +450,9 @@ export default {
       rightPanelTransitioning.value = false
 
       function onMouseMove(e) {
-        rightPanelWidth.value = Math.max(window.innerWidth * 0.05, Math.min(600, window.innerWidth - e.clientX))
+        const leftWidth = ui.sidebarCollapsed ? 0 : ui.sidebarWidth
+        const maxAllowed = Math.max(window.innerWidth * 0.05, window.innerWidth - leftWidth - window.innerWidth * 0.05)
+        rightPanelWidth.value = Math.max(window.innerWidth * 0.05, Math.min(maxAllowed, window.innerWidth - e.clientX))
       }
 
       function onMouseUp() {
@@ -368,6 +489,7 @@ export default {
       sessionWithTicket,
       comments,
       loading,
+      hasSentComments,
       proyectoId,
       variables,
       loadingVariables,
@@ -376,12 +498,20 @@ export default {
       formatDate,
       badgeClass,
       deleteComment,
+      deleteSentComments,
       truncateValue,
       openVariableDetail,
       ejecutarComando,
+      detenerComando,
+      crearComando,
       editarComando,
       eliminarComando,
+      executingCommands,
       onResizeStart,
+      selectedFilePath,
+      archivosTreeWidth,
+      onFileSelected,
+      onArchivosSplitStart,
     }
   },
 }
@@ -536,5 +666,23 @@ export default {
 .comando-desc {
   font-size: 0.65rem;
   line-height: 1.2;
+}
+.archivos-container {
+  min-height: 0;
+}
+.archivos-tree-panel {
+  min-width: 80px;
+}
+.archivos-splitter {
+  width: 6px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  background: transparent;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 5;
+}
+.archivos-splitter:hover {
+  background: rgba(117, 170, 219, 0.12);
 }
 </style>

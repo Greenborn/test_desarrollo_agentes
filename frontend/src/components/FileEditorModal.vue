@@ -3,14 +3,21 @@
     <div v-if="loading" class="d-flex align-items-center justify-content-center flex-grow-1 text-muted small">
       Cargando archivo...
     </div>
+    <div v-else-if="error" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-danger small px-3">
+      <span>{{ error }}</span>
+      <button class="btn btn-sm btn-outline-secondary mt-2" @click="reload">Reintentar</button>
+    </div>
     <div v-else class="d-flex flex-column flex-grow-1" style="min-height: 0;">
-      <div class="file-path text-muted small px-3 py-1 flex-shrink-0 text-truncate" :title="filePath">
-        {{ filePath }}
+      <div class="file-path text-muted small px-3 py-1 flex-shrink-0 d-flex align-items-center justify-content-between">
+        <span class="text-truncate">{{ filePath }}</span>
+        <button v-if="isMarkdown" class="btn btn-sm" :class="editMode ? 'btn-outline-primary' : 'btn-outline-info'" @click="toggleMode">
+          {{ editMode ? 'Vista previa' : 'Editar' }}
+        </button>
       </div>
-      <div v-if="error" class="alert alert-danger small mx-3 mt-1 py-1 px-2 flex-shrink-0">
-        {{ error }}
+      <div v-if="isMarkdown && !editMode" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
+        <ChatFormatter :text="content" />
       </div>
-      <textarea
+      <textarea v-show="!isMarkdown || editMode"
         class="file-editor form-control flex-grow-1 border-0 rounded-0"
         v-model="content"
         :disabled="saving"
@@ -29,22 +36,38 @@
 </template>
 
 <script>
-import { onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useFileEditorStore } from '../stores/fileEditor.js'
+import ChatFormatter from './ChatFormatter.vue'
 
 export default {
+  components: { ChatFormatter },
   props: {
     filePath: { type: String, required: true },
   },
   emits: ['close'],
   setup(props) {
     const editorStore = useFileEditorStore()
+    const editMode = ref(false)
+
+    const isMarkdown = computed(() => props.filePath.toLowerCase().endsWith('.md'))
+
+    function toggleMode() {
+      editMode.value = !editMode.value
+    }
 
     function save() {
       editorStore.save(props.filePath)
     }
 
-    onMounted(() => editorStore.loadFile(props.filePath))
+    function reload() {
+      editorStore.loadFile(props.filePath)
+    }
+
+    onMounted(() => {
+      editorStore.reset()
+      editorStore.loadFile(props.filePath)
+    })
 
     return {
       content: editorStore.content,
@@ -53,7 +76,8 @@ export default {
       saved: editorStore.saved,
       error: editorStore.error,
       dirty: editorStore.dirty,
-      save,
+      editMode, isMarkdown, toggleMode,
+      save, reload,
     }
   },
 }
@@ -67,6 +91,12 @@ export default {
 .file-path {
   border-bottom: 1px solid #374151;
   word-break: break-all;
+}
+.preview-content {
+  background: #0d1117;
+  color: #c9d1d9;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 .file-editor {
   background: #0d1117 !important;

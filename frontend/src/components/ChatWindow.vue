@@ -30,20 +30,52 @@
         <button class="btn btn-sm btn-outline-danger flex-shrink-0" @click="abortDeteccion">⏹ Detener</button>
       </div>
     </div>
-    <div class="border-top p-2" style="border-color: #374151;" v-if="activeSessionId">
-      <form @submit.prevent="send" class="d-flex gap-2">
+    <div v-if="ocStore.ocSessionId && ocStore.selectedProvider" class="border-top opencode-sticky-bar p-2" style="border-color: #75AADB; background: #0d1b2a;">
+      <div class="d-flex gap-2 flex-wrap align-items-end">
+        <div style="min-width: 150px; flex: 1;">
+          <label class="small text-light-emphasis mb-1">Modelo</label>
+          <select v-model="ocStore.selectedModel" class="form-select form-select-sm bg-dark text-light border-secondary font-monospace">
+            <option value="" disabled>Selecciona modelo...</option>
+            <option v-for="m in ocStore.getModelsForProvider(ocStore.selectedProvider)" :key="m.value" :value="m.value">{{ m.label }}</option>
+          </select>
+        </div>
+        <div v-if="ocStore.modelSupportsReasoning(ocStore.selectedProvider, ocStore.selectedModel)" style="min-width: 140px; flex: 1;">
+          <label class="small text-light-emphasis mb-1">Pensamiento</label>
+          <select v-model="ocStore.selectedThinking" class="form-select form-select-sm bg-dark text-light border-secondary font-monospace">
+            <option v-for="t in ocStore.thinkingOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+          </select>
+        </div>
+        <div style="min-width: 120px; flex: 1;">
+          <label class="small text-light-emphasis mb-1">Temp.</label>
+          <select v-model="ocStore.selectedTemperature" class="form-select form-select-sm bg-dark text-light border-secondary font-monospace">
+            <option v-for="t in ocStore.temperatureOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+          </select>
+        </div>
+        <div style="min-width: 120px; flex: 1;">
+          <label class="small text-light-emphasis mb-1">Modo</label>
+          <div class="btn-group btn-group-sm w-100" role="group">
+            <button type="button" class="btn btn-sm font-monospace" :class="ocStore.selectedMode === 'Plan' ? 'btn-warning' : 'btn-outline-secondary'" @click="ocStore.selectedMode = 'Plan'">Plan</button>
+            <button type="button" class="btn btn-sm font-monospace" :class="ocStore.selectedMode === 'Build' ? 'btn-success' : 'btn-outline-secondary'" @click="ocStore.selectedMode = 'Build'">Build</button>
+          </div>
+        </div>
+      </div>
+      <div class="d-flex gap-2 mt-2">
         <textarea
-          v-model="input"
-          class="form-control flex-grow-1 bg-dark text-light border-secondary"
-          placeholder="Escribe tu mensaje..."
-          :disabled="streaming || executing"
-          rows="1"
-          style="resize: vertical; max-height: 150px;"
-          @keydown.enter.exact.prevent="send"
+          v-model="ocInput"
+          class="form-control form-control-sm bg-dark text-light border-secondary font-monospace flex-grow-1"
+          rows="2"
+          :placeholder="ocStreaming ? 'OpenCode está procesando...' : 'Escribe tu mensaje para OpenCode...'"
+          :disabled="ocStreaming"
+          style="resize: vertical; max-height: 120px;"
+          @keydown.enter.exact.prevent="sendToOpencodeFromSticky"
         ></textarea>
-        <button class="btn btn-argentina" :disabled="streaming || executing || !input.trim()">Enviar</button>
-      </form>
+        <div class="d-flex flex-column gap-1 flex-shrink-0">
+          <button class="btn btn-sm btn-success" :disabled="ocStreaming || !ocInput.trim()" @click="sendToOpencodeFromSticky">Enviar</button>
+          <button class="btn btn-sm btn-outline-danger" @click="finishOpencode">⏹ Finalizar</button>
+        </div>
+      </div>
     </div>
+    <DeepSeekChatFab v-if="activeSessionId && !ocStore.ocSessionId" :active-session-id="activeSessionId" @send="handleFabSend" />
     <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu"></div>
     <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
       <div class="context-menu-item" @click="toggleRawView(ctxMenu.msg)">{{ rawMsgKeys.has(msgKey(ctxMenu.msg)) ? '🎨 Vista formateada' : '📄 Vista texto plano' }}</div>
@@ -74,11 +106,12 @@ import { useConsoleLogStream } from '../composables/useConsoleLogStream.js'
 import { useNetworkLogStream } from '../composables/useNetworkLogStream.js'
 import TicketInfoBar from './TicketInfoBar.vue'
 import ChatMessage from './ChatMessage.vue'
+import DeepSeekChatFab from './DeepSeekChatFab.vue'
 import HelpContent from './HelpModal.vue'
 import FuncionalidadWizard from './FuncionalidadWizard.vue'
 
 export default {
-  components: { TicketInfoBar, ChatMessage },
+  components: { TicketInfoBar, ChatMessage, DeepSeekChatFab },
   setup() {
     const chat = useChatStore()
     const cmdStore = useCommandStore()
@@ -90,6 +123,7 @@ export default {
     const { getVariables, interpolate } = useProjectVariables()
     const { activeSessionId, messages, streaming, executing, currentChunk, currentThinking, sessions } = storeToRefs(chat)
     const input = ref('')
+    const ocInput = ref('')
     const messagesContainer = ref(null)
     const ocStreaming = ref(false)
     const ocChunk = ref('')
@@ -336,6 +370,55 @@ export default {
       await chat.clearMessages(chat.activeSessionId)
     }
 
+    async function handleFabSend(text) {
+      if (!chat.activeSessionId) return
+      const resolved = await resolveInput(text)
+      if (resolved.startsWith('/')) {
+        executeCommand(resolved)
+      } else {
+        chat.sendMessage(chat.activeSessionId, resolved)
+      }
+    }
+
+    async function sendToOpencodeFromSticky() {
+      const raw = ocInput.value.trim()
+      if (!raw || !chat.activeSessionId) return
+      ocInput.value = ''
+      const resolved = await resolveInput(raw)
+      if (resolved.startsWith('/')) {
+        executeCommand(resolved)
+      } else if (ocStreaming.value) {
+        ocStore.messageQueue.push(resolved)
+        chat.pushMessage({
+          role: 'opencode_info',
+          content: JSON.stringify({ type: 'queued', message: `⏳ Mensaje encolado: "${resolved.slice(0, 80)}${resolved.length > 80 ? '...' : ''}"` }),
+          _key: 'queue-' + Date.now(),
+        })
+      } else {
+        chat.pushMessage({
+          role: 'opencode_confirmed',
+          content: resolved,
+          _key: 'confirmed-' + Date.now(),
+        })
+        chat._saveMessageToDb(chat.activeSessionId, { role: 'opencode_confirmed', content: resolved })
+        sendToOpencode(resolved)
+      }
+    }
+
+    async function finishOpencode() {
+      try {
+        await fetch('/api/opencode/finish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, directory: cmdStore.currentDir || undefined }),
+        })
+      } catch (err) {
+        console.error('Error al finalizar OpenCode:', err.message)
+      }
+      ocStore.finish()
+    }
+
     async function iniciarOpencode() {
       if (!chat.activeSessionId) return
       await executeCommand('/dev_opencode_iniciar')
@@ -422,27 +505,6 @@ export default {
             sendToOpencode(next)
             return
           }
-          const controlData = {
-            controlId: 'followup-' + Date.now(),
-            controlType: 'opencode_form',
-            models: ocStore.getModelsForProvider(ocStore.selectedProvider),
-            modelValue: ocStore.selectedModel || '',
-            thinkingOptions: ocStore.thinkingOptions,
-            thinkingValue: ocStore.selectedThinking || '',
-            temperatureOptions: ocStore.temperatureOptions,
-            temperatureValue: ocStore.selectedTemperature || ocStore.savedTemperature || '0.7',
-            modeValue: ocStore.selectedMode || 'Build',
-            placeholder: 'Escribe otro mensaje para OpenCode...',
-            rows: 3,
-          }
-          const followupMsg = {
-            role: 'opencode_control',
-            content: JSON.stringify(controlData),
-            controlData,
-            _key: 'control-' + Date.now(),
-          }
-          chat.pushMessage(followupMsg)
-          chat._saveMessageToDb(sessionId, followupMsg)
         },
         onError(msg) {
           ocStreaming.value = false
@@ -1023,6 +1085,20 @@ export default {
           await executeAmbientesDiffComment(controlId, controlMsg, value.message, value.modo_envio)
         }
         return
+      } else if (controlType === 'ticket_comment') {
+        if (value === null) {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Comentario cancelado.',
+              _key: 'result-' + Date.now(),
+            }
+          }
+        } else if (value.action === 'confirm') {
+          await executeTicketComment(controlId, controlMsg, value.message, value.modo_envio)
+        }
+        return
       } else if (stepType === 'resolution_set_default') {
         try {
           await fetch('/api/command/setting', {
@@ -1318,16 +1394,25 @@ export default {
         return
       } else if (controlType === 'peticion') {
         if (value === null) {
+          const ctrl = peticionControllers[controlId]
+          if (ctrl) {
+            ctrl.abort()
+            delete peticionControllers[controlId]
+          }
           const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
           if (idx >= 0) {
-            chat.messages[idx] = { role: 'result', content: 'Petición cancelada.', _key: 'result-' + Date.now() }
+            chat.messages[idx] = { role: 'result', content: 'Petición detenida.', _key: 'result-' + Date.now() }
           }
           return
         }
 
+        const controller = new AbortController()
+        peticionControllers[controlId] = controller
+
         const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
         if (idx >= 0) {
           chat.messages[idx].controlData.sending = true
+          chat.messages[idx].controlData.progressText = '🌐 Conectando con ' + value.method + ' ' + value.url + '...'
         }
 
         let payload
@@ -1337,6 +1422,7 @@ export default {
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify(value),
+            signal: controller.signal,
           })
           if (!res.ok) {
             const errData = await res.json()
@@ -1344,6 +1430,12 @@ export default {
           }
           payload = await res.json()
         } catch (err) {
+          if (err.name === 'AbortError') {
+            if (idx >= 0) {
+              chat.messages[idx] = { role: 'result', content: 'Petición detenida.', _key: 'result-' + Date.now() }
+            }
+            return
+          }
           console.error('Error en petición proxy:', err)
           if (idx >= 0) {
             chat.messages[idx] = {
@@ -1356,6 +1448,8 @@ export default {
             }
           }
           return
+        } finally {
+          delete peticionControllers[controlId]
         }
 
         if (idx >= 0) {
@@ -1366,6 +1460,15 @@ export default {
               payload,
             },
             _key: 'result-' + Date.now(),
+          }
+        }
+
+        const proyectoId = await _getProyectoId()
+        if (proyectoId) {
+          try {
+            await projectVarStore.saveVariable(proyectoId, 'peticion_datos', JSON.stringify(value))
+          } catch (err) {
+            console.error('Error al guardar peticion_datos:', err.message)
           }
         }
         return
@@ -1436,6 +1539,7 @@ export default {
     let descripcionData = { provider: '', model: '', thinking: '', mode: 'Plan', temperature: '' }
     const descripcionUserInput = ref('')
     let repoCrearRamaData = { proyectoId: '', ticketRedmineId: '', baseBranch: '', repoAcronimo: '' }
+    const peticionControllers = {}
 
     async function handleDocumentacionUpdate(controlId, value, controlMsg) {
       const subStepType = controlMsg.controlData.subStepType
@@ -1912,27 +2016,6 @@ export default {
               },
               _key: 'control-' + Date.now(),
             })
-            const controlData = {
-              controlId: 'followup-' + Date.now(),
-              controlType: 'opencode_form',
-              stepType: 'ticket_descripcion',
-              ticket,
-              models: ocStore.getModelsForProvider(ocStore.selectedProvider),
-              modelValue: ocStore.selectedModel || '',
-              thinkingOptions: ocStore.thinkingOptions,
-              thinkingValue: ocStore.selectedThinking || '',
-              modeValue: ocStore.selectedMode || 'Plan',
-              placeholder: 'Escribe otro mensaje para OpenCode...',
-              rows: 3,
-            }
-            const followupMsg = {
-              role: 'opencode_control',
-              content: JSON.stringify(controlData),
-              controlData,
-              _key: 'control-' + Date.now(),
-            }
-            chat.pushMessage(followupMsg)
-            chat._saveMessageToDb(sessionId, followupMsg)
           } else {
             chat.pendingNotifications[sessionId] = Date.now()
           }
@@ -2048,28 +2131,6 @@ export default {
                 _key: 'control-' + Date.now(),
               }
             }
-            // Add new followup control to continue the conversation
-            const controlData = {
-              controlId: 'followup-' + Date.now(),
-              controlType: 'opencode_form',
-              stepType: 'ticket_descripcion',
-              ticket,
-              models: ocStore.getModelsForProvider(ocStore.selectedProvider),
-              modelValue: ocStore.selectedModel || '',
-              thinkingOptions: ocStore.thinkingOptions,
-              thinkingValue: ocStore.selectedThinking || '',
-              modeValue: ocStore.selectedMode || 'Plan',
-              placeholder: 'Escribe otro mensaje para OpenCode...',
-              rows: 3,
-            }
-            const followupMsg = {
-              role: 'opencode_control',
-              content: JSON.stringify(controlData),
-              controlData,
-              _key: 'control-' + Date.now(),
-            }
-            chat.pushMessage(followupMsg)
-            chat._saveMessageToDb(sessionId, followupMsg)
           } else {
             chat.pendingNotifications[sessionId] = Date.now()
           }
@@ -2972,6 +3033,98 @@ export default {
       }
     }
 
+    async function executeTicketComment(controlId, controlMsg, message, modo_envio) {
+      const sessionId = chat.activeSessionId
+      const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+      if (idx >= 0) {
+        chat.messages[idx].controlData.loading = true
+      }
+
+      try {
+        const session = sessions.value.find(s => Number(s.id) === Number(sessionId))
+        const idTicket = session?.id_ticket_redmine || ticketInfo.value?.redmine_id || null
+
+        if (!idTicket) {
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'No hay ticket asociado a la sesión. Usá /chat_set_ticket para asignar uno.',
+              _key: 'err-' + Date.now(),
+            }
+          }
+          return
+        }
+
+        const notesBody = message.trim()
+
+        if (modo_envio === 'enviar') {
+          try {
+            const ticketRes = await fetch('/api/tickets/session/' + sessionId, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ notes: notesBody }),
+            })
+            const ticketData = await ticketRes.json()
+
+            if (idx >= 0) {
+              if (ticketData.success) {
+                chat.messages[idx] = {
+                  role: 'result',
+                  content: '✓ Comentario enviado al ticket #' + idTicket + '.',
+                  _key: 'result-' + Date.now(),
+                }
+              } else {
+                chat.messages[idx] = {
+                  role: 'result',
+                  content: '✗ Error al enviar comentario: ' + (ticketData.error || 'Error desconocido'),
+                  _key: 'err-' + Date.now(),
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error al enviar comentario al ticket:', err.message)
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: '✗ Error al enviar comentario: ' + err.message,
+                _key: 'err-' + Date.now(),
+              }
+            }
+          }
+        } else {
+          try {
+            await redmineComments.queueComment(sessionId, idTicket, notesBody, 'ticket_comment')
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: '✓ Comentario encolado para el ticket #' + idTicket + '. Usá /dev_redmine_comentarios_enviar para enviarlo.',
+                _key: 'result-' + Date.now(),
+              }
+            }
+          } catch (err) {
+            console.error('Error al encolar comentario:', err.message)
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: '✗ Error al encolar comentario: ' + err.message,
+                _key: 'err-' + Date.now(),
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error al procesar comentario de ticket:', err.message)
+        if (idx >= 0) {
+          chat.messages[idx] = {
+            role: 'result',
+            content: 'Error de conexión: ' + err.message,
+            _key: 'err-' + Date.now(),
+          }
+        }
+      }
+    }
+
     async function addMessage(role, content, extra) {
       const msg = { role, content, _key: 'msg-' + Date.now() + '-' + Math.random(), ...extra }
       chat.pushMessage(msg)
@@ -3081,7 +3234,12 @@ export default {
       streamSessionId,
       isActiveSession,
       input,
+      ocStore,
+      ocInput,
       send,
+      handleFabSend,
+      sendToOpencodeFromSticky,
+      finishOpencode,
       onControlConfirm,
       onContextMenu,
       closeCtxMenu,
@@ -3173,5 +3331,21 @@ html, body {
 /* --- Lista simple de mensajes --- */
 .messages-list {
   padding: 1rem;
+}
+
+.opencode-sticky-bar {
+  flex-shrink: 0;
+  border-top-width: 1px;
+  border-top-style: solid;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.opencode-sticky-bar select.form-select-sm,
+.opencode-sticky-bar textarea {
+  font-size: 0.8rem;
+}
+
+.opencode-sticky-bar .btn-group .btn-sm {
+  font-size: 0.75rem;
 }
 </style>

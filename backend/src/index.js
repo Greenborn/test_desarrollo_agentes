@@ -21,7 +21,7 @@ import environmentsRoutes from './routes/environments.routes.js';
 import playwrightLogsRoutes from './routes/playwrightLogs.routes.js';
 import stateRoutes from './routes/state.routes.js';
 import gestorRoutes from './routes/gestor.routes.js';
-import comandosPersonalizadosRoutes from './routes/comandosPersonalizados.routes.js';
+import comandosPersonalizadosRoutes, { stopAll as stopComandosPersonalizados } from './routes/comandosPersonalizados.routes.js';
 import proxyRoutes from './routes/proxy.routes.js';
 import opencode from './services/opencode.js';
 import * as devInstanceManager from './services/devInstanceManager.js';
@@ -83,15 +83,18 @@ async function start() {
 start();
 
 process.on('exit', () => {
+  stopComandosPersonalizados();
   devInstanceManager.stopAll();
   opencode.stopAllServers();
 });
 process.on('SIGTERM', () => {
+  stopComandosPersonalizados();
   devInstanceManager.stopAll();
   opencode.stopAllServers();
   process.exit(0);
 });
 process.on('SIGINT', () => {
+  stopComandosPersonalizados();
   devInstanceManager.stopAll();
   opencode.stopAllServers();
   process.exit(0);

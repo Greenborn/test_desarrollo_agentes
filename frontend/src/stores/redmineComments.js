@@ -30,12 +30,14 @@ export const useRedmineCommentsStore = defineStore('redmineComments', () => {
     }
   }
 
-  async function queueComment(sessionId, ticketRedmineId, comentario) {
+  async function queueComment(sessionId, ticketRedmineId, comentario, tipo) {
+    const payload = { session_id: sessionId, ticket_redmine_id: ticketRedmineId, comentario }
+    if (tipo) payload.tipo = tipo
     const res = await fetch('/api/redmine/comments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ session_id: sessionId, ticket_redmine_id: ticketRedmineId, comentario }),
+      body: JSON.stringify(payload),
     })
     const data = await res.json()
     if (!data.success) {
@@ -68,5 +70,18 @@ export const useRedmineCommentsStore = defineStore('redmineComments', () => {
     }
   }
 
-  return { commentsBySession, loadingBySession, activeTicketBySession, loadComments, refreshComments, queueComment, deleteComment, clearComments }
+  async function deleteSentComments(sessionId) {
+    const res = await fetch('/api/redmine/comments/sent', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ sessionId }),
+    })
+    const data = await res.json()
+    if (!data.success) throw new Error(data.error || 'Error al eliminar comentarios enviados')
+    await refreshComments(sessionId)
+    return data
+  }
+
+  return { commentsBySession, loadingBySession, activeTicketBySession, loadComments, refreshComments, queueComment, deleteComment, deleteSentComments, clearComments }
 })

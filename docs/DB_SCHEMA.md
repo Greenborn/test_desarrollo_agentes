@@ -38,7 +38,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 |---|---|---|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
 | `session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
-| `role` | ENUM(`'user'`, `'assistant'`, `'command'`, `'result'`, `'opencode_info'`, `'opencode_result'`, `'opencode_control'`) | NOT NULL |
+| `role` | ENUM(`'user'`, `'assistant'`, `'command'`, `'result'`, `'opencode_info'`, `'opencode_result'`, `'opencode_control'`, `'opencode_confirmed'`) | NOT NULL |
 | `content` | LONGTEXT | NOT NULL |
 | `thinking` | LONGTEXT | nullable — contenido del thinking de DeepSeek |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
@@ -204,7 +204,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `comentario` | TEXT | NOT NULL |
 | `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` — FK lógica → `workspaces(id)` |
 | `estado` | ENUM(`'pendiente'`, `'enviado'`, `'error'`) | DEFAULT `'pendiente'` |
-| `tipo` | ENUM(`'comentario_commit'`, `'ticket_edit'`) | NOT NULL, DEFAULT `'comentario_commit'` |
+| `tipo` | ENUM(`'comentario_commit'`, `'ticket_edit'`, `'ticket_comment'`) | NOT NULL, DEFAULT `'comentario_commit'` |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 

@@ -94,7 +94,12 @@ register({
         return `- ${ticketTag} ${trimmed}`
       }
 
-      const combined = comentarios.map((c) => formatComment(c.comentario)).join('\n')
+      const combined = comentarios.map((c) => {
+        if (c.tipo === 'ticket_comment') {
+          return c.comentario.trim()
+        }
+        return formatComment(c.comentario)
+      }).join('\n')
 
       chatStore.pushMessage({
         role: 'opencode_control',
