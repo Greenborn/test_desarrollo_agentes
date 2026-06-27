@@ -453,6 +453,14 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Respuesta 400:** `{ error: "..." }` (IDs inválidos, mensaje vacío, comentarios de distintos tickets, etc.)
 - **Respuesta 500:** `{ error: "..." }` (error de API Redmine)
 
+### `DELETE /api/redmine/comments/:id`
+- **Auth:** Requerida
+- **Params:** `id` — ID del comentario en la base local
+- **Descripción:** Elimina un comentario de la tabla `redmine_comentarios`. Verifica que el comentario exista y que pertenezca a un workspace accesible por el usuario.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 404:** `{ error: "Comentario no encontrado" }`
+- **Respuesta 403:** `{ error: "Acceso denegado al comentario" }`
+
 ---
 
 ## Tickets (`/api/tickets`)
