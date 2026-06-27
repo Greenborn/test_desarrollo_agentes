@@ -45,6 +45,17 @@ export const useRedmineCommentsStore = defineStore('redmineComments', () => {
     return data
   }
 
+  async function deleteComment(commentId, sessionId) {
+    const res = await fetch(`/api/redmine/comments/${commentId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    const data = await res.json()
+    if (!data.success) throw new Error(data.error || 'Error al eliminar comentario')
+    await refreshComments(sessionId)
+    return data
+  }
+
   function clearComments(sessionId) {
     if (sessionId) {
       delete commentsBySession.value[sessionId]
@@ -57,5 +68,5 @@ export const useRedmineCommentsStore = defineStore('redmineComments', () => {
     }
   }
 
-  return { commentsBySession, loadingBySession, activeTicketBySession, loadComments, refreshComments, queueComment, clearComments }
+  return { commentsBySession, loadingBySession, activeTicketBySession, loadComments, refreshComments, queueComment, deleteComment, clearComments }
 })

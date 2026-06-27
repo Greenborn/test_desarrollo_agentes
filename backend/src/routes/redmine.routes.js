@@ -650,4 +650,26 @@ router.post('/comments/send', async (req, res) => {
   }
 });
 
+router.delete('/comments/:id', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const comment = await db('redmine_comentarios').where({ id: req.params.id }).first();
+    if (!comment) {
+      return res.status(404).json({ error: 'Comentario no encontrado' });
+    }
+
+    const wsIds = req.session.workspaceIds || [];
+    if (wsIds.length > 0 && !wsIds.includes(comment.workspace_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al comentario' });
+    }
+
+    await db('redmine_comentarios').where({ id: req.params.id }).del();
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al eliminar comentario:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

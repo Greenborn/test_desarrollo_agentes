@@ -23,6 +23,7 @@
       </div>
       <div v-else class="comments-list flex-grow-1 overflow-y-auto px-2 py-1">
         <div v-for="c in comments" :key="c.id" class="comment-item d-flex flex-column px-2 py-2 mb-1 rounded">
+          <button class="delete-btn" @click.stop="deleteComment(c)" title="Eliminar comentario">×</button>
           <div class="d-flex align-items-center gap-1 mb-1">
             <span class="badge" :class="badgeClass(c.estado)">{{ c.estado }}</span>
             <span class="text-muted" style="font-size: 0.65rem;">#{{ c.ticket_redmine_id }}</span>
@@ -128,6 +129,15 @@ export default {
       modal.open(VariableDetailModal, { variable }, { title: variable.key })
     }
 
+    async function deleteComment(c) {
+      if (!confirm('¿Eliminar este comentario?')) return
+      try {
+        await redmineComments.deleteComment(c.id, activeSessionId.value)
+      } catch (err) {
+        console.error('Error al eliminar comentario:', err)
+      }
+    }
+
     function badgeClass(estado) {
       return {
         pendiente: 'bg-warning text-dark',
@@ -202,6 +212,7 @@ export default {
       loadingVariables,
       formatDate,
       badgeClass,
+      deleteComment,
       truncateValue,
       openVariableDetail,
       onResizeStart,
@@ -238,9 +249,31 @@ export default {
 .comment-item {
   background: #1a2744;
   border: 1px solid #374151;
+  position: relative;
 }
 .comment-item:hover {
   background: #1e3050;
+}
+.delete-btn {
+  display: none;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0 4px;
+  line-height: 1.2;
+  border-radius: 3px;
+  z-index: 2;
+}
+.comment-item:hover .delete-btn {
+  display: block;
+}
+.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
 }
 .comment-preview {
   font-size: 0.7rem;
