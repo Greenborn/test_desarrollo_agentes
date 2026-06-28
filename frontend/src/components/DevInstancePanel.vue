@@ -337,14 +337,16 @@ export default {
       cerrandoPuertosRef.value = true
       try {
         await devCerrarPuertos(ports)
+        const portsStr = ports.join(', ')
         if (pinnedProjectId.value) {
           try {
-            await projectVarsStore.saveVariable(pinnedProjectId.value, 'ports_to_close', portsInput.value)
+            await projectVarsStore.saveVariable(pinnedProjectId.value, 'ports_to_close', portsStr)
           } catch (err) {
             console.error('[DevInstancePanel] Error al guardar puertos en variable del proyecto:', err)
           }
         }
-        portsInput.value = ''
+        localStorage.setItem('dev_ports_to_close_default', portsStr)
+        portsInput.value = portsStr
       } catch (err) {
         console.error('[DevInstancePanel] Error al cerrar puertos:', err)
       } finally {
@@ -353,11 +355,14 @@ export default {
     }
 
     watch(pinnedProjectId, async (newId) => {
-      if (!newId) return
-      await projectVarsStore.loadVariables(newId)
-      const vars = projectVarsStore.variablesByProject[newId] || []
-      const portsVar = vars.find(v => v.key === 'ports_to_close')
-      portsInput.value = portsVar ? portsVar.value : ''
+      if (newId) {
+        await projectVarsStore.loadVariables(newId)
+        const vars = projectVarsStore.variablesByProject[newId] || []
+        const portsVar = vars.find(v => v.key === 'ports_to_close')
+        portsInput.value = portsVar ? portsVar.value : (localStorage.getItem('dev_ports_to_close_default') || '')
+      } else {
+        portsInput.value = localStorage.getItem('dev_ports_to_close_default') || ''
+      }
     }, { immediate: true })
 
     watch(displayText, async () => {

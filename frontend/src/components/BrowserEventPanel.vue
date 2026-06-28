@@ -868,6 +868,7 @@ export default {
       formatTime,
       formatJson,
       uiStore,
+      deletingEventId,
     }
   },
 }

@@ -167,6 +167,44 @@ router.post('/network/store', async (req, res) => {
   res.json({ success: true });
 });
 
+router.get('/console', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const chatSessionId = req.query.chat_session_id;
+  if (!chatSessionId) {
+    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  }
+
+  try {
+    const logs = await db('playwright_console_logs')
+      .where({ chat_session_id: parseInt(chatSessionId) })
+      .orderBy('created_at', 'desc')
+      .limit(500);
+    res.json(logs);
+  } catch (err) {
+    console.log('Error al obtener console logs:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/console/stream', (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const chatSessionId = req.query.chat_session_id;
+  if (!chatSessionId) {
+    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+
+  sendSSE(res, { type: 'connected', chat_session_id: parseInt(chatSessionId) });
+  addSSEConnection(chatSessionId, res);
+});
+
 router.post('/console/notify', async (req, res) => {
   const { chat_session_id, type, text, location, instance_name } = req.body;
   if (!chat_session_id) {

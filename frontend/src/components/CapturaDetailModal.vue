@@ -36,7 +36,7 @@
             <button class="btn btn-sm btn-outline-danger ms-auto py-0 px-2" style="font-size: 0.6rem;" @click="eliminarMetadata(m)">✕</button>
           </div>
           <div class="metadata-value-box p-2 rounded">
-            <pre class="mb-0"><code>{{ truncateValue(m.value) }}</code></pre>
+            <pre class="mb-0"><code>{{ m.value }}</code></pre>
           </div>
         </div>
       </div>
@@ -87,12 +87,6 @@ export default {
       }
     }
 
-    function truncateValue(val) {
-      if (!val) return '(vacío)'
-      if (val.length > 5000) return val.slice(0, 5000) + '…'
-      return val
-    }
-
     function formatDate(dateStr) {
       if (!dateStr) return ''
       const d = new Date(dateStr)
@@ -101,7 +95,7 @@ export default {
 
     onMounted(loadMetadata)
 
-    return { activeTab, metadata, loadingMetadata, eliminarMetadata, truncateValue, formatDate }
+    return { activeTab, metadata, loadingMetadata, eliminarMetadata, formatDate }
   },
 }
 </script>
@@ -128,8 +122,6 @@ export default {
 .metadata-value-box {
   background: #0d1117;
   border: 1px solid #30363d;
-  max-height: 300px;
-  overflow-y: auto;
 }
 .metadata-value-box pre {
   font-size: 0.7rem;
