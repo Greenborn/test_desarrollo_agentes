@@ -1,40 +1,146 @@
+import WebSocket from 'ws';
+
 const MEMORIA_PORT = process.env.SERVICIO_MEMORIA_PORT || 4101;
 const API_KEY = process.env.MEMORIA_API_KEY;
-const BASE_URL = `http://localhost:${MEMORIA_PORT}/api/memoria`;
+const WS_URL = `ws://localhost:${MEMORIA_PORT}/api/memoria`;
 
-const headers = {
-  'Content-Type': 'application/json',
-  ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
-};
+let ws = null;
+let msgIdCounter = 0;
+const pending = new Map();
+let connecting = false;
+let connectCallbacks = [];
+let reconnectTimer = null;
 
-async function request(method, path, body) {
-  const opts = { method, headers };
-  if (body !== undefined) {
-    opts.body = JSON.stringify(body);
-  }
-
-  const res = await fetch(`${BASE_URL}${path}`, opts);
-
-  if (!res.ok) {
-    const text = await res.text();
-    let detail;
-    try { detail = JSON.parse(text).error; } catch { detail = text; }
-    throw new Error(`Memoria API error ${res.status}: ${detail}`);
-  }
-
-  return res.json();
+function getNextId() {
+  msgIdCounter += 1;
+  return `mem_${msgIdCounter}`;
 }
 
-export default {
+function cleanupPending(errorMsg) {
+  for (const [id, { reject }] of pending) {
+    reject(new Error(errorMsg));
+    pending.delete(id);
+  }
+}
+
+function flushConnectCallbacks(err) {
+  connecting = false;
+  const cbs = connectCallbacks;
+  connectCallbacks = [];
+  for (const cb of cbs) {
+    if (err) cb.reject(err);
+    else cb.resolve();
+  }
+}
+
+function connect() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+    return Promise.resolve();
+  }
+
+  if (connecting) {
+    return new Promise((resolve, reject) => {
+      connectCallbacks.push({ resolve, reject });
+    });
+  }
+
+  connecting = true;
+
+  return new Promise((resolve, reject) => {
+    connectCallbacks.push({ resolve, reject });
+
+    try {
+      ws = new WebSocket(WS_URL);
+    } catch (err) {
+      flushConnectCallbacks(err);
+      return;
+    }
+
+    ws.on('open', () => {
+      ws.send(JSON.stringify({ id: getNextId(), type: 'auth', token: API_KEY }));
+    });
+
+    ws.on('message', (raw) => {
+      let msg;
+      try {
+        msg = JSON.parse(raw);
+      } catch {
+        return;
+      }
+
+      if (msg.type === 'auth_result') {
+        if (msg.error) {
+          console.log('[memoriaClient] Error de autenticación:', msg.error);
+          flushConnectCallbacks(new Error(msg.error));
+          return;
+        }
+        flushConnectCallbacks(null);
+        return;
+      }
+
+      const id = msg.id;
+      if (id && pending.has(id)) {
+        const entry = pending.get(id);
+        pending.delete(id);
+        if (msg.type === 'error') {
+          entry.reject(new Error(msg.error));
+        } else {
+          entry.resolve(msg);
+        }
+      }
+    });
+
+    ws.on('close', () => {
+      console.log('[memoriaClient] WebSocket desconectado, reintentando en 1s');
+      ws = null;
+      flushConnectCallbacks(new Error('Conexión WebSocket cerrada'));
+      cleanupPending('Conexión WebSocket cerrada');
+
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(() => connect(), 1000);
+    });
+
+    ws.on('error', (err) => {
+      console.log('[memoriaClient] Error WebSocket:', err.message);
+      ws = null;
+      flushConnectCallbacks(err);
+      cleanupPending(err.message);
+
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(() => connect(), 1000);
+    });
+  });
+}
+
+async function request(type, payload = {}) {
+  await connect();
+
+  const id = getNextId();
+  const msg = JSON.stringify({ id, type, ...payload });
+
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+
+    try {
+      ws.send(msg);
+    } catch (err) {
+      pending.delete(id);
+      reject(err);
+    }
+  });
+}
+
+const client = {
   async set(namespace, key, value, ttl) {
-    return request('POST', '/set', { namespace, key, value, ttl });
+    return request('set', { namespace, key, value, ttl });
   },
 
   async get(namespace, key) {
     try {
-      return await request('GET', `/get/${encodeURIComponent(namespace)}/${encodeURIComponent(key)}`);
+      const result = await request('get', { namespace, key });
+      return result;
     } catch (err) {
-      if (err.message.includes('404')) {
+      if (err.message && (err.message.includes('no encontrada') || err.message.includes('expirada'))) {
         return null;
       }
       throw err;
@@ -42,27 +148,31 @@ export default {
   },
 
   async del(namespace, key) {
-    return request('DELETE', `/del/${encodeURIComponent(namespace)}/${encodeURIComponent(key)}`);
+    return request('del', { namespace, key });
   },
 
   async keys(namespace) {
-    return request('GET', `/keys/${encodeURIComponent(namespace)}`);
+    return request('keys', { namespace });
   },
 
   async clear(namespace) {
-    return request('DELETE', `/clear/${encodeURIComponent(namespace)}`);
+    return request('clear', { namespace });
   },
 
   async expire(namespace, key, ttl) {
-    return request('POST', `/expire/${encodeURIComponent(namespace)}/${encodeURIComponent(key)}`, { ttl });
+    return request('expire', { namespace, key, ttl });
   },
 
   async health() {
     try {
-      const res = await fetch(`${BASE_URL}/health`);
-      return res.ok;
+      await connect();
+      return !!(ws && ws.readyState === WebSocket.OPEN);
     } catch {
       return false;
     }
   },
 };
+
+connect();
+
+export default client;
