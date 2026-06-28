@@ -803,6 +803,12 @@ async function extractFormControls(idSession) {
 
   try {
     const result = await page.evaluate(() => {
+      const scrollX = window.scrollX || window.pageXOffset || 0;
+      const scrollY = window.scrollY || window.pageYOffset || 0;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const pageWidth = document.documentElement.scrollWidth;
+      const pageHeight = document.documentElement.scrollHeight;
       const controls = [];
 
       document.querySelectorAll('input, select, textarea, button').forEach((el) => {
@@ -830,6 +836,7 @@ async function extractFormControls(idSession) {
           pattern: el.pattern || null,
           autocomplete: el.autocomplete || null,
           rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          documentRect: { x: rect.x + scrollX, y: rect.y + scrollY, width: rect.width, height: rect.height },
           form: el.form ? (el.form.id || el.form.name || null) : null,
         };
 
@@ -875,6 +882,12 @@ async function extractFormControls(idSession) {
         forms,
         url: window.location.href,
         title: document.title,
+        scrollX,
+        scrollY,
+        viewportWidth,
+        viewportHeight,
+        pageWidth,
+        pageHeight,
       };
     });
 

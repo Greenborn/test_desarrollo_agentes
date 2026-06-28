@@ -496,7 +496,7 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 ### `POST /api/navegador/capturar-pantalla`
 - **Auth:** Requerida
 - **Body:** `{ sessionId: number, fullpage?: boolean }`
-- **Descripción:** Toma una captura de pantalla del navegador activo via Playwright, la guarda en `uploads/archivos/` y crea un registro en la tabla `archivos` vinculado al proyecto de la sesión de chat. La sesión debe tener un proyecto asignado.
+- **Descripción:** Toma una captura de pantalla del navegador activo via Playwright, la guarda en `uploads/archivos/` y crea un registro en la tabla `archivos` vinculado al proyecto de la sesión de chat. La sesión debe tener un proyecto asignado. Adicionalmente guarda en `capturas_metadata` el HTML de la página (`key: 'page_html'`) y los inputs detectados con sus posiciones (`key: 'detected_inputs'`).
 - **Respuesta 200:** `{ success: true, archivo: { id, proyecto_id, chat_session_id, nombre_original, nombre_storage, tipo, tamano, created_at } }`
 - **Respuesta 400:** `{ error: "La sesión de chat no está vinculada a un proyecto." }` o `{ error: "No hay sesión de navegador activa." }`
 - **Respuesta 404:** `{ error: "Sesión de chat no encontrada" }`
@@ -519,7 +519,7 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
   | `set_headless` | `{ headless: boolean\|"0"\|"1" }` | `{ success: true, reiniciado, id_session?, headless }` |
   | `close` | `{ id_session }` | `{ success: true }` |
 | `take_screenshot` | `{ id_session?, fullpage? }` | `{ success: true, id_session, fullpage, image_base64 (string), size (bytes) }` |
-  | `extract_form_controls` | `{ id_session? }` | `{ success: true, id_session, url, title, forms, controls }` |
+  | `extract_form_controls` | `{ id_session? }` | `{ success: true, id_session, url, title, scrollX, scrollY, viewportWidth, viewportHeight, pageWidth, pageHeight, forms, controls }` |
 
 ---
 

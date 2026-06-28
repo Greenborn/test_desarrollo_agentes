@@ -208,6 +208,36 @@ router.post('/capturar-pantalla', async (req, res) => {
       console.log('[navegador] Error al capturar HTML:', htmlErr.message);
     }
 
+    // Capturar inputs detectados y guardarlos como metadata
+    try {
+      const inputsRes = await fetch(`${playwrightManager.baseUrl()}/api/command`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comando: 'extract_form_controls', parametros: {} }),
+      });
+      const inputsData = await inputsRes.json();
+      if (!inputsData.error && inputsData.controls) {
+        await db('capturas_metadata').insert({
+          archivo_id: archivoId,
+          key: 'detected_inputs',
+          value: JSON.stringify({
+            controls: inputsData.controls,
+            forms: inputsData.forms,
+            url: inputsData.url,
+            title: inputsData.title,
+            scrollX: inputsData.scrollX,
+            scrollY: inputsData.scrollY,
+            viewportWidth: inputsData.viewportWidth,
+            viewportHeight: inputsData.viewportHeight,
+            pageWidth: inputsData.pageWidth,
+            pageHeight: inputsData.pageHeight,
+          }),
+        });
+      }
+    } catch (inputsErr) {
+      console.log('[navegador] Error al capturar inputs detectados:', inputsErr.message);
+    }
+
     await saveToChat(sessionId, 'command', '[navegador] capturar_pantalla');
     await saveToChat(sessionId, 'result',
       `Captura de pantalla guardada:\n` +

@@ -204,6 +204,12 @@ curl -X POST http://localhost:4098/api/command \
   "id_session": "550e8400-...",
   "url": "https://ejemplo.com/login",
   "title": "Iniciar Sesión",
+  "scrollX": 0,
+  "scrollY": 0,
+  "viewportWidth": 1920,
+  "viewportHeight": 1080,
+  "pageWidth": 1920,
+  "pageHeight": 3000,
   "forms": [
     { "id": "login-form", "name": null, "action": "https://ejemplo.com/login", "method": "post", "autocomplete": "on", "novalidate": false }
   ],
@@ -222,11 +228,14 @@ curl -X POST http://localhost:4098/api/command \
       "maxLength": 255,
       "autocomplete": "email",
       "rect": { "x": 200, "y": 150, "width": 300, "height": 38 },
+      "documentRect": { "x": 200, "y": 150, "width": 300, "height": 38 },
       "form": "login-form"
     }
   ]
 }
 ```
+
+> **Nota:** `rect` contiene coordenadas relativas al viewport (`getBoundingClientRect`). `documentRect` contiene coordenadas relativas al documento completo (`rect + scrollX/Y`), útiles para localizar elementos en capturas fullpage. Los campos `scrollX`, `scrollY`, `viewportWidth`, `viewportHeight`, `pageWidth` y `pageHeight` describen el estado del viewport y el tamaño total de la página al momento de la extracción.
 
 #### Errores posibles
 

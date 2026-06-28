@@ -407,6 +407,13 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos`, se eliminen automáticamente todos sus registros de metadata.
 
+**Keys conocidas:**
+
+| Key | Value |
+|-----|-------|
+| `page_html` | `string` — HTML completo de la página al momento de la captura (`document.documentElement.outerHTML`) |
+| `detected_inputs` | `JSON` — Arreglo de controles de formulario detectados (`input`, `select`, `textarea`, `button`) con sus propiedades, bounding boxes (viewport y documento), más metadatos del viewport. Ver [`docs/PLAYWRIGHT_API.md`](PLAYWRIGHT_API.md#43-extract_form_controls) para la estructura completa. |
+
 ---
 
 ## 23. `playwright_console_logs`
