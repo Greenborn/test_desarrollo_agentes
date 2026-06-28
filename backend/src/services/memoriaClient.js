@@ -173,6 +173,6 @@ const client = {
   },
 };
 
-connect();
+connect().catch(() => {});
 
 export default client;
