@@ -63,6 +63,44 @@ router.get('/:id/download', async (req, res) => {
   }
 });
 
+router.get('/:id/metadata', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const archivo = await db('archivos').where({ id: req.params.id }).first();
+    if (!archivo) {
+      return res.status(404).json({ error: 'Archivo no encontrado' });
+    }
+    const metadata = await db('capturas_metadata')
+      .where({ archivo_id: req.params.id })
+      .orderBy('created_at', 'asc')
+      .select('*');
+    res.json({ metadata });
+  } catch (err) {
+    console.log('Error al listar metadata:', err.message);
+    res.status(500).json({ metadata: [], error: err.message });
+  }
+});
+
+router.delete('/:id/metadata/:mid', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const archivo = await db('archivos').where({ id: req.params.id }).first();
+    if (!archivo) {
+      return res.status(404).json({ error: 'Archivo no encontrado' });
+    }
+    const deleted = await db('capturas_metadata')
+      .where({ id: req.params.mid, archivo_id: req.params.id })
+      .del();
+    if (!deleted) {
+      return res.status(404).json({ error: 'Metadata no encontrada' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al eliminar metadata:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {

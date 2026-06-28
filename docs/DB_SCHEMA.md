@@ -395,7 +395,21 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
-## 22. `playwright_console_logs`
+## 22. `capturas_metadata`
+
+| Columna | Tipo | Restricciones |
+|---------|------|---------------|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `archivo_id` | INTEGER UNSIGNED | NOT NULL, FK → `archivos(id)` ON DELETE CASCADE |
+| `key` | VARCHAR(255) | NOT NULL |
+| `value` | LONGTEXT | NOT NULL — texto o JSON |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos`, se eliminen automáticamente todos sus registros de metadata.
+
+---
+
+## 23. `playwright_console_logs`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -432,6 +446,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `comandos_personalizados_proyectos` | `id_proyecto` | `proyectos` | `id` | — (FK lógica) |
 | `documentacion_archivo` | `escaneo_id` | `documentacion_escaneo` | `id` | CASCADE |
 | `archivos` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
+| `capturas_metadata` | `archivo_id` | `archivos` | `id` | CASCADE |
 
 ---
 

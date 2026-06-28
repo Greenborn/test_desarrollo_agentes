@@ -189,6 +189,25 @@ router.post('/capturar-pantalla', async (req, res) => {
 
     const archivo = await db('archivos').where({ id: archivoId }).first();
 
+    // Capturar HTML de la página y guardarlo como metadata
+    try {
+      const htmlRes = await fetch(`${playwrightManager.baseUrl()}/api/command`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comando: 'get_page_html', parametros: {} }),
+      });
+      const htmlData = await htmlRes.json();
+      if (!htmlData.error && htmlData.html) {
+        await db('capturas_metadata').insert({
+          archivo_id: archivoId,
+          key: 'page_html',
+          value: htmlData.html,
+        });
+      }
+    } catch (htmlErr) {
+      console.log('[navegador] Error al capturar HTML:', htmlErr.message);
+    }
+
     await saveToChat(sessionId, 'command', '[navegador] capturar_pantalla');
     await saveToChat(sessionId, 'result',
       `Captura de pantalla guardada:\n` +

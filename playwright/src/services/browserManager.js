@@ -1021,6 +1021,26 @@ async function takeScreenshot(idSession, fullpage = false) {
   }
 }
 
+async function getPageHtml(idSession) {
+  if (!idSession) {
+    throw new Error('Parámetro "id_session" es requerido');
+  }
+
+  const session = sessions.get(idSession);
+  if (!session) {
+    throw new Error(`Sesión no encontrada: "${idSession}"`);
+  }
+
+  try {
+    const html = await session.page.evaluate(() => document.documentElement.outerHTML);
+    console.log(`Sesión ${idSession} HTML de página obtenido (${html.length} chars)`);
+    return html;
+  } catch (err) {
+    console.log(`Error al obtener HTML en sesión ${idSession}:`, err.message);
+    throw new Error(`Error al obtener HTML de la página: ${err.message}`);
+  }
+}
+
 export default {
   setDb,
   startSession,
@@ -1030,6 +1050,7 @@ export default {
   stopEventRecording,
   executeAction,
   takeScreenshot,
+  getPageHtml,
   getSession,
   getActiveSession,
   closeSession,

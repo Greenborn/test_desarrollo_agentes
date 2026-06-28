@@ -34,329 +34,346 @@
       </div>
     </div>
 
-    <div class="row g-4 flex-grow-1 overflow-auto" style="min-height: 0;">
-      <div class="col-md-6 d-flex flex-column gap-4">
-        <div v-if="matches('api key deepseek')">
-          <label class="form-label">API Key DeepSeek</label>
-          <div class="input-group">
-            <input
-              :type="showKey ? 'text' : 'password'"
-              class="form-control bg-dark text-light border-secondary"
-              v-model="keyInput"
-              placeholder="sk-..."
-            />
-            <button class="btn btn-outline-argentina" @click="showKey = !showKey">
-              {{ showKey ? 'Ocultar' : 'Mostrar' }}
-            </button>
+    <div class="row row-cols-1 row-cols-lg-3 g-3 flex-grow-1 overflow-auto" style="min-height: 0;">
+
+      <div class="col" v-if="cardHasVisible(['api key deepseek', 'token redmine', 'url redmine'])">
+        <div class="card bg-dark border-secondary h-100">
+          <div class="card-header bg-dark border-secondary py-2 px-3">
+            <h6 class="mb-0 fw-semibold">Credenciales</h6>
           </div>
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveKey">
-            Guardar Key
-          </button>
-        </div>
+          <div class="card-body d-flex flex-column gap-3">
+            <div v-if="matches('api key deepseek')">
+              <label class="form-label small mb-1">API Key DeepSeek</label>
+              <div class="input-group input-group-sm">
+                <input
+                  :type="showKey ? 'text' : 'password'"
+                  class="form-control bg-dark text-light border-secondary"
+                  v-model="keyInput"
+                  placeholder="sk-..."
+                />
+                <button class="btn btn-outline-argentina" @click="showKey = !showKey">
+                  {{ showKey ? 'Ocultar' : 'Mostrar' }}
+                </button>
+              </div>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveKey">Guardar Key</button>
+            </div>
 
-        <div v-if="matches('token redmine')">
-          <label class="form-label">Token Redmine</label>
-          <div class="input-group">
-            <input
-              :type="showRedmineToken ? 'text' : 'password'"
-              class="form-control bg-dark text-light border-secondary"
-              v-model="redmineTokenInput"
-              placeholder="token..."
-            />
-            <button class="btn btn-outline-argentina" @click="showRedmineToken = !showRedmineToken">
-              {{ showRedmineToken ? 'Ocultar' : 'Mostrar' }}
-            </button>
-          </div>
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveRedmineToken">
-            Guardar Token
-          </button>
-        </div>
+            <div v-if="matches('token redmine')">
+              <label class="form-label small mb-1">Token Redmine</label>
+              <div class="input-group input-group-sm">
+                <input
+                  :type="showRedmineToken ? 'text' : 'password'"
+                  class="form-control bg-dark text-light border-secondary"
+                  v-model="redmineTokenInput"
+                  placeholder="token..."
+                />
+                <button class="btn btn-outline-argentina" @click="showRedmineToken = !showRedmineToken">
+                  {{ showRedmineToken ? 'Ocultar' : 'Mostrar' }}
+                </button>
+              </div>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveRedmineToken">Guardar Token</button>
+            </div>
 
-        <div v-if="matches('url redmine')">
-          <label class="form-label">URL Redmine</label>
-          <input
-            type="text"
-            class="form-control bg-dark text-light border-secondary"
-            v-model="redmineUrlInput"
-            placeholder="https://redmine.tudominio.com"
-          />
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveRedmineUrl">
-            Guardar URL
-          </button>
-        </div>
-
-        <div v-if="matches('system prompt del agente')">
-          <label class="form-label">System Prompt del agente</label>
-          <textarea
-            class="form-control font-monospace bg-dark text-light border-secondary"
-            rows="8"
-            v-model="promptInput"
-          ></textarea>
-          <button class="btn btn-sm mt-2 btn-argentina" @click="savePrompt">
-            Guardar Prompt
-          </button>
-        </div>
-
-        <div v-if="matches('debounce omnifiltro')">
-          <label class="form-label">Omnifiltro — Tiempo de debounce (ms)</label>
-          <input
-            type="number"
-            class="form-control bg-dark text-light border-secondary"
-            v-model.number="omnifilterDebounceInput"
-            min="0"
-            step="100"
-            placeholder="2000"
-          />
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveOmnifilterDebounce">
-            Guardar
-          </button>
-        </div>
-
-        <div v-if="matches('acronimo rama repositorio git')">
-          <label class="form-label">Acrónimo para ramas Git</label>
-          <input
-            type="text"
-            class="form-control bg-dark text-light border-secondary"
-            v-model="repoAcronimoInput"
-            placeholder="TKT"
-          />
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveRepoAcronimo">
-            Guardar
-          </button>
-        </div>
-
-        <div v-if="matches('locale idioma')">
-          <label class="form-label">Locale (idioma del agente OpenCode)</label>
-          <input
-            type="text"
-            class="form-control bg-dark text-light border-secondary"
-            v-model="localeInput"
-            placeholder="es_ES.UTF-8"
-          />
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveLocale">
-            Guardar
-          </button>
-        </div>
-
-        <div v-if="matches('colores prioridad')" class="border-top border-secondary pt-3">
-          <label class="form-label mb-2 fw-bold">Colores de Prioridad</label>
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="small text-nowrap" style="width: 90px;">Baja</span>
-            <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 50px; height: 32px;" v-model="priorityColorLowInput" />
-            <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 100px;" v-model="priorityColorLowInput" placeholder="#hex" />
-            <button class="btn btn-sm btn-argentina" @click="savePriorityColor('priority_color_low')">Guardar</button>
-          </div>
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="small text-nowrap" style="width: 90px;">Normal</span>
-            <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 50px; height: 32px;" v-model="priorityColorNormalInput" />
-            <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 100px;" v-model="priorityColorNormalInput" placeholder="#hex" />
-            <button class="btn btn-sm btn-argentina" @click="savePriorityColor('priority_color_normal')">Guardar</button>
-          </div>
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="small text-nowrap" style="width: 90px;">Alta</span>
-            <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 50px; height: 32px;" v-model="priorityColorHighInput" />
-            <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 100px;" v-model="priorityColorHighInput" placeholder="#hex" />
-            <button class="btn btn-sm btn-argentina" @click="savePriorityColor('priority_color_high')">Guardar</button>
-          </div>
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="small text-nowrap" style="width: 90px;">Urgente</span>
-            <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 50px; height: 32px;" v-model="priorityColorUrgentInput" />
-            <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 100px;" v-model="priorityColorUrgentInput" placeholder="#hex" />
-            <button class="btn btn-sm btn-argentina" @click="savePriorityColor('priority_color_urgent')">Guardar</button>
-          </div>
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="small text-nowrap" style="width: 90px;">Inmediata</span>
-            <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 50px; height: 32px;" v-model="priorityColorImmediateInput" />
-            <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 100px;" v-model="priorityColorImmediateInput" placeholder="#hex" />
-            <button class="btn btn-sm btn-argentina" @click="savePriorityColor('priority_color_immediate')">Guardar</button>
+            <div v-if="matches('url redmine')">
+              <label class="form-label small mb-1">URL Redmine</label>
+              <input
+                type="text"
+                class="form-control form-control-sm bg-dark text-light border-secondary"
+                v-model="redmineUrlInput"
+                placeholder="https://redmine.tudominio.com"
+              />
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveRedmineUrl">Guardar URL</button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="col-md-6 d-flex flex-column gap-4">
-        <div v-if="matches('base de datos')">
-          <label class="form-label">Prompt Documentación - Base de Datos</label>
-          <textarea
-            class="form-control font-monospace bg-dark text-light border-secondary"
-            rows="4"
-            v-model="docBdInput"
-          ></textarea>
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('base_datos')">
-            Guardar Prompt
-          </button>
-        </div>
-
-        <div v-if="matches('subproyectos')">
-          <label class="form-label">Prompt Documentación - Subproyectos</label>
-          <textarea
-            class="form-control font-monospace bg-dark text-light border-secondary"
-            rows="4"
-            v-model="docSubInput"
-          ></textarea>
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('subproyectos')">
-            Guardar Prompt
-          </button>
-        </div>
-
-        <div v-if="matches('endpoints')">
-          <label class="form-label">Prompt Documentación - Endpoints</label>
-          <textarea
-            class="form-control font-monospace bg-dark text-light border-secondary"
-            rows="4"
-            v-model="docEndpointsInput"
-          ></textarea>
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('endpoints')">
-            Guardar Prompt
-          </button>
-        </div>
-
-        <div v-if="matches('websockets')">
-          <label class="form-label">Prompt Documentación - WebSockets</label>
-          <textarea
-            class="form-control font-monospace bg-dark text-light border-secondary"
-            rows="4"
-            v-model="docWsInput"
-          ></textarea>
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('web_sockets')">
-            Guardar Prompt
-          </button>
-        </div>
-
-        <div v-if="matches('funcionalidades')">
-          <label class="form-label">Prompt Documentación - Funcionalidades</label>
-          <textarea
-            class="form-control font-monospace bg-dark text-light border-secondary"
-            rows="4"
-            v-model="docFuncInput"
-          ></textarea>
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDoc('funcionalidades')">
-            Guardar Prompt
-          </button>
-        </div>
-
-        <div v-if="matches('descripcion ticket prompt redactar')">
-          <label class="form-label">Prompt de Sistema — Redactar Descripción Ticket</label>
-          <textarea
-            class="form-control font-monospace bg-dark text-light border-secondary"
-            rows="4"
-            v-model="descripcionPromptInput"
-          ></textarea>
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDescripcionPrompt">
-            Guardar Prompt
-          </button>
-        </div>
-
-        <div v-if="matches('refinar descripcion ticket prompt')">
-          <label class="form-label">Prompt de Sistema — Refinar Descripción Ticket (DeepSeek)</label>
-          <textarea
-            class="form-control font-monospace bg-dark text-light border-secondary"
-            rows="4"
-            v-model="refinarPromptInput"
-          ></textarea>
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveRefinarPrompt">
-            Guardar Prompt
-          </button>
-        </div>
-
-        <div v-if="matches('deteccion funcionalidades prompt deteccion_funcionalidades')">
-          <label class="form-label">Prompt — Detección de Funcionalidades (OpenCode)</label>
-          <textarea
-            class="form-control font-monospace bg-dark text-light border-secondary"
-            rows="4"
-            v-model="deteccionPromptInput"
-          ></textarea>
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveDeteccionPrompt">
-            Guardar Prompt
-          </button>
-        </div>
-
-        <div v-if="matches('codigo extensiones archivos code_file')" class="border-top border-secondary pt-3">
-          <label class="form-label mb-2 fw-bold">Archivos de Código</label>
-          <div class="small text-muted mb-2">Extensiones de archivos considerados código (separadas por coma) y tamaño máximo en KB para incluir en el árbol.</div>
-          <div class="d-flex gap-2 mb-2 align-items-start">
-            <div style="flex: 1;">
-              <label class="form-label small">Extensiones</label>
-              <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" v-model="codeExtensionsInput" placeholder=".js,.vue,.py,..." />
+      <div class="col" v-if="cardHasVisible(['acronimo rama repositorio git', 'locale idioma', 'debounce omnifiltro', 'colores prioridad'])">
+        <div class="card bg-dark border-secondary h-100">
+          <div class="card-header bg-dark border-secondary py-2 px-3">
+            <h6 class="mb-0 fw-semibold">Preferencias</h6>
+          </div>
+          <div class="card-body d-flex flex-column gap-3">
+            <div v-if="matches('acronimo rama repositorio git')">
+              <label class="form-label small mb-1">Acrónimo para ramas Git</label>
+              <input
+                type="text"
+                class="form-control form-control-sm bg-dark text-light border-secondary"
+                v-model="repoAcronimoInput"
+                placeholder="TKT"
+              />
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveRepoAcronimo">Guardar</button>
             </div>
-            <div style="width: 120px;">
-              <label class="form-label small">Max KB</label>
-              <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" v-model.number="codeMaxSizeInput" min="1" />
+
+            <div v-if="matches('locale idioma')">
+              <label class="form-label small mb-1">Locale (idioma del agente OpenCode)</label>
+              <input
+                type="text"
+                class="form-control form-control-sm bg-dark text-light border-secondary"
+                v-model="localeInput"
+                placeholder="es_ES.UTF-8"
+              />
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveLocale">Guardar</button>
             </div>
-            <div class="pt-4">
-              <button class="btn btn-sm btn-argentina" @click="saveCodeConfig">Guardar</button>
+
+            <div v-if="matches('debounce omnifiltro')">
+              <label class="form-label small mb-1">Omnifiltro — Tiempo de debounce (ms)</label>
+              <input
+                type="number"
+                class="form-control form-control-sm bg-dark text-light border-secondary"
+                v-model.number="omnifilterDebounceInput"
+                min="0"
+                step="100"
+                placeholder="2000"
+              />
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveOmnifilterDebounce">Guardar</button>
             </div>
-          </div>
-        </div>
 
-        <div v-if="matches('intervalo reproduccion navegador')" class="border-top border-secondary pt-3">
-          <label class="form-label">Intervalo de Reproducción del Navegador (ms)</label>
-          <div class="small text-muted mb-2">Tiempo entre cada acción al reproducir grabaciones en Eventos del Navegador</div>
-          <input
-            type="number"
-            class="form-control bg-dark text-light border-secondary"
-            v-model.number="replayIntervalInput"
-            min="100"
-            step="100"
-            placeholder="1000"
-            style="max-width: 200px;"
-          />
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveReplayInterval">Guardar</button>
-        </div>
-
-        <div v-if="matches('limite respuesta peticion http')" class="border-top border-secondary pt-3">
-          <label class="form-label">Límite de respuesta — Peticiones HTTP (KB)</label>
-          <div class="small text-muted mb-2">Tamaño máximo del body al usar /peticion. Si se excede, la respuesta se trunca (nunca se rechaza).</div>
-          <input
-            type="number"
-            class="form-control bg-dark text-light border-secondary"
-            v-model.number="requestResponseMaxSizeInput"
-            min="1"
-            step="10"
-            placeholder="100"
-            style="max-width: 200px;"
-          />
-          <button class="btn btn-sm mt-2 btn-argentina" @click="saveRequestResponseMaxSize">Guardar</button>
-        </div>
-
-        <div v-if="matches('resoluciones pantalla resolucion')" class="border-top border-secondary pt-3">
-          <label class="form-label mb-2 fw-bold">Resoluciones de Pantalla</label>
-          <div class="small text-muted mb-2">Usadas por /navegador_iniciar --resolution=ID</div>
-          <div v-for="(res, i) in resolutionsEdit" :key="i" class="d-flex gap-2 mb-1 align-items-center">
-            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 130px;" placeholder="id" v-model="resolutionsEdit[i].id" />
-            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 90px;" placeholder="ancho" v-model.number="resolutionsEdit[i].width" min="1" />
-            <span class="text-muted small">x</span>
-            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 90px;" placeholder="alto" v-model.number="resolutionsEdit[i].height" min="1" />
-            <button class="btn btn-sm btn-outline-danger" @click="removeResolution(i)" title="Eliminar">✕</button>
-          </div>
-          <div class="d-flex gap-2 mb-2 align-items-center">
-            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 130px;" placeholder="nuevo id" v-model="newResId" />
-            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 90px;" placeholder="ancho" v-model.number="newResWidth" min="1" />
-            <span class="text-muted small">x</span>
-            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 90px;" placeholder="alto" v-model.number="newResHeight" min="1" />
-            <button class="btn btn-sm btn-outline-argentina" @click="addResolution">+ Agregar</button>
-            <button class="btn btn-sm btn-outline-secondary" @click="resetResolutions" title="Restaurar valores por defecto">↺</button>
-          </div>
-          <button class="btn btn-sm btn-argentina" @click="saveResolutions">Guardar Resoluciones</button>
-        </div>
-
-        <div v-if="matches('ambientes entorno dev tst prd')" class="border-top border-secondary pt-3">
-          <label class="form-label mb-2 fw-bold">Ambientes</label>
-          <div class="small text-muted mb-2">Ambientes de trabajo con rama y descripción</div>
-          <div v-for="(env, i) in envStore.list" :key="env.id || i" class="d-flex gap-2 mb-1 align-items-center">
-            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 80px;" placeholder="nombre" v-model="envStore.list[i].name" />
-            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 100px;" placeholder="rama" v-model="envStore.list[i].branch" />
-            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" style="flex: 1;" placeholder="descripción" v-model="envStore.list[i].description" />
-            <button class="btn btn-sm btn-outline-argentina" @click="envStore.save(i, selectedWId)" title="Guardar">✓</button>
-            <button class="btn btn-sm btn-outline-danger" @click="envStore.remove(i)" title="Eliminar" v-if="envStore.list[i].id">✕</button>
-          </div>
-          <div class="d-flex gap-2 mt-2 align-items-center">
-            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 80px;" placeholder="nombre" v-model="newEnvName" />
-            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 100px;" placeholder="rama" v-model="newEnvBranch" />
-            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" style="flex: 1;" placeholder="descripción" v-model="newEnvDescription" />
-            <button class="btn btn-sm btn-outline-argentina" @click="addEnvironment">+ Agregar</button>
+            <div v-if="matches('colores prioridad')">
+              <label class="form-label small mb-2 fw-semibold">Colores de Prioridad</label>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="small text-nowrap" style="width: 75px;">Baja</span>
+                <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 42px; height: 28px;" v-model="priorityColorLowInput" />
+                <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 90px;" v-model="priorityColorLowInput" placeholder="#hex" />
+                <button class="btn btn-sm btn-argentina ms-auto" @click="savePriorityColor('priority_color_low')">Guardar</button>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="small text-nowrap" style="width: 75px;">Normal</span>
+                <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 42px; height: 28px;" v-model="priorityColorNormalInput" />
+                <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 90px;" v-model="priorityColorNormalInput" placeholder="#hex" />
+                <button class="btn btn-sm btn-argentina ms-auto" @click="savePriorityColor('priority_color_normal')">Guardar</button>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="small text-nowrap" style="width: 75px;">Alta</span>
+                <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 42px; height: 28px;" v-model="priorityColorHighInput" />
+                <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 90px;" v-model="priorityColorHighInput" placeholder="#hex" />
+                <button class="btn btn-sm btn-argentina ms-auto" @click="savePriorityColor('priority_color_high')">Guardar</button>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="small text-nowrap" style="width: 75px;">Urgente</span>
+                <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 42px; height: 28px;" v-model="priorityColorUrgentInput" />
+                <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 90px;" v-model="priorityColorUrgentInput" placeholder="#hex" />
+                <button class="btn btn-sm btn-argentina ms-auto" @click="savePriorityColor('priority_color_urgent')">Guardar</button>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="small text-nowrap" style="width: 75px;">Inmediata</span>
+                <input type="color" class="form-control form-control-color bg-dark border-secondary p-1" style="width: 42px; height: 28px;" v-model="priorityColorImmediateInput" />
+                <input type="text" class="form-control bg-dark text-light border-secondary font-monospace small" style="width: 90px;" v-model="priorityColorImmediateInput" placeholder="#hex" />
+                <button class="btn btn-sm btn-argentina ms-auto" @click="savePriorityColor('priority_color_immediate')">Guardar</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      <div class="col" v-if="cardHasVisible(['system prompt del agente', 'descripcion ticket prompt redactar', 'refinar descripcion ticket prompt', 'deteccion funcionalidades prompt deteccion_funcionalidades'])">
+        <div class="card bg-dark border-secondary h-100">
+          <div class="card-header bg-dark border-secondary py-2 px-3">
+            <h6 class="mb-0 fw-semibold">Prompts del Sistema</h6>
+          </div>
+          <div class="card-body d-flex flex-column gap-3">
+            <div v-if="matches('system prompt del agente')">
+              <label class="form-label small mb-1">System Prompt del agente</label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="5"
+                v-model="promptInput"
+              ></textarea>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="savePrompt">Guardar Prompt</button>
+            </div>
+
+            <div v-if="matches('descripcion ticket prompt redactar')">
+              <label class="form-label small mb-1">Prompt — Redactar Descripción Ticket</label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="3"
+                v-model="descripcionPromptInput"
+              ></textarea>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveDescripcionPrompt">Guardar Prompt</button>
+            </div>
+
+            <div v-if="matches('refinar descripcion ticket prompt')">
+              <label class="form-label small mb-1">Prompt — Refinar Descripción Ticket</label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="3"
+                v-model="refinarPromptInput"
+              ></textarea>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveRefinarPrompt">Guardar Prompt</button>
+            </div>
+
+            <div v-if="matches('deteccion funcionalidades prompt deteccion_funcionalidades')">
+              <label class="form-label small mb-1">Prompt — Detección de Funcionalidades</label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="3"
+                v-model="deteccionPromptInput"
+              ></textarea>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveDeteccionPrompt">Guardar Prompt</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col" v-if="cardHasVisible(['base de datos', 'subproyectos', 'endpoints', 'websockets', 'funcionalidades'])">
+        <div class="card bg-dark border-secondary h-100">
+          <div class="card-header bg-dark border-secondary py-2 px-3">
+            <h6 class="mb-0 fw-semibold">Prompts de Documentación</h6>
+          </div>
+          <div class="card-body d-flex flex-column gap-3">
+            <div v-if="matches('base de datos')">
+              <label class="form-label small mb-1">Base de Datos</label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="3"
+                v-model="docBdInput"
+              ></textarea>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveDoc('base_datos')">Guardar Prompt</button>
+            </div>
+
+            <div v-if="matches('subproyectos')">
+              <label class="form-label small mb-1">Subproyectos</label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="3"
+                v-model="docSubInput"
+              ></textarea>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveDoc('subproyectos')">Guardar Prompt</button>
+            </div>
+
+            <div v-if="matches('endpoints')">
+              <label class="form-label small mb-1">Endpoints</label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="3"
+                v-model="docEndpointsInput"
+              ></textarea>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveDoc('endpoints')">Guardar Prompt</button>
+            </div>
+
+            <div v-if="matches('websockets')">
+              <label class="form-label small mb-1">WebSockets</label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="3"
+                v-model="docWsInput"
+              ></textarea>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveDoc('web_sockets')">Guardar Prompt</button>
+            </div>
+
+            <div v-if="matches('funcionalidades')">
+              <label class="form-label small mb-1">Funcionalidades</label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="3"
+                v-model="docFuncInput"
+              ></textarea>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveDoc('funcionalidades')">Guardar Prompt</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col" v-if="cardHasVisible(['codigo extensiones archivos code_file', 'intervalo reproduccion navegador', 'limite respuesta peticion http', 'resoluciones pantalla resolucion'])">
+        <div class="card bg-dark border-secondary h-100">
+          <div class="card-header bg-dark border-secondary py-2 px-3">
+            <h6 class="mb-0 fw-semibold">Opciones Técnicas</h6>
+          </div>
+          <div class="card-body d-flex flex-column gap-3">
+            <div v-if="matches('codigo extensiones archivos code_file')">
+              <label class="form-label small mb-1 fw-semibold">Archivos de Código</label>
+              <div class="small text-muted mb-1">Extensiones (separadas por coma) y tamaño máximo en KB</div>
+              <div class="d-flex gap-2 align-items-start">
+                <div style="flex: 1;">
+                  <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" v-model="codeExtensionsInput" placeholder=".js,.vue,.py,..." />
+                </div>
+                <div style="width: 90px;">
+                  <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" v-model.number="codeMaxSizeInput" min="1" placeholder="KB" />
+                </div>
+              </div>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveCodeConfig">Guardar</button>
+            </div>
+
+            <div v-if="matches('intervalo reproduccion navegador')">
+              <label class="form-label small mb-1">Intervalo de Reproducción del Navegador (ms)</label>
+              <div class="small text-muted mb-1">Tiempo entre cada acción al reproducir grabaciones</div>
+              <input
+                type="number"
+                class="form-control form-control-sm bg-dark text-light border-secondary"
+                v-model.number="replayIntervalInput"
+                min="100"
+                step="100"
+                placeholder="1000"
+                style="max-width: 160px;"
+              />
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveReplayInterval">Guardar</button>
+            </div>
+
+            <div v-if="matches('limite respuesta peticion http')">
+              <label class="form-label small mb-1">Límite de respuesta — Peticiones HTTP (KB)</label>
+              <div class="small text-muted mb-1">Tamaño máximo del body al usar /peticion. Si se excede, la respuesta se trunca.</div>
+              <input
+                type="number"
+                class="form-control form-control-sm bg-dark text-light border-secondary"
+                v-model.number="requestResponseMaxSizeInput"
+                min="1"
+                step="10"
+                placeholder="100"
+                style="max-width: 160px;"
+              />
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveRequestResponseMaxSize">Guardar</button>
+            </div>
+
+            <div v-if="matches('resoluciones pantalla resolucion')">
+              <label class="form-label small mb-1 fw-semibold">Resoluciones de Pantalla</label>
+              <div class="small text-muted mb-1">Usadas por /navegador_iniciar --resolution=ID</div>
+              <div v-for="(res, i) in resolutionsEdit" :key="i" class="d-flex gap-1 mb-1 align-items-center">
+                <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 100px;" placeholder="id" v-model="resolutionsEdit[i].id" />
+                <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 65px;" placeholder="ancho" v-model.number="resolutionsEdit[i].width" min="1" />
+                <span class="text-muted small">x</span>
+                <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 65px;" placeholder="alto" v-model.number="resolutionsEdit[i].height" min="1" />
+                <button class="btn btn-sm btn-outline-danger py-0 px-1" @click="removeResolution(i)" title="Eliminar">✕</button>
+              </div>
+              <div class="d-flex gap-1 mb-1 align-items-center">
+                <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 100px;" placeholder="nuevo id" v-model="newResId" />
+                <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 65px;" placeholder="ancho" v-model.number="newResWidth" min="1" />
+                <span class="text-muted small">x</span>
+                <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 65px;" placeholder="alto" v-model.number="newResHeight" min="1" />
+                <button class="btn btn-sm btn-outline-argentina py-0 px-1" @click="addResolution">+</button>
+                <button class="btn btn-sm btn-outline-secondary py-0 px-1" @click="resetResolutions" title="Restaurar valores por defecto">↺</button>
+              </div>
+              <button class="btn btn-sm btn-argentina" @click="saveResolutions">Guardar Resoluciones</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col" v-if="cardHasVisible(['ambientes entorno dev tst prd'])">
+        <div class="card bg-dark border-secondary h-100">
+          <div class="card-header bg-dark border-secondary py-2 px-3">
+            <h6 class="mb-0 fw-semibold">Ambientes</h6>
+          </div>
+          <div class="card-body d-flex flex-column gap-2">
+            <div v-if="matches('ambientes entorno dev tst prd')">
+              <div class="small text-muted mb-1">Ambientes de trabajo con rama y descripción</div>
+              <div v-for="(env, i) in envStore.list" :key="env.id || i" class="d-flex gap-1 mb-1 align-items-center">
+                <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 70px;" placeholder="nombre" v-model="envStore.list[i].name" />
+                <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 85px;" placeholder="rama" v-model="envStore.list[i].branch" />
+                <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" style="flex: 1;" placeholder="descripción" v-model="envStore.list[i].description" />
+                <button class="btn btn-sm btn-outline-argentina py-0 px-1" @click="envStore.save(i, selectedWId)" title="Guardar">✓</button>
+                <button class="btn btn-sm btn-outline-danger py-0 px-1" @click="envStore.remove(i)" title="Eliminar" v-if="envStore.list[i].id">✕</button>
+              </div>
+              <div class="d-flex gap-1 mt-1 align-items-center">
+                <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 70px;" placeholder="nombre" v-model="newEnvName" />
+                <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 85px;" placeholder="rama" v-model="newEnvBranch" />
+                <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" style="flex: 1;" placeholder="descripción" v-model="newEnvDescription" />
+                <button class="btn btn-sm btn-outline-argentina py-0 px-1" @click="addEnvironment">+ Agregar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <div class="flex-shrink-0">
@@ -430,6 +447,12 @@ export default {
     function matches(label) {
       if (!searchTerm.value) return true
       return label.toLowerCase().includes(searchTerm.value.toLowerCase())
+    }
+
+    function cardHasVisible(labels) {
+      if (!searchTerm.value) return true
+      const term = searchTerm.value.toLowerCase()
+      return labels.some(label => label.toLowerCase().includes(term))
     }
 
     const DOC_INPUTS = {
@@ -843,7 +866,7 @@ export default {
       saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
       saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveDeteccionPrompt, saveCodeConfig, saveRepoAcronimo,
       saveLocale, savePriorityColor, saveReplayInterval, saveRequestResponseMaxSize,
-      addResolution, removeResolution, resetResolutions, saveResolutions, matches,
+      addResolution, removeResolution, resetResolutions, saveResolutions, matches, cardHasVisible,
       envStore, wsMessage,
       onWorkspaceChange, openCreateModal, openEditModal, openDeleteConfirm, cancelDelete, executeDelete, deleteConfirmWs, deleting,
       exportAllConfig, handleImport, triggerImport, importInput,

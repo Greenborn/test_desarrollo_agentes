@@ -472,10 +472,24 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 - **Respuesta 200:** Archivo binario con `Content-Type` apropiado
 - **Respuesta 404:** `{ error: "Archivo no encontrado" }` o `{ error: "El archivo no existe en el disco" }`
 
+### `GET /api/archivos/:id/metadata`
+- **Auth:** Requerida
+- **Params:** `id` — ID del archivo
+- **Descripción:** Lista los registros de metadata asociados a un archivo (captura de pantalla). Ordenados por fecha ascendente.
+- **Respuesta 200:** `{ metadata: [{ id, archivo_id, key, value, created_at }] }`
+- **Respuesta 404:** `{ error: "Archivo no encontrado" }`
+
+### `DELETE /api/archivos/:id/metadata/:mid`
+- **Auth:** Requerida
+- **Params:** `id` — ID del archivo, `mid` — ID del registro de metadata
+- **Descripción:** Elimina un registro de metadata específico.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 404:** `{ error: "Archivo no encontrado" }` o `{ error: "Metadata no encontrada" }`
+
 ### `DELETE /api/archivos/:id`
 - **Auth:** Requerida
 - **Params:** `id` — ID del archivo
-- **Descripción:** Elimina el archivo del disco y su registro en la base de datos.
+- **Descripción:** Elimina el archivo del disco y su registro en la base de datos. Los metadatos asociados se eliminan en cascada.
 - **Respuesta 200:** `{ success: true }`
 - **Respuesta 404:** `{ error: "Archivo no encontrado" }`
 

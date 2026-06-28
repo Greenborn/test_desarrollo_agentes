@@ -133,6 +133,7 @@
                 <div class="captura-fecha text-muted" style="font-size: 0.6rem;">{{ formatDate(c.created_at) }}</div>
               </div>
               <div class="captura-actions d-flex flex-column gap-1 ms-1 flex-shrink-0">
+                <button class="captura-detail-btn" title="Ver detalles" @click.stop="verDetallesCaptura(c)">🔍</button>
                 <a :href="`/api/archivos/${c.id}/download`" download :title="`Descargar ${c.nombre_original}`" class="captura-download-btn" @click.stop>⬇</a>
                 <button class="captura-delete-btn" title="Eliminar captura" @click.stop="eliminarCaptura(c)">✕</button>
               </div>
@@ -169,6 +170,7 @@ import { useComandosPersonalizadosStore } from '../stores/comandosPersonalizados
 import { useModalStore } from '../stores/modal.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import VariableDetailModal from './VariableDetailModal.vue'
+import CapturaDetailModal from './CapturaDetailModal.vue'
 import FileTreePanel from './FileTreePanel.vue'
 import FilePreviewPanel from './FilePreviewPanel.vue'
 
@@ -241,6 +243,10 @@ export default {
 
     function seleccionarCaptura(c) {
       capturaSeleccionada.value = c
+    }
+
+    function verDetallesCaptura(c) {
+      modal.open(CapturaDetailModal, { captura: c }, { title: c.nombre_original, wide: true })
     }
 
     async function eliminarCaptura(c) {
@@ -684,6 +690,7 @@ export default {
       capturaSeleccionada,
       capturasListWidth,
       seleccionarCaptura,
+      verDetallesCaptura,
       eliminarCaptura,
       onCapturasSplitStart,
       filtrarPorSesion,
@@ -885,7 +892,7 @@ export default {
 .captura-actions {
   display: none;
 }
-.captura-download-btn, .captura-delete-btn {
+.captura-detail-btn, .captura-download-btn, .captura-delete-btn {
   background: none;
   border: none;
   font-size: 0.65rem;
@@ -896,6 +903,10 @@ export default {
   text-decoration: none;
   color: #6b7280;
   transition: color 0.15s, background 0.15s;
+}
+.captura-detail-btn:hover {
+  color: #f8f9fa;
+  background: rgba(255, 255, 255, 0.1);
 }
 .captura-download-btn:hover {
   color: #75AADB;
