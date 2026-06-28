@@ -413,6 +413,7 @@ El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos
 |-----|-------|
 | `page_html` | `string` — HTML completo de la página al momento de la captura (`document.documentElement.outerHTML`) |
 | `detected_inputs` | `JSON` — Arreglo de controles de formulario detectados (`input`, `select`, `textarea`, `button`) con sus propiedades, bounding boxes (viewport y documento), más metadatos del viewport. Ver [`docs/PLAYWRIGHT_API.md`](PLAYWRIGHT_API.md#43-extract_form_controls) para la estructura completa. |
+| `quick_notes` | `JSON` — Arreglo de notas rápidas asociadas a la captura. Cada nota tiene `{ id, text, controlIndex (null si es general, o índice en detected_inputs.controls), createdAt }`. Se gestiona desde el modal de detalle de captura. |
 
 ---
 

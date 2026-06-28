@@ -486,6 +486,14 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 - **Respuesta 200:** `{ success: true }`
 - **Respuesta 404:** `{ error: "Archivo no encontrado" }` o `{ error: "Metadata no encontrada" }`
 
+### `POST /api/archivos/:id/metadata`
+- **Auth:** Requerida
+- **Body:** `{ key: string, value: string }`
+- **Descripción:** Crea o actualiza una entrada de metadata para el archivo. Si ya existe una entrada con la misma `key` para el archivo, actualiza su `value`; si no, crea una nueva. Útil para guardar notas rápidas (`key: 'quick_notes'`) u otros metadatos definidos por el usuario.
+- **Respuesta 200:** `{ metadata: { id, archivo_id, key, value, created_at } }`
+- **Respuesta 400:** `{ error: "key y value son requeridos" }`
+- **Respuesta 404:** `{ error: "Archivo no encontrado" }`
+
 ### `DELETE /api/archivos/:id`
 - **Auth:** Requerida
 - **Params:** `id` — ID del archivo

@@ -81,6 +81,41 @@ router.get('/:id/metadata', async (req, res) => {
   }
 });
 
+router.post('/:id/metadata', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const archivo = await db('archivos').where({ id: req.params.id }).first();
+    if (!archivo) {
+      return res.status(404).json({ error: 'Archivo no encontrado' });
+    }
+    const { key, value } = req.body;
+    if (!key || value === undefined || value === null) {
+      return res.status(400).json({ error: 'key y value son requeridos' });
+    }
+    const existing = await db('capturas_metadata')
+      .where({ archivo_id: req.params.id, key })
+      .first();
+    if (existing) {
+      await db('capturas_metadata')
+        .where({ id: existing.id })
+        .update({ value, created_at: db.fn.now() });
+    } else {
+      await db('capturas_metadata').insert({
+        archivo_id: req.params.id,
+        key,
+        value,
+      });
+    }
+    const record = await db('capturas_metadata')
+      .where({ archivo_id: req.params.id, key })
+      .first();
+    res.json({ metadata: record });
+  } catch (err) {
+    console.log('Error al guardar metadata:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/:id/metadata/:mid', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {

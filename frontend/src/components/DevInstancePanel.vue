@@ -50,7 +50,11 @@
       >
         Actividad de Red
       </button>
-      <div v-if="tab === 'instancias'" class="ms-auto d-flex align-items-center gap-1">
+      <div v-if="tab === 'instancias'" class="ms-auto d-flex align-items-center gap-2">
+        <label class="filter-session-toggle d-flex align-items-center gap-1 small text-secondary" style="font-size: 0.7rem; cursor: pointer;">
+          <input type="checkbox" v-model="filterBySession" class="form-check-input m-0" style="cursor: pointer; width: 14px; height: 14px;" />
+          Solo sesión actual
+        </label>
         <button
           class="btn btn-sm py-0 px-1"
           style="font-size: 0.7rem; color: #6b7280; background: none; border: none; line-height: 1;"
@@ -83,10 +87,18 @@
           <span v-if="!activeSessionId" class="small" style="color: #6b7280;">Seleccione una sesión de chat para habilitar el botón.</span>
         </template>
       </div>
+      <div v-else-if="filterBySession && filteredProcesses.length === 0" class="flex-grow-1 d-flex flex-column align-items-center justify-content-center text-muted small" style="gap: 10px;">
+        <span>No hay instancias asociadas a la sesión actual.</span>
+        <button
+          class="btn btn-sm py-0 px-1"
+          style="font-size: 0.7rem; color: #6b7280; background: none; border: none;"
+          @click="filterBySession = false"
+        >Mostrar todas</button>
+      </div>
       <div v-else class="d-flex flex-grow-1" style="min-height: 0;">
         <div class="left-panel d-flex flex-column flex-shrink-0 overflow-y-auto px-2 py-1">
           <button
-            v-for="p in devProcesses"
+            v-for="p in filteredProcesses"
             :key="p.name"
             class="process-btn d-flex align-items-center gap-1 w-100 text-start px-2 py-1 mb-1"
             :class="{ selected: selectedProcess === p.name }"
@@ -94,6 +106,7 @@
           >
             <span class="status-dot" :class="p.status"></span>
             <span class="small fw-semibold" :class="p.status === 'running' ? 'text-light' : 'text-muted'">{{ p.name }}</span>
+            <span v-if="p.sessionId && filterBySession" class="badge bg-info-subtle text-info ms-1" style="font-size: 0.55rem;">{{ p.sessionId.slice(0, 6) }}…</span>
             <span class="badge ms-auto" :class="p.status === 'running' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'" style="font-size: 0.6rem;">{{ typeLabel(p.type) }}</span>
           </button>
 
@@ -236,6 +249,12 @@ export default {
     const { find } = useCommandRegistry()
     const { projects, selectedProject, pinnedProjectId } = storeToRefs(projectStore)
     const projectFilter = ref('')
+    const filterBySession = ref(false)
+
+    const filteredProcesses = computed(() => {
+      if (!filterBySession.value || !activeSessionId.value) return devProcesses.value
+      return devProcesses.value.filter(p => p.sessionId === activeSessionId.value)
+    })
 
     const filteredProjects = computed(() => {
       const filter = projectFilter.value.toLowerCase().trim()
@@ -408,6 +427,8 @@ export default {
       projectFilter,
       filteredProjects,
       selectProject,
+      filterBySession,
+      filteredProcesses,
     }
   },
 }
