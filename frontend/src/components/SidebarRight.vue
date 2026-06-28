@@ -10,6 +10,7 @@
       <button class="tab-btn" :class="{ active: tab === 'variables' }" @click="selectTab('variables')">Variables</button>
       <button class="tab-btn" :class="{ active: tab === 'comandos' }" @click="selectTab('comandos')">Comandos</button>
       <button class="tab-btn" :class="{ active: tab === 'capturas' }" @click="selectTab('capturas')">Capturas</button>
+      <button class="tab-btn" :class="{ active: tab === 'casos_prueba' }" @click="selectTab('casos_prueba')">Casos de Prueba</button>
     </div>
 
     <template v-if="tab === 'comentarios'">
@@ -153,6 +154,19 @@
         </div>
       </div>
     </template>
+    <template v-else-if="tab === 'casos_prueba'">
+      <div class="casos-prueba-container d-flex flex-grow-1 overflow-hidden" style="min-height: 0;">
+        <div class="casos-prueba-list flex-shrink-0 overflow-hidden" :style="{ width: casosPruebaListWidth + 'px' }">
+          <div class="d-flex align-items-center justify-content-center h-100 text-secondary small px-3 text-center">
+            <span>En construcción</span>
+          </div>
+        </div>
+        <div class="casos-prueba-splitter" @mousedown.prevent="onCasosPruebaSplitStart"></div>
+        <div class="casos-prueba-detail flex-grow-1 d-flex align-items-center justify-content-center text-secondary small px-3 text-center">
+          <span>En construcción</span>
+        </div>
+      </div>
+    </template>
     <div class="sidebar-right-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-right-resize-handle-bar"></div>
     </div>
@@ -160,7 +174,7 @@
 </template>
 
 <script>
-import { watch, ref, computed } from 'vue'
+import { watch, ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiStore } from '../stores/ui.js'
 import { useChatStore } from '../stores/chat.js'
@@ -169,6 +183,7 @@ import { useProjectVariablesStore } from '../stores/projectVariables.js'
 import { useComandosPersonalizadosStore } from '../stores/comandosPersonalizados.js'
 import { useModalStore } from '../stores/modal.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
+import { settingSet, settingGet } from '../services/settingService.js'
 import VariableDetailModal from './VariableDetailModal.vue'
 import CapturaDetailModal from './CapturaDetailModal.vue'
 import FileTreePanel from './FileTreePanel.vue'
@@ -211,11 +226,104 @@ export default {
 
     const selectedFilePath = ref(null)
     const archivosTreeWidth = ref(140)
+    const ARCHIVOS_TREE_WIDTH_KEY = 'archivos_tree_width'
+    const ARCHIVOS_TREE_MIN = 80
+
+    async function loadArchivosTreeWidth() {
+      try {
+        const result = await settingGet(ARCHIVOS_TREE_WIDTH_KEY)
+        if (result.value) {
+          archivosTreeWidth.value = Math.max(ARCHIVOS_TREE_MIN, parseInt(result.value, 10) || 140)
+        }
+      } catch (err) {
+        console.error('Error al cargar ancho del árbol de archivos:', err)
+      }
+    }
+
+    async function saveArchivosTreeWidth() {
+      try {
+        await settingSet(ARCHIVOS_TREE_WIDTH_KEY, String(archivosTreeWidth.value))
+      } catch (err) {
+        console.error('Error al guardar ancho del árbol de archivos:', err)
+      }
+    }
 
     const capturas = ref([])
     const loadingCapturas = ref(false)
     const capturaSeleccionada = ref(null)
     const capturasListWidth = ref(160)
+    const CAPTURAS_LIST_WIDTH_KEY = 'capturas_list_width'
+    const CAPTURAS_LIST_MIN = 80
+
+    async function loadCapturasListWidth() {
+      try {
+        const result = await settingGet(CAPTURAS_LIST_WIDTH_KEY)
+        if (result.value) {
+          capturasListWidth.value = Math.max(CAPTURAS_LIST_MIN, parseInt(result.value, 10) || 160)
+        }
+      } catch (err) {
+        console.error('Error al cargar ancho de lista de capturas:', err)
+      }
+    }
+
+    async function saveCapturasListWidth() {
+      try {
+        await settingSet(CAPTURAS_LIST_WIDTH_KEY, String(capturasListWidth.value))
+      } catch (err) {
+        console.error('Error al guardar ancho de lista de capturas:', err)
+      }
+    }
+
+    const casosPruebaListWidth = ref(180)
+    const CASOS_PRUEBA_LIST_WIDTH_KEY = 'casos_prueba_list_width'
+    const CASOS_PRUEBA_LIST_MIN = 80
+
+    async function loadCasosPruebaListWidth() {
+      try {
+        const result = await settingGet(CASOS_PRUEBA_LIST_WIDTH_KEY)
+        if (result.value) {
+          casosPruebaListWidth.value = Math.max(CASOS_PRUEBA_LIST_MIN, parseInt(result.value, 10) || 180)
+        }
+      } catch (err) {
+        console.error('Error al cargar ancho de lista de casos de prueba:', err)
+      }
+    }
+
+    async function saveCasosPruebaListWidth() {
+      try {
+        await settingSet(CASOS_PRUEBA_LIST_WIDTH_KEY, String(casosPruebaListWidth.value))
+      } catch (err) {
+        console.error('Error al guardar ancho de lista de casos de prueba:', err)
+      }
+    }
+
+    function onCasosPruebaSplitStart(e) {
+      const startX = e.clientX
+      const startWidth = casosPruebaListWidth.value
+      const container = e.target.closest('.casos-prueba-container')
+
+      function onMouseMove(e) {
+        const delta = e.clientX - startX
+        const containerWidth = container ? container.getBoundingClientRect().width : 400
+        const minWidth = 80
+        const maxWidth = containerWidth - 80
+        casosPruebaListWidth.value = Math.max(minWidth, Math.min(maxWidth, startWidth + delta))
+      }
+
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        saveCasosPruebaListWidth()
+      }
+
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
     const filtrarPorSesion = ref(true)
 
     async function loadCapturas(proyectoId) {
@@ -306,6 +414,7 @@ export default {
         document.removeEventListener('mouseup', onMouseUp)
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
+        saveArchivosTreeWidth()
       }
 
       document.addEventListener('mousemove', onMouseMove)
@@ -651,6 +760,12 @@ export default {
       }, 300)
     })
 
+    onMounted(() => {
+      loadCapturasListWidth()
+      loadArchivosTreeWidth()
+      loadCasosPruebaListWidth()
+    })
+
     return {
       rightPanelCollapsed,
       rightPanelWidth,
@@ -695,6 +810,8 @@ export default {
       onCapturasSplitStart,
       filtrarPorSesion,
       tomarCaptura,
+      casosPruebaListWidth,
+      onCasosPruebaSplitStart,
     }
   },
 }
@@ -941,5 +1058,26 @@ export default {
 }
 .capturas-splitter:hover {
   background: rgba(117, 170, 219, 0.12);
+}
+.casos-prueba-container {
+  background: #16213e;
+}
+.casos-prueba-list {
+  background: #16213e;
+}
+.casos-prueba-splitter {
+  width: 6px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  background: transparent;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 5;
+}
+.casos-prueba-splitter:hover {
+  background: rgba(117, 170, 219, 0.12);
+}
+.casos-prueba-detail {
+  background: #0f172a;
 }
 </style>
