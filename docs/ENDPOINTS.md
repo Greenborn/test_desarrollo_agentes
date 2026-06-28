@@ -465,6 +465,13 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 - **Descripción:** Lista los archivos almacenados, filtrados opcionalmente por proyecto o sesión de chat. Ordenados por fecha descendente.
 - **Respuesta 200:** `{ archivos: [{ id, proyecto_id, chat_session_id, nombre_original, nombre_storage, tipo, tamano, created_at }] }`
 
+### `GET /api/archivos/:id/download`
+- **Auth:** Requerida
+- **Params:** `id` — ID del archivo
+- **Descripción:** Sirve el archivo binario (imagen, etc.) almacenado en disco. Usado para mostrar previsualizaciones en el frontend.
+- **Respuesta 200:** Archivo binario con `Content-Type` apropiado
+- **Respuesta 404:** `{ error: "Archivo no encontrado" }` o `{ error: "El archivo no existe en el disco" }`
+
 ### `DELETE /api/archivos/:id`
 - **Auth:** Requerida
 - **Params:** `id` — ID del archivo

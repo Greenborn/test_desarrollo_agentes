@@ -115,7 +115,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `right_panel_collapsed` | `'true'` / `'false'` | Panel lateral derecho colapsado |
 | `right_panel_width` | `'220'` | Ancho del panel derecho (px o %) |
 | `sidebar_chat_tab` | `'chats'` / `'servicios'` | Pestaña activa del sidebar izquierdo |
-| `sidebar_right_tab` | `'comentarios'` / `'archivos'` / `'variables'` / `'comandos'` | Pestaña activa del panel derecho |
+| `sidebar_right_tab` | `'comentarios'` / `'archivos'` / `'variables'` / `'comandos'` / `'capturas'` | Pestaña activa del panel derecho |
 | `dev_panel_tab` | `'instancias'` / `'repositorio'` / `'tickets'` / `'proyectos'` / `'console_logs'` / `'events'` / `'network_logs'` | Pestaña activa del panel inferior de desarrollo |
 
 ---

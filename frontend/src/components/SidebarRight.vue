@@ -9,6 +9,7 @@
       <button class="tab-btn" :class="{ active: tab === 'archivos' }" @click="selectTab('archivos')">Archivos</button>
       <button class="tab-btn" :class="{ active: tab === 'variables' }" @click="selectTab('variables')">Variables</button>
       <button class="tab-btn" :class="{ active: tab === 'comandos' }" @click="selectTab('comandos')">Comandos</button>
+      <button class="tab-btn" :class="{ active: tab === 'capturas' }" @click="selectTab('capturas')">Capturas</button>
     </div>
 
     <template v-if="tab === 'comentarios'">
@@ -99,6 +100,58 @@
         </div>
       </div>
     </template>
+    <template v-else-if="tab === 'capturas'">
+      <div v-if="!activeSession" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
+        <span>Seleccione una sesión de chat</span>
+      </div>
+      <div v-else-if="!proyectoId" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
+        <span>Sin proyecto asignado a esta sesión</span>
+      </div>
+      <div v-else class="d-flex flex-column flex-grow-1 overflow-hidden" style="min-height: 0;">
+        <div class="capturas-filter d-flex align-items-center px-2 py-1 flex-shrink-0 gap-2" style="border-bottom: 1px solid #374151;">
+          <label class="d-flex align-items-center gap-2 small" style="cursor: pointer; font-size: 0.7rem; color: #cbd5e1;">
+            <input type="checkbox" v-model="filtrarPorSesion" class="form-check-input m-0" style="cursor: pointer; width: 14px; height: 14px;" />
+            Solo sesión actual
+          </label>
+          <button class="btn btn-sm btn-outline-argentina ms-auto py-0 px-2" style="font-size: 0.65rem;" @click="tomarCaptura" :disabled="!activeSession || !proyectoId">📷 Capturar</button>
+        </div>
+        <div v-if="loadingCapturas" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small">
+          <span>Cargando capturas…</span>
+        </div>
+        <div v-else class="capturas-container d-flex flex-grow-1 overflow-hidden" style="min-height: 0;">
+          <div class="capturas-list flex-shrink-0 overflow-y-auto" :style="{ width: capturasListWidth + 'px' }">
+            <div v-if="capturas.length === 0" class="d-flex align-items-center justify-content-center text-secondary small px-3 py-4 text-center">
+              <span>Sin capturas de pantalla</span>
+            </div>
+            <div v-for="c in capturas" :key="c.id" class="captura-item d-flex align-items-start px-2 py-2 mb-1 rounded position-relative"
+              :class="{ selected: capturaSeleccionada?.id === c.id }" @click="seleccionarCaptura(c)" role="button">
+              <div class="captura-thumb me-2 flex-shrink-0">
+                <img :src="`/api/archivos/${c.id}/download`" class="rounded" style="width: 40px; height: 30px; object-fit: cover;" @error="$event.target.style.display='none'" />
+              </div>
+              <div class="captura-info min-width-0 flex-grow-1">
+                <div class="captura-nombre text-truncate small">{{ c.nombre_original }}</div>
+                <div class="captura-fecha text-muted" style="font-size: 0.6rem;">{{ formatDate(c.created_at) }}</div>
+              </div>
+              <div class="captura-actions d-flex flex-column gap-1 ms-1 flex-shrink-0">
+                <a :href="`/api/archivos/${c.id}/download`" download :title="`Descargar ${c.nombre_original}`" class="captura-download-btn" @click.stop>⬇</a>
+                <button class="captura-delete-btn" title="Eliminar captura" @click.stop="eliminarCaptura(c)">✕</button>
+              </div>
+            </div>
+          </div>
+          <div class="capturas-splitter" @mousedown.prevent="onCapturasSplitStart"></div>
+          <div v-if="capturaSeleccionada" class="captura-preview flex-grow-1 d-flex flex-column align-items-center justify-content-start overflow-auto p-2">
+            <img :src="`/api/archivos/${capturaSeleccionada.id}/download`" class="img-fluid rounded" style="max-width: 100%;" />
+            <div class="captura-preview-info text-center mt-2 small">
+              <div class="text-light">{{ capturaSeleccionada.nombre_original }}</div>
+              <div class="text-muted">{{ (capturaSeleccionada.tamano / 1024).toFixed(1) }} KB — {{ formatDate(capturaSeleccionada.created_at) }}</div>
+            </div>
+          </div>
+          <div v-else class="captura-preview flex-grow-1 d-flex align-items-center justify-content-center text-secondary small px-3 text-center">
+            <span>Seleccione una captura para previsualizar</span>
+          </div>
+        </div>
+      </div>
+    </template>
     <div class="sidebar-right-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-right-resize-handle-bar"></div>
     </div>
@@ -130,6 +183,7 @@ export default {
     const comandosStore = useComandosPersonalizadosStore()
     const { rightPanelCollapsed, rightPanelWidth, sidebarRightTab } = storeToRefs(ui)
     const { activeSessionId, sessions } = storeToRefs(chat)
+    const { find } = useCommandRegistry()
     const tab = ref('comentarios')
     const stopTabSync = watch(sidebarRightTab, (v) => { tab.value = v; stopTabSync() })
 
@@ -155,6 +209,104 @@ export default {
 
     const selectedFilePath = ref(null)
     const archivosTreeWidth = ref(140)
+
+    const capturas = ref([])
+    const loadingCapturas = ref(false)
+    const capturaSeleccionada = ref(null)
+    const capturasListWidth = ref(160)
+    const filtrarPorSesion = ref(true)
+
+    async function loadCapturas(proyectoId) {
+      if (!proyectoId) return
+      loadingCapturas.value = true
+      try {
+        let url = `/api/archivos?proyecto_id=${encodeURIComponent(proyectoId)}&tipo=image/png`
+        if (filtrarPorSesion.value && activeSessionId.value) {
+          url += `&chat_session_id=${activeSessionId.value}`
+        }
+        const res = await fetch(url, { credentials: 'include' })
+        if (res.ok) {
+          const data = await res.json()
+          capturas.value = data.archivos || []
+        } else {
+          capturas.value = []
+        }
+      } catch (err) {
+        console.error('Error al cargar capturas:', err)
+        capturas.value = []
+      } finally {
+        loadingCapturas.value = false
+      }
+    }
+
+    function seleccionarCaptura(c) {
+      capturaSeleccionada.value = c
+    }
+
+    async function eliminarCaptura(c) {
+      if (!confirm(`¿Eliminar la captura "${c.nombre_original}"?`)) return
+      try {
+        const res = await fetch(`/api/archivos/${c.id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error || 'Error al eliminar')
+        }
+        capturas.value = capturas.value.filter(a => a.id !== c.id)
+        if (capturaSeleccionada.value?.id === c.id) {
+          capturaSeleccionada.value = null
+        }
+      } catch (err) {
+        console.error('Error al eliminar captura:', err)
+      }
+    }
+
+    async function tomarCaptura() {
+      const sid = activeSessionId.value
+      if (!sid) return
+
+      const cmd = find('/navegador_capturar_pantalla')
+      if (!cmd) {
+        console.error('Comando /navegador_capturar_pantalla no encontrado')
+        return
+      }
+
+      await chat.runCommand('/navegador_capturar_pantalla', async (loadingIdx, sessionId) => {
+        return cmd.execute([], { chatStore: chat, sessionId })
+      })
+
+      if (proyectoId.value) {
+        await loadCapturas(proyectoId.value)
+      }
+    }
+
+    function onCapturasSplitStart(e) {
+      const startX = e.clientX
+      const startWidth = capturasListWidth.value
+      const container = e.target.closest('.capturas-container')
+
+      function onMouseMove(e) {
+        const delta = e.clientX - startX
+        const containerWidth = container ? container.getBoundingClientRect().width : 400
+        const minWidth = 80
+        const maxWidth = containerWidth - 80
+        capturasListWidth.value = Math.max(minWidth, Math.min(maxWidth, startWidth + delta))
+      }
+
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
 
     function onFileSelected({ path, name }) {
       selectedFilePath.value = path
@@ -259,10 +411,25 @@ export default {
       if (!newId) {
         projectVariables.clearVariables()
         comandosStore.clearCommands()
+        capturas.value = []
+        capturaSeleccionada.value = null
         return
       }
       projectVariables.loadVariables(newId)
       comandosStore.loadCommands(newId)
+      loadCapturas(newId)
+    })
+
+    watch(filtrarPorSesion, () => {
+      if (proyectoId.value) {
+        loadCapturas(proyectoId.value)
+      }
+    })
+
+    watch(activeSessionId, () => {
+      if (proyectoId.value && filtrarPorSesion.value) {
+        loadCapturas(proyectoId.value)
+      }
     })
 
     const executingCommands = ref(new Map())
@@ -512,6 +679,15 @@ export default {
       archivosTreeWidth,
       onFileSelected,
       onArchivosSplitStart,
+      capturas,
+      loadingCapturas,
+      capturaSeleccionada,
+      capturasListWidth,
+      seleccionarCaptura,
+      eliminarCaptura,
+      onCapturasSplitStart,
+      filtrarPorSesion,
+      tomarCaptura,
     }
   },
 }
@@ -683,6 +859,76 @@ export default {
   z-index: 5;
 }
 .archivos-splitter:hover {
+  background: rgba(117, 170, 219, 0.12);
+}
+.capturas-container {
+  background: #16213e;
+}
+.capturas-list {
+  background: #16213e;
+}
+.captura-item {
+  background: #1a2744;
+  border: 1px solid #374151;
+  cursor: pointer;
+}
+.captura-item:hover {
+  background: #1e3050;
+}
+.captura-item.selected {
+  background: #1e3050;
+  border-color: #75AADB;
+}
+.captura-item:hover .captura-actions {
+  display: flex;
+}
+.captura-actions {
+  display: none;
+}
+.captura-download-btn, .captura-delete-btn {
+  background: none;
+  border: none;
+  font-size: 0.65rem;
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1.2;
+  text-decoration: none;
+  color: #6b7280;
+  transition: color 0.15s, background 0.15s;
+}
+.captura-download-btn:hover {
+  color: #75AADB;
+  background: rgba(117, 170, 219, 0.12);
+}
+.captura-delete-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+.captura-nombre {
+  color: #cbd5e1;
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+.captura-fecha {
+  font-size: 0.6rem;
+}
+.captura-preview {
+  background: #0f172a;
+}
+.captura-preview-info {
+  font-size: 0.7rem;
+}
+.capturas-splitter {
+  width: 6px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  background: transparent;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 5;
+}
+.capturas-splitter:hover {
   background: rgba(117, 170, 219, 0.12);
 }
 </style>

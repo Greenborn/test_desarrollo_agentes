@@ -26,7 +26,7 @@ function ensureStorageDir() {
 router.get('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { proyecto_id, chat_session_id } = req.query;
+    const { proyecto_id, chat_session_id, tipo } = req.query;
     let query = db('archivos').orderBy('created_at', 'desc');
     if (proyecto_id) {
       query = query.where({ proyecto_id });
@@ -34,11 +34,32 @@ router.get('/', async (req, res) => {
     if (chat_session_id) {
       query = query.where({ chat_session_id });
     }
+    if (tipo) {
+      query = query.where({ tipo });
+    }
     const archivos = await query.select('*');
     res.json({ archivos });
   } catch (err) {
     console.log('Error al listar archivos:', err.message);
     res.status(500).json({ archivos: [], error: err.message });
+  }
+});
+
+router.get('/:id/download', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const archivo = await db('archivos').where({ id: req.params.id }).first();
+    if (!archivo) {
+      return res.status(404).json({ error: 'Archivo no encontrado' });
+    }
+    const filePath = path.join(STORAGE_DIR, archivo.nombre_storage);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'El archivo no existe en el disco' });
+    }
+    res.sendFile(filePath);
+  } catch (err) {
+    console.log('Error al descargar archivo:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
