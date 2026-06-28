@@ -33,6 +33,16 @@
         <div class="part right" :class="{ filled: !rightPanelCollapsed }"></div>
       </div>
     </button>
+    <button
+      class="layout-btn"
+      :class="{ active: !centralPanelCollapsed }"
+      @click="toggleCentralPanel"
+      title="Toggle central panel"
+    >
+      <div class="layout-icon window">
+        <div class="part content" :class="{ filled: !centralPanelCollapsed }"></div>
+      </div>
+    </button>
   </div>
 </template>
 
@@ -44,7 +54,7 @@ import { useUiStore } from '../stores/ui.js'
 export default {
   setup() {
     const ui = useUiStore()
-    const { sidebarCollapsed, panelCollapsed, rightPanelCollapsed } = storeToRefs(ui)
+    const { sidebarCollapsed, panelCollapsed, rightPanelCollapsed, centralPanelCollapsed } = storeToRefs(ui)
 
     onMounted(() => {
       ui.loadLayoutPrefs()
@@ -54,9 +64,11 @@ export default {
       sidebarCollapsed,
       panelCollapsed,
       rightPanelCollapsed,
+      centralPanelCollapsed,
       toggleSidebar: ui.toggleSidebar,
       togglePanel: ui.togglePanel,
       toggleRightPanel: ui.toggleRightPanel,
+      toggleCentralPanel: ui.toggleCentralPanel,
     }
   },
 }
@@ -128,6 +140,22 @@ export default {
   border-top: 1.5px solid currentColor;
 }
 .layout-icon.split-v .part.bottom.filled {
+  background: currentColor;
+}
+.layout-icon.window {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.layout-icon.window .part.content {
+  width: 70%;
+  height: 70%;
+  border: 1.5px solid currentColor;
+  border-radius: 1px;
+  background: transparent;
+  transition: background 0.15s;
+}
+.layout-icon.window .part.content.filled {
   background: currentColor;
 }
 </style>

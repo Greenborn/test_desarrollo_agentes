@@ -151,6 +151,7 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
+import { settingSet, settingGet } from '../services/settingService.js'
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
@@ -385,18 +386,12 @@ export default {
     // --- Layout persistence ---
     async function loadLayoutPrefs() {
       try {
-        const [resL, resR] = await Promise.all([
-          fetch(`/api/command/setting/${SETTING_KEY_L}`, { credentials: 'include' }),
-          fetch(`/api/command/setting/${SETTING_KEY_R}`, { credentials: 'include' }),
+        const [dL, dR] = await Promise.all([
+          settingGet(SETTING_KEY_L),
+          settingGet(SETTING_KEY_R),
         ])
-        if (resL.ok) {
-          const d = await resL.json()
-          if (d.value) leftWidth.value = Math.max(SPLITTER_MIN_L, parseInt(d.value, 10) || SPLITTER_MIN_L)
-        }
-        if (resR.ok) {
-          const d = await resR.json()
-          if (d.value) rightWidth.value = Math.max(SPLITTER_MIN_R, parseInt(d.value, 10) || SPLITTER_MIN_R)
-        }
+        if (dL.value) leftWidth.value = Math.max(SPLITTER_MIN_L, parseInt(dL.value, 10) || SPLITTER_MIN_L)
+        if (dR.value) rightWidth.value = Math.max(SPLITTER_MIN_R, parseInt(dR.value, 10) || SPLITTER_MIN_R)
       } catch (err) {
         console.error('Error al cargar preferencias de layout:', err)
       }
@@ -405,18 +400,8 @@ export default {
     async function saveLayoutPrefs() {
       try {
         await Promise.all([
-          fetch('/api/command/setting', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ key: SETTING_KEY_L, value: String(leftWidth.value) }),
-          }),
-          fetch('/api/command/setting', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ key: SETTING_KEY_R, value: String(rightWidth.value) }),
-          }),
+          settingSet(SETTING_KEY_L, String(leftWidth.value)),
+          settingSet(SETTING_KEY_R, String(rightWidth.value)),
         ])
       } catch (err) {
         console.error('Error al guardar preferencias de layout:', err)

@@ -1,4 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
+import { settingSet } from '../../services/settingService.js'
 
 const { register } = useCommandRegistry()
 
@@ -71,16 +72,7 @@ register({
       throw new Error(`Resolución no válida: "${resolutionId}". Resoluciones disponibles: ${avail || '(ninguna configurada)'}`)
     }
 
-    const res = await fetch('/api/command/setting', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ key: 'default_resolution', value: resolutionId }),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      throw new Error(data.error || 'Error al guardar la resolución por defecto')
-    }
+    await settingSet('default_resolution', resolutionId)
 
     chatStore.messages.push({
       role: 'result',

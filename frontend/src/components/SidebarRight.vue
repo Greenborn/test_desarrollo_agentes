@@ -162,6 +162,12 @@
           </div>
         </div>
         <div class="casos-prueba-splitter" @mousedown.prevent="onCasosPruebaSplitStart"></div>
+        <div class="casos-prueba-middle flex-shrink-0 overflow-hidden" :style="{ width: casosPruebaMiddleWidth + 'px' }">
+          <div class="d-flex align-items-center justify-content-center h-100 text-secondary small px-3 text-center">
+            <span>En construcción</span>
+          </div>
+        </div>
+        <div class="casos-prueba-splitter-middle" @mousedown.prevent="onCasosPruebaMiddleSplitStart"></div>
         <div class="casos-prueba-detail flex-grow-1 d-flex align-items-center justify-content-center text-secondary small px-3 text-center">
           <span>En construcción</span>
         </div>
@@ -316,6 +322,56 @@ export default {
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
         saveCasosPruebaListWidth()
+      }
+
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    const casosPruebaMiddleWidth = ref(180)
+    const CASOS_PRUEBA_MIDDLE_WIDTH_KEY = 'casos_prueba_middle_width'
+    const CASOS_PRUEBA_MIDDLE_MIN = 80
+
+    async function loadCasosPruebaMiddleWidth() {
+      try {
+        const result = await settingGet(CASOS_PRUEBA_MIDDLE_WIDTH_KEY)
+        if (result.value) {
+          casosPruebaMiddleWidth.value = Math.max(CASOS_PRUEBA_MIDDLE_MIN, parseInt(result.value, 10) || 180)
+        }
+      } catch (err) {
+        console.error('Error al cargar ancho de columna media de casos de prueba:', err)
+      }
+    }
+
+    async function saveCasosPruebaMiddleWidth() {
+      try {
+        await settingSet(CASOS_PRUEBA_MIDDLE_WIDTH_KEY, String(casosPruebaMiddleWidth.value))
+      } catch (err) {
+        console.error('Error al guardar ancho de columna media de casos de prueba:', err)
+      }
+    }
+
+    function onCasosPruebaMiddleSplitStart(e) {
+      const startX = e.clientX
+      const startWidth = casosPruebaMiddleWidth.value
+      const container = e.target.closest('.casos-prueba-container')
+
+      function onMouseMove(e) {
+        const delta = e.clientX - startX
+        const containerWidth = container ? container.getBoundingClientRect().width : 400
+        const minWidth = 80
+        const maxWidth = containerWidth - 80
+        casosPruebaMiddleWidth.value = Math.max(minWidth, Math.min(maxWidth, startWidth + delta))
+      }
+
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        saveCasosPruebaMiddleWidth()
       }
 
       document.addEventListener('mousemove', onMouseMove)
@@ -764,6 +820,7 @@ export default {
       loadCapturasListWidth()
       loadArchivosTreeWidth()
       loadCasosPruebaListWidth()
+      loadCasosPruebaMiddleWidth()
     })
 
     return {
@@ -812,6 +869,8 @@ export default {
       tomarCaptura,
       casosPruebaListWidth,
       onCasosPruebaSplitStart,
+      casosPruebaMiddleWidth,
+      onCasosPruebaMiddleSplitStart,
     }
   },
 }
@@ -1075,6 +1134,21 @@ export default {
   z-index: 5;
 }
 .casos-prueba-splitter:hover {
+  background: rgba(117, 170, 219, 0.12);
+}
+.casos-prueba-middle {
+  background: #16213e;
+}
+.casos-prueba-splitter-middle {
+  width: 6px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  background: transparent;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 5;
+}
+.casos-prueba-splitter-middle:hover {
   background: rgba(117, 170, 219, 0.12);
 }
 .casos-prueba-detail {

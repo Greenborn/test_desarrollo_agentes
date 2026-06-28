@@ -3,9 +3,11 @@
     <Topbar />
     <div class="d-flex flex-grow-1 overflow-hidden" style="height: 0; min-height: 0;">
       <SidebarChat />
-      <TicketDetail v-if="selectedTicket" class="flex-grow-1" />
-      <ProjectDetail v-else-if="selectedProject" class="flex-grow-1" />
-      <ChatWindow v-else class="flex-grow-1" />
+      <div v-if="!centralPanelCollapsed" class="d-flex flex-column flex-grow-1 overflow-hidden" style="min-width: 0;">
+        <TicketDetail v-if="selectedTicket" class="flex-grow-1" />
+        <ProjectDetail v-else-if="selectedProject" class="flex-grow-1" />
+        <ChatWindow v-else class="flex-grow-1" />
+      </div>
       <SidebarRight />
     </div>
     <div
@@ -48,7 +50,7 @@ export default {
     const projectStore = useProjectStore()
     const ticketStore = useTicketStore()
     const ui = useUiStore()
-    const { panelCollapsed, panelHeight } = storeToRefs(ui)
+    const { panelCollapsed, panelHeight, centralPanelCollapsed } = storeToRefs(ui)
     const { selectedProject } = storeToRefs(projectStore)
     const { selectedTicket } = storeToRefs(ticketStore)
 
@@ -108,7 +110,7 @@ export default {
       }, 300)
     })
 
-    return { selectedProject, selectedTicket, panelCollapsed, panelHeight, isTransitioning, startResize }
+    return { selectedProject, selectedTicket, panelCollapsed, panelHeight, centralPanelCollapsed, isTransitioning, startResize }
   },
 }
 </script>

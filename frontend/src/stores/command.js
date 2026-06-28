@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { settingSet, settingGet } from '../services/settingService.js'
 
 const API = '/api'
 
@@ -14,8 +15,7 @@ export const useCommandStore = defineStore('command', () => {
 
   async function loadLastDirectory() {
     try {
-      const res = await fetch(`${API}/command/setting/last_directory`, { credentials: 'include' })
-      const data = await res.json()
+      const data = await settingGet('last_directory')
       if (data.value) currentDir.value = data.value
     } catch (err) {
       console.error('Error al cargar last_directory:', err)
@@ -25,12 +25,7 @@ export const useCommandStore = defineStore('command', () => {
   async function setDirectory(dir) {
     currentDir.value = dir
     try {
-      await fetch(`${API}/command/setting`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ key: 'last_directory', value: dir }),
-      })
+      await settingSet('last_directory', dir)
     } catch (err) {
       console.error('Error al guardar directorio:', err)
     }

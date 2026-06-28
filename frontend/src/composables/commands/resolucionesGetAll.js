@@ -1,4 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
+import { settingGet } from '../../services/settingService.js'
 
 const { register } = useCommandRegistry()
 
@@ -10,7 +11,7 @@ register({
   async execute(args, { chatStore }) {
     const [settingsRes, defaultRes] = await Promise.all([
       fetch('/api/settings', { credentials: 'include' }).then(r => r.json()),
-      fetch('/api/command/setting/default_resolution', { credentials: 'include' }).then(r => r.json()),
+      settingGet('default_resolution'),
     ])
 
     const resolutions = settingsRes.screen_resolutions || []

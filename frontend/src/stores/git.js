@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { settingSet, settingGet } from '../services/settingService.js'
 
 const API = '/api'
 
@@ -131,8 +132,7 @@ export const useGitStore = defineStore('git', () => {
   async function loadZoom(type) {
     const key = type === 'chat' ? 'chat_zoom' : 'git_graph_zoom'
     try {
-      const res = await fetch(`${API}/command/setting/${key}`, { credentials: 'include' })
-      const data = await res.json()
+      const data = await settingGet(key)
       if (data.value !== null && data.value !== undefined) {
         const val = parseInt(data.value, 10) || 100
         if (type === 'chat') chatZoom.value = val
@@ -146,12 +146,7 @@ export const useGitStore = defineStore('git', () => {
   async function saveZoom(type, val) {
     const key = type === 'chat' ? 'chat_zoom' : 'git_graph_zoom'
     try {
-      await fetch(`${API}/command/setting`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ key, value: String(val) }),
-      })
+      await settingSet(key, String(val))
     } catch (err) {
       console.error(`Error al guardar zoom (${key}):`, err)
     }

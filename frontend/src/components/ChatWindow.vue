@@ -98,6 +98,7 @@ import { useDevInstanceStore } from '../stores/devInstance.js'
 import { useProjectVariablesStore } from '../stores/projectVariables.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
 import { useComandosPersonalizadosStore } from '../stores/comandosPersonalizados.js'
+import { settingSet } from '../services/settingService.js'
 import { useTicketStore } from '../stores/ticket.js'
 import { deteccionState, abortDeteccion } from '../composables/commands/deteccionFuncionalidades.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
@@ -1104,12 +1105,7 @@ export default {
         return
       } else if (stepType === 'resolution_set_default') {
         try {
-          await fetch('/api/command/setting', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ key: 'default_resolution', value }),
-          })
+          await settingSet('default_resolution', value)
           const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
           if (idx >= 0) {
             chat.messages[idx] = {

@@ -1,5 +1,6 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { useUiStore } from '../../stores/ui.js';
+import { settingGet } from '../../services/settingService.js';
 
 const { register } = useCommandRegistry();
 
@@ -15,8 +16,7 @@ async function fetchResolutions() {
 
 async function fetchDefaultResolution(resolutions) {
   try {
-    const res = await fetch('/api/command/setting/default_resolution', { credentials: 'include' });
-    const data = await res.json();
+    const data = await settingGet('default_resolution');
     if (data.value) return resolutions.find(r => r.id === data.value) || null;
   } catch {}
   return null;

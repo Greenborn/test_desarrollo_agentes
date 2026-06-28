@@ -79,6 +79,40 @@ async function handleMemoriaKeys(payload) {
   return { type: 'memoria_keys_result', success: true, keys: result.keys || [] };
 }
 
+async function handleSettingSet(payload, cookieToken) {
+  const token = payload.sessionToken || cookieToken;
+  if (!token) return { type: 'error', error: 'Sesión no válida' };
+  const session = await getSessionFromToken(token);
+  if (!session || !session.userId) return { type: 'error', error: 'Sesión no válida' };
+
+  const { key, value } = payload;
+  if (!key) return { type: 'error', error: 'key requerido' };
+  if (value === undefined || value === null) return { type: 'error', error: 'value requerido' };
+
+  await db('user_settings')
+    .insert({ user_id: session.userId, key, value: String(value) })
+    .onConflict(['user_id', 'key'])
+    .merge();
+
+  return { type: 'setting_set_result', success: true };
+}
+
+async function handleSettingGet(payload, cookieToken) {
+  const token = payload.sessionToken || cookieToken;
+  if (!token) return { type: 'error', error: 'Sesión no válida' };
+  const session = await getSessionFromToken(token);
+  if (!session || !session.userId) return { type: 'error', error: 'Sesión no válida' };
+
+  const { key } = payload;
+  if (!key) return { type: 'error', error: 'key requerido' };
+
+  const row = await db('user_settings')
+    .where({ user_id: session.userId, key })
+    .first();
+
+  return { type: 'setting_get_result', success: true, value: row ? row.value : null };
+}
+
 async function handleProyectoVarListar(payload) {
   const { sessionToken } = payload;
   if (!sessionToken) return { type: 'error', error: 'Sesión no válida' };
@@ -401,6 +435,12 @@ export function setupFrontendWebSocket(server) {
             break;
           case 'memoria:keys':
             result = await handleMemoriaKeys(payload);
+            break;
+          case 'setting:set':
+            result = await handleSettingSet(payload, cookieToken);
+            break;
+          case 'setting:get':
+            result = await handleSettingGet(payload, cookieToken);
             break;
           case 'proyectoVarListar':
             result = await handleProyectoVarListar(payload);

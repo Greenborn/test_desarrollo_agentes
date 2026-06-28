@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { settingSet, settingGet } from '../services/settingService.js'
 
 export const useUiStore = defineStore('ui', () => {
   const sidebarCollapsed = ref(false)
@@ -10,6 +11,7 @@ export const useUiStore = defineStore('ui', () => {
   const rightPanelCollapsed = ref(true)
   const rightPanelWidth = ref(220)
   const recordingListWidth = ref(220)
+  const centralPanelCollapsed = ref(false)
 
   const sidebarChatTab = ref('chats')
   const sidebarRightTab = ref('comentarios')
@@ -30,6 +32,13 @@ export const useUiStore = defineStore('ui', () => {
     saveLayoutPrefs()
   }
 
+  function toggleCentralPanel() {
+    console.log('[toggleCentralPanel] antes:', centralPanelCollapsed.value)
+    centralPanelCollapsed.value = !centralPanelCollapsed.value
+    console.log('[toggleCentralPanel] despues:', centralPanelCollapsed.value)
+    saveLayoutPrefs()
+  }
+
   function setRightPanelWidth(w) {
     rightPanelWidth.value = w
   }
@@ -45,66 +54,17 @@ export const useUiStore = defineStore('ui', () => {
   async function saveLayoutPrefs() {
     try {
       await Promise.all([
-        fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'sidebar_collapsed', value: String(sidebarCollapsed.value) }),
-        }),
-        fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'sidebar_width', value: String(sidebarWidth.value) }),
-        }),
-        fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'panel_collapsed', value: String(panelCollapsed.value) }),
-        }),
-        fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'panel_height', value: String(panelHeight.value) }),
-        }),
-        fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'right_panel_collapsed', value: String(rightPanelCollapsed.value) }),
-        }),
-        fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'right_panel_width', value: String(rightPanelWidth.value) }),
-        }),
-        fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'recording_list_width', value: String(recordingListWidth.value) }),
-        }),
-        fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'sidebar_chat_tab', value: sidebarChatTab.value }),
-        }),
-        fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'sidebar_right_tab', value: sidebarRightTab.value }),
-        }),
-        fetch('/api/command/setting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ key: 'dev_panel_tab', value: devPanelTab.value }),
-        }),
+        settingSet('sidebar_collapsed', String(sidebarCollapsed.value)),
+        settingSet('sidebar_width', String(sidebarWidth.value)),
+        settingSet('panel_collapsed', String(panelCollapsed.value)),
+        settingSet('panel_height', String(panelHeight.value)),
+        settingSet('right_panel_collapsed', String(rightPanelCollapsed.value)),
+        settingSet('right_panel_width', String(rightPanelWidth.value)),
+        settingSet('recording_list_width', String(recordingListWidth.value)),
+        settingSet('central_panel_collapsed', String(centralPanelCollapsed.value)),
+        settingSet('sidebar_chat_tab', sidebarChatTab.value),
+        settingSet('sidebar_right_tab', sidebarRightTab.value),
+        settingSet('dev_panel_tab', devPanelTab.value),
       ])
     } catch (err) {
       console.error('Error saving layout preferences:', err)
@@ -113,28 +73,19 @@ export const useUiStore = defineStore('ui', () => {
 
   async function loadLayoutPrefs() {
     try {
-      const [sidebarRes, widthRes, panelRes, heightRes, rightCollapsedRes, rightWidthRes, recordingListRes, sidebarChatTabRes, sidebarRightTabRes, devPanelTabRes] = await Promise.all([
-        fetch('/api/command/setting/sidebar_collapsed', { credentials: 'include' }),
-        fetch('/api/command/setting/sidebar_width', { credentials: 'include' }),
-        fetch('/api/command/setting/panel_collapsed', { credentials: 'include' }),
-        fetch('/api/command/setting/panel_height', { credentials: 'include' }),
-        fetch('/api/command/setting/right_panel_collapsed', { credentials: 'include' }),
-        fetch('/api/command/setting/right_panel_width', { credentials: 'include' }),
-        fetch('/api/command/setting/recording_list_width', { credentials: 'include' }),
-        fetch('/api/command/setting/sidebar_chat_tab', { credentials: 'include' }),
-        fetch('/api/command/setting/sidebar_right_tab', { credentials: 'include' }),
-        fetch('/api/command/setting/dev_panel_tab', { credentials: 'include' }),
+      const [sidebarData, widthData, panelData, heightData, rightCollapsedData, rightWidthData, recordingListData, centralPanelData, sidebarChatTabData, sidebarRightTabData, devPanelTabData] = await Promise.all([
+        settingGet('sidebar_collapsed'),
+        settingGet('sidebar_width'),
+        settingGet('panel_collapsed'),
+        settingGet('panel_height'),
+        settingGet('right_panel_collapsed'),
+        settingGet('right_panel_width'),
+        settingGet('recording_list_width'),
+        settingGet('central_panel_collapsed'),
+        settingGet('sidebar_chat_tab'),
+        settingGet('sidebar_right_tab'),
+        settingGet('dev_panel_tab'),
       ])
-      const sidebarData = await sidebarRes.json()
-      const widthData = await widthRes.json()
-      const panelData = await panelRes.json()
-      const heightData = await heightRes.json()
-      const rightCollapsedData = await rightCollapsedRes.json()
-      const rightWidthData = await rightWidthRes.json()
-      const recordingListData = await recordingListRes.json()
-      const sidebarChatTabData = await sidebarChatTabRes.json()
-      const sidebarRightTabData = await sidebarRightTabRes.json()
-      const devPanelTabData = await devPanelTabRes.json()
       if (sidebarData.value !== null) {
         sidebarCollapsed.value = sidebarData.value === 'true'
       }
@@ -176,6 +127,9 @@ export const useUiStore = defineStore('ui', () => {
           recordingListWidth.value = Math.max(140, Math.min(400, raw))
         }
       }
+      if (centralPanelData.value !== null) {
+        centralPanelCollapsed.value = centralPanelData.value === 'true'
+      }
       if (sidebarChatTabData.value !== null) {
         sidebarChatTab.value = sidebarChatTabData.value
       }
@@ -190,5 +144,5 @@ export const useUiStore = defineStore('ui', () => {
     }
   }
 
-  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, omnifilter, rightPanelCollapsed, rightPanelWidth, recordingListWidth, sidebarChatTab, sidebarRightTab, devPanelTab, toggleSidebar, togglePanel, toggleRightPanel, setPanelHeight, setRightPanelWidth, setOmnifilter, saveLayoutPrefs, loadLayoutPrefs }
+  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, omnifilter, rightPanelCollapsed, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarChatTab, sidebarRightTab, devPanelTab, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setOmnifilter, saveLayoutPrefs, loadLayoutPrefs }
 })

@@ -1,4 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
+import { settingGet } from '../../services/settingService.js'
 
 const { register } = useCommandRegistry()
 
@@ -8,7 +9,7 @@ register({
   description: 'Muestra la resolución de pantalla por defecto configurada.',
   usage: '/resolucion_get_default',
   async execute(args, { chatStore }) {
-    const defaultRes = await fetch('/api/command/setting/default_resolution', { credentials: 'include' }).then(r => r.json())
+    const defaultRes = await settingGet('default_resolution')
 
     const resolutionId = defaultRes.value || ''
     if (!resolutionId) {

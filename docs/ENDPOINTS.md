@@ -225,14 +225,14 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - **Query:** `prefix` (default `/`), `cwd` (default `process.cwd()`)
 - **Respuesta:** `{ directories: string[] }`
 
-### `GET /api/command/setting/:key`
-- **Auth:** Requerida
-- **Respuesta:** `{ value: string|null }`
+### ~~`GET /api/command/setting/:key`~~ → Migrado a WebSocket (`setting:get`)
+- ~~**Auth:** Requerida~~
+- ~~**Respuesta:** `{ value: string|null }`~~
 
-### `POST /api/command/setting`
-- **Auth:** Requerida
-- **Body:** `{ key: string, value: string }`
-- **Respuesta:** `{ success: true }`
+### ~~`POST /api/command/setting`~~ → Migrado a WebSocket (`setting:set`)
+- ~~**Auth:** Requerida~~
+- ~~**Body:** `{ key: string, value: string }`~~
+- ~~**Respuesta:** `{ success: true }`~~
 
 ### `GET /api/command/history`
 - **Auth:** Requerida

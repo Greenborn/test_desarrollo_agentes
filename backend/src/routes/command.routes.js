@@ -246,32 +246,6 @@ router.get('/arbol-directorios', async (req, res) => {
   }
 });
 
-router.get('/setting/:key', async (req, res) => {
-  if (!authGuard(req, res)) return;
-  try {
-    const row = await db('user_settings')
-      .where({ user_id: req.session.userId, key: req.params.key })
-      .first();
-    res.json({ value: row ? row.value : null });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.post('/setting', async (req, res) => {
-  if (!authGuard(req, res)) return;
-  try {
-    const { key, value } = req.body;
-    await db('user_settings')
-      .insert({ user_id: req.session.userId, key, value })
-      .onConflict(['user_id', 'key'])
-      .merge();
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 router.get('/history', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {

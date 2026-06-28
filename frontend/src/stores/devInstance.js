@@ -3,8 +3,6 @@ import { ref, reactive, computed } from 'vue'
 import { useChatStore } from './chat.js'
 
 const API = '/api'
-const STORAGE_KEY = 'opencode_dev_instances'
-
 export const useDevInstanceStore = defineStore('devInstance', () => {
   const processes = ref([])
   const frontendPorts = ref([])
