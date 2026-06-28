@@ -380,7 +380,22 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
-## 21. `playwright_console_logs`
+## 21. `archivos`
+
+| Columna | Tipo | Restricciones |
+|---------|------|---------------|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `proyecto_id` | VARCHAR(255) | NOT NULL — FK lógica → `proyectos(id)` |
+| `chat_session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
+| `nombre_original` | VARCHAR(500) | NOT NULL — nombre original del archivo subido/capturado |
+| `nombre_storage` | VARCHAR(500) | NOT NULL — nombre único UUID en disco (`uploads/archivos/`) |
+| `tipo` | VARCHAR(100) | NOT NULL — MIME type (`image/png`, etc.) |
+| `tamano` | INTEGER | NOT NULL — tamaño en bytes |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+---
+
+## 22. `playwright_console_logs`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -416,6 +431,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `documentacion_escaneo` | `session_id` | `chat_sessions` | `id` | CASCADE |
 | `comandos_personalizados_proyectos` | `id_proyecto` | `proyectos` | `id` | — (FK lógica) |
 | `documentacion_archivo` | `escaneo_id` | `documentacion_escaneo` | `id` | CASCADE |
+| `archivos` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 
 ---
 

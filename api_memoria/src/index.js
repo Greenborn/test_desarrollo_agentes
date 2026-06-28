@@ -1,7 +1,10 @@
 import { execSync } from 'child_process';
+import http from 'http';
 import express from 'express';
+import { WebSocketServer } from 'ws';
 import authMiddleware from './authMiddleware.js';
 import memoriaRoutes from './routes/memoria.routes.js';
+import setupWebSocket from './wsHandler.js';
 
 const PORT = process.env.SERVICIO_MEMORIA_PORT;
 if (!PORT) {
@@ -21,10 +24,15 @@ function killPort(port) {
 }
 killPort(PORT);
 
-const server = app.listen(PORT, (err) => {
+const server = http.createServer(app);
+
+const wss = new WebSocketServer({ server, path: '/api/memoria' });
+setupWebSocket(wss);
+
+server.listen(PORT, (err) => {
   if (err) {
     console.log('Error al iniciar servidor memoria:', err.message);
     process.exit(1);
   }
-  console.log(`Memoria service listening on port ${PORT}`);
+  console.log(`Memoria service listening on port ${PORT} (HTTP + WebSocket)`);
 });

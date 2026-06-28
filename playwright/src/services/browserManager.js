@@ -1001,6 +1001,26 @@ async function executeAction(idSession, action) {
   }
 }
 
+async function takeScreenshot(idSession, fullpage = false) {
+  if (!idSession) {
+    throw new Error('Parámetro "id_session" es requerido');
+  }
+
+  const session = sessions.get(idSession);
+  if (!session) {
+    throw new Error(`Sesión no encontrada: "${idSession}"`);
+  }
+
+  try {
+    const buffer = await session.page.screenshot({ fullPage: fullpage, type: 'png' });
+    console.log(`Sesión ${idSession} captura de pantalla tomada (fullpage: ${fullpage})`);
+    return buffer;
+  } catch (err) {
+    console.log(`Error al tomar captura en sesión ${idSession}:`, err.message);
+    throw new Error(`Error al tomar captura de pantalla: ${err.message}`);
+  }
+}
+
 export default {
   setDb,
   startSession,
@@ -1009,6 +1029,7 @@ export default {
   setupEventRecording,
   stopEventRecording,
   executeAction,
+  takeScreenshot,
   getSession,
   getActiveSession,
   closeSession,

@@ -237,6 +237,47 @@ curl -X POST http://localhost:4098/api/command \
 
 ---
 
+### 4.8 `take_screenshot`
+
+Toma una captura de pantalla de la página actual en una sesión de navegador activa.
+
+#### Parámetros
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `id_session` | `string` | No (usa sesión activa si se omite) | UUID de la sesión obtenido de `start` |
+| `fullpage` | `boolean` | No (default `false`) | Si es `true`, captura la página completa (incluye scroll) |
+
+#### Ejemplo
+
+```bash
+curl -X POST http://localhost:4098/api/command \
+  -H 'Content-Type: application/json' \
+  -d '{"comando":"take_screenshot","parametros":{"fullpage":true}}'
+```
+
+#### Respuesta
+
+```json
+{
+  "success": true,
+  "id_session": "550e8400-e29b-41d4-a716-446655440000",
+  "fullpage": true,
+  "image_base64": "iVBORw0KGgo... (base64 del PNG)",
+  "size": 245760
+}
+```
+
+#### Errores posibles
+
+| Causa | HTTP | Mensaje |
+|---|---|---|
+| No hay sesión activa | 400 | `No hay sesión activa. Usá "start" primero o pasá "id_session"` |
+| Sesión no existe | 500 | `Sesión no encontrada: "uuid..."` |
+| Error de captura | 500 | `Error al tomar captura de pantalla: ...` |
+
+---
+
 ## 5. Flujo típico
 
 ```
@@ -272,6 +313,7 @@ curl -X POST http://localhost:4098/api/command \
 | `extractFormControls(idSession)` | Extrae todos los controles de formulario de la página (`input`, `select`, `textarea`, `button`) con sus características y metadatos del formulario |
 | `getSession(idSession)` | Retorna datos de la sesión o `null` |
 | `closeSession(idSession)` | Cierra navegador y elimina sesión |
+| `takeScreenshot(idSession, fullpage)` | Toma captura de pantalla de la página actual, retorna Buffer PNG |
 
 ---
 
@@ -315,6 +357,7 @@ playwright/
 ```
 COMANDOS DISPONIBLES:
 - start                    → inicia navegador chrome/firefox, devuelve id_session
+- take_screenshot          → captura pantalla de la página actual, devuelve base64
 - go_to_url                → navega a una URL en una sesión existente
 - set_headless             → cambia modo headless (0=visible, 1=headless)
 - close                    → cierra una sesión de navegador
@@ -330,6 +373,7 @@ USO:
   { "comando": "extract_form_controls",    "parametros": { "id_session": "uuid" } }
   { "comando": "start_event_recording",    "parametros": { "id_session": "uuid", "chat_session_id": 123 } }
   { "comando": "stop_event_recording",     "parametros": { "id_session": "uuid" } }
+  { "comando": "take_screenshot",          "parametros": { "id_session": "uuid", "fullpage": true } }
 
 LOGS DE RED Y CONSOLA:
   Al iniciar una sesión con `start`, el servicio captura automáticamente:

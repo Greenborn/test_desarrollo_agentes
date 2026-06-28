@@ -2,6 +2,7 @@
 
 - **api_gestor_servicios:** Puerto `4200` (configurable vía `SERVICIO_GESTOR_PORT`). Punto de entrada que orquesta el resto de servicios. Los endpoints operativos requieren `GESTOR_API_KEY`. El frontend no lo llama directamente.
 - **Backend Express principal:** Puerto `4000` (configurable vía `PORT` en `.env`). Actúa como proxy para `api_gestor_servicios` (inyecta la API key automáticamente).
+- **api_memoria (`memoriaClient.js`):** La comunicación desde el backend hacia el servicio de memoria se realiza **exclusivamente por WebSocket** (`ws://`, puerto 4101, path `/api/memoria`). Los endpoints HTTP del servicio de memoria se mantienen para compatibilidad con consumidores externos.
 - Todas las rutas protegidas requieren sesión activa (cookie `session_token` almacenada en el servicio de memoria `api_memoria`).
 
 ---
@@ -37,6 +38,66 @@ Endpoints del orquestador `api_gestor_servicios`. Los endpoints operativos (`/se
 - **Respuesta 200:** `{ success: true, message: "Servicio \"backend\" reiniciado", running: true }`
 - **Respuesta 404:** `{ error: "Servicio \"...\" no encontrado" }`
 - **Descripción:** Mata el proceso del servicio y lo vuelve a spawnear.
+
+---
+
+## Servicio de Memoria — Protocolo WebSocket (`api_memoria`)
+
+El servicio `api_memoria` (puerto `4101`) expone un servidor WebSocket en la misma dirección y puerto que HTTP, path `/api/memoria`.
+
+**Conexión:** `ws://localhost:4101/api/memoria`
+
+### Autenticación
+
+Al conectarse, el cliente debe enviar un mensaje `auth` como primer mensaje:
+
+```json
+{ "id": "auth_1", "type": "auth", "token": "MEMORIA_API_KEY" }
+```
+
+El servidor responde:
+```json
+{ "id": "auth_1", "type": "auth_result", "success": true }
+```
+
+Si el token es inválido, la conexión se cierra.
+
+### Formato general
+
+**Request:** `{ "id": string, "type": string, ...campos según operación }`
+**Response éxito:** `{ "id": string, "type": "${type}_result", ...datos }`
+**Response error:** `{ "id": string, "type": "error", "error": string }`
+
+El campo `id` permite correlacionar request y response; el cliente lo genera.
+
+### Operaciones
+
+| type | Campos request | Response éxito | Descripción |
+|------|---------------|----------------|-------------|
+| `set` | `namespace`, `key`, `value`, `ttl?` | `set_result: { success, namespace, key }` | Guarda un valor |
+| `get` | `namespace`, `key` | `get_result: { namespace, key, value }` | Obtiene un valor |
+| `del` | `namespace`, `key` | `del_result: { success }` | Elimina una clave |
+| `keys` | `namespace` | `keys_result: { namespace, keys: [...] }` | Lista claves de un namespace |
+| `clear` | `namespace` | `clear_result: { success }` | Elimina todo un namespace |
+| `expire` | `namespace`, `key`, `ttl` | `expire_result: { success, namespace, key, expiresAt }` | Asigna TTL a una clave |
+| `health` | — | `health_result: { status: "ok" }` | Health check |
+
+### Ejemplos
+
+```json
+→ { "id": "r1", "type": "set", "namespace": "session", "key": "abc-123", "value": { "userId": 1 }, "ttl": 86400 }
+← { "id": "r1", "type": "set_result", "success": true, "namespace": "session", "key": "abc-123" }
+
+→ { "id": "r2", "type": "get", "namespace": "session", "key": "abc-123" }
+← { "id": "r2", "type": "get_result", "namespace": "session", "key": "abc-123", "value": { "userId": 1 } }
+
+→ { "id": "r3", "type": "del", "namespace": "session", "key": "abc-123" }
+← { "id": "r3", "type": "del_result", "success": true }
+```
+
+### Cliente interno
+
+El backend se comunica con `api_memoria` exclusivamente por WebSocket a través de `backend/src/services/memoriaClient.js`. Los endpoints HTTP REST de `api_memoria` se mantienen para consumidores externos.
 
 ---
 
@@ -396,6 +457,32 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 
 ---
 
+## Archivos (`/api/archivos`)
+
+### `GET /api/archivos`
+- **Auth:** Requerida
+- **Query:** `proyecto_id` (opcional), `chat_session_id` (opcional)
+- **Descripción:** Lista los archivos almacenados, filtrados opcionalmente por proyecto o sesión de chat. Ordenados por fecha descendente.
+- **Respuesta 200:** `{ archivos: [{ id, proyecto_id, chat_session_id, nombre_original, nombre_storage, tipo, tamano, created_at }] }`
+
+### `DELETE /api/archivos/:id`
+- **Auth:** Requerida
+- **Params:** `id` — ID del archivo
+- **Descripción:** Elimina el archivo del disco y su registro en la base de datos.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 404:** `{ error: "Archivo no encontrado" }`
+
+### `POST /api/navegador/capturar-pantalla`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number, fullpage?: boolean }`
+- **Descripción:** Toma una captura de pantalla del navegador activo via Playwright, la guarda en `uploads/archivos/` y crea un registro en la tabla `archivos` vinculado al proyecto de la sesión de chat. La sesión debe tener un proyecto asignado.
+- **Respuesta 200:** `{ success: true, archivo: { id, proyecto_id, chat_session_id, nombre_original, nombre_storage, tipo, tamano, created_at } }`
+- **Respuesta 400:** `{ error: "La sesión de chat no está vinculada a un proyecto." }` o `{ error: "No hay sesión de navegador activa." }`
+- **Respuesta 404:** `{ error: "Sesión de chat no encontrada" }`
+- **Respuesta 502:** `{ error: "Servicio Playwright no disponible" }`
+
+---
+
 ## Servicio Playwright (servidor separado, puerto `4098`)
 
 ### `GET /api/health`
@@ -410,6 +497,7 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
   | `go_to_url` | `{ id_session?, url }` | `{ success: true, id_session }` |
   | `set_headless` | `{ headless: boolean\|"0"\|"1" }` | `{ success: true, reiniciado, id_session?, headless }` |
   | `close` | `{ id_session }` | `{ success: true }` |
+| `take_screenshot` | `{ id_session?, fullpage? }` | `{ success: true, id_session, fullpage, image_base64 (string), size (bytes) }` |
   | `extract_form_controls` | `{ id_session? }` | `{ success: true, id_session, url, title, forms, controls }` |
 
 ---

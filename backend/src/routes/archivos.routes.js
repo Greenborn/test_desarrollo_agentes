@@ -1,0 +1,69 @@
+import { Router } from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import db from '../config/db.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const STORAGE_DIR = path.resolve(__dirname, '../../../uploads/archivos');
+
+const router = Router();
+
+function authGuard(req, res) {
+  if (!req.session?.userId) {
+    res.status(401).json({ error: 'Sesión no válida' });
+    return false;
+  }
+  return true;
+}
+
+function ensureStorageDir() {
+  if (!fs.existsSync(STORAGE_DIR)) {
+    fs.mkdirSync(STORAGE_DIR, { recursive: true });
+  }
+}
+
+router.get('/', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { proyecto_id, chat_session_id } = req.query;
+    let query = db('archivos').orderBy('created_at', 'desc');
+    if (proyecto_id) {
+      query = query.where({ proyecto_id });
+    }
+    if (chat_session_id) {
+      query = query.where({ chat_session_id });
+    }
+    const archivos = await query.select('*');
+    res.json({ archivos });
+  } catch (err) {
+    console.log('Error al listar archivos:', err.message);
+    res.status(500).json({ archivos: [], error: err.message });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const archivo = await db('archivos').where({ id: req.params.id }).first();
+    if (!archivo) {
+      return res.status(404).json({ error: 'Archivo no encontrado' });
+    }
+    const filePath = path.join(STORAGE_DIR, archivo.nombre_storage);
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (fsErr) {
+      console.log('Error al eliminar archivo del disco:', fsErr.message);
+    }
+    await db('archivos').where({ id: req.params.id }).del();
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al eliminar archivo:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+export { STORAGE_DIR, ensureStorageDir };
+export default router;

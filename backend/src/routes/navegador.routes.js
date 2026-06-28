@@ -1,5 +1,13 @@
 import { Router } from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import playwrightManager from '../services/playwrightManager.js';
+import db from '../config/db.js';
+import { STORAGE_DIR, ensureStorageDir } from './archivos.routes.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const router = Router();
 
@@ -44,6 +52,9 @@ router.get('/status', async (req, res) => {
       return res.json({ hasActiveSession: false });
     }
     const data = await pwRes.json();
+    if (data.hasActiveSession) {
+      data.originalSessionId = data.chatSessionId || null;
+    }
     res.json(data);
   } catch (err) {
     console.log('Error al verificar estado del navegador:', err.message);
@@ -60,9 +71,25 @@ router.post('/command', async (req, res) => {
   }
 
   try {
-    const commandText = `Navegador: ${comando}${parametros ? ' ' + JSON.stringify(parametros) : ''}`;
+    // Determinar la sesión de chat a la que asociar los mensajes
+    let targetSessionId = sessionId;
 
-    await saveToChat(sessionId, 'command', `[navegador] ${comando}`);
+    // Para comandos que actúan sobre un navegador existente, obtener el chatSessionId original
+    if (comando !== 'start' && comando !== 'close_all') {
+      try {
+        const statusRes = await fetch(`${playwrightManager.baseUrl()}/api/status`);
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          if (statusData.hasActiveSession && statusData.chatSessionId) {
+            targetSessionId = statusData.chatSessionId;
+          }
+        }
+      } catch (err) {
+        console.log('[navegador] Error al obtener status del navegador:', err.message);
+      }
+    }
+
+    await saveToChat(targetSessionId, 'command', `[navegador] ${comando}`);
 
     const pwParametros = (comando === 'start' || comando === 'start_event_recording') ? { ...parametros, chat_session_id: sessionId } : parametros;
 
@@ -76,21 +103,108 @@ router.post('/command', async (req, res) => {
     });
     const data = await pwRes.json();
 
+    // Indicar al frontend si la sesión destino difiere de la solicitada
+    if (targetSessionId !== sessionId) {
+      data.originalSessionId = targetSessionId;
+    }
+
     if (data.error) {
-      await saveToChat(sessionId, 'result', `Error: ${data.error}`);
+      await saveToChat(targetSessionId, 'result', `Error: ${data.error}`);
     } else {
       const resultText = Object.entries(data)
         .map(([k, v]) => `${k}: ${v}`)
         .join('\n');
-      await saveToChat(sessionId, 'result', resultText || JSON.stringify(data));
+      await saveToChat(targetSessionId, 'result', resultText || JSON.stringify(data));
     }
 
-    await updateSessionTimestamp(sessionId);
+    await updateSessionTimestamp(targetSessionId);
     res.status(pwRes.status).json(data);
   } catch (err) {
     console.log('Error al conectar con servicio playwright:', err.message);
-    await saveToChat(sessionId, 'result', `Error de conexión: ${err.message}`);
+    await saveToChat(targetSessionId || sessionId, 'result', `Error de conexión: ${err.message}`);
     res.status(502).json({ error: 'Error al conectar con el servicio de navegador' });
+  }
+});
+
+router.post('/capturar-pantalla', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { sessionId, fullpage } = req.body;
+
+  if (!sessionId) {
+    return res.status(400).json({ error: 'sessionId es requerido' });
+  }
+
+  try {
+    const session = await db('chat_sessions').where({ id: sessionId }).first();
+    if (!session) {
+      return res.status(404).json({ error: 'Sesión de chat no encontrada' });
+    }
+    if (!session.proyecto_id) {
+      return res.status(400).json({ error: 'La sesión de chat no está vinculada a un proyecto. Use /chat_set_proyecto primero.' });
+    }
+
+    const statusRes = await fetch(`${playwrightManager.baseUrl()}/api/status`);
+    if (!statusRes.ok) {
+      return res.status(502).json({ error: 'Servicio Playwright no disponible' });
+    }
+    const statusData = await statusRes.json();
+    if (!statusData.hasActiveSession) {
+      return res.status(400).json({ error: 'No hay sesión de navegador activa. Use /navegador_iniciar primero.' });
+    }
+
+    await playwrightManager.ensureRunning();
+
+    const pwRes = await fetch(`${playwrightManager.baseUrl()}/api/command`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        comando: 'take_screenshot',
+        parametros: { fullpage: fullpage === true || fullpage === 'true' },
+      }),
+    });
+    const pwData = await pwRes.json();
+
+    if (pwData.error) {
+      await saveToChat(sessionId, 'result', `Error al capturar pantalla: ${pwData.error}`);
+      return res.status(500).json({ error: pwData.error });
+    }
+
+    const imageBuffer = Buffer.from(pwData.image_base64, 'base64');
+    ensureStorageDir();
+
+    const uuid = crypto.randomUUID();
+    const nombreStorage = `${uuid}_screenshot.png`;
+    const filePath = path.join(STORAGE_DIR, nombreStorage);
+    fs.writeFileSync(filePath, imageBuffer);
+
+    const [archivoId] = await db('archivos').insert({
+      proyecto_id: session.proyecto_id,
+      chat_session_id: sessionId,
+      nombre_original: `screenshot_${new Date().toISOString().slice(0, 19).replace(/[^0-9]/g, '_')}.png`,
+      nombre_storage: nombreStorage,
+      tipo: 'image/png',
+      tamano: imageBuffer.length,
+    });
+
+    const archivo = await db('archivos').where({ id: archivoId }).first();
+
+    await saveToChat(sessionId, 'command', '[navegador] capturar_pantalla');
+    await saveToChat(sessionId, 'result',
+      `Captura de pantalla guardada:\n` +
+      `  ID: ${archivo.id}\n` +
+      `  Nombre: ${archivo.nombre_original}\n` +
+      `  Tamaño: ${(archivo.tamano / 1024).toFixed(1)} KB\n` +
+      `  Proyecto: ${archivo.proyecto_id}\n` +
+      `  Fecha: ${archivo.created_at}`
+    );
+
+    await updateSessionTimestamp(sessionId);
+    res.json({ success: true, archivo });
+  } catch (err) {
+    console.log('Error en navegador/capturar-pantalla:', err.message);
+    await saveToChat(sessionId, 'result', `Error: ${err.message}`);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -99,14 +213,28 @@ router.post('/finish', async (req, res) => {
 
   const { id_session, sessionId } = req.body;
 
+  // Determinar sesión origen del navegador
+  let targetSessionId = sessionId;
+  try {
+    const statusRes = await fetch(`${playwrightManager.baseUrl()}/api/status`);
+    if (statusRes.ok) {
+      const statusData = await statusRes.json();
+      if (statusData.hasActiveSession && statusData.chatSessionId) {
+        targetSessionId = statusData.chatSessionId;
+      }
+    }
+  } catch (err) {
+    console.log('[navegador] Error al obtener status del navegador:', err.message);
+  }
+
   if (!id_session) {
     const errorMsg = 'No hay sesión de navegador activa. Usá /navegador_iniciar primero.';
-    await saveToChat(sessionId, 'result', errorMsg);
+    await saveToChat(targetSessionId, 'result', errorMsg);
     return res.status(400).json({ error: errorMsg });
   }
 
   try {
-    await saveToChat(sessionId, 'command', '[navegador] finish');
+    await saveToChat(targetSessionId, 'command', '[navegador] finish');
 
     await playwrightManager.ensureRunning();
 
@@ -118,16 +246,16 @@ router.post('/finish', async (req, res) => {
     const data = await pwRes.json();
 
     if (data.error) {
-      await saveToChat(sessionId, 'result', `Error al cerrar navegador: ${data.error}`);
+      await saveToChat(targetSessionId, 'result', `Error al cerrar navegador: ${data.error}`);
     } else {
-      await saveToChat(sessionId, 'result', `Sesión de navegador cerrada: ${targetId}`);
+      await saveToChat(targetSessionId, 'result', `Sesión de navegador cerrada: ${id_session}`);
     }
 
-    await updateSessionTimestamp(sessionId);
+    await updateSessionTimestamp(targetSessionId);
     res.status(pwRes.status).json(data);
   } catch (err) {
     console.log('Error en navegador/finish:', err.message);
-    await saveToChat(sessionId, 'result', `Error: ${err.message}`);
+    await saveToChat(targetSessionId, 'result', `Error: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });

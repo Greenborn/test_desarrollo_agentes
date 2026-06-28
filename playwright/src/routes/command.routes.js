@@ -9,7 +9,17 @@ router.get('/health', (req, res) => {
 
 router.get('/status', (req, res) => {
   const active = browserManager.getActiveSession();
-  res.json({ hasActiveSession: !!active });
+  if (active) {
+    res.json({
+      hasActiveSession: true,
+      id_session: active.id,
+      chatSessionId: active.chatSessionId,
+      instanceName: active.instanceName,
+      navegador: active.navegador,
+    });
+  } else {
+    res.json({ hasActiveSession: false });
+  }
 });
 
 router.post('/command', async (req, res) => {
@@ -177,6 +187,34 @@ router.post('/command', async (req, res) => {
       try {
         const result = await browserManager.executeAction(idSession, action);
         return res.json({ success: true, id_session: idSession, ...result });
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+
+    if (comando === 'take_screenshot') {
+      let idSession = parametros?.id_session;
+      if (!idSession) {
+        const active = browserManager.getActiveSession();
+        if (active) idSession = active.id;
+      }
+      if (!idSession) {
+        return res.status(400).json({
+          error: 'No hay sesión activa. Usá "start" primero o pasá "id_session"',
+        });
+      }
+
+      const fullpage = parametros?.fullpage === true || parametros?.fullpage === 'true';
+
+      try {
+        const buffer = await browserManager.takeScreenshot(idSession, fullpage);
+        return res.json({
+          success: true,
+          id_session: idSession,
+          fullpage,
+          image_base64: buffer.toString('base64'),
+          size: buffer.length,
+        });
       } catch (err) {
         return res.status(500).json({ error: err.message });
       }

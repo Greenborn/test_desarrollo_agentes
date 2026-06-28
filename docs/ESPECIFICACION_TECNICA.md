@@ -14,8 +14,8 @@ Orquestador de agentes IA. En su fase inicial, ofrece un chat con un agente de p
 | Driver BD | mysql2 | 3+ |
 | Frontend | Vue 3 + Vite | 3.5+ / 6+ |
 | Estilos | Bootstrap | 5.3+ |
-| Comunicación | Socket.IO | 4.8+ |
-| Autenticación | api_memoria (sesiones en servicio centralizado in-memory) | — |
+| Comunicación | HTTP REST + WebSocket (ws) | 8+ |
+| Autenticación | api_memoria (sesiones en servicio centralizado in-memory vía WebSocket) | — |
 | Chat IA | DeepSeek API (streaming) | — |
 | Encriptación | crypto (AES-256-CBC) | nativo Node |
 | **Prohibido** | TypeScript | — |
@@ -37,7 +37,7 @@ Orquestador de agentes IA. En su fase inicial, ofrece un chat con un agente de p
 - Frontend SPA se comunica **exclusivamente** por Socket.IO (sin HTTP REST)
 - Express sirve como base HTTP para montar Socket.IO y servir estáticos en producción
 - Sesiones manejadas con cookies vía api_memoria (servicio centralizado in-memory key-value con TTL)
-- Socket.IO middleware verifica sesión en cada conexión
+- `api_memoria` expone tanto HTTP REST como WebSocket en el mismo puerto. El backend se comunica **exclusivamente por WebSocket** a través de `memoriaClient.js` con reconexión automática.
 
 ## 4. Estructura del proyecto
 

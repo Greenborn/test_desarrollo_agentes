@@ -19,6 +19,7 @@ const temperatureOptions = [
 export const useOpencodeStore = defineStore('opencode', () => {
   const step = ref('idle')
   const ocSessionId = ref(null)
+  const chatSessionId = ref(null)
   const defaultModels = ref({})
   const providers = ref([])
   const savedProvider = ref('')
@@ -42,6 +43,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
     const state = {
       ocStep: step.value,
       ocSessionId: ocSessionId.value,
+      ocChatSessionId: chatSessionId.value,
       ocProvider: selectedProvider.value,
       ocModel: selectedModel.value,
       ocThinking: selectedThinking.value,
@@ -204,6 +206,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
   function finish() {
     step.value = 'idle'
     ocSessionId.value = null
+    chatSessionId.value = null
     streaming.value = false
     streamText.value = ''
     streamThinking.value = ''
@@ -224,6 +227,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
     if (!ocSid && (!ocStep || ocStep === 'idle')) return false
     step.value = ocStep || 'idle'
     ocSessionId.value = ocSid || null
+    chatSessionId.value = savedState.ocChatSessionId || null
     selectedProvider.value = savedState.ocProvider || ''
     selectedModel.value = savedState.ocModel || ''
     selectedThinking.value = savedState.ocThinking || ''
@@ -244,7 +248,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
   }
 
   return {
-    step, ocSessionId, defaultModels, providers,
+    step, ocSessionId, chatSessionId, defaultModels, providers,
     savedProvider, savedModel, savedThinking, savedMode, savedTemperature,
     selectedProvider, selectedModel, selectedThinking, selectedMode, selectedTemperature,
     streaming, streamText, streamThinking,

@@ -80,6 +80,20 @@ register({
       return `No se pudieron generar acciones a partir de los ${events.length} eventos de la grabación #${recordingId}.`
     }
 
+    // Determinar si el navegador pertenece a otra sesión de chat
+    let targetSessionId = sessionId
+    try {
+      const statusRes = await fetch('/api/navegador/status', { credentials: 'include' })
+      if (statusRes.ok) {
+        const statusData = await statusRes.json()
+        if (statusData.hasActiveSession && statusData.originalSessionId && Number(statusData.originalSessionId) !== Number(sessionId)) {
+          targetSessionId = statusData.originalSessionId
+        }
+      }
+    } catch (err) {
+      console.error('Error al verificar sesión origen del navegador:', err.message)
+    }
+
     const total = actions.length
     let ejecutadas = 0
     let errores = 0
@@ -133,9 +147,9 @@ register({
         ? { role: 'result', content: `✅ [${step}/${total}] ${label}` }
         : { role: 'result', content: `❌ [${step}/${total}] ${label} — Error: ${errorMsg}` }
 
-      chatStore.pushMessage(stepMsg, sessionId)
-      if (sessionId) {
-        chatStore._saveMessageToDb(sessionId, stepMsg)
+      chatStore.pushMessage(stepMsg, targetSessionId)
+      if (targetSessionId) {
+        chatStore._saveMessageToDb(targetSessionId, stepMsg)
       }
 
       if (i < total - 1) {

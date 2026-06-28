@@ -4,7 +4,7 @@
       <span class="priority-dot" :class="priorityClass(ticketInfo.priority_id)"></span>
       <span class="ticket-id">#{{ ticketInfo.redmine_id }}</span>
       <span class="ticket-sep text-muted">—</span>
-      <span class="ticket-subject text-truncate">{{ ticketInfo.subject }}</span>
+      <span class="ticket-subject text-truncate" :title="ticketInfo.subject">{{ truncatedSubject }}</span>
     </template>
     <span v-if="currentBranchDisplay && currentBranchDisplay !== 'Sin repo'" class="branch-name ms-2">· rama: {{ currentBranchDisplay }}</span>
     <div class="ms-auto d-flex align-items-center gap-2">
@@ -39,6 +39,12 @@ export default {
 
     const currentBranchDisplay = computed(() => gitStore.getCurrentBranch(props.activeSessionId))
 
+    const truncatedSubject = computed(() => {
+      if (!props.ticketInfo?.subject) return ''
+      const s = props.ticketInfo.subject
+      return s.length > 50 ? s.slice(0, 50) + '…' : s
+    })
+
     function priorityClass(priorityId) {
       if (!priorityId) return 'priority-none'
       if (priorityId <= 1) return 'priority-low'
@@ -57,7 +63,7 @@ export default {
       gitStore.zoomOut('chat')
     }
 
-    return { gitStore, currentBranchDisplay, priorityClass, zoomIn, zoomOut }
+    return { gitStore, currentBranchDisplay, truncatedSubject, priorityClass, zoomIn, zoomOut }
   },
 }
 </script>

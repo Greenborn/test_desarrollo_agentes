@@ -30,7 +30,7 @@
         <button class="btn btn-sm btn-outline-danger flex-shrink-0" @click="abortDeteccion">⏹ Detener</button>
       </div>
     </div>
-    <div v-if="ocStore.ocSessionId && ocStore.selectedProvider" class="border-top opencode-sticky-bar p-2" style="border-color: #75AADB; background: #0d1b2a;">
+    <div v-if="ocStore.ocSessionId && ocStore.selectedProvider && activeSessionId && ocStore.chatSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId)" class="border-top opencode-sticky-bar p-2" style="border-color: #75AADB; background: #0d1b2a;">
       <div class="d-flex gap-2 flex-wrap align-items-end">
         <div style="min-width: 150px; flex: 1;">
           <label class="small text-light-emphasis mb-1">Modelo</label>
@@ -75,7 +75,7 @@
         </div>
       </div>
     </div>
-    <DeepSeekChatFab v-if="activeSessionId && !ocStore.ocSessionId" :active-session-id="activeSessionId" @send="handleFabSend" />
+    <DeepSeekChatFab v-if="activeSessionId && (!ocStore.ocSessionId || (ocStore.chatSessionId && Number(activeSessionId) !== Number(ocStore.chatSessionId)))" :active-session-id="activeSessionId" @send="handleFabSend" />
     <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu"></div>
     <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
       <div class="context-menu-item" @click="toggleRawView(ctxMenu.msg)">{{ rawMsgKeys.has(msgKey(ctxMenu.msg)) ? '🎨 Vista formateada' : '📄 Vista texto plano' }}</div>
@@ -253,17 +253,19 @@ export default {
       }
     }
 
-    async function sendToOpencode(prompt) {
+    async function sendToOpencode(prompt, overrideSessionId) {
       if (!ocStore.selectedProvider) {
+        const sid = overrideSessionId || chat.activeSessionId
         chat.pushMessage({
           role: 'opencode_info',
           content: JSON.stringify({ type: 'info', message: 'No hay sesión OpenCode configurada. Ejecutá /dev_opencode_iniciar primero.' }),
           _key: 'info-' + Date.now(),
-        })
+        }, sid)
         return
       }
+      const targetSessionId = overrideSessionId || ocStore.chatSessionId || chat.activeSessionId
       await opencodeStreamPrompt(
-        chat.activeSessionId,
+        targetSessionId,
         prompt,
         ocStore.selectedProvider,
         ocStore.selectedModel,
@@ -382,7 +384,8 @@ export default {
 
     async function sendToOpencodeFromSticky() {
       const raw = ocInput.value.trim()
-      if (!raw || !chat.activeSessionId) return
+      const targetSessionId = ocStore.chatSessionId || chat.activeSessionId
+      if (!raw || !targetSessionId) return
       ocInput.value = ''
       const resolved = await resolveInput(raw)
       if (resolved.startsWith('/')) {
@@ -393,15 +396,15 @@ export default {
           role: 'opencode_info',
           content: JSON.stringify({ type: 'queued', message: `⏳ Mensaje encolado: "${resolved.slice(0, 80)}${resolved.length > 80 ? '...' : ''}"` }),
           _key: 'queue-' + Date.now(),
-        })
+        }, targetSessionId)
       } else {
         chat.pushMessage({
           role: 'opencode_confirmed',
           content: resolved,
           _key: 'confirmed-' + Date.now(),
-        })
-        chat._saveMessageToDb(chat.activeSessionId, { role: 'opencode_confirmed', content: resolved })
-        sendToOpencode(resolved)
+        }, targetSessionId)
+        chat._saveMessageToDb(targetSessionId, { role: 'opencode_confirmed', content: resolved })
+        sendToOpencode(resolved, targetSessionId)
       }
     }
 
@@ -2500,6 +2503,7 @@ export default {
           ocSetupData.mode = mode
           ocSetupData.temperature = temperature
           ocSetupData.prompt = prompt
+          ocStore.chatSessionId = chat.activeSessionId
           await ocStore.select('model', model)
           await ocStore.select('thinking', thinking || '')
           await ocStore.select('mode', mode)

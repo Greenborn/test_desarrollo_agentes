@@ -64,6 +64,7 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/resoluciones_get_all` | Muestra las resoluciones de pantalla configuradas | `/resoluciones_get_all` |
 | `/resolucion_get_default` | Muestra la resolución de pantalla por defecto configurada | `/resolucion_get_default` |
 | `/resolucion_set_default` | Establece la resolución de pantalla por defecto. Usa Tab para autocompletar el ID de resolución | `/resolucion_set_default --resolucion=<ID>` |
+| `/navegador_capturar_pantalla` | Toma una captura de pantalla del navegador activo y la guarda en el proyecto vinculado a la sesión actual. Requiere sesión de navegador activa y proyecto asignado a la sesión de chat | `/navegador_capturar_pantalla [--fullpage=true]` |
 
 ---
 
@@ -83,6 +84,8 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/proyecto_var_crear` | Crea una nueva variable en un proyecto. Sin `--id` usa el proyecto de la sesión actual | `/proyecto_var_crear --key=nombre --value=valor [--id=proyecto]` |
 | `/proyecto_var_actualizar` | Actualiza el valor de una variable existente en un proyecto. Sin `--id` usa el proyecto de la sesión actual | `/proyecto_var_actualizar --key=nombre --value=valor [--id=proyecto]` |
 | `/proyecto_var_eliminar` | Elimina una variable de un proyecto. Sin `--id` usa el proyecto de la sesión actual | `/proyecto_var_eliminar --key=nombre [--id=proyecto]` |
+| `/archivos_listar` | Lista los archivos del proyecto vinculado a la sesión actual o del especificado | `/archivos_listar [--id=proyecto]` |
+| `/archivos_eliminar` | Elimina un archivo del proyecto por su ID | `/archivos_eliminar --id=<id_archivo>` |
 
 ### Interpolación de variables
 

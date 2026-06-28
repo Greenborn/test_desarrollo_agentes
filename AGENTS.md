@@ -14,7 +14,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 
 - **Backend:** Node.js + Express + Knex + mysql2 + MariaDB — JavaScript puro (NO TypeScript)
 - **Frontend:** Vue 3 + Vite + Bootstrap 5 — JavaScript puro (NO TypeScript)
-- **Comunicación:** HTTP REST + SSE streaming (no WebSockets)
+- **Comunicación:** HTTP REST + SSE streaming + WebSocket (api_memoria vía ws)
 - **Autenticación:** Sesiones con cookies (api_memoria — sesiones almacenadas en servicio de memoria centralizado)
 - **Agente chat:** DeepSeek API con streaming (thinking + respuesta en vivo)
 - **Encriptación:** AES-256-CBC con clave desde `.env`
@@ -64,10 +64,13 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 │   └── src/
 │       ├── index.js       # Entrypoint (Express)
 │       └── routes/        # gastos.routes.js
-├── api_memoria/           # Servicio de memoria en caché centralizada
+├── api_memoria/           # Servicio de memoria en caché centralizada (HTTP + WebSocket)
 │   └── src/
-│       ├── index.js       # Entrypoint (Express)
+│       ├── index.js       # Entrypoint (Express + WebSocket server)
 │       ├── authMiddleware.js  # API key auth
+│       ├── wsHandler.js   # Manejador de conexiones WebSocket
+│       ├── services/
+│       │   └── memoriaStore.js  # Lógica compartida del store in-memory
 │       └── routes/        # memoria.routes.js (set/get/del/keys/clear/expire)
 ├── playwright/            # Servicio Playwright (Express wrapper)
 │   └── src/
