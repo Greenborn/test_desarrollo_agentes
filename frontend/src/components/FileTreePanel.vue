@@ -25,8 +25,7 @@
           }"
           :style="{ paddingLeft: (item.depth * 20) + 'px' }"
           :title="item.node.path"
-          @click="item.node.type === 'directory' ? handleToggleDirectory(item.node.path) : handleSelectFile(item.node.path, item.node.name)"
-          @dblclick="item.node.type === 'file' ? openFile(item.node.path) : null"
+           @click="item.node.type === 'directory' ? handleToggleDirectory(item.node.path) : handleFileClick(item.node.path, item.node.name)"
         >
           <span v-if="item.node.type === 'directory'" class="tree-toggle flex-shrink-0">
             {{ handleIsExpanded(item.node.path) ? '▾' : '▸' }}
@@ -41,7 +40,7 @@
 </template>
 
 <script>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useModalStore } from '../stores/modal.js'
 import { useFileTreeStore } from '../stores/fileTree.js'
 import FileEditorModal from './FileEditorModal.vue'
@@ -83,6 +82,7 @@ export default {
     const fileTreeStore = useFileTreeStore()
 
     const selectedFile = ref(null)
+    let clickTimer = null
 
     const tree = computed(() => props.sessionId ? fileTreeStore.getTree(props.sessionId) : null)
     const loading = computed(() => props.sessionId ? fileTreeStore.getLoading(props.sessionId) : false)
@@ -92,6 +92,19 @@ export default {
     function handleSelectFile(path, name) {
       selectedFile.value = path
       emit('file-selected', { path, name })
+    }
+
+    function handleFileClick(path, name) {
+      if (clickTimer) {
+        clearTimeout(clickTimer)
+        clickTimer = null
+        openFile(path)
+        return
+      }
+      clickTimer = setTimeout(() => {
+        clickTimer = null
+        handleSelectFile(path, name)
+      }, 250)
     }
 
     function openFile(path) {
@@ -118,6 +131,10 @@ export default {
       return props.sessionId ? fileTreeStore.isExpanded(props.sessionId, path) : false
     }
 
+    onBeforeUnmount(() => {
+      if (clickTimer) clearTimeout(clickTimer)
+    })
+
     watch(() => props.sessionId, (newId) => {
       if (newId) fileTreeStore.fetchTree(newId)
     }, { immediate: true })
@@ -125,7 +142,7 @@ export default {
     return {
       tree, loading, error, flatTree, selectedFile,
       getFileIcon, reloadTree, handleToggleDirectory, handleIsExpanded,
-      handleSelectFile, openFile,
+      handleSelectFile, handleFileClick, openFile,
     }
   },
 }

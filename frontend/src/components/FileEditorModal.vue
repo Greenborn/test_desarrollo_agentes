@@ -37,8 +37,9 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import { useFileEditorStore } from '../stores/fileEditor.js'
 import ChatFormatter from './ChatFormatter.vue'
+
+const API = '/api'
 
 export default {
   components: { ChatFormatter },
@@ -47,35 +48,78 @@ export default {
   },
   emits: ['close'],
   setup(props) {
-    const editorStore = useFileEditorStore()
+    const content = ref('')
+    const originalContent = ref('')
+    const loading = ref(false)
+    const saving = ref(false)
+    const saved = ref(false)
+    const error = ref(null)
     const editMode = ref(false)
 
+    const dirty = computed(() => content.value !== originalContent.value)
     const isMarkdown = computed(() => props.filePath.toLowerCase().endsWith('.md'))
 
     function toggleMode() {
       editMode.value = !editMode.value
     }
 
-    function save() {
-      editorStore.save(props.filePath)
+    async function loadFile(filePath) {
+      loading.value = true
+      error.value = null
+      try {
+        const res = await fetch(`${API}/command/read-file?path=${encodeURIComponent(filePath)}`, {
+          credentials: 'include',
+        })
+        const data = await res.json()
+        if (data.success) {
+          content.value = data.content
+          originalContent.value = data.content
+        } else {
+          error.value = data.error || 'Error al leer el archivo'
+        }
+      } catch (err) {
+        error.value = err.message || 'Error de conexión'
+      } finally {
+        loading.value = false
+      }
+    }
+
+    async function save() {
+      saving.value = true
+      saved.value = false
+      error.value = null
+      try {
+        const res = await fetch(`${API}/command/write-file`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ path: props.filePath, content: content.value }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          originalContent.value = content.value
+          saved.value = true
+          setTimeout(() => { saved.value = false }, 2000)
+        } else {
+          error.value = data.error || 'Error al guardar el archivo'
+        }
+      } catch (err) {
+        error.value = err.message || 'Error de conexión'
+      } finally {
+        saving.value = false
+      }
     }
 
     function reload() {
-      editorStore.loadFile(props.filePath)
+      loadFile(props.filePath)
     }
 
     onMounted(() => {
-      editorStore.reset()
-      editorStore.loadFile(props.filePath)
+      loadFile(props.filePath)
     })
 
     return {
-      content: editorStore.content,
-      loading: editorStore.loading,
-      saving: editorStore.saving,
-      saved: editorStore.saved,
-      error: editorStore.error,
-      dirty: editorStore.dirty,
+      content, loading, saving, saved, error, dirty,
       editMode, isMarkdown, toggleMode,
       save, reload,
     }
