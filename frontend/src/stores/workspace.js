@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useAuthStore } from './auth.js'
+import wsClient from '../services/wsClient.js'
 
 const API = '/api'
 
@@ -29,15 +30,11 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   async function selectWorkspaces(ids) {
     try {
       loading.value = true
-      const res = await fetch(`${API}/workspaces/select`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ workspaceIds: ids }),
-      })
-      const data = await res.json()
+      const auth = useAuthStore()
+      const data = await wsClient.send('selectWorkspaces', { sessionToken: auth.getSessionToken(), workspaceIds: ids })
       if (data.success) {
         selectedIds.value = data.workspaceIds
+        auth.setWorkspaceIds(data.workspaceIds)
       }
       return data
     } catch (err) {

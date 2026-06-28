@@ -1,6 +1,8 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { parseCommandArgs } from '../parseCommandArgs.js';
 import { useProjectVariablesStore } from '../../stores/projectVariables.js';
+import wsClient from '../../services/wsClient.js';
+import { useAuthStore } from '../../stores/auth.js';
 
 const { register } = useCommandRegistry();
 
@@ -51,19 +53,14 @@ register({
     }
 
     try {
-      const res = await fetch(
-        `/api/proyecto/${encodeURIComponent(proyectoId)}/variables/${encodeURIComponent(params.key)}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ value: params.value }),
-        },
-      )
-      if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData.error || 'Error al actualizar variable')
-      }
+      const auth = useAuthStore()
+      const data = await wsClient.send('proyectoVarActualizar', {
+        sessionToken: auth.getSessionToken(),
+        proyectoId,
+        key: params.key,
+        value: params.value,
+      })
+      if (!data.success) throw new Error(data.error || 'Error al actualizar variable')
       const pvStore = useProjectVariablesStore()
       await pvStore.loadVariables(proyectoId)
       return `Variable "${params.key}" actualizada correctamente en "${proyectoId}"`

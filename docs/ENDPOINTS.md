@@ -461,9 +461,9 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 
 ### `GET /api/archivos`
 - **Auth:** Requerida
-- **Query:** `proyecto_id` (opcional), `chat_session_id` (opcional)
-- **Descripción:** Lista los archivos almacenados, filtrados opcionalmente por proyecto o sesión de chat. Ordenados por fecha descendente.
-- **Respuesta 200:** `{ archivos: [{ id, proyecto_id, chat_session_id, nombre_original, nombre_storage, tipo, tamano, created_at }] }`
+- **Query:** `proyecto_id` (opcional), `chat_session_id` (opcional), `tipo` (opcional), `include_metadata` (opcional)
+- **Descripción:** Lista los archivos almacenados, filtrados opcionalmente por proyecto, sesión de chat o tipo MIME. Ordenados por fecha descendente. Si `include_metadata=true`, cada archivo incluye un array `metadata` con sus registros de `capturas_metadata` asociados.
+- **Respuesta 200:** `{ archivos: [{ id, proyecto_id, chat_session_id, nombre_original, nombre_storage, tipo, tamano, created_at, metadata?: [{ id, archivo_id, key, value, created_at }] }] }`
 
 ### `GET /api/archivos/:id/download`
 - **Auth:** Requerida

@@ -10,6 +10,7 @@ const cookieOpts = {
   secure: false,
   sameSite: 'lax',
   path: '/',
+  domain: 'localhost',
   maxAge: SESSION_TTL * 1000,
 };
 
@@ -78,7 +79,11 @@ function attachSessionMethods(session, req, res) {
 
 async function memoriaSession(req, res, next) {
   const cookies = parseCookies(req.headers.cookie);
-  const token = cookies[COOKIE_NAME];
+  let token = cookies[COOKIE_NAME];
+
+  if (!token) {
+    token = req.headers['x-session-token'];
+  }
 
   const sessionData = {};
 

@@ -36,6 +36,7 @@ import { parseCommandArgs } from '../composables/parseCommandArgs.js'
 import { useChatStore } from '../stores/chat.js'
 import { useWorkspaceStore } from '../stores/workspace.js'
 import { contrastTextColor } from '../utils/color.js'
+import wsClient from '../services/wsClient.js'
 import CommandInput from './CommandInput.vue'
 import LayoutControls from './LayoutControls.vue'
 import HelpContent from './HelpModal.vue'
@@ -262,18 +263,22 @@ export default {
             const projRes = await fetch(`/api/proyecto/session/${sessionId}`, { credentials: 'include' })
             const projData = await projRes.json()
             if (projData.proyectoId) {
-              const varRes = await fetch(`/api/proyecto/${encodeURIComponent(projData.proyectoId)}/variables`, { credentials: 'include' })
-              const varData = await varRes.json()
+              const auth = useAuthStore()
+              const varData = await wsClient.send('proyectoVarListar', {
+                sessionToken: auth.getSessionToken(),
+                proyectoId: projData.proyectoId,
+              })
               const existingKeys = new Set((varData.variables || []).map(v => v.key))
               const consoleVars = ['NAVEGADOR_CONSOLE_ERRORS', 'NAVEGADOR_CONSOLE_WARNS', 'NAVEGADOR_CONSOLE_LOGS', 'NAVEGADOR_NETWORK_ERRORS']
               const created = []
               for (const varKey of consoleVars) {
                 if (!existingKeys.has(varKey)) {
-                  await fetch(`/api/proyecto/${encodeURIComponent(projData.proyectoId)}/variables`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ key: varKey, value: '{}', type: 'memory' }),
+                  await wsClient.send('proyectoVarCrear', {
+                    sessionToken: auth.getSessionToken(),
+                    proyectoId: projData.proyectoId,
+                    key: varKey,
+                    value: '{}',
+                    type: 'memory',
                   })
                   created.push(varKey)
                 }
@@ -451,14 +456,15 @@ export default {
           const sessionRes = await fetch(`/api/proyecto/session/${chatStore.activeSessionId}`, { credentials: 'include' })
           const sessionData = await sessionRes.json()
           if (sessionData.proyectoId) {
+            const auth = useAuthStore()
             const consoleVars = ['NAVEGADOR_CONSOLE_ERRORS', 'NAVEGADOR_CONSOLE_WARNS', 'NAVEGADOR_CONSOLE_LOGS', 'NAVEGADOR_NETWORK_ERRORS']
             for (const varKey of consoleVars) {
               try {
-                await fetch(`/api/proyecto/${encodeURIComponent(sessionData.proyectoId)}/variables/${varKey}`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: JSON.stringify({ value: '{}' }),
+                await wsClient.send('proyectoVarActualizar', {
+                  sessionToken: auth.getSessionToken(),
+                  proyectoId: sessionData.proyectoId,
+                  key: varKey,
+                  value: '{}',
                 })
               } catch (err) {
                 console.error(`Error al limpiar ${varKey}:`, err.message)

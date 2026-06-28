@@ -1,4 +1,6 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
+import wsClient from '../../services/wsClient.js';
+import { useAuthStore } from '../../stores/auth.js';
 
 const { register } = useCommandRegistry();
 
@@ -39,14 +41,11 @@ register({
     }
 
     try {
-      const res = await fetch(`/api/proyecto/${encodeURIComponent(proyectoId)}/variables`, {
-        credentials: 'include',
+      const auth = useAuthStore()
+      const data = await wsClient.send('proyectoVarListar', {
+        sessionToken: auth.getSessionToken(),
+        proyectoId,
       })
-      if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData.error || 'Error al listar variables')
-      }
-      const data = await res.json()
 
       if (!data.variables || data.variables.length === 0) {
         return `(sin variables para el proyecto "${proyectoId}")`

@@ -56,6 +56,7 @@ import './composables/commands/peticion.js'
 import './composables/commands/archivosListar.js'
 import './composables/commands/archivosEliminar.js'
 import './composables/commands/navegadorCapturarPantalla.js'
+import './composables/commands/capturasListar.js'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -64,11 +65,17 @@ app.use(router)
 
 const originalFetch = window.fetch.bind(window)
 window.fetch = async function (url, options = {}) {
+  const auth = useAuthStore()
+  const token = auth.getSessionToken()
+  if (token) {
+    options = { ...options }
+    options.headers = options.headers ? { ...options.headers } : {}
+    options.headers['X-Session-Token'] = token
+  }
   const res = await originalFetch(url, options)
   if (res.status === 401) {
     const urlStr = (typeof url === 'string' ? url : url.url) || ''
     if (!urlStr.includes('/api/auth/')) {
-      const auth = useAuthStore()
       if (auth.user) {
         auth.forceLogout()
         router.push('/')

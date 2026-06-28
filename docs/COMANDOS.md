@@ -65,6 +65,7 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/resolucion_get_default` | Muestra la resolución de pantalla por defecto configurada | `/resolucion_get_default` |
 | `/resolucion_set_default` | Establece la resolución de pantalla por defecto. Usa Tab para autocompletar el ID de resolución | `/resolucion_set_default --resolucion=<ID>` |
 | `/navegador_capturar_pantalla` | Toma una captura de pantalla del navegador activo y la guarda en el proyecto vinculado a la sesión actual. Requiere sesión de navegador activa y proyecto asignado a la sesión de chat | `/navegador_capturar_pantalla [--fullpage=true]` |
+| `/capturas_listar` | Lista las capturas de pantalla del proyecto vinculado a la sesión de chat actual, o de un proyecto específico si se pasa como argumento. Muestra cada imagen inline con sus comentarios (`quick_notes`) | `/capturas_listar [proyecto_id]` |
 
 ---
 

@@ -26,7 +26,7 @@ function ensureStorageDir() {
 router.get('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { proyecto_id, chat_session_id, tipo } = req.query;
+    const { proyecto_id, chat_session_id, tipo, include_metadata } = req.query;
     let query = db('archivos').orderBy('created_at', 'desc');
     if (proyecto_id) {
       query = query.where({ proyecto_id });
@@ -37,7 +37,23 @@ router.get('/', async (req, res) => {
     if (tipo) {
       query = query.where({ tipo });
     }
-    const archivos = await query.select('*');
+    let archivos = await query.select('*');
+    if (include_metadata === 'true' && archivos.length > 0) {
+      const archivoIds = archivos.map(a => a.id);
+      const metadataRows = await db('capturas_metadata')
+        .whereIn('archivo_id', archivoIds)
+        .orderBy('created_at', 'asc')
+        .select('*');
+      const metadataByArchivo = {};
+      for (const row of metadataRows) {
+        if (!metadataByArchivo[row.archivo_id]) metadataByArchivo[row.archivo_id] = [];
+        metadataByArchivo[row.archivo_id].push({ id: row.id, key: row.key, value: row.value, created_at: row.created_at });
+      }
+      archivos = archivos.map(a => ({
+        ...a,
+        metadata: metadataByArchivo[a.id] || [],
+      }));
+    }
     res.json({ archivos });
   } catch (err) {
     console.log('Error al listar archivos:', err.message);

@@ -1,4 +1,6 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
+import wsClient from '../../services/wsClient.js';
+import { useAuthStore } from '../../stores/auth.js';
 
 const { register } = useCommandRegistry();
 
@@ -16,12 +18,13 @@ register({
 
     if (proyectoId) {
       try {
-        const res = await fetch(`/api/proyecto/${encodeURIComponent(proyectoId)}/variables`, {
-          credentials: 'include',
+        const auth = useAuthStore()
+        const data = await wsClient.send('proyectoVarListar', {
+          sessionToken: auth.getSessionToken(),
+          proyectoId,
         })
-        if (res.ok) {
-          const data = await res.json()
-          const peticionVar = (data.variables || []).find(v => v.key === 'peticion_datos')
+        if (data.variables) {
+          const peticionVar = data.variables.find(v => v.key === 'peticion_datos')
           if (peticionVar && peticionVar.value) {
             initialData = JSON.parse(peticionVar.value)
           }

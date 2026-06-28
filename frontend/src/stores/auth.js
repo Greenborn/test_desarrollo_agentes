@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useTicketStore } from './ticket.js'
 import { useProjectStore } from './project.js'
+import wsClient from '../services/wsClient.js'
 
 const API = '/api'
 
@@ -9,6 +10,12 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
   const loading = ref(true)
   const error = ref('')
+
+  let sessionToken = null
+
+  function getSessionToken() {
+    return sessionToken
+  }
 
   function getWorkspaceIds() {
     return user.value?.workspaceIds || []
@@ -21,6 +28,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function forceLogout() {
     user.value = null
+    sessionToken = null
     loading.value = false
     error.value = ''
   }
@@ -46,9 +54,13 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function checkSession() {
     try {
-      const res = await fetch(`${API}/auth/me`, { credentials: 'include' })
-      const data = await res.json()
-      user.value = data
+      const data = await wsClient.send('checkSession', { sessionToken })
+      if (data.success && data.user) {
+        sessionToken = data.sessionToken
+        user.value = data.user
+      } else {
+        user.value = null
+      }
     } catch (err) {
       console.error('Error en checkSession:', err)
       user.value = null
@@ -61,19 +73,24 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
     loading.value = true
     try {
-      const res = await fetch(`${API}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username, password }),
-      })
-      const data = await res.json()
+      const data = await wsClient.send('login', { username, password })
       if (data.success) {
+        sessionToken = data.sessionToken
+        try {
+          await fetch(`${API}/auth/apply-session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ sessionToken }),
+          })
+        } catch (err) {
+          console.error('Error al aplicar sesión:', err)
+        }
         user.value = data.user
       } else {
-        error.value = data.error
+        error.value = data.error || 'Credenciales inválidas'
       }
-    } catch {
+    } catch (err) {
       error.value = 'Error de conexión'
     } finally {
       loading.value = false
@@ -82,16 +99,15 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     try {
-      await fetch(`${API}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      })
+      await wsClient.send('logout', { sessionToken })
     } catch (err) {
       console.error('Error en logout:', err)
     }
+    sessionToken = null
     user.value = null
     loading.value = false
+    document.cookie = 'session_token=; path=/; max-age=0; SameSite=Lax'
   }
 
-  return { user, loading, error, getWorkspaceIds, getPrimaryWorkspaceId, activeWorkspaceId, forceLogout, setWorkspaceIds, login, logout, checkSession }
+  return { user, loading, error, getSessionToken, getWorkspaceIds, getPrimaryWorkspaceId, activeWorkspaceId, forceLogout, setWorkspaceIds, login, logout, checkSession }
 })

@@ -27,6 +27,7 @@ import archivosRoutes, { ensureStorageDir } from './routes/archivos.routes.js';
 import opencode from './services/opencode.js';
 import * as devInstanceManager from './services/devInstanceManager.js';
 import memoriaClient from './services/memoriaClient.js';
+import { setupFrontendWebSocket } from './services/frontendWsServer.js';
 import db from './config/db.js';
 
 const PORT = process.env.PORT;
@@ -74,6 +75,7 @@ async function start() {
   }
 
   const server = http.createServer(app);
+  setupFrontendWebSocket(server);
   server.listen(PORT, (err) => {
     if (err) {
       console.log('Error al iniciar servidor:', err.message);

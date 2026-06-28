@@ -1,6 +1,8 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { parseCommandArgs } from '../parseCommandArgs.js';
 import { useProjectVariablesStore } from '../../stores/projectVariables.js';
+import wsClient from '../../services/wsClient.js';
+import { useAuthStore } from '../../stores/auth.js';
 
 const { register } = useCommandRegistry();
 
@@ -51,16 +53,14 @@ register({
     }
 
     try {
-      const res = await fetch(`/api/proyecto/${encodeURIComponent(proyectoId)}/variables`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ key: params.key, value: params.value }),
+      const auth = useAuthStore()
+      const data = await wsClient.send('proyectoVarCrear', {
+        sessionToken: auth.getSessionToken(),
+        proyectoId,
+        key: params.key,
+        value: params.value,
       })
-      if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData.error || 'Error al crear variable')
-      }
+      if (!data.success) throw new Error(data.error || 'Error al crear variable')
       const pvStore = useProjectVariablesStore()
       await pvStore.loadVariables(proyectoId)
       return `Variable "${params.key}" creada correctamente en "${proyectoId}"`

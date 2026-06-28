@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import wsClient from '../services/wsClient.js'
+import { useAuthStore } from './auth.js'
 
 export const useProjectVariablesStore = defineStore('projectVariables', () => {
   const variablesByProject = ref({})
@@ -9,14 +11,11 @@ export const useProjectVariablesStore = defineStore('projectVariables', () => {
     if (!proyectoId) return
     loadingByProject.value[proyectoId] = true
     try {
-      const res = await fetch(`/api/proyecto/${encodeURIComponent(proyectoId)}/variables`, {
-        credentials: 'include',
+      const auth = useAuthStore()
+      const data = await wsClient.send('proyectoVarListar', {
+        sessionToken: auth.getSessionToken(),
+        proyectoId,
       })
-      if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData.error || 'Error al cargar variables')
-      }
-      const data = await res.json()
       variablesByProject.value[proyectoId] = data.variables || []
     } catch (err) {
       console.error('Error en loadVariables:', err.message)
@@ -38,29 +37,30 @@ export const useProjectVariablesStore = defineStore('projectVariables', () => {
 
   async function saveVariable(proyectoId, key, value) {
     if (!proyectoId) return
+    const auth = useAuthStore()
     const existing = (variablesByProject.value[proyectoId] || []).find(v => v.key === key)
-    const url = existing
-      ? `/api/proyecto/${encodeURIComponent(proyectoId)}/variables/${encodeURIComponent(key)}`
-      : `/api/proyecto/${encodeURIComponent(proyectoId)}/variables`
-    const method = existing ? 'PUT' : 'POST'
-    const payload = existing ? { value } : { key, value, type: 'db' }
     try {
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData.error || 'Error al guardar variable')
-      }
       if (existing) {
+        const data = await wsClient.send('proyectoVarActualizar', {
+          sessionToken: auth.getSessionToken(),
+          proyectoId,
+          key,
+          value,
+        })
+        if (!data.success) throw new Error(data.error || 'Error al actualizar variable')
         const idx = variablesByProject.value[proyectoId].findIndex(v => v.key === key)
         if (idx !== -1) {
           variablesByProject.value[proyectoId][idx].value = value
         }
       } else {
+        const data = await wsClient.send('proyectoVarCrear', {
+          sessionToken: auth.getSessionToken(),
+          proyectoId,
+          key,
+          value,
+          type: 'db',
+        })
+        if (!data.success) throw new Error(data.error || 'Error al crear variable')
         variablesByProject.value[proyectoId].push({ key, value, type: 'db' })
       }
     } catch (err) {

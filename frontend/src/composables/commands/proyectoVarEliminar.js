@@ -1,6 +1,8 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { parseCommandArgs } from '../parseCommandArgs.js';
 import { useProjectVariablesStore } from '../../stores/projectVariables.js';
+import wsClient from '../../services/wsClient.js';
+import { useAuthStore } from '../../stores/auth.js';
 
 const { register } = useCommandRegistry();
 
@@ -48,17 +50,13 @@ register({
     }
 
     try {
-      const res = await fetch(
-        `/api/proyecto/${encodeURIComponent(proyectoId)}/variables/${encodeURIComponent(params.key)}`,
-        {
-          method: 'DELETE',
-          credentials: 'include',
-        },
-      )
-      if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData.error || 'Error al eliminar variable')
-      }
+      const auth = useAuthStore()
+      const data = await wsClient.send('proyectoVarEliminar', {
+        sessionToken: auth.getSessionToken(),
+        proyectoId,
+        key: params.key,
+      })
+      if (!data.success) throw new Error(data.error || 'Error al eliminar variable')
       const pvStore = useProjectVariablesStore()
       await pvStore.loadVariables(proyectoId)
       return `Variable "${params.key}" eliminada correctamente de "${proyectoId}"`

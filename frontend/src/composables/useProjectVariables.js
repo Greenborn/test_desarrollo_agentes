@@ -1,15 +1,15 @@
+import wsClient from '../services/wsClient.js';
+import { useAuthStore } from '../stores/auth.js';
+
 export function useProjectVariables() {
   async function getVariables(proyectoId) {
     if (!proyectoId) return [];
     try {
-      const res = await fetch(`/api/proyecto/${encodeURIComponent(proyectoId)}/variables`, {
-        credentials: 'include',
+      const auth = useAuthStore();
+      const data = await wsClient.send('proyectoVarListar', {
+        sessionToken: auth.getSessionToken(),
+        proyectoId,
       });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Error al obtener variables');
-      }
-      const data = await res.json();
       return data.variables || [];
     } catch (err) {
       console.error('Error en getVariables:', err.message);

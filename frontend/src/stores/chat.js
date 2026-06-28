@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useAuthStore } from './auth.js'
+import wsClient from '../services/wsClient.js'
 
 const API = '/api'
 const SESSION_KEY = 'oc_active_session_id'
@@ -239,11 +240,12 @@ export const useChatStore = defineStore('chat', () => {
     if (_saveTimer) clearTimeout(_saveTimer)
     _saveTimer = setTimeout(async () => {
       try {
-        await fetch(`${API}/state/ui`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ state: { activeSessionId: activeSessionId.value } }),
+        const auth = useAuthStore()
+        await wsClient.send('memoria:set', {
+          namespace: 'ui_state',
+          key: `user_${auth.user?.id}`,
+          value: { activeSessionId: activeSessionId.value },
+          ttl: 86400,
         })
       } catch (err) {
         console.error('Error saving UI state:', err)
