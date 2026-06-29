@@ -6,6 +6,13 @@
         <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
       </div>
       <div v-else class="messages-list p-3">
+        <div v-if="loadingMore" class="text-center text-muted small py-2">
+          <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+          Cargando mensajes anteriores...
+        </div>
+        <div v-if="!loadingMore && !hasMoreMessages && messages.length > 50" class="text-center text-muted small py-1">
+          — Todos los mensajes cargados —
+        </div>
         <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
         <div v-if="streaming" class="text-start mb-3">
           <div class="d-inline-block rounded-3 p-3 text-start" style="max-width: 80%; background: #1a2744; border: 1px solid #374151; color: #e0e0e0;">
@@ -122,7 +129,7 @@ export default {
     const gitStore = useGitStore()
     const { find } = useCommandRegistry()
     const { getVariables, interpolate } = useProjectVariables()
-    const { activeSessionId, messages, streaming, executing, currentChunk, currentThinking, sessions } = storeToRefs(chat)
+    const { activeSessionId, messages, streaming, executing, currentChunk, currentThinking, sessions, loadingMore, hasMoreMessages } = storeToRefs(chat)
     const input = ref('')
     const ocInput = ref('')
     const messagesContainer = ref(null)
@@ -3165,8 +3172,17 @@ export default {
     }
 
     let resizeObserver = null
+    const _isNearBottom = ref(true)
 
-    async function scrollToBottom() {
+    function checkNearBottom() {
+      const el = messagesContainer.value
+      if (!el) return true
+      const gap = el.scrollHeight - el.scrollTop - el.clientHeight
+      return gap < 200
+    }
+
+    async function scrollToBottom(force = false) {
+      if (!force && !_isNearBottom.value) return
       await nextTick()
       await new Promise((resolve) => requestAnimationFrame(resolve))
       if (messagesContainer.value) {
@@ -3179,13 +3195,29 @@ export default {
       }, 100)
     }
 
-    watch(messages, scrollToBottom, { deep: true })
-    watch([currentChunk, ocChunk], scrollToBottom)
+    async function onScrollLoadMore() {
+      const el = messagesContainer.value
+      if (!el) return
+
+      _isNearBottom.value = checkNearBottom()
+
+      if (el.scrollTop === 0 && !loadingMore.value && hasMoreMessages.value && activeSessionId.value) {
+        const oldScrollHeight = el.scrollHeight
+        await chat.loadMoreMessages(activeSessionId.value)
+        await nextTick()
+        if (messagesContainer.value) {
+          messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight - oldScrollHeight
+        }
+      }
+    }
+
+    watch(messages, () => scrollToBottom(false), { deep: true })
+    watch([currentChunk, ocChunk], () => scrollToBottom(false))
 
     watch(activeSessionId, () => {
       loadTicketInfo()
       fetchGitBranch()
-      scrollToBottom()
+      scrollToBottom(true)
     })
 
     watch(() => cmdStore.currentDir, () => {
@@ -3205,11 +3237,12 @@ export default {
     onMounted(async () => {
       if (messagesContainer.value) {
         resizeObserver = new ResizeObserver(() => {
-          if (messagesContainer.value) {
+          if (messagesContainer.value && _isNearBottom.value) {
             messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
           }
         })
         resizeObserver.observe(messagesContainer.value)
+        messagesContainer.value.addEventListener('scroll', onScrollLoadMore)
       }
       loadTicketInfo()
       loadZoom()
@@ -3219,6 +3252,9 @@ export default {
 
     onUnmounted(() => {
       if (resizeObserver) resizeObserver.disconnect()
+      if (messagesContainer.value) {
+        messagesContainer.value.removeEventListener('scroll', onScrollLoadMore)
+      }
     })
 
     return {
@@ -3261,6 +3297,8 @@ export default {
       messagesContainer,
       ticketInfo,
       gitStore,
+      loadingMore,
+      hasMoreMessages,
     }
   },
 }

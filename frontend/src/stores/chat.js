@@ -19,6 +19,9 @@ export const useChatStore = defineStore('chat', () => {
   const currentChunk = ref('')
   const currentThinking = ref('')
   const pendingNotifications = ref({})
+  const loadingMore = ref(false)
+  const hasMoreMessages = ref(true)
+  const oldestMessageId = ref(null)
   const sessionTickets = ref({})
   const _sessionStreamCache = ref({})
   const _ocSessionStreamCache = ref({})
@@ -257,6 +260,9 @@ export const useChatStore = defineStore('chat', () => {
     activeSessionId.value = sessionId
     messages.value = []
     clearPendingNotification(sessionId)
+    loadingMore.value = false
+    hasMoreMessages.value = true
+    oldestMessageId.value = null
     const cache = _sessionStreamCache.value[sessionId]
     if (cache && _streamingSessions.value[sessionId]) {
       currentChunk.value = cache.chunk || ''
@@ -266,7 +272,7 @@ export const useChatStore = defineStore('chat', () => {
       currentThinking.value = ''
     }
     try {
-      const res = await fetch(`${API}/chat/sessions/${sessionId}/messages`, { credentials: 'include' })
+      const res = await fetch(`${API}/chat/sessions/${sessionId}/messages?limit=50`, { credentials: 'include' })
       const data = await res.json()
       if (data.error) {
         console.error('Error al cargar mensajes:', data.error)
@@ -278,10 +284,16 @@ export const useChatStore = defineStore('chat', () => {
             try {
               const parsed = JSON.parse(m.content)
               m.controlData = parsed
-            } catch {}
+            } catch {
+              // malformed controlData saved in DB, skip silently
+            }
           }
           return m
         })
+        hasMoreMessages.value = data.hasMore !== false
+        if (messages.value.length > 0) {
+          oldestMessageId.value = messages.value[0].id
+        }
       }
       const ocCache = _ocSessionStreamCache.value[sessionId]
       if (ocCache && _ocStreamingSessions.value[sessionId]) {
@@ -295,6 +307,43 @@ export const useChatStore = defineStore('chat', () => {
       }
     } catch (err) {
       console.error('Error al cargar mensajes:', err)
+    }
+  }
+
+  async function loadMoreMessages(sessionId) {
+    if (loadingMore.value || !hasMoreMessages.value || !oldestMessageId.value) return
+    loadingMore.value = true
+    try {
+      const res = await fetch(`${API}/chat/sessions/${sessionId}/messages?limit=50&before=${oldestMessageId.value}`, { credentials: 'include' })
+      const data = await res.json()
+      if (data.error) {
+        console.error('Error al cargar más mensajes:', data.error)
+        return
+      }
+      if (Number(data.sessionId) === Number(activeSessionId.value)) {
+        const mapped = data.messages.map(m => {
+          if (m.role === 'opencode_control' && !m.controlData && typeof m.content === 'string') {
+            try {
+              const parsed = JSON.parse(m.content)
+              m.controlData = parsed
+            } catch {
+              // malformed controlData saved in DB, skip silently
+            }
+          }
+          return m
+        })
+        messages.value = [...mapped, ...messages.value]
+        hasMoreMessages.value = data.hasMore !== false
+        if (mapped.length > 0) {
+          oldestMessageId.value = mapped[0].id
+        } else {
+          hasMoreMessages.value = false
+        }
+      }
+    } catch (err) {
+      console.error('Error al cargar más mensajes:', err)
+    } finally {
+      loadingMore.value = false
     }
   }
 
@@ -605,7 +654,8 @@ export const useChatStore = defineStore('chat', () => {
     sessions, activeSessionId, messages,
     streaming, creating, executing, sessionStatus, currentChunk, currentThinking,
     pendingNotifications,
-    loadSessions, createSession, createSessionIfNeeded, runCommand, loadMessages,
+    loadSessions, createSession, createSessionIfNeeded, runCommand, loadMessages, loadMoreMessages,
+    loadingMore, hasMoreMessages,
     sendMessage, deleteMessage, deleteSession, clearMessages, stopAllExecutions,
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
     setOcStreaming, updateOcStreamCache, clearOcStreamCache,

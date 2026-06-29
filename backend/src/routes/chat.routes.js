@@ -71,14 +71,38 @@ router.post('/sessions', async (req, res) => {
 router.get('/sessions/:id/messages', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const messages = await db('chat_messages')
-      .where({ session_id: req.params.id })
-      .orderBy('created_at', 'asc')
+    const sessionId = req.params.id;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const before = req.query.before ? parseInt(req.query.before) : null;
+
+    const query = db('chat_messages')
+      .where({ session_id: sessionId })
       .select('id', 'role', 'content', 'thinking', 'created_at');
-    res.json({ sessionId: Number(req.params.id), messages });
+
+    if (before) {
+      query.andWhere('id', '<', before);
+    }
+
+    const rows = await query
+      .orderBy('id', 'desc')
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    if (hasMore) rows.pop();
+
+    const messages = rows.reverse();
+
+    // Only count total on first page
+    let total = null;
+    if (!before) {
+      const [{ count }] = await db('chat_messages').where({ session_id: sessionId }).count('* as count');
+      total = Number(count);
+    }
+
+    res.json({ sessionId: Number(sessionId), messages, hasMore, total });
   } catch (err) {
     console.log('Error al cargar mensajes:', err.message);
-    res.status(500).json({ sessionId: Number(req.params.id), messages: [], error: err.message });
+    res.status(500).json({ sessionId: Number(req.params.id), messages: [], hasMore: false, total: 0, error: err.message });
   }
 });
 
