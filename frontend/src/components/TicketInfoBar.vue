@@ -1,10 +1,10 @@
 <template>
-  <div v-if="activeSessionId" class="ticket-info-bar px-3 d-flex align-items-center gap-2" :class="ticketInfo ? priorityClass(ticketInfo.priority_id) : 'priority-none'">
+  <div v-if="activeSessionId" class="ticket-info-bar px-3 d-flex align-items-center gap-2 flex-wrap" :class="ticketInfo ? priorityClass(ticketInfo.priority_id) : 'priority-none'">
     <template v-if="ticketInfo">
       <span class="priority-dot" :class="priorityClass(ticketInfo.priority_id)"></span>
       <span class="ticket-id">#{{ ticketInfo.redmine_id }}</span>
       <span class="ticket-sep text-muted">—</span>
-      <span class="ticket-subject text-truncate" :title="ticketInfo.subject">{{ truncatedSubject }}</span>
+      <span class="ticket-subject" :title="ticketInfo.subject">{{ truncatedSubject }}</span>
     </template>
     <span v-if="currentBranchDisplay && currentBranchDisplay !== 'Sin repo'" class="branch-name ms-2">· rama: {{ currentBranchDisplay }}</span>
     <div class="ms-auto d-flex align-items-center gap-2">
@@ -75,6 +75,7 @@ export default {
   font-size: 0.8rem;
   color: #9ca3af;
   min-height: 32px;
+  height: auto;
   flex-shrink: 0;
   transition: background 0.2s, border-color 0.2s;
 }
@@ -110,7 +111,9 @@ export default {
 }
 .ticket-subject {
   color: #e0e0e0;
+  min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ticket-sep {

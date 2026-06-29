@@ -192,6 +192,99 @@ router.post('/sessions/:id/messages', async (req, res) => {
   }
 });
 
+router.post('/sessions/:id/agent-documentacion', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const sessionId = req.params.id;
+  const { noteContent, systemPrompt } = req.body;
+  if (!noteContent || !systemPrompt) {
+    return res.status(400).json({ error: 'noteContent y systemPrompt requeridos' });
+  }
+
+  try {
+    const session = await db('chat_sessions').where({ id: sessionId, user_id: req.session.userId }).first();
+    if (!session) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+
+    await db('chat_messages').insert({
+      session_id: sessionId,
+      role: 'user',
+      content: `[AGENTE DOCUMENTACIÓN]\n\n${noteContent}`,
+    });
+    await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+
+    const wsId = session.workspace_id || (req.session.workspaceIds || [1])[0] || 1;
+    let fullThinking = '';
+    let fullResponse = '';
+    let usageData = null;
+
+    for await (const chunk of streamChat(
+      [{ role: 'user', content: noteContent }],
+      wsId,
+      systemPrompt
+    )) {
+      if (chunk.type === 'usage') {
+        usageData = chunk;
+        continue;
+      }
+      if (chunk.type === 'thinking') {
+        fullThinking += chunk.content;
+      } else if (chunk.type === 'response') {
+        fullResponse += chunk.content;
+      }
+      res.write(`data: ${JSON.stringify({ ...chunk, sessionId })}\n\n`);
+    }
+
+    await db('chat_messages').insert({
+      session_id: sessionId,
+      role: 'assistant',
+      content: fullResponse,
+      thinking: fullThinking || null,
+    });
+    await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
+
+    if (usageData) {
+      try {
+        const chatSess = await db('chat_sessions').where({ id: sessionId }).select('proyecto_id').first();
+        const idProyecto = chatSess?.proyecto_id;
+        if (idProyecto) {
+          const gastosPort = process.env.SERVICIO_GASTOS_PORT || 4100;
+          const precio = (usageData.completion_tokens || 0) * 0.0000011;
+          await fetch(`http://localhost:${gastosPort}/api/gastos/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id_chat_session: parseInt(sessionId),
+              id_proyecto: idProyecto,
+              precio: precio,
+              tokens: usageData.total_tokens || 0,
+            }),
+          });
+        }
+      } catch (e) {
+        console.log('[gastos] error al registrar en agente documentación:', e.message);
+      }
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'done', sessionId })}\n\n`);
+    res.end();
+  } catch (err) {
+    console.log('Error en agente documentación:', err.message);
+    if (res.headersSent) {
+      res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
+      res.end();
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
 router.post('/sessions/:id/save-messages', async (req, res) => {
   if (!authGuard(req, res)) return;
   const { messages } = req.body;

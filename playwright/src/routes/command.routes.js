@@ -254,6 +254,63 @@ router.post('/command', async (req, res) => {
       return res.json({ success: true });
     }
 
+    if (comando === 'evaluate_selector') {
+      let idSession = parametros?.id_session;
+      if (!idSession) {
+        const active = browserManager.getActiveSession();
+        if (active) idSession = active.id;
+      }
+      if (!idSession) {
+        return res.status(400).json({
+          error: 'No hay sesión activa. Usá "start" primero o pasá "id_session"',
+        });
+      }
+
+      const selector = parametros?.selector;
+      if (!selector) {
+        return res.status(400).json({ error: 'Parámetro "selector" es requerido' });
+      }
+
+      const extractType = parametros?.extract_type || 'text';
+      const attributeName = parametros?.attribute_name || null;
+
+      try {
+        const result = await browserManager.evaluateSelector(idSession, selector, extractType, attributeName);
+        return res.json({ success: true, id_session: idSession, selector, extract_type: extractType, ...result });
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+
+    if (comando === 'simulate_event') {
+      let idSession = parametros?.id_session;
+      if (!idSession) {
+        const active = browserManager.getActiveSession();
+        if (active) idSession = active.id;
+      }
+      if (!idSession) {
+        return res.status(400).json({
+          error: 'No hay sesión activa. Usá "start" primero o pasá "id_session"',
+        });
+      }
+
+      const selector = parametros?.selector;
+      if (!selector) {
+        return res.status(400).json({ error: 'Parámetro "selector" es requerido' });
+      }
+
+      const eventType = parametros?.event_type || 'click';
+      const eventInit = parametros?.event_init || {};
+
+      try {
+        const action = { type: 'dispatch_event', selector, eventType, eventInit };
+        const result = await browserManager.executeAction(idSession, action);
+        return res.json({ success: true, id_session: idSession, selector, event_type: eventType, ...result });
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
+      }
+    }
+
     return res.status(400).json({ error: `Comando desconocido: "${comando}"` });
   } catch (err) {
     console.log('Error en /api/command:', err.message);

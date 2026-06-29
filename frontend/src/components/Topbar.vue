@@ -527,6 +527,10 @@ export default {
           })
           const data = await res.json()
           if (data.success) {
+            if (data.workspaceIds) {
+              wsStore.selectedIds = data.workspaceIds
+              auth.setWorkspaceIds(data.workspaceIds)
+            }
             await chatStore.loadSessions()
             return `Proyecto "${proyectoId}" seleccionado.`
           }

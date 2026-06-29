@@ -21,6 +21,7 @@ import { useChatStore } from '../stores/chat.js'
 import { useCommandStore } from '../stores/command.js'
 import { useProjectStore } from '../stores/project.js'
 import { useAuthStore } from '../stores/auth.js'
+import { useWorkspaceStore } from '../stores/workspace.js'
 
 export default {
   emits: ['close'],
@@ -48,12 +49,18 @@ export default {
         }
         const sessionId = chatStore.activeSessionId
         if (sessionId) {
-          await fetch('/api/proyecto/session', {
+          const pres = await fetch('/api/proyecto/session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ sessionId, proyectoId: proyectoId.value, cwd: cmdStore.currentDir || undefined }),
           })
+          const pdata = await pres.json()
+          if (pdata.workspaceIds) {
+            const wsStore = useWorkspaceStore()
+            wsStore.selectedIds = pdata.workspaceIds
+            auth.setWorkspaceIds(pdata.workspaceIds)
+          }
         }
         chatStore.pushMessage({
           role: 'command',

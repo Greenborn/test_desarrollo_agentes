@@ -11,6 +11,7 @@ import './composables/commands/iniciarNavegador.js'
 import './composables/commands/nuevaFuncionalidad.js'
 import './composables/commands/documentacionAll.js'
 import './composables/commands/documentacionUpdate.js'
+import './composables/commands/documentacionNotas.js'
 import './composables/commands/gastosAll.js'
 import './composables/commands/gastosProyecto.js'
 import './composables/commands/arbolDirectorios.js'
@@ -57,6 +58,8 @@ import './composables/commands/archivosListar.js'
 import './composables/commands/archivosEliminar.js'
 import './composables/commands/navegadorCapturarPantalla.js'
 import './composables/commands/capturasListar.js'
+import './composables/commands/navegadorEvaluarSelector.js'
+import './composables/commands/navegadorSimularEvento.js'
 
 const app = createApp(App)
 const pinia = createPinia()

@@ -191,11 +191,57 @@ router.post('/session', async (req, res) => {
 
   try {
     const updateData = { id_ticket_redmine: idTicketRedmine || null, updated_at: db.fn.now() };
+
+    if (idTicketRedmine) {
+      let targetWsId = null;
+
+      const ticket = await db('tickets')
+        .where({ redmine_id: idTicketRedmine })
+        .select('workspace_id', 'proyecto_id')
+        .first();
+
+      if (ticket?.workspace_id) {
+        targetWsId = ticket.workspace_id;
+      } else {
+        const session = await db('chat_sessions')
+          .where({ id: sessionId, user_id: req.session.userId })
+          .select('proyecto_id')
+          .first();
+
+        if (session?.proyecto_id) {
+          const proyecto = await db('proyectos')
+            .where({ id: session.proyecto_id })
+            .select('workspace_id')
+            .first();
+
+          if (proyecto?.workspace_id) {
+            targetWsId = proyecto.workspace_id;
+          }
+        }
+      }
+
+      if (targetWsId) {
+        updateData.workspace_id = targetWsId;
+
+        const oldIds = req.session.workspaceIds || [1];
+        if (!oldIds.includes(targetWsId)) {
+          const newIds = [...oldIds, targetWsId];
+          req.session.workspaceIds = newIds;
+          await new Promise(resolve => req.session.save(resolve));
+
+          await db('user_settings')
+            .insert({ user_id: req.session.userId, key: 'selected_workspace_id', value: JSON.stringify(newIds) })
+            .onConflict(['user_id', 'key'])
+            .merge();
+        }
+      }
+    }
+
     await db('chat_sessions')
       .where({ id: sessionId, user_id: req.session.userId })
       .update(updateData);
 
-    res.json({ success: true });
+    res.json({ success: true, workspaceIds: req.session.workspaceIds || [1] });
   } catch (err) {
     console.log('Error al asignar ticket a sesión:', err.message);
     res.status(500).json({ error: err.message });

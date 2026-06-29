@@ -114,9 +114,18 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `panel_height` | `'250'` | Alto del panel inferior (px o %) |
 | `right_panel_collapsed` | `'true'` / `'false'` | Panel lateral derecho colapsado |
 | `right_panel_width` | `'220'` | Ancho del panel derecho (px o %) |
+| `sidebar_width_pct` | `'50'` | Porcentaje del panel izquierdo cuando el centro está oculto (5–95%). El derecho ocupa el resto |
 | `sidebar_chat_tab` | `'chats'` / `'servicios'` | Pestaña activa del sidebar izquierdo |
 | `sidebar_right_tab` | `'comentarios'` / `'archivos'` / `'variables'` / `'comandos'` / `'capturas'` | Pestaña activa del panel derecho |
 | `dev_panel_tab` | `'instancias'` / `'repositorio'` / `'tickets'` / `'proyectos'` / `'console_logs'` / `'events'` / `'network_logs'` | Pestaña activa del panel inferior de desarrollo |
+| `archivos_tree_width` | `'140'` | Ancho del árbol de archivos en el panel derecho (modo normal) |
+| `archivos_tree_width_full` | `'260'` | Ancho del árbol de archivos cuando el panel derecho ocupa todo el ancho |
+| `capturas_list_width` | `'160'` | Ancho de la lista de capturas (modo normal) |
+| `capturas_list_width_full` | `'280'` | Ancho de la lista de capturas cuando el panel derecho ocupa todo el ancho |
+| `casos_prueba_list_width` | `'180'` | Ancho de la lista de casos de prueba (modo normal) |
+| `casos_prueba_list_width_full` | `'300'` | Ancho de la lista de casos de prueba cuando el panel derecho ocupa todo el ancho |
+| `casos_prueba_middle_width` | `'180'` | Ancho de la columna media de casos de prueba (modo normal) |
+| `casos_prueba_middle_width_full` | `'300'` | Ancho de la columna media de casos de prueba cuando el panel derecho ocupa todo el ancho |
 
 ---
 
@@ -417,7 +426,25 @@ El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos
 
 ---
 
-## 23. `playwright_console_logs`
+## 24. `documentacion_notas`
+
+| Columna | Tipo | Restricciones |
+|---------|------|---------------|
+| `id` | INTEGER | PK, AUTO_INCREMENT |
+| `id_proyecto` | VARCHAR(255) | NOT NULL — FK lógica → `proyectos(id)` |
+| `clave` | VARCHAR(255) | NOT NULL |
+| `valor` | MEDIUMTEXT | nullable — contenido de la nota (≤ 16KB validado por API) |
+| `id_ticket` | INTEGER | NOT NULL — FK lógica → `tickets(redmine_id)` |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP |
+
+**Restricciones:**
+- `UNIQUE(id_proyecto, clave)`
+- `INDEX(id_proyecto)`
+
+---
+
+## 25. `playwright_console_logs`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -455,6 +482,8 @@ El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos
 | `documentacion_archivo` | `escaneo_id` | `documentacion_escaneo` | `id` | CASCADE |
 | `archivos` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 | `capturas_metadata` | `archivo_id` | `archivos` | `id` | CASCADE |
+| `documentacion_notas` | `id_proyecto` | `proyectos` | `id` | — (FK lógica) |
+| `documentacion_notas` | `id_ticket` | `tickets` | `redmine_id` | — (FK lógica) |
 
 ---
 
@@ -481,7 +510,8 @@ proyectos
  ├─ funcionalidades.proyecto_id (FK lógica)
  ├─ gastos_tokens_usados.id_proyecto (FK)
  ├─ tickets.proyecto_id (FK)
- └─ project_variables.proyecto_id (FK)
+ ├─ project_variables.proyecto_id (FK)
+ └─ documentacion_notas.id_proyecto (FK lógica)
 
 tickets
  └─ chat_sessions.id_ticket_redmine (FK lógica)

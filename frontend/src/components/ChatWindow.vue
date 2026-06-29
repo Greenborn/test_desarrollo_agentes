@@ -107,6 +107,8 @@ import { useRedmineCommentsStore } from '../stores/redmineComments.js'
 import { useComandosPersonalizadosStore } from '../stores/comandosPersonalizados.js'
 import { settingSet } from '../services/settingService.js'
 import { useTicketStore } from '../stores/ticket.js'
+import { useWorkspaceStore } from '../stores/workspace.js'
+import { useAuthStore } from '../stores/auth.js'
 import { deteccionState, abortDeteccion } from '../composables/commands/deteccionFuncionalidades.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { useProjectVariables } from '../composables/useProjectVariables.js'
@@ -1217,12 +1219,19 @@ export default {
 
             if (value.autoAssign && sessionId && ticketRedmineId) {
               try {
-                await fetch('/api/tickets/session', {
+                const tr = await fetch('/api/tickets/session', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   credentials: 'include',
                   body: JSON.stringify({ sessionId, idTicketRedmine: ticketRedmineId }),
                 })
+                const td = await tr.json()
+                if (td.workspaceIds) {
+                  const ws = useWorkspaceStore()
+                  const au = useAuthStore()
+                  ws.selectedIds = td.workspaceIds
+                  au.setWorkspaceIds(td.workspaceIds)
+                }
                 await chat.loadSessions()
                 await loadTicketInfo()
               } catch (err) {
@@ -1245,20 +1254,34 @@ export default {
             if (value.createBranch) {
               try {
                 if (value.project_id) {
-                  await fetch('/api/proyecto/session', {
+                  const pr = await fetch('/api/proyecto/session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({ sessionId: chat.activeSessionId, proyectoId: value.project_id, cwd: '' }),
                   })
+                  const pd = await pr.json()
+                  if (pd.workspaceIds) {
+                    const ws4 = useWorkspaceStore()
+                    const au4 = useAuthStore()
+                    ws4.selectedIds = pd.workspaceIds
+                    au4.setWorkspaceIds(pd.workspaceIds)
+                  }
                 }
                 if (!value.autoAssign && ticketRedmineId) {
-                  await fetch('/api/tickets/session', {
+                  const tr2 = await fetch('/api/tickets/session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({ sessionId: chat.activeSessionId, idTicketRedmine: ticketRedmineId }),
                   })
+                  const td2 = await tr2.json()
+                  if (td2.workspaceIds) {
+                    const ws2 = useWorkspaceStore()
+                    const au2 = useAuthStore()
+                    ws2.selectedIds = td2.workspaceIds
+                    au2.setWorkspaceIds(td2.workspaceIds)
+                  }
                 }
                 await chat.loadSessions()
 
@@ -1779,6 +1802,12 @@ export default {
           if (!data.success) {
             console.error('Error al asignar proyecto:', data.error)
           }
+          if (data.workspaceIds) {
+            const ws5 = useWorkspaceStore()
+            const au5 = useAuthStore()
+            ws5.selectedIds = data.workspaceIds
+            au5.setWorkspaceIds(data.workspaceIds)
+          }
         } catch (err) {
           console.error('Error al asignar proyecto:', err.message)
         }
@@ -1837,6 +1866,12 @@ export default {
           const data = await res.json()
           if (!data.success) {
             console.error('Error al asignar ticket:', data.error)
+          }
+          if (data.workspaceIds) {
+            const ws3 = useWorkspaceStore()
+            const au3 = useAuthStore()
+            ws3.selectedIds = data.workspaceIds
+            au3.setWorkspaceIds(data.workspaceIds)
           }
         } catch (err) {
           console.error('Error al asignar ticket:', err.message)

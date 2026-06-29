@@ -121,6 +121,78 @@ const TABLA_MAP = {
   funcionalidades: 'documentacion_funcionalidades',
 };
 
+// ------------------------------------------------
+// NOTAS (key-value documentation)
+// ------------------------------------------------
+
+router.get('/notas/:proyectoId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const response = await fetch(`${DOC_BASE()}/notas/${req.params.proyectoId}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.log('Error al listar notas:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/notas/:proyectoId/:clave', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const response = await fetch(`${DOC_BASE()}/notas/${req.params.proyectoId}/${encodeURIComponent(req.params.clave)}`);
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    console.log('Error al obtener nota:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/notas', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const response = await fetch(`${DOC_BASE()}/notas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+    });
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    console.log('Error al crear nota:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/notas/:id', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const response = await fetch(`${DOC_BASE()}/notas/${req.params.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+    });
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    console.log('Error al actualizar nota:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/notas/:id', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const response = await fetch(`${DOC_BASE()}/notas/${req.params.id}`, { method: 'DELETE' });
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.log('Error al eliminar nota:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.put('/:tipo/:proyectoId', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {

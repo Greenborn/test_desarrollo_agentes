@@ -66,6 +66,8 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/resolucion_set_default` | Establece la resolución de pantalla por defecto. Usa Tab para autocompletar el ID de resolución | `/resolucion_set_default --resolucion=<ID>` |
 | `/navegador_capturar_pantalla` | Toma una captura de pantalla del navegador activo y la guarda en el proyecto vinculado a la sesión actual. Requiere sesión de navegador activa y proyecto asignado a la sesión de chat | `/navegador_capturar_pantalla [--fullpage=true]` |
 | `/capturas_listar` | Lista las capturas de pantalla del proyecto vinculado a la sesión de chat actual, o de un proyecto específico si se pasa como argumento. Muestra cada imagen inline con sus comentarios (`quick_notes`) | `/capturas_listar [proyecto_id]` |
+| `/navegador_evaluar_selector` | Evalúa un selector CSS en la página activa del navegador y devuelve el valor: valor de input, texto, HTML, atributo, checked, existencia o cantidad. El resultado se muestra en el chat. También disponible desde el panel de grabaciones (botón 🔍 Consultar) | `/navegador_evaluar_selector <selector> [tipo] [nombre_atributo]` |
+| `/navegador_simular_evento` | Simula un evento DOM en un elemento de la página activa del navegador. Útil para pruebas automatizadas. El tipo de evento puede ser click, mouseenter, focus, blur, change, etc. | `/navegador_simular_evento <selector> <tipo_evento> [opciones_json]` |
 
 ---
 
@@ -173,6 +175,24 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 | `/deteccion_funcionalidades` | Obtiene el listado de archivos de código del proyecto filtrado por extensiones configurables, los resume uno por uno vía DeepSeek y entrega el JSON completo con descripciones. Por defecto reutiliza el último escaneo de la sesión (si existe), sobrescribiendo sus archivos. Con `--escaneo-id` reutiliza un escaneo específico. | `/deteccion_funcionalidades [--escaneo-id=<id>]` |
 
 ---
+
+---
+
+## Documentación (Notas)
+
+| Comando | Descripción | Uso |
+|---------|-------------|-----|
+| `/doc_nota_listar` | Lista todas las notas de documentación del proyecto. Si no se especifica proyecto, usa el de la sesión actual | `/doc_nota_listar [--proyecto-id=<id>]` |
+| `/doc_nota_crear` | Crea una nota de documentación. El ticket se toma del contexto de la sesión (obligatorio) | `/doc_nota_crear --clave=<key> --valor=<text> [--proyecto-id=<id>]` |
+| `/doc_nota_ver` | Muestra el contenido completo de una nota de documentación | `/doc_nota_ver --clave=<key> [--proyecto-id=<id>]` |
+| `/doc_nota_editar` | Actualiza el contenido de una nota de documentación existente | `/doc_nota_editar --clave=<key> [--valor=<text>] [--proyecto-id=<id>]` |
+| `/doc_nota_eliminar` | Elimina una nota de documentación | `/doc_nota_eliminar --clave=<key> [--proyecto-id=<id>]` |
+
+Las notas de documentación se gestionan desde:
+- **Panel lateral derecho** → pestaña **Documentación**: lista de claves (izquierda) y editor de texto (derecha), con columnas redimensionables y persistencia de ancho.
+- **Chat**: mediante los comandos `/doc_nota_*` listados arriba.
+
+Cada nota se guarda en la tabla `documentacion_notas` y está asociada a un proyecto y un ticket de Redmine. El contenido está limitado a 16KB.
 
 ---
 

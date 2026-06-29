@@ -76,10 +76,34 @@ router.post('/proyecto/session', async (req, res) => {
   try {
     const updateData = { proyecto_id: proyectoId || null, updated_at: db.fn.now() };
     if (cwd) updateData.cwd = cwd;
+
+    if (proyectoId) {
+      const proyecto = await db('proyectos')
+        .where({ id: proyectoId })
+        .select('workspace_id')
+        .first();
+
+      if (proyecto?.workspace_id) {
+        updateData.workspace_id = proyecto.workspace_id;
+
+        const oldIds = req.session.workspaceIds || [1];
+        if (!oldIds.includes(proyecto.workspace_id)) {
+          const newIds = [...oldIds, proyecto.workspace_id];
+          req.session.workspaceIds = newIds;
+          await new Promise(resolve => req.session.save(resolve));
+
+          await db('user_settings')
+            .insert({ user_id: req.session.userId, key: 'selected_workspace_id', value: JSON.stringify(newIds) })
+            .onConflict(['user_id', 'key'])
+            .merge();
+        }
+      }
+    }
+
     await db('chat_sessions')
       .where({ id: sessionId, user_id: req.session.userId })
       .update(updateData);
-    res.json({ success: true });
+    res.json({ success: true, workspaceIds: req.session.workspaceIds || [1] });
   } catch (err) {
     console.log('Error al asignar proyecto a sesión:', err.message);
     res.status(500).json({ error: err.message });

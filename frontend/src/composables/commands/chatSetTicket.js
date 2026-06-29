@@ -1,5 +1,7 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
 import { useChatStore } from '../../stores/chat.js'
+import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useAuthStore } from '../../stores/auth.js'
 import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
@@ -74,6 +76,12 @@ register({
       })
       const data = await res.json()
       if (data.success) {
+        if (data.workspaceIds) {
+          const workspaceStore = useWorkspaceStore()
+          const auth = useAuthStore()
+          workspaceStore.selectedIds = data.workspaceIds
+          auth.setWorkspaceIds(data.workspaceIds)
+        }
         await chatStore.loadSessions()
         return `Ticket #${idTicketRedmine} asignado a la sesión actual.`
       }

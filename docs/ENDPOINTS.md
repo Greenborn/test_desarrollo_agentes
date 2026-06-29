@@ -522,12 +522,20 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 - **Comandos:**
   | comando | parametros | Respuesta |
   |---|---|---|
-  | `start` | `{ navegador: "chromium"|"firefox", headless?, url?, resolution?: { width, height }, chat_session_id?: number }` | `{ id_session, headless, url, resolution, chat_session_id }` |
+  | `start` | `{ navegador: "chromium"\|"firefox", headless?, url?, resolution?: { width, height }, chat_session_id?: number }` | `{ id_session, headless, url, resolution, chat_session_id }` |
   | `go_to_url` | `{ id_session?, url }` | `{ success: true, id_session }` |
   | `set_headless` | `{ headless: boolean\|"0"\|"1" }` | `{ success: true, reiniciado, id_session?, headless }` |
   | `close` | `{ id_session }` | `{ success: true }` |
-| `take_screenshot` | `{ id_session?, fullpage? }` | `{ success: true, id_session, fullpage, image_base64 (string), size (bytes) }` |
+  | `take_screenshot` | `{ id_session?, fullpage? }` | `{ success: true, id_session, fullpage, image_base64 (string), size (bytes) }` |
   | `extract_form_controls` | `{ id_session? }` | `{ success: true, id_session, url, title, scrollX, scrollY, viewportWidth, viewportHeight, pageWidth, pageHeight, forms, controls }` |
+  | `get_page_html` | `{ id_session? }` | `{ success: true, id_session, html (string) }` |
+  | `start_event_recording` | `{ id_session?, chat_session_id?, recording_id? }` | `{ success: true, id_session, recording: true, recording_id }` |
+  | `stop_event_recording` | `{ id_session? }` | `{ success: true, id_session, recording: false }` |
+  | `execute_action` | `{ id_session?, action: { type, selector?, value?, key?, x?, y?, delay?, eventType?, eventInit? } }` | `{ success: true, id_session, type, selector? }` |
+  | `evaluate_selector` | `{ id_session?, selector, extract_type?, attribute_name? }` | `{ success: true, id_session, selector, extract_type, found (boolean), value }` |
+  | `simulate_event` | `{ id_session?, selector, event_type?, event_init? }` | `{ success: true, id_session, selector, event_type }` |
+- **Tipos de action (execute_action):** `click`, `fill`, `type`, `select`, `submit`, `press`, `focus`, `blur`, `check`, `uncheck`, `hover`, `scroll`, `dispatch_event`
+- **Tipos de extract_type (evaluate_selector):** `value`, `text`, `html`, `attribute`, `checked`, `exists`, `count`
 
 ---
 
@@ -915,6 +923,69 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ---
 
+## Documentación — Notas (`api_documental`, puerto `4099`)
+
+Endpoint base: `http://localhost:4099/api/documentacion`
+
+### `GET /api/documentacion/notas/:proyectoId`
+- **Auth:** No (servicio interno)
+- **Path params:** `proyectoId` (string, requerido)
+- **Descripción:** Lista todas las notas de documentación de un proyecto. Devuelve solo metadatos (id, clave, id_ticket, created_at, updated_at), sin el contenido.
+- **Respuesta 200:** `[{ id, clave, id_ticket, created_at, updated_at }]`
+- **Respuesta 400:** `{ error: "proyectoId requerido" }`
+
+### `GET /api/documentacion/notas/:proyectoId/:clave`
+- **Auth:** No (servicio interno)
+- **Path params:** `proyectoId` (string), `clave` (string)
+- **Descripción:** Obtiene una nota de documentación completa por su clave, incluyendo el contenido (`valor`).
+- **Respuesta 200:** `{ id, id_proyecto, clave, valor, id_ticket, created_at, updated_at }`
+- **Respuesta 404:** `{ error: "Nota no encontrada" }`
+
+### `POST /api/documentacion/notas`
+- **Auth:** No (servicio interno)
+- **Body (JSON):**
+  ```json
+  {
+    "id_proyecto": "PROY-001",
+    "clave": "nombre_de_la_nota",
+    "valor": "contenido de la nota (max 16384 caracteres)",
+    "id_ticket": 1234
+  }
+  ```
+- **Descripción:** Crea una nueva nota de documentación.
+- **Campos requeridos:** `id_proyecto`, `clave`, `valor`, `id_ticket`
+- **Restricciones:** `valor` ≤ 16384 caracteres; la combinación `(id_proyecto, clave)` debe ser única.
+- **Respuesta 201:** `{ id, id_proyecto, clave, valor, id_ticket, created_at, updated_at }`
+- **Respuesta 400:** Error de validación (campo faltante, valor muy largo)
+- **Respuesta 409:** `{ error: "Ya existe una nota con esa clave en el proyecto" }`
+
+### `PUT /api/documentacion/notas/:id`
+- **Auth:** No (servicio interno)
+- **Path params:** `id` (number)
+- **Body (JSON):**
+  ```json
+  {
+    "clave": "nombre_de_la_nota",
+    "valor": "contenido actualizado (max 16384 caracteres)",
+    "id_ticket": 1234
+  }
+  ```
+- **Descripción:** Actualiza una nota existente.
+- **Campos requeridos:** `clave`, `valor`, `id_ticket`
+- **Restricciones:** `valor` ≤ 16384 caracteres; la combinación `(id_proyecto, clave)` debe ser única.
+- **Respuesta 200:** `{ id, id_proyecto, clave, valor, id_ticket, created_at, updated_at }`
+- **Respuesta 404:** `{ error: "Nota no encontrada" }`
+- **Respuesta 409:** `{ error: "Ya existe una nota con esa clave en el proyecto" }`
+
+### `DELETE /api/documentacion/notas/:id`
+- **Auth:** No (servicio interno)
+- **Path params:** `id` (number)
+- **Descripción:** Elimina una nota de documentación.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 404:** `{ error: "Nota no encontrada" }`
+
+---
+
 ## Playwright Logs (`/api/playwright-logs`)
 
 ### `GET /api/playwright-logs/network`
@@ -982,6 +1053,21 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Query:** `chat_session_id?` (number, opcional), `recording_id?` (number|"none", opcional), `order?` ("asc"|"desc", opcional, default "desc")
 - **Descripción:** Obtiene las últimas 500 entradas de eventos de usuario. Se puede filtrar por `chat_session_id` o `recording_id` (o `recording_id=none` para eventos no asignados). Por defecto ordena descendente; usar `order=asc` para orden ascendente (más antiguos primero).
 - **Respuesta 200:** `[{ id, chat_session_id, recording_id, playwright_session_id, event_type, selector, tag_name, text_content, value, url, x, y, key, key_code, alt_key, ctrl_key, shift_key, meta_key, scroll_x, scroll_y, target_rect, metadata, created_at }]`
+
+### `POST /api/playwright-logs/events`
+- **Auth:** Requerida
+- **Body:** `{ chat_session_id: number, recording_id?: number, event_type: string, selector?: string, tag_name?: string, text_content?: string, value?: string, url?: string, x?: number, y?: number, key?: string, key_code?: string, alt_key?: boolean, ctrl_key?: boolean, shift_key?: boolean, meta_key?: boolean, scroll_x?: number, scroll_y?: number, metadata?: string }`
+- **Descripción:** Crea un evento personalizado (ej: tipo `query` para consultas de selector). Útil para agregar pasos de consulta a una grabación.
+- **Respuesta 201:** `{ id, chat_session_id, recording_id, event_type, selector, value, ... }`
+- **Respuesta 400:** `{ error: "chat_session_id es requerido" }` o `{ error: "event_type es requerido" }`
+
+### `PATCH /api/playwright-logs/events/:id`
+- **Auth:** Requerida
+- **Params:** `id` (number) — ID del evento
+- **Body:** `{ value?: string, text_content?: string, metadata?: string }`
+- **Descripción:** Actualiza campos de un evento existente. Usado durante el replay para guardar el resultado de consultas `query` en el evento.
+- **Respuesta 200:** Evento actualizado
+- **Respuesta 404:** `{ error: "Evento no encontrado" }`
 
 ### `DELETE /api/playwright-logs/events`
 - **Auth:** Requerida

@@ -246,7 +246,181 @@ curl -X POST http://localhost:4098/api/command \
 
 ---
 
-### 4.8 `take_screenshot`
+### 4.4 `start_event_recording`
+
+Inicia la grabación de eventos de usuario en la página activa. Inyecta listeners JavaScript que capturan: `click`, `dblclick`, `input`, `change`, `submit`, `keydown`, `scroll`, `focus`, `blur`. Los eventos se almacenan en la tabla `playwright_events`.
+
+#### Parámetros
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `id_session` | `string` | No (usa sesión activa si se omite) | UUID de la sesión |
+| `chat_session_id` | `integer` | No | ID de sesión de chat para asociar eventos |
+| `recording_id` | `integer` | No | ID de grabación para agrupar eventos |
+
+#### Ejemplo
+
+```json
+{ "comando": "start_event_recording", "parametros": { "id_session": "uuid", "chat_session_id": 123, "recording_id": 1 } }
+```
+
+---
+
+### 4.5 `stop_event_recording`
+
+Pausa la grabación de eventos (desactiva el flag `window.__pwRecording = false`). No destruye los listeners, por lo que se puede reanudar con `start_event_recording`.
+
+#### Parámetros
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `id_session` | `string` | No (usa sesión activa si se omite) | UUID de la sesión |
+
+#### Ejemplo
+
+```json
+{ "comando": "stop_event_recording", "parametros": { "id_session": "uuid" } }
+```
+
+---
+
+### 4.6 `execute_action` — Simulación de eventos en inputs
+
+Ejecuta una acción simulada sobre un elemento de la página. Diseñado para pruebas automatizadas y replay de grabaciones.
+
+#### Parámetros
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `id_session` | `string` | No (usa sesión activa si se omite) | UUID de la sesión |
+| `action` | `object` | Sí | Objeto con la acción a ejecutar |
+
+#### Tipos de acción
+
+| Tipo | Parámetros adicionales | Descripción |
+|---|---|---|
+| `click` | `selector` | Click en el elemento |
+| `fill` | `selector`, `value` | Rellena un input con valor (Playwright nativo) |
+| `type` | `selector`, `value`, `delay` (opcional, default 50ms) | Escribe caracter por caracter simulando tipeo |
+| `select` | `selector`, `value` | Selecciona opción en un `<select>` |
+| `submit` | `selector` | Envía un formulario |
+| `press` | `selector`, `key` | Presiona una tecla (default `Enter`) |
+| `focus` | `selector` | Fija el foco en un elemento |
+| `blur` | `selector` | Quita el foco de un elemento |
+| `check` | `selector` | Marca un checkbox |
+| `uncheck` | `selector` | Desmarca un checkbox |
+| `hover` | `selector` | Posiciona el cursor sobre un elemento |
+| `scroll` | `x`, `y` | Desplaza la ventana a las coordenadas |
+| `dispatch_event` | `selector`, `eventType`, `eventInit` | Dispara un evento DOM arbitrario |
+
+#### Ejemplos
+
+```json
+{ "comando": "execute_action", "parametros": { "action": { "type": "focus", "selector": "#email" } } }
+{ "comando": "execute_action", "parametros": { "action": { "type": "type", "selector": "#username", "value": "admin", "delay": 30 } } }
+{ "comando": "execute_action", "parametros": { "action": { "type": "blur", "selector": "#username" } } }
+{ "comando": "execute_action", "parametros": { "action": { "type": "check", "selector": "#terms" } } }
+{ "comando": "execute_action", "parametros": { "action": { "type": "dispatch_event", "selector": "#miBoton", "eventType": "mouseenter", "eventInit": {} } } }
+```
+
+> **Nota:** Durante la ejecución de `execute_action`, la grabación de eventos se pausa automáticamente para evitar contaminar los eventos grabados. Al finalizar, se restaura el estado anterior de grabación.
+
+---
+
+### 4.7 `evaluate_selector` — Consulta de valores en la vista
+
+Evalúa un selector CSS en la página activa y extrae un valor específico (valor de input, texto, HTML, atributo, etc.). El resultado se retorna en la respuesta, y desde la interfaz se puede persistir en la sesión de chat y en eventos de grabación.
+
+#### Parámetros
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `id_session` | `string` | No (usa sesión activa si se omite) | UUID de la sesión |
+| `selector` | `string` | Sí | Selector CSS del elemento a consultar |
+| `extract_type` | `string` | No (default `text`) | Tipo de extracción: `value`, `text`, `html`, `attribute`, `checked`, `exists`, `count` |
+| `attribute_name` | `string` | No | Nombre del atributo (requerido si `extract_type=attribute`) |
+
+#### Tipos de extracción
+
+| Tipo | Retorna | Descripción |
+|---|---|---|
+| `value` | `string` | Valor de un input (`element.value`) |
+| `text` | `string` | Texto visible del elemento (`textContent.trim()`) |
+| `html` | `string` | HTML interno del elemento (`innerHTML`) |
+| `attribute` | `string` | Valor de un atributo (`getAttribute(name)`) |
+| `checked` | `boolean` | Estado checked de un checkbox/radio |
+| `exists` | `boolean` | `true` si el elemento existe en el DOM |
+| `count` | `number` | Cantidad de elementos que coinciden con el selector |
+
+#### Ejemplo
+
+```bash
+curl -X POST http://localhost:4098/api/command \
+  -H 'Content-Type: application/json' \
+  -d '{"comando":"evaluate_selector","parametros":{"selector":"#username","extract_type":"value"}}'
+```
+
+#### Respuesta
+
+```json
+{
+  "success": true,
+  "id_session": "550e8400-...",
+  "selector": "#username",
+  "extract_type": "value",
+  "found": true,
+  "value": "admin"
+}
+```
+
+Si el elemento no se encuentra:
+
+```json
+{
+  "success": true,
+  "id_session": "550e8400-...",
+  "selector": "#no-existe",
+  "extract_type": "text",
+  "found": false,
+  "value": null
+}
+```
+
+#### Uso en grabaciones
+
+Cuando se usa desde la interfaz de grabaciones (panel inferior), el resultado se puede:
+- Mostrar en el panel de eventos
+- Guardar como evento de tipo `query` en la grabación (`event_type: 'query'`)
+- Enviar a la sesión de chat como mensaje de resultado
+
+Durante el replay de una grabación, los eventos `query` se ejecutan automáticamente y el resultado se actualiza en el evento y se muestra en el chat.
+
+---
+
+### 4.8 `simulate_event` — Simulación de eventos DOM
+
+Simula un evento DOM genérico en un elemento de la página. Útil para pruebas de comportamiento que requieren eventos específicos (mouseenter, mouseleave, transitionend, etc.).
+
+#### Parámetros
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `id_session` | `string` | No (usa sesión activa si se omite) | UUID de la sesión |
+| `selector` | `string` | Sí | Selector CSS del elemento objetivo |
+| `event_type` | `string` | No (default `click`) | Tipo de evento DOM (`click`, `mouseenter`, `focus`, `blur`, `change`, etc.) |
+| `event_init` | `object` | No (default `{}`) | Objeto con propiedades del evento (`bubbles`, `cancelable`, `detail`, etc.) |
+
+#### Ejemplo
+
+```bash
+curl -X POST http://localhost:4098/api/command \
+  -H 'Content-Type: application/json' \
+  -d '{"comando":"simulate_event","parametros":{"selector":"#boton","event_type":"mouseenter","event_init":{"bubbles":true}}}'
+```
+
+---
+
+### 4.9 `take_screenshot`
 
 Toma una captura de pantalla de la página actual en una sesión de navegador activa.
 
@@ -284,6 +458,52 @@ curl -X POST http://localhost:4098/api/command \
 | No hay sesión activa | 400 | `No hay sesión activa. Usá "start" primero o pasá "id_session"` |
 | Sesión no existe | 500 | `Sesión no encontrada: "uuid..."` |
 | Error de captura | 500 | `Error al tomar captura de pantalla: ...` |
+
+---
+
+### 4.10 `get_page_html`
+
+Obtiene el HTML completo de la página actual (`document.documentElement.outerHTML`).
+
+#### Parámetros
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `id_session` | `string` | No (usa sesión activa si se omite) | UUID de la sesión |
+
+#### Ejemplo
+
+```json
+{ "comando": "get_page_html", "parametros": {} }
+```
+
+#### Respuesta
+
+```json
+{
+  "success": true,
+  "id_session": "uuid",
+  "html": "<!DOCTYPE html><html>..."
+}
+```
+
+---
+
+### 4.11 `set_headless`
+
+Cambia el modo headless global y reinicia la sesión activa si existe.
+
+#### Parámetros
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `headless` | `boolean\|string` | Sí | `true`, `false`, `"0"` o `"1"` |
+
+#### Ejemplo
+
+```json
+{ "comando": "set_headless", "parametros": { "headless": true } }
+```
 
 ---
 
@@ -371,8 +591,12 @@ COMANDOS DISPONIBLES:
 - set_headless             → cambia modo headless (0=visible, 1=headless)
 - close                    → cierra una sesión de navegador
 - extract_form_controls    → extrae todos los controles de formulario de la página actual
+- get_page_html            → obtiene el HTML completo de la página actual
 - start_event_recording    → inicia grabación de eventos de usuario (click, input, keydown, scroll, etc.)
 - stop_event_recording     → pausa la grabación de eventos (se puede reanudar)
+- execute_action           → ejecuta una acción simulada (click, fill, type, focus, blur, check, uncheck, hover, dispatch_event, etc.)
+- evaluate_selector        → consulta el valor de un elemento por selector CSS (value, text, html, attribute, checked, exists, count)
+- simulate_event           → simula un evento DOM arbitrario en un elemento
 
 USO:
   { "comando": "start",                    "parametros": { "navegador": "chrome"|"firefox", "headless": true|false, "chat_session_id": 123 } }
@@ -383,6 +607,16 @@ USO:
   { "comando": "start_event_recording",    "parametros": { "id_session": "uuid", "chat_session_id": 123 } }
   { "comando": "stop_event_recording",     "parametros": { "id_session": "uuid" } }
   { "comando": "take_screenshot",          "parametros": { "id_session": "uuid", "fullpage": true } }
+  { "comando": "get_page_html",            "parametros": { "id_session": "uuid" } }
+  { "comando": "execute_action",           "parametros": { "id_session": "uuid", "action": { "type": "focus", "selector": "#id" } } }
+  { "comando": "evaluate_selector",        "parametros": { "id_session": "uuid", "selector": "#id", "extract_type": "value" } }
+  { "comando": "simulate_event",           "parametros": { "id_session": "uuid", "selector": "#id", "event_type": "mouseenter" } }
+
+TIPOS DE ACCIÓN (execute_action):
+  click, fill, type, select, submit, press, focus, blur, check, uncheck, hover, scroll, dispatch_event
+
+TIPOS DE EXTRACCIÓN (evaluate_selector):
+  value, text, html, attribute, checked, exists, count
 
 LOGS DE RED Y CONSOLA:
   Al iniciar una sesión con `start`, el servicio captura automáticamente:
@@ -397,6 +631,7 @@ GRABACIÓN DE EVENTOS:
   - Cada evento genera un registro en la tabla `playwright_events` asociado al `chat_session_id`
   - `stop_event_recording` solo desactiva el flag `window.__pwRecording = false` (no destruye listeners)
   - Se puede reanudar con `start_event_recording` sin necesidad de reinyectar el script
+  - Los eventos de tipo `query` (consulta de selectores) se guardan y ejecutan durante el replay
 
 ERRORES:
   - 400: parámetros faltantes o comando desconocido

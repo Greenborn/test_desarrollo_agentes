@@ -93,6 +93,16 @@ export const useBrowserStore = defineStore('browser', () => {
     return navegadorCommand('execute_action', { action }, sessionId)
   }
 
+  async function evaluateSelector(selector, extractType, attributeName, sessionId) {
+    const params = { selector, extract_type: extractType || 'text' }
+    if (attributeName) params.attribute_name = attributeName
+    return navegadorCommand('evaluate_selector', params, sessionId)
+  }
+
+  async function simulateEvent(selector, eventType, eventInit, sessionId) {
+    return navegadorCommand('simulate_event', { selector, event_type: eventType || 'click', event_init: eventInit || {} }, sessionId)
+  }
+
   function clear() {
     navegadorSessionId.value = null
     hasBrowserSession.value = false
@@ -105,6 +115,6 @@ export const useBrowserStore = defineStore('browser', () => {
     navegadorSessionId, hasBrowserSession, isRecording, currentRecordingId,
     selectedRecordingId, starting, stopping,
     navegadorCommand, fetchStatus, navigate, configureHeadless, finish,
-    startRecording, stopRecording, executeAction, clear,
+    startRecording, stopRecording, executeAction, evaluateSelector, simulateEvent, clear,
   }
 })

@@ -995,6 +995,51 @@ async function executeAction(idSession, action) {
           console.log(`Sesión ${idSession} scroll a x=${x}, y=${y}`);
           break;
         }
+        case 'focus': {
+          if (!selector) throw new Error('Acción focus requiere selector');
+          await page.focus(selector);
+          console.log(`Sesión ${idSession} focus en "${selector}"`);
+          break;
+        }
+        case 'blur': {
+          if (!selector) throw new Error('Acción blur requiere selector');
+          await page.$eval(selector, (el) => el.blur());
+          console.log(`Sesión ${idSession} blur en "${selector}"`);
+          break;
+        }
+        case 'check': {
+          if (!selector) throw new Error('Acción check requiere selector');
+          await page.check(selector);
+          console.log(`Sesión ${idSession} check en "${selector}"`);
+          break;
+        }
+        case 'uncheck': {
+          if (!selector) throw new Error('Acción uncheck requiere selector');
+          await page.uncheck(selector);
+          console.log(`Sesión ${idSession} uncheck en "${selector}"`);
+          break;
+        }
+        case 'hover': {
+          if (!selector) throw new Error('Acción hover requiere selector');
+          await page.hover(selector);
+          console.log(`Sesión ${idSession} hover en "${selector}"`);
+          break;
+        }
+        case 'type': {
+          if (!selector) throw new Error('Acción type requiere selector');
+          const delay = action.delay != null ? action.delay : 50;
+          await page.type(selector, value || '', { delay });
+          console.log(`Sesión ${idSession} type en "${selector}" → "${value}" (delay: ${delay}ms)`);
+          break;
+        }
+        case 'dispatch_event': {
+          if (!selector) throw new Error('Acción dispatch_event requiere selector');
+          const eventType = action.eventType || 'click';
+          const eventInit = action.eventInit || {};
+          await page.dispatchEvent(selector, eventType, eventInit);
+          console.log(`Sesión ${idSession} dispatch_event "${eventType}" en "${selector}"`);
+          break;
+        }
         default:
           throw new Error(`Tipo de acción no soportado: "${type}"`);
       }
@@ -1054,6 +1099,53 @@ async function getPageHtml(idSession) {
   }
 }
 
+async function evaluateSelector(idSession, selector, extractType, attributeName) {
+  if (!idSession) {
+    throw new Error('Parámetro "id_session" es requerido');
+  }
+  if (!selector) {
+    throw new Error('Parámetro "selector" es requerido');
+  }
+
+  const session = sessions.get(idSession);
+  if (!session) {
+    throw new Error(`Sesión no encontrada: "${idSession}"`);
+  }
+
+  try {
+    const result = await session.page.evaluate(({ sel, type, attr }) => {
+      const el = document.querySelector(sel);
+      if (!el) return { found: false, value: null };
+
+      switch (type) {
+        case 'value':
+          return { found: true, value: el.value !== undefined ? el.value : null };
+        case 'text':
+          return { found: true, value: (el.textContent || '').trim() };
+        case 'html':
+          return { found: true, value: el.innerHTML };
+        case 'attribute':
+          if (!attr) return { found: true, value: null, error: 'attributeName requerido' };
+          return { found: true, value: el.getAttribute(attr) };
+        case 'checked':
+          return { found: true, value: el.checked !== undefined ? el.checked : null };
+        case 'count':
+          return { found: true, value: document.querySelectorAll(sel).length };
+        case 'exists':
+          return { found: true, value: !!document.querySelector(sel) };
+        default:
+          return { found: true, value: (el.textContent || '').trim() };
+      }
+    }, { sel: selector, type: extractType || 'text', attr: attributeName || null });
+
+    console.log(`Sesión ${idSession} evaluateSelector "${selector}" (${extractType || 'text'}): ${JSON.stringify(result)}`);
+    return result;
+  } catch (err) {
+    console.log(`Error evaluando selector "${selector}" en sesión ${idSession}:`, err.message);
+    throw new Error(`Error al evaluar selector: ${err.message}`);
+  }
+}
+
 export default {
   setDb,
   startSession,
@@ -1064,6 +1156,7 @@ export default {
   executeAction,
   takeScreenshot,
   getPageHtml,
+  evaluateSelector,
   getSession,
   getActiveSession,
   closeSession,

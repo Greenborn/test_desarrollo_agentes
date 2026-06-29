@@ -92,18 +92,17 @@
         <div class="d-flex align-items-center gap-1 ms-auto">
           <span v-if="isRecording" class="recording-dot" title="Grabando eventos"></span>
           <button
-            class="btn btn-sm btn-outline-danger py-0 px-2"
-            style="font-size: 0.7rem;"
-            :disabled="!activeSessionId || clearing"
-            @click="clearEvents"
-          >Limpiar</button>
-          <button
-            v-if="!replaying && selectedRecordingId !== null"
             class="btn btn-sm py-0 px-2"
             style="font-size: 0.65rem; background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3);"
             :disabled="!hasBrowserSession || isRecording || displayedEvents.length === 0"
             @click="replayRecording"
           >▶ Reproducir</button>
+          <button
+            class="btn btn-sm py-0 px-2"
+            style="font-size: 0.65rem; background: rgba(168, 85, 247, 0.15); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.3);"
+            :disabled="!hasBrowserSession"
+            @click="toggleQueryForm"
+          >🔍 Consultar</button>
           <template v-if="replaying">
             <button
               class="btn btn-sm py-0 px-2"
@@ -112,6 +111,68 @@
             >⏹ Detener</button>
             <span class="small text-muted">Paso {{ replayProgress.current }}/{{ replayProgress.total }}</span>
           </template>
+        </div>
+      </div>
+      <div v-if="showQueryForm" class="query-form px-3 py-2 border-bottom border-secondary flex-shrink-0">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <input
+            v-model="querySelector"
+            class="form-control form-control-sm"
+            placeholder="Selector CSS (ej: #username, .mensaje, input[name='email'])"
+            style="font-size: 0.7rem; background: #0d1117; border-color: #374151; color: #e0e0e0; min-width: 220px; flex: 1;"
+            @keyup.enter="executeQuery"
+          />
+          <select
+            v-model="queryExtractType"
+            class="form-select form-select-sm"
+            style="font-size: 0.7rem; background: #0d1117; border-color: #374151; color: #e0e0e0; width: auto;"
+          >
+            <option value="value">Valor</option>
+            <option value="text">Texto</option>
+            <option value="html">HTML</option>
+            <option value="attribute">Atributo</option>
+            <option value="checked">Checked</option>
+            <option value="exists">Existe</option>
+            <option value="count">Cantidad</option>
+          </select>
+          <input
+            v-if="queryExtractType === 'attribute'"
+            v-model="queryAttributeName"
+            class="form-control form-control-sm"
+            placeholder="Nombre del atributo"
+            style="font-size: 0.7rem; background: #0d1117; border-color: #374151; color: #e0e0e0; width: 120px;"
+            @keyup.enter="executeQuery"
+          />
+          <button
+            class="btn btn-sm py-0 px-2"
+            style="font-size: 0.7rem; background: rgba(117, 170, 219, 0.15); color: #75AADB; border: 1px solid rgba(117, 170, 219, 0.3);"
+            :disabled="!querySelector || queryExecuting"
+            @click="executeQuery"
+          >{{ queryExecuting ? 'Consultando...' : '▶ Ejecutar' }}</button>
+          <button
+            class="btn btn-sm py-0 px-2"
+            style="font-size: 0.65rem; background: none; color: #6b7280; border: 1px solid #374151;"
+            @click="showQueryForm = false"
+          >✕</button>
+        </div>
+        <div v-if="queryResult !== null" class="query-result mt-2 p-2 rounded" style="background: #161b22; border: 1px solid #30363d;">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="small text-success fw-semibold">Resultado:</span>
+            <span class="small query-result-value">{{ formatQueryResult(queryResult) }}</span>
+            <span v-if="queryResult.found === false" class="small text-warning">(elemento no encontrado)</span>
+          </div>
+          <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+            <label class="small text-muted d-flex align-items-center gap-1" style="cursor: pointer;">
+              <input type="checkbox" v-model="querySaveToRecording" class="form-check-input m-0" style="width: 12px; height: 12px;" />
+              💾 Guardar como paso en grabación
+            </label>
+            <button
+              class="btn btn-sm py-0 px-2"
+              style="font-size: 0.65rem; background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3);"
+              :disabled="querySaving"
+              @click="sendQueryResultToChat"
+            >💬 Enviar al chat</button>
+          </div>
         </div>
       </div>
       <div class="overflow-y-auto flex-grow-1" ref="containerRef">
@@ -272,6 +333,15 @@ export default {
     const replaying = ref(false)
     const replayProgress = ref({ current: 0, total: 0 })
     const replayCancelled = ref(false)
+
+    const showQueryForm = ref(false)
+    const querySelector = ref('')
+    const queryExtractType = ref('value')
+    const queryAttributeName = ref('')
+    const queryExecuting = ref(false)
+    const queryResult = ref(null)
+    const querySaveToRecording = ref(false)
+    const querySaving = ref(false)
 
     let pollTimer = null
     let statusTimer = null
@@ -435,6 +505,111 @@ export default {
       }
     }
 
+    function toggleQueryForm() {
+      showQueryForm.value = !showQueryForm.value
+      if (!showQueryForm.value) {
+        queryResult.value = null
+      }
+    }
+
+    function formatQueryResult(result) {
+      if (!result || result.found === false) return '—'
+      const val = result.value
+      if (val === null || val === undefined) return 'null'
+      if (typeof val === 'boolean') return val ? 'true' : 'false'
+      if (typeof val === 'number') return String(val)
+      return String(val)
+    }
+
+    async function executeQuery() {
+      const selector = querySelector.value.trim()
+      if (!selector || !hasBrowserSession.value) return
+
+      queryExecuting.value = true
+      queryResult.value = null
+      try {
+        const data = await browserStore.evaluateSelector(selector, queryExtractType.value, queryAttributeName.value || null, activeSessionId.value)
+        if (data.error) throw new Error(data.error)
+        queryResult.value = data
+
+        if (querySaveToRecording.value && selectedRecordingId.value !== undefined && activeSessionId.value) {
+          try {
+            const meta = { extract_type: queryExtractType.value }
+            if (queryAttributeName.value) meta.attribute_name = queryAttributeName.value
+
+            const res = await fetch(`/api/playwright-logs/events`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                chat_session_id: activeSessionId.value,
+                recording_id: selectedRecordingId.value,
+                event_type: 'query',
+                selector,
+                value: data.found ? String(data.value) : null,
+                metadata: JSON.stringify(meta),
+              }),
+            })
+            if (res.ok) {
+              await fetchRecordingEvents()
+            }
+          } catch (err) {
+            console.error('Error al guardar evento query:', err.message)
+          }
+        }
+
+        let msgContent = `🔍 Consulta: ${selector} (${queryExtractType.value})`
+        if (data.found) {
+          const formatted = formatQueryResult(data)
+          msgContent += ` → Resultado: ${formatted}`
+        } else {
+          msgContent += ` → Elemento no encontrado`
+        }
+        try {
+          await fetch(`/api/chat/sessions/${activeSessionId.value}/save-messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              messages: [{ role: 'result', content: msgContent }],
+            }),
+          })
+          chatStore.pushMessage({ role: 'result', content: msgContent }, activeSessionId.value)
+        } catch (e) {
+          console.error('Error al enviar consulta al chat:', e.message)
+        }
+      } catch (err) {
+        console.error('Error al ejecutar consulta:', err.message)
+        queryResult.value = { found: false, value: null, error: err.message }
+      } finally {
+        queryExecuting.value = false
+      }
+    }
+
+    async function sendQueryResultToChat() {
+      if (!queryResult.value || !activeSessionId.value) return
+      const selector = querySelector.value.trim()
+      let msgContent = `🔍 Consulta: ${selector} (${queryExtractType.value})`
+      if (queryResult.value.found) {
+        msgContent += ` → Resultado: ${formatQueryResult(queryResult.value)}`
+      } else {
+        msgContent += ` → Elemento no encontrado`
+      }
+      try {
+        await fetch(`/api/chat/sessions/${activeSessionId.value}/save-messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            messages: [{ role: 'result', content: msgContent }],
+          }),
+        })
+        chatStore.pushMessage({ role: 'result', content: msgContent }, activeSessionId.value)
+      } catch (e) {
+        console.error('Error al enviar consulta al chat:', e.message)
+      }
+    }
+
     async function doStartRecording(recordingId) {
       const sessionId = activeSessionId.value
       if (!sessionId) return
@@ -552,6 +727,7 @@ export default {
       scroll: 'Scroll',
       focus: 'Focus',
       blur: 'Blur',
+      query: 'Consulta',
     }
 
     function typeClass(type) {
@@ -565,6 +741,7 @@ export default {
         scroll: 'bg-secondary-subtle text-secondary',
         focus: 'bg-success-subtle text-success',
         blur: 'bg-secondary-subtle text-secondary',
+        query: 'bg-query-subtle text-query',
       }
       return map[type] || 'bg-secondary-subtle text-secondary'
     }
@@ -599,6 +776,16 @@ export default {
       }
       if (evt.event_type === 'submit') {
         return `Submit formulario "${evt.text_content || evt.selector}"`
+      }
+      if (evt.event_type === 'query') {
+        let meta = {}
+        try { meta = evt.metadata ? (typeof evt.metadata === 'string' ? JSON.parse(evt.metadata) : evt.metadata) : {} } catch (e) {}
+        const extractType = meta.extract_type || 'text'
+        const desc = `"${evt.selector}" (${extractType})`
+        if (evt.value != null) {
+          return `${label}: ${desc} → "${String(evt.value).substring(0, 120)}"`
+        }
+        return `${label}: ${desc}`
       }
       return `${label}: ${evt.text_content || evt.selector || ''}`
     }
@@ -643,6 +830,11 @@ export default {
           return { type: 'press', selector: evt.selector, key: evt.key || 'Enter' }
         case 'scroll':
           return { type: 'scroll', x: evt.scroll_x || 0, y: evt.scroll_y || 0 }
+        case 'query': {
+          let meta = {}
+          try { meta = evt.metadata ? (typeof evt.metadata === 'string' ? JSON.parse(evt.metadata) : evt.metadata) : {} } catch (e) {}
+          return { type: 'query', selector: evt.selector, extractType: meta.extract_type || 'value', attributeName: meta.attribute_name || null }
+        }
         default:
           return null
       }
@@ -657,6 +849,13 @@ export default {
         case 'submit': return `Submit formulario "${evt.text_content || evt.selector}"`
         case 'keydown': return `Presionar tecla "${evt.key}" en "${evt.text_content || evt.selector}"`
         case 'scroll': return `Scroll a (${evt.scroll_x}, ${evt.scroll_y})`
+        case 'query': {
+          let meta = {}
+          try { meta = evt.metadata ? (typeof evt.metadata === 'string' ? JSON.parse(evt.metadata) : evt.metadata) : {} } catch (e) {}
+          const extractType = meta.extract_type || 'text'
+          const result = evt.value != null ? ` → "${String(evt.value).substring(0, 80)}"` : ''
+          return `Consultar "${evt.selector}" (${extractType})${result}`
+        }
         default: return `${label}: ${evt.text_content || evt.selector || ''}`
       }
     }
@@ -708,10 +907,33 @@ export default {
           const { action, event: evt } = actionEntries[i]
 
           try {
-            const execData = await browserStore.executeAction(action, activeSessionId.value)
-            if (execData.error) throw new Error(execData.error)
+            let execData, desc
 
-            const desc = describeAction(evt)
+            if (action.type === 'query') {
+              const qData = await browserStore.evaluateSelector(action.selector, action.extractType || 'value', action.attributeName || null, activeSessionId.value)
+              if (qData.error) throw new Error(qData.error)
+              execData = qData
+              const resultStr = qData.found ? String(qData.value).substring(0, 80) : 'no encontrado'
+              desc = `Consultar "${action.selector}" → ${resultStr}`
+
+              if (evt && evt.id && qData.found) {
+                try {
+                  await fetch(`/api/playwright-logs/events/${evt.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ value: String(qData.value) }),
+                  })
+                } catch (e) {
+                  console.error('Error al actualizar evento query con resultado:', e.message)
+                }
+              }
+            } else {
+              execData = await browserStore.executeAction(action, activeSessionId.value)
+              if (execData.error) throw new Error(execData.error)
+              desc = describeAction(evt)
+            }
+
             try {
               await fetch(`/api/chat/sessions/${activeSessionId.value}/save-messages`, {
                 method: 'POST',
@@ -861,6 +1083,18 @@ export default {
       replayProgress,
       replayRecording,
       cancelReplay,
+      showQueryForm,
+      querySelector,
+      queryExtractType,
+      queryAttributeName,
+      queryExecuting,
+      queryResult,
+      querySaveToRecording,
+      querySaving,
+      toggleQueryForm,
+      executeQuery,
+      sendQueryResultToChat,
+      formatQueryResult,
       typeClass,
       describeEvent,
       isExpanded,
@@ -1056,6 +1290,24 @@ export default {
   overflow-y: auto;
   margin: 2px 0 0;
   border: 1px solid #30363d;
+}
+.query-form {
+  background: #161b22;
+}
+.query-result-value {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  color: #22c55e;
+  word-break: break-all;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bg-query-subtle {
+  background-color: rgba(168, 85, 247, 0.15) !important;
+}
+.text-query {
+  color: #a855f7 !important;
 }
 .recording-dot {
   width: 8px;

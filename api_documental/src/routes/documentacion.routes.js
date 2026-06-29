@@ -30,6 +30,112 @@ const TABLAS = {
 
 const router = Router();
 
+// ------------------- NOTAS (key-value) -------------------
+const MAX_VALOR_LENGTH = 16384;
+
+router.get('/notas/:proyectoId', async (req, res) => {
+  try {
+    const { proyectoId } = req.params;
+    if (!proyectoId) {
+      return res.status(400).json({ error: 'proyectoId requerido' });
+    }
+    const rows = await db('documentacion_notas')
+      .where({ id_proyecto: proyectoId })
+      .orderBy('clave')
+      .select('id', 'clave', 'id_ticket', 'created_at', 'updated_at');
+    res.json(rows);
+  } catch (err) {
+    console.log('Error al listar notas:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/notas/:proyectoId/:clave', async (req, res) => {
+  try {
+    const { proyectoId, clave } = req.params;
+    if (!proyectoId || !clave) {
+      return res.status(400).json({ error: 'proyectoId y clave requeridos' });
+    }
+    const row = await db('documentacion_notas')
+      .where({ id_proyecto: proyectoId, clave })
+      .first();
+    if (!row) {
+      return res.status(404).json({ error: 'Nota no encontrada' });
+    }
+    res.json(row);
+  } catch (err) {
+    console.log('Error al obtener nota:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/notas', async (req, res) => {
+  try {
+    const { id_proyecto, clave, valor, id_ticket } = req.body;
+    if (!id_proyecto) return res.status(400).json({ error: 'id_proyecto requerido' });
+    if (!clave) return res.status(400).json({ error: 'clave requerida' });
+    if (!id_ticket && id_ticket !== 0) return res.status(400).json({ error: 'id_ticket requerido' });
+    if (!valor) return res.status(400).json({ error: 'valor requerido' });
+    if (valor.length > MAX_VALOR_LENGTH) {
+      return res.status(400).json({ error: `valor no puede exceder ${MAX_VALOR_LENGTH} caracteres` });
+    }
+
+    const [id] = await db('documentacion_notas').insert({ id_proyecto, clave, valor, id_ticket });
+    const row = await db('documentacion_notas').where({ id }).first();
+    res.status(201).json(row);
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Ya existe una nota con esa clave en el proyecto' });
+    }
+    console.log('Error al crear nota:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/notas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { clave, valor, id_ticket } = req.body;
+    if (!clave) return res.status(400).json({ error: 'clave requerida' });
+    if (!id_ticket && id_ticket !== 0) return res.status(400).json({ error: 'id_ticket requerido' });
+    if (!valor) return res.status(400).json({ error: 'valor requerido' });
+    if (valor.length > MAX_VALOR_LENGTH) {
+      return res.status(400).json({ error: `valor no puede exceder ${MAX_VALOR_LENGTH} caracteres` });
+    }
+
+    const updated = await db('documentacion_notas')
+      .where({ id })
+      .update({ clave, valor, id_ticket, updated_at: db.fn.now() });
+    if (!updated) {
+      return res.status(404).json({ error: 'Nota no encontrada' });
+    }
+    const row = await db('documentacion_notas').where({ id }).first();
+    res.json(row);
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Ya existe una nota con esa clave en el proyecto' });
+    }
+    console.log('Error al actualizar nota:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/notas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await db('documentacion_notas').where({ id }).del();
+    if (!deleted) {
+      return res.status(404).json({ error: 'Nota no encontrada' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al eliminar nota:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ------------------- LEGACY ENDPOINTS -------------------
+
 router.get('/:proyectoId', async (req, res) => {
   try {
     const { proyectoId } = req.params;

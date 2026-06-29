@@ -12,6 +12,7 @@ export const useUiStore = defineStore('ui', () => {
   const rightPanelWidth = ref(220)
   const recordingListWidth = ref(220)
   const centralPanelCollapsed = ref(false)
+  const sidebarWidthPct = ref(50)
 
   const sidebarChatTab = ref('chats')
   const sidebarRightTab = ref('comentarios')
@@ -43,6 +44,10 @@ export const useUiStore = defineStore('ui', () => {
     rightPanelWidth.value = w
   }
 
+  function setSidebarWidthPct(val) {
+    sidebarWidthPct.value = Math.max(5, Math.min(95, val))
+  }
+
   function setPanelHeight(h) {
     panelHeight.value = h
   }
@@ -62,6 +67,7 @@ export const useUiStore = defineStore('ui', () => {
         settingSet('right_panel_width', String(rightPanelWidth.value)),
         settingSet('recording_list_width', String(recordingListWidth.value)),
         settingSet('central_panel_collapsed', String(centralPanelCollapsed.value)),
+        settingSet('sidebar_width_pct', String(sidebarWidthPct.value)),
         settingSet('sidebar_chat_tab', sidebarChatTab.value),
         settingSet('sidebar_right_tab', sidebarRightTab.value),
         settingSet('dev_panel_tab', devPanelTab.value),
@@ -73,7 +79,7 @@ export const useUiStore = defineStore('ui', () => {
 
   async function loadLayoutPrefs() {
     try {
-      const [sidebarData, widthData, panelData, heightData, rightCollapsedData, rightWidthData, recordingListData, centralPanelData, sidebarChatTabData, sidebarRightTabData, devPanelTabData] = await Promise.all([
+      const [sidebarData, widthData, panelData, heightData, rightCollapsedData, rightWidthData, recordingListData, centralPanelData, sidebarWidthPctData, sidebarChatTabData, sidebarRightTabData, devPanelTabData] = await Promise.all([
         settingGet('sidebar_collapsed'),
         settingGet('sidebar_width'),
         settingGet('panel_collapsed'),
@@ -82,6 +88,7 @@ export const useUiStore = defineStore('ui', () => {
         settingGet('right_panel_width'),
         settingGet('recording_list_width'),
         settingGet('central_panel_collapsed'),
+        settingGet('sidebar_width_pct'),
         settingGet('sidebar_chat_tab'),
         settingGet('sidebar_right_tab'),
         settingGet('dev_panel_tab'),
@@ -130,6 +137,10 @@ export const useUiStore = defineStore('ui', () => {
       if (centralPanelData.value !== null) {
         centralPanelCollapsed.value = centralPanelData.value === 'true'
       }
+      if (sidebarWidthPctData.value !== null) {
+        const raw = parseFloat(sidebarWidthPctData.value) || 50
+        sidebarWidthPct.value = Math.max(5, Math.min(95, raw))
+      }
       if (sidebarChatTabData.value !== null) {
         sidebarChatTab.value = sidebarChatTabData.value
       }
@@ -144,5 +155,5 @@ export const useUiStore = defineStore('ui', () => {
     }
   }
 
-  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, omnifilter, rightPanelCollapsed, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarChatTab, sidebarRightTab, devPanelTab, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setOmnifilter, saveLayoutPrefs, loadLayoutPrefs }
+  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, omnifilter, rightPanelCollapsed, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarWidthPct, sidebarChatTab, sidebarRightTab, devPanelTab, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setSidebarWidthPct, setOmnifilter, saveLayoutPrefs, loadLayoutPrefs }
 })

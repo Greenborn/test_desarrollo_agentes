@@ -2,7 +2,7 @@
   <div
     class="sidebar-chat d-flex flex-column h-100 bg-dark"
     :class="{ collapsed: sidebarCollapsed, transitioning: sidebarTransitioning }"
-    :style="sidebarCollapsed ? {} : { width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px' }"
+    :style="sidebarStyle"
   >
     <!-- Tab bar -->
     <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
@@ -78,7 +78,7 @@ export default {
     const settings = useSettingsStore()
     const ws = useWorkspaceStore()
     const { sessions, activeSessionId, creating, sessionStatus, pendingNotifications } = storeToRefs(chat)
-    const { sidebarCollapsed, sidebarWidth, omnifilter, sidebarChatTab } = storeToRefs(ui)
+    const { sidebarCollapsed, sidebarWidth, centralPanelCollapsed, sidebarWidthPct, rightPanelCollapsed, omnifilter, sidebarChatTab } = storeToRefs(ui)
     const tab = ref('chats')
     const stopTabSync = watch(sidebarChatTab, (v) => { tab.value = v; stopTabSync() })
     const { redmineUrl } = storeToRefs(settings)
@@ -100,6 +100,17 @@ export default {
 
     const sidebarTransitioning = ref(false)
     let transitionTimer = null
+
+    const sidebarStyle = computed(() => {
+      if (sidebarCollapsed.value) return {}
+      if (centralPanelCollapsed.value) {
+        if (rightPanelCollapsed.value) {
+          return { flex: '1 1 100%', minWidth: '5vw' }
+        }
+        return { flex: `0 0 ${sidebarWidthPct.value}%`, minWidth: '5vw' }
+      }
+      return { width: sidebarWidth.value + 'px', minWidth: sidebarWidth.value + 'px' }
+    })
 
     const filteredSessions = computed(() => {
       const filter = omnifilter.value.toLowerCase()
@@ -165,10 +176,18 @@ export default {
 
     function onResizeStart(e) {
       sidebarTransitioning.value = false
+      const resizeHandle = e.currentTarget
 
       function onMouseMove(e) {
-        const maxAllowed = Math.max(window.innerWidth * 0.05, window.innerWidth - (ui.rightPanelCollapsed ? 0 : ui.rightPanelWidth) - window.innerWidth * 0.05)
-        sidebarWidth.value = Math.max(window.innerWidth * 0.05, Math.min(maxAllowed, e.clientX))
+        if (ui.centralPanelCollapsed) {
+          const container = resizeHandle.closest('.sidebar-chat')?.parentElement
+          const containerWidth = container ? container.getBoundingClientRect().width : window.innerWidth
+          const pct = (e.clientX / containerWidth) * 100
+          ui.setSidebarWidthPct(pct)
+        } else {
+          const maxAllowed = Math.max(window.innerWidth * 0.05, window.innerWidth - (ui.rightPanelCollapsed ? 0 : ui.rightPanelWidth) - window.innerWidth * 0.05)
+          sidebarWidth.value = Math.max(window.innerWidth * 0.05, Math.min(maxAllowed, e.clientX))
+        }
       }
 
       function onMouseUp() {
@@ -205,6 +224,7 @@ export default {
       sidebarCollapsed,
       sidebarWidth,
       sidebarTransitioning,
+      sidebarStyle,
       sessionTooltip,
       formatDate,
       redmineUrl,

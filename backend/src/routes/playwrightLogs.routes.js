@@ -408,6 +408,78 @@ router.get('/events', async (req, res) => {
   }
 });
 
+router.post('/events', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { chat_session_id, recording_id, event_type, selector, tag_name, text_content, value, url, x, y, key, key_code, alt_key, ctrl_key, shift_key, meta_key, scroll_x, scroll_y, metadata } = req.body;
+
+  if (!chat_session_id) {
+    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  }
+  if (!event_type) {
+    return res.status(400).json({ error: 'event_type es requerido' });
+  }
+
+  try {
+    const [id] = await db('playwright_events').insert({
+      chat_session_id: parseInt(chat_session_id),
+      recording_id: recording_id != null ? parseInt(recording_id) : null,
+      event_type,
+      selector: selector || null,
+      tag_name: tag_name || null,
+      text_content: text_content || null,
+      value: value != null ? String(value).substring(0, 1000) : null,
+      url: url || null,
+      x: x != null ? x : null,
+      y: y != null ? y : null,
+      key: key || null,
+      key_code: key_code || null,
+      alt_key: alt_key != null ? alt_key : null,
+      ctrl_key: ctrl_key != null ? ctrl_key : null,
+      shift_key: shift_key != null ? shift_key : null,
+      meta_key: meta_key != null ? meta_key : null,
+      scroll_x: scroll_x != null ? scroll_x : null,
+      scroll_y: scroll_y != null ? scroll_y : null,
+      metadata: metadata || null,
+    });
+
+    const created = await db('playwright_events').where({ id }).first();
+    res.status(201).json(created);
+  } catch (err) {
+    console.log('Error al crear evento:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/events/:id', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { id } = req.params;
+  const { value, text_content, metadata } = req.body;
+
+  try {
+    const existing = await db('playwright_events').where({ id }).first();
+    if (!existing) {
+      return res.status(404).json({ error: 'Evento no encontrado' });
+    }
+
+    const updateData = {};
+    if (value !== undefined) updateData.value = String(value).substring(0, 1000);
+    if (text_content !== undefined) updateData.text_content = String(text_content).substring(0, 1000);
+    if (metadata !== undefined) updateData.metadata = metadata;
+
+    if (Object.keys(updateData).length > 0) {
+      await db('playwright_events').where({ id }).update(updateData);
+    }
+
+    const updated = await db('playwright_events').where({ id }).first();
+    res.json(updated);
+  } catch (err) {
+    console.log('Error al actualizar evento:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/events', async (req, res) => {
   if (!authGuard(req, res)) return;
 

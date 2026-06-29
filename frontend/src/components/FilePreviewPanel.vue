@@ -14,21 +14,20 @@
     <template v-else-if="isMarkdown">
       <div class="preview-header small text-muted px-2 py-1 flex-shrink-0 text-truncate d-flex align-items-center justify-content-between">
         <span class="text-truncate">{{ fileName }}</span>
-      </div>
-      <div class="preview-content flex-grow-1 overflow-y-auto px-2 py-2" style="min-height: 0;">
-        <div v-if="loading" class="d-flex align-items-center justify-content-center text-secondary small py-4">
-          <span>Cargando vista previa…</span>
-        </div>
-        <div v-else-if="error" class="text-danger small py-2">
-          {{ error }}
-        </div>
-        <ChatFormatter v-else :text="content" />
+        <button v-if="canCopy" class="btn btn-sm btn-outline-secondary border-0 py-0" style="font-size: 0.65rem;" @click="copyToClipboard" title="Copiar contenido">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 2px;"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg> Copiar
+        </button>
       </div>
     </template>
     <template v-else-if="isCodeFile">
       <div class="preview-header small text-muted px-2 py-1 flex-shrink-0 text-truncate d-flex align-items-center justify-content-between">
         <span class="text-truncate">{{ fileName }}</span>
-        <span class="badge bg-secondary ms-2" style="font-size: 0.6rem;">código</span>
+        <span>
+          <button v-if="canCopy" class="btn btn-sm btn-outline-secondary border-0 py-0" style="font-size: 0.65rem;" @click="copyToClipboard" title="Copiar contenido">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 2px;"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg> Copiar
+          </button>
+          <span class="badge bg-secondary ms-1" style="font-size: 0.6rem;">código</span>
+        </span>
       </div>
       <div class="preview-content code-preview flex-grow-1 overflow-y-auto px-0 py-0" style="min-height: 0;">
         <div v-if="loading" class="d-flex align-items-center justify-content-center text-secondary small py-4">
@@ -136,6 +135,17 @@ export default {
       return EXT_TO_LANG[ext] || null
     })
 
+    const canCopy = computed(() => {
+      const ext = fileExtension.value
+      return ext === 'md' || ext === 'js'
+    })
+
+    function copyToClipboard() {
+      navigator.clipboard.writeText(content.value).catch(err => {
+        console.error('Error al copiar al portapapeles:', err)
+      })
+    }
+
     const isTooLarge = computed(() => {
       if (!content.value || !isCodeFile.value) return false
       const maxBytes = maxSizeKb.value * 1024
@@ -191,7 +201,7 @@ export default {
       loadPreview()
     })
 
-    return { content, loading, error, fileName, isMarkdown, isCodeFile, isTooLarge, maxSizeKb, highlightedCode }
+    return { content, loading, error, fileName, isMarkdown, isCodeFile, canCopy, copyToClipboard, isTooLarge, maxSizeKb, highlightedCode }
   },
 }
 </script>

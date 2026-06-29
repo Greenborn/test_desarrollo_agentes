@@ -2,7 +2,7 @@
   <div
     class="sidebar-right d-flex flex-column h-100 bg-dark"
     :class="{ collapsed: rightPanelCollapsed, transitioning: rightPanelTransitioning }"
-    :style="rightPanelCollapsed ? {} : { width: rightPanelWidth + 'px', minWidth: rightPanelWidth + 'px' }"
+    :style="sidebarStyle"
   >
     <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
       <button class="tab-btn" :class="{ active: tab === 'comentarios' }" @click="selectTab('comentarios')">Comentarios</button>
@@ -11,6 +11,7 @@
       <button class="tab-btn" :class="{ active: tab === 'comandos' }" @click="selectTab('comandos')">Comandos</button>
       <button class="tab-btn" :class="{ active: tab === 'capturas' }" @click="selectTab('capturas')">Capturas</button>
       <button class="tab-btn" :class="{ active: tab === 'casos_prueba' }" @click="selectTab('casos_prueba')">Casos de Prueba</button>
+      <button class="tab-btn" :class="{ active: tab === 'documentacion' }" @click="selectTab('documentacion')">Documentación</button>
     </div>
 
     <template v-if="tab === 'comentarios'">
@@ -41,7 +42,7 @@
     </template>
     <template v-else-if="tab === 'archivos'">
       <div class="archivos-container d-flex flex-grow-1 overflow-hidden" style="min-height: 0;">
-        <div class="archivos-tree-panel flex-shrink-0 overflow-hidden" :style="{ width: archivosTreeWidth + 'px' }">
+        <div class="archivos-tree-panel flex-shrink-0 overflow-hidden" :style="{ width: effectiveArchivosTreeWidth + 'px' }">
           <FileTreePanel :session-id="activeSessionId" @file-selected="onFileSelected" />
         </div>
         <div class="archivos-splitter" @mousedown.prevent="onArchivosSplitStart"></div>
@@ -120,7 +121,7 @@
           <span>Cargando capturas…</span>
         </div>
         <div v-else class="capturas-container d-flex flex-grow-1 overflow-hidden" style="min-height: 0;">
-          <div class="capturas-list flex-shrink-0 overflow-y-auto" :style="{ width: capturasListWidth + 'px' }">
+          <div class="capturas-list flex-shrink-0 overflow-y-auto" :style="{ width: effectiveCapturasListWidth + 'px' }">
             <div v-if="capturas.length === 0" class="d-flex align-items-center justify-content-center text-secondary small px-3 py-4 text-center">
               <span>Sin capturas de pantalla</span>
             </div>
@@ -156,13 +157,13 @@
     </template>
     <template v-else-if="tab === 'casos_prueba'">
       <div class="casos-prueba-container d-flex flex-grow-1 overflow-hidden" style="min-height: 0;">
-        <div class="casos-prueba-list flex-shrink-0 overflow-hidden" :style="{ width: casosPruebaListWidth + 'px' }">
+        <div class="casos-prueba-list flex-shrink-0 overflow-hidden" :style="{ width: effectiveCasosPruebaListWidth + 'px' }">
           <div class="d-flex align-items-center justify-content-center h-100 text-secondary small px-3 text-center">
             <span>En construcción</span>
           </div>
         </div>
         <div class="casos-prueba-splitter" @mousedown.prevent="onCasosPruebaSplitStart"></div>
-        <div class="casos-prueba-middle flex-shrink-0 overflow-hidden" :style="{ width: casosPruebaMiddleWidth + 'px' }">
+        <div class="casos-prueba-middle flex-shrink-0 overflow-hidden" :style="{ width: effectiveCasosPruebaMiddleWidth + 'px' }">
           <div class="d-flex align-items-center justify-content-center h-100 text-secondary small px-3 text-center">
             <span>En construcción</span>
           </div>
@@ -172,6 +173,9 @@
           <span>En construcción</span>
         </div>
       </div>
+    </template>
+    <template v-else-if="tab === 'documentacion'">
+      <DocumentacionPanel :proyecto-id="proyectoId" :ticket-id="activeTicketId" />
     </template>
     <div class="sidebar-right-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-right-resize-handle-bar"></div>
@@ -187,6 +191,7 @@ import { useChatStore } from '../stores/chat.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
 import { useProjectVariablesStore } from '../stores/projectVariables.js'
 import { useComandosPersonalizadosStore } from '../stores/comandosPersonalizados.js'
+import { useDocumentacionNotasStore } from '../stores/documentacionNotas.js'
 import { useModalStore } from '../stores/modal.js'
 import { useCommandRegistry } from '../composables/useCommandRegistry.js'
 import { settingSet, settingGet } from '../services/settingService.js'
@@ -194,9 +199,10 @@ import VariableDetailModal from './VariableDetailModal.vue'
 import CapturaDetailModal from './CapturaDetailModal.vue'
 import FileTreePanel from './FileTreePanel.vue'
 import FilePreviewPanel from './FilePreviewPanel.vue'
+import DocumentacionPanel from './DocumentacionPanel.vue'
 
 export default {
-  components: { FileTreePanel, FilePreviewPanel },
+  components: { FileTreePanel, FilePreviewPanel, DocumentacionPanel },
   setup() {
     const ui = useUiStore()
     const chat = useChatStore()
@@ -204,7 +210,8 @@ export default {
     const redmineComments = useRedmineCommentsStore()
     const projectVariables = useProjectVariablesStore()
     const comandosStore = useComandosPersonalizadosStore()
-    const { rightPanelCollapsed, rightPanelWidth, sidebarRightTab } = storeToRefs(ui)
+    const docNotasStore = useDocumentacionNotasStore()
+    const { rightPanelCollapsed, rightPanelWidth, centralPanelCollapsed, sidebarWidthPct, sidebarCollapsed, sidebarRightTab } = storeToRefs(ui)
     const { activeSessionId, sessions } = storeToRefs(chat)
     const { find } = useCommandRegistry()
     const tab = ref('comentarios')
@@ -222,6 +229,7 @@ export default {
     const hasSentComments = computed(() => comments.value.some(c => c.estado === 'enviado'))
 
     const proyectoId = computed(() => activeSession.value?.proyecto_id || null)
+    const activeTicketId = computed(() => activeSession.value?.id_ticket_redmine || null)
     const variables = computed(() => projectVariables.variablesByProject[proyectoId.value] || [])
     const loadingVariables = computed(() => projectVariables.loadingByProject[proyectoId.value] || false)
     const comandos = computed(() => comandosStore.getCommandsForProject(proyectoId.value))
@@ -230,16 +238,40 @@ export default {
     const rightPanelTransitioning = ref(false)
     let transitionTimer = null
 
+    const sidebarStyle = computed(() => {
+      if (rightPanelCollapsed.value) return {}
+      if (centralPanelCollapsed.value) {
+        if (sidebarCollapsed.value) {
+          return { flex: '1 1 100%', minWidth: '5vw' }
+        }
+        const rightPct = 100 - sidebarWidthPct.value
+        return { flex: `0 0 ${rightPct}%`, minWidth: '5vw' }
+      }
+      return { width: rightPanelWidth.value + 'px', minWidth: rightPanelWidth.value + 'px' }
+    })
+
+    const isFullWidth = computed(() => centralPanelCollapsed.value && sidebarCollapsed.value)
+
     const selectedFilePath = ref(null)
     const archivosTreeWidth = ref(140)
+    const archivosTreeWidthFull = ref(260)
     const ARCHIVOS_TREE_WIDTH_KEY = 'archivos_tree_width'
+    const ARCHIVOS_TREE_WIDTH_FULL_KEY = 'archivos_tree_width_full'
     const ARCHIVOS_TREE_MIN = 80
+
+    const effectiveArchivosTreeWidth = computed(() => isFullWidth.value ? archivosTreeWidthFull.value : archivosTreeWidth.value)
 
     async function loadArchivosTreeWidth() {
       try {
-        const result = await settingGet(ARCHIVOS_TREE_WIDTH_KEY)
-        if (result.value) {
-          archivosTreeWidth.value = Math.max(ARCHIVOS_TREE_MIN, parseInt(result.value, 10) || 140)
+        const [normal, full] = await Promise.all([
+          settingGet(ARCHIVOS_TREE_WIDTH_KEY),
+          settingGet(ARCHIVOS_TREE_WIDTH_FULL_KEY),
+        ])
+        if (normal.value) {
+          archivosTreeWidth.value = Math.max(ARCHIVOS_TREE_MIN, parseInt(normal.value, 10) || 140)
+        }
+        if (full.value) {
+          archivosTreeWidthFull.value = Math.max(ARCHIVOS_TREE_MIN, parseInt(full.value, 10) || 260)
         }
       } catch (err) {
         console.error('Error al cargar ancho del árbol de archivos:', err)
@@ -248,7 +280,10 @@ export default {
 
     async function saveArchivosTreeWidth() {
       try {
-        await settingSet(ARCHIVOS_TREE_WIDTH_KEY, String(archivosTreeWidth.value))
+        await Promise.all([
+          settingSet(ARCHIVOS_TREE_WIDTH_KEY, String(archivosTreeWidth.value)),
+          settingSet(ARCHIVOS_TREE_WIDTH_FULL_KEY, String(archivosTreeWidthFull.value)),
+        ])
       } catch (err) {
         console.error('Error al guardar ancho del árbol de archivos:', err)
       }
@@ -258,14 +293,24 @@ export default {
     const loadingCapturas = ref(false)
     const capturaSeleccionada = ref(null)
     const capturasListWidth = ref(160)
+    const capturasListWidthFull = ref(280)
     const CAPTURAS_LIST_WIDTH_KEY = 'capturas_list_width'
+    const CAPTURAS_LIST_WIDTH_FULL_KEY = 'capturas_list_width_full'
     const CAPTURAS_LIST_MIN = 80
+
+    const effectiveCapturasListWidth = computed(() => isFullWidth.value ? capturasListWidthFull.value : capturasListWidth.value)
 
     async function loadCapturasListWidth() {
       try {
-        const result = await settingGet(CAPTURAS_LIST_WIDTH_KEY)
-        if (result.value) {
-          capturasListWidth.value = Math.max(CAPTURAS_LIST_MIN, parseInt(result.value, 10) || 160)
+        const [normal, full] = await Promise.all([
+          settingGet(CAPTURAS_LIST_WIDTH_KEY),
+          settingGet(CAPTURAS_LIST_WIDTH_FULL_KEY),
+        ])
+        if (normal.value) {
+          capturasListWidth.value = Math.max(CAPTURAS_LIST_MIN, parseInt(normal.value, 10) || 160)
+        }
+        if (full.value) {
+          capturasListWidthFull.value = Math.max(CAPTURAS_LIST_MIN, parseInt(full.value, 10) || 280)
         }
       } catch (err) {
         console.error('Error al cargar ancho de lista de capturas:', err)
@@ -274,21 +319,34 @@ export default {
 
     async function saveCapturasListWidth() {
       try {
-        await settingSet(CAPTURAS_LIST_WIDTH_KEY, String(capturasListWidth.value))
+        await Promise.all([
+          settingSet(CAPTURAS_LIST_WIDTH_KEY, String(capturasListWidth.value)),
+          settingSet(CAPTURAS_LIST_WIDTH_FULL_KEY, String(capturasListWidthFull.value)),
+        ])
       } catch (err) {
         console.error('Error al guardar ancho de lista de capturas:', err)
       }
     }
 
     const casosPruebaListWidth = ref(180)
+    const casosPruebaListWidthFull = ref(300)
     const CASOS_PRUEBA_LIST_WIDTH_KEY = 'casos_prueba_list_width'
+    const CASOS_PRUEBA_LIST_WIDTH_FULL_KEY = 'casos_prueba_list_width_full'
     const CASOS_PRUEBA_LIST_MIN = 80
+
+    const effectiveCasosPruebaListWidth = computed(() => isFullWidth.value ? casosPruebaListWidthFull.value : casosPruebaListWidth.value)
 
     async function loadCasosPruebaListWidth() {
       try {
-        const result = await settingGet(CASOS_PRUEBA_LIST_WIDTH_KEY)
-        if (result.value) {
-          casosPruebaListWidth.value = Math.max(CASOS_PRUEBA_LIST_MIN, parseInt(result.value, 10) || 180)
+        const [normal, full] = await Promise.all([
+          settingGet(CASOS_PRUEBA_LIST_WIDTH_KEY),
+          settingGet(CASOS_PRUEBA_LIST_WIDTH_FULL_KEY),
+        ])
+        if (normal.value) {
+          casosPruebaListWidth.value = Math.max(CASOS_PRUEBA_LIST_MIN, parseInt(normal.value, 10) || 180)
+        }
+        if (full.value) {
+          casosPruebaListWidthFull.value = Math.max(CASOS_PRUEBA_LIST_MIN, parseInt(full.value, 10) || 300)
         }
       } catch (err) {
         console.error('Error al cargar ancho de lista de casos de prueba:', err)
@@ -297,15 +355,55 @@ export default {
 
     async function saveCasosPruebaListWidth() {
       try {
-        await settingSet(CASOS_PRUEBA_LIST_WIDTH_KEY, String(casosPruebaListWidth.value))
+        await Promise.all([
+          settingSet(CASOS_PRUEBA_LIST_WIDTH_KEY, String(casosPruebaListWidth.value)),
+          settingSet(CASOS_PRUEBA_LIST_WIDTH_FULL_KEY, String(casosPruebaListWidthFull.value)),
+        ])
       } catch (err) {
         console.error('Error al guardar ancho de lista de casos de prueba:', err)
+      }
+    }
+
+    const casosPruebaMiddleWidth = ref(180)
+    const casosPruebaMiddleWidthFull = ref(300)
+    const CASOS_PRUEBA_MIDDLE_WIDTH_KEY = 'casos_prueba_middle_width'
+    const CASOS_PRUEBA_MIDDLE_WIDTH_FULL_KEY = 'casos_prueba_middle_width_full'
+    const CASOS_PRUEBA_MIDDLE_MIN = 80
+
+    const effectiveCasosPruebaMiddleWidth = computed(() => isFullWidth.value ? casosPruebaMiddleWidthFull.value : casosPruebaMiddleWidth.value)
+
+    async function loadCasosPruebaMiddleWidth() {
+      try {
+        const [normal, full] = await Promise.all([
+          settingGet(CASOS_PRUEBA_MIDDLE_WIDTH_KEY),
+          settingGet(CASOS_PRUEBA_MIDDLE_WIDTH_FULL_KEY),
+        ])
+        if (normal.value) {
+          casosPruebaMiddleWidth.value = Math.max(CASOS_PRUEBA_MIDDLE_MIN, parseInt(normal.value, 10) || 180)
+        }
+        if (full.value) {
+          casosPruebaMiddleWidthFull.value = Math.max(CASOS_PRUEBA_MIDDLE_MIN, parseInt(full.value, 10) || 300)
+        }
+      } catch (err) {
+        console.error('Error al cargar ancho de columna media de casos de prueba:', err)
+      }
+    }
+
+    async function saveCasosPruebaMiddleWidth() {
+      try {
+        await Promise.all([
+          settingSet(CASOS_PRUEBA_MIDDLE_WIDTH_KEY, String(casosPruebaMiddleWidth.value)),
+          settingSet(CASOS_PRUEBA_MIDDLE_WIDTH_FULL_KEY, String(casosPruebaMiddleWidthFull.value)),
+        ])
+      } catch (err) {
+        console.error('Error al guardar ancho de columna media de casos de prueba:', err)
       }
     }
 
     function onCasosPruebaSplitStart(e) {
       const startX = e.clientX
       const startWidth = casosPruebaListWidth.value
+      const startWidthFull = casosPruebaListWidthFull.value
       const container = e.target.closest('.casos-prueba-container')
 
       function onMouseMove(e) {
@@ -313,7 +411,11 @@ export default {
         const containerWidth = container ? container.getBoundingClientRect().width : 400
         const minWidth = 80
         const maxWidth = containerWidth - 80
-        casosPruebaListWidth.value = Math.max(minWidth, Math.min(maxWidth, startWidth + delta))
+        if (isFullWidth.value) {
+          casosPruebaListWidthFull.value = Math.max(minWidth, Math.min(maxWidth, startWidthFull + delta))
+        } else {
+          casosPruebaListWidth.value = Math.max(minWidth, Math.min(maxWidth, startWidth + delta))
+        }
       }
 
       function onMouseUp() {
@@ -330,32 +432,10 @@ export default {
       document.body.style.userSelect = 'none'
     }
 
-    const casosPruebaMiddleWidth = ref(180)
-    const CASOS_PRUEBA_MIDDLE_WIDTH_KEY = 'casos_prueba_middle_width'
-    const CASOS_PRUEBA_MIDDLE_MIN = 80
-
-    async function loadCasosPruebaMiddleWidth() {
-      try {
-        const result = await settingGet(CASOS_PRUEBA_MIDDLE_WIDTH_KEY)
-        if (result.value) {
-          casosPruebaMiddleWidth.value = Math.max(CASOS_PRUEBA_MIDDLE_MIN, parseInt(result.value, 10) || 180)
-        }
-      } catch (err) {
-        console.error('Error al cargar ancho de columna media de casos de prueba:', err)
-      }
-    }
-
-    async function saveCasosPruebaMiddleWidth() {
-      try {
-        await settingSet(CASOS_PRUEBA_MIDDLE_WIDTH_KEY, String(casosPruebaMiddleWidth.value))
-      } catch (err) {
-        console.error('Error al guardar ancho de columna media de casos de prueba:', err)
-      }
-    }
-
     function onCasosPruebaMiddleSplitStart(e) {
       const startX = e.clientX
       const startWidth = casosPruebaMiddleWidth.value
+      const startWidthFull = casosPruebaMiddleWidthFull.value
       const container = e.target.closest('.casos-prueba-container')
 
       function onMouseMove(e) {
@@ -363,7 +443,11 @@ export default {
         const containerWidth = container ? container.getBoundingClientRect().width : 400
         const minWidth = 80
         const maxWidth = containerWidth - 80
-        casosPruebaMiddleWidth.value = Math.max(minWidth, Math.min(maxWidth, startWidth + delta))
+        if (isFullWidth.value) {
+          casosPruebaMiddleWidthFull.value = Math.max(minWidth, Math.min(maxWidth, startWidthFull + delta))
+        } else {
+          casosPruebaMiddleWidth.value = Math.max(minWidth, Math.min(maxWidth, startWidth + delta))
+        }
       }
 
       function onMouseUp() {
@@ -455,6 +539,7 @@ export default {
     function onCapturasSplitStart(e) {
       const startX = e.clientX
       const startWidth = capturasListWidth.value
+      const startWidthFull = capturasListWidthFull.value
       const container = e.target.closest('.capturas-container')
 
       function onMouseMove(e) {
@@ -462,7 +547,11 @@ export default {
         const containerWidth = container ? container.getBoundingClientRect().width : 400
         const minWidth = 80
         const maxWidth = containerWidth - 80
-        capturasListWidth.value = Math.max(minWidth, Math.min(maxWidth, startWidth + delta))
+        if (isFullWidth.value) {
+          capturasListWidthFull.value = Math.max(minWidth, Math.min(maxWidth, startWidthFull + delta))
+        } else {
+          capturasListWidth.value = Math.max(minWidth, Math.min(maxWidth, startWidth + delta))
+        }
       }
 
       function onMouseUp() {
@@ -470,7 +559,7 @@ export default {
         document.removeEventListener('mouseup', onMouseUp)
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
-        saveArchivosTreeWidth()
+        saveCapturasListWidth()
       }
 
       document.addEventListener('mousemove', onMouseMove)
@@ -486,6 +575,7 @@ export default {
     function onArchivosSplitStart(e) {
       const startX = e.clientX
       const startWidth = archivosTreeWidth.value
+      const startWidthFull = archivosTreeWidthFull.value
       const container = e.target.closest('.archivos-container')
 
       function onMouseMove(e) {
@@ -493,7 +583,11 @@ export default {
         const containerWidth = container ? container.getBoundingClientRect().width : 400
         const minWidth = 80
         const maxWidth = containerWidth - 80
-        archivosTreeWidth.value = Math.max(minWidth, Math.min(maxWidth, startWidth + delta))
+        if (isFullWidth.value) {
+          archivosTreeWidthFull.value = Math.max(minWidth, Math.min(maxWidth, startWidthFull + delta))
+        } else {
+          archivosTreeWidth.value = Math.max(minWidth, Math.min(maxWidth, startWidth + delta))
+        }
       }
 
       function onMouseUp() {
@@ -501,6 +595,7 @@ export default {
         document.removeEventListener('mouseup', onMouseUp)
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
+        saveArchivosTreeWidth()
       }
 
       document.addEventListener('mousemove', onMouseMove)
@@ -582,12 +677,14 @@ export default {
       if (!newId) {
         projectVariables.clearVariables()
         comandosStore.clearCommands()
+        docNotasStore.clearNotas()
         capturas.value = []
         capturaSeleccionada.value = null
         return
       }
       projectVariables.loadVariables(newId)
       comandosStore.loadCommands(newId)
+      docNotasStore.loadNotas(newId)
       loadCapturas(newId)
     })
 
@@ -786,11 +883,19 @@ export default {
 
     function onResizeStart(e) {
       rightPanelTransitioning.value = false
+      const resizeHandle = e.currentTarget
 
       function onMouseMove(e) {
-        const leftWidth = ui.sidebarCollapsed ? 0 : ui.sidebarWidth
-        const maxAllowed = Math.max(window.innerWidth * 0.05, window.innerWidth - leftWidth - window.innerWidth * 0.05)
-        rightPanelWidth.value = Math.max(window.innerWidth * 0.05, Math.min(maxAllowed, window.innerWidth - e.clientX))
+        if (ui.centralPanelCollapsed) {
+          const container = resizeHandle.closest('.sidebar-right')?.parentElement
+          const containerWidth = container ? container.getBoundingClientRect().width : window.innerWidth
+          const rightPct = ((containerWidth - e.clientX) / containerWidth) * 100
+          ui.setSidebarWidthPct(100 - Math.max(5, Math.min(95, rightPct)))
+        } else {
+          const leftWidth = ui.sidebarCollapsed ? 0 : ui.sidebarWidth
+          const maxAllowed = Math.max(window.innerWidth * 0.05, window.innerWidth - leftWidth - window.innerWidth * 0.05)
+          rightPanelWidth.value = Math.max(window.innerWidth * 0.05, Math.min(maxAllowed, window.innerWidth - e.clientX))
+        }
       }
 
       function onMouseUp() {
@@ -827,10 +932,12 @@ export default {
       rightPanelCollapsed,
       rightPanelWidth,
       rightPanelTransitioning,
+      sidebarStyle,
       tab,
       selectTab,
       activeSessionId,
       activeSession,
+      activeTicketId,
       sessionWithTicket,
       comments,
       loading,
@@ -854,22 +961,22 @@ export default {
       executingCommands,
       onResizeStart,
       selectedFilePath,
-      archivosTreeWidth,
+      effectiveArchivosTreeWidth,
       onFileSelected,
       onArchivosSplitStart,
       capturas,
       loadingCapturas,
       capturaSeleccionada,
-      capturasListWidth,
+      effectiveCapturasListWidth,
       seleccionarCaptura,
       verDetallesCaptura,
       eliminarCaptura,
       onCapturasSplitStart,
       filtrarPorSesion,
       tomarCaptura,
-      casosPruebaListWidth,
+      effectiveCasosPruebaListWidth,
       onCasosPruebaSplitStart,
-      casosPruebaMiddleWidth,
+      effectiveCasosPruebaMiddleWidth,
       onCasosPruebaMiddleSplitStart,
     }
   },
