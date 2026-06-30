@@ -431,7 +431,7 @@ export default {
     }
 
     async function fetchRecordings() {
-      await logsStore.fetchRecordings(currentProjectId.value)
+      await logsStore.fetchRecordings()
     }
 
     async function startRecording() {

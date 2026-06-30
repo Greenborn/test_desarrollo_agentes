@@ -1,0 +1,743 @@
+import { ref } from 'vue'
+import { useChatStore } from '../stores/chat.js'
+import { useOpencodeStore } from '../stores/opencode.js'
+import { useGitStore } from '../stores/git.js'
+import { useProjectVariables } from './useProjectVariables.js'
+
+const DOC_LABELS = {
+  base_datos: 'Base de Datos',
+  subproyectos: 'Subproyectos',
+  endpoints: 'Endpoints',
+  web_sockets: 'WebSockets',
+  funcionalidades: 'Funcionalidades',
+}
+
+export function useOpencodeStreaming() {
+  const chat = useChatStore()
+  const ocStore = useOpencodeStore()
+  const gitStore = useGitStore()
+  const { getVariables, interpolate } = useProjectVariables()
+
+  const ocStreaming = ref(false)
+  const ocChunk = ref('')
+  const ocThinking = ref('')
+  const streamSessionId = ref(null)
+  const streamingConsole = ref(false)
+
+  function isActiveSession(sid) {
+    return sid && Number(chat.activeSessionId) === Number(sid)
+  }
+
+  async function _getProyectoId() {
+    const sid = chat.activeSessionId
+    if (!sid) return null
+    try {
+      const res = await fetch(`/api/proyecto/session/${sid}`, { credentials: 'include' })
+      const data = await res.json()
+      return data.proyectoId || null
+    } catch (err) {
+      console.error('Error al obtener proyecto de sesión:', err.message)
+      return null
+    }
+  }
+
+  async function resolveInput(text) {
+    if (!text || !text.includes('{{')) return text
+    const proyectoId = await _getProyectoId()
+    if (!proyectoId) return text
+    const variables = await getVariables(proyectoId)
+    return interpolate(text, variables)
+  }
+
+  function fetchGitBranch() {
+    return gitStore.fetchGitBranch(chat.activeSessionId)
+  }
+
+  async function addMessage(role, content, extra) {
+    const msg = { role, content, _key: 'msg-' + Date.now() + '-' + Math.random(), ...extra }
+    chat.pushMessage(msg)
+    return msg
+  }
+
+  async function opencodeStreamDescripcion(sessionId, prompt, provider, model, thinking, mode, temperature, ticket) {
+    ocStreaming.value = true
+    ocChunk.value = ''
+    ocThinking.value = ''
+    streamSessionId.value = sessionId
+    if (sessionId) chat.setSessionStatus(sessionId, 'executing')
+    chat.setOcStreaming(sessionId, true)
+
+    const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
+    streamMsg._key = 'stream-' + Date.now()
+
+    await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
+      onChunk(content) {
+        ocChunk.value += content
+        chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].content = ocChunk.value
+        }
+      },
+      onThinking(content) {
+        ocThinking.value += content
+        chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+        }
+      },
+      onControl(control) {
+        const controlMsg = {
+          role: 'opencode_control',
+          content: JSON.stringify(control),
+          controlData: control,
+          _key: 'control-' + Date.now(),
+        }
+        chat._saveMessageToDb(sessionId, controlMsg)
+        if (isActiveSession(sessionId)) {
+          chat.pushMessage(controlMsg)
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+      onDone(json, fullText) {
+        chat.setOcStreaming(sessionId, false)
+        chat.clearOcStreamCache(sessionId)
+        ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+        if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+        const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
+        const thinking = json.thinking || ocThinking.value || null
+        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse, thinking })
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) {
+            chat.messages[idx].streaming = false
+            chat.messages[idx].role = 'opencode_result'
+            chat.messages[idx].content = fullResponse
+            chat.messages[idx].thinking = thinking
+          }
+          chat.pushMessage({
+            role: 'opencode_control',
+            controlData: {
+              controlId: 'descripcion-result-' + Date.now(),
+              controlType: 'descripcion_result',
+              description: fullResponse,
+              loading: false,
+              ticket,
+            },
+            _key: 'control-' + Date.now(),
+          })
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+      onError(msg) {
+        chat.setOcStreaming(sessionId, false)
+        chat.clearOcStreamCache(sessionId)
+        ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+        if (sessionId) chat.setSessionStatus(sessionId, 'error')
+        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) {
+            chat.messages[idx].content = '[Error: ' + msg + ']'
+            chat.messages[idx].streaming = false
+          }
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+    })
+  }
+
+  async function opencodeStreamDescripcionFollowup(sessionId, userPrompt, ticket, temperature, descripcionData) {
+    ocStreaming.value = true
+    ocChunk.value = ''
+    ocThinking.value = ''
+    streamSessionId.value = sessionId
+    if (sessionId) chat.setSessionStatus(sessionId, 'executing')
+    chat.setOcStreaming(sessionId, true)
+
+    if (isActiveSession(sessionId)) {
+      chat.pushMessage({
+        role: 'user',
+        content: userPrompt,
+        _key: 'user-' + Date.now(),
+      })
+
+      chat.pushMessage({
+        role: 'opencode_info',
+        content: '📤 Mensaje enviado a OpenCode:\n\n' + userPrompt,
+        _key: 'prompt-' + Date.now(),
+      })
+    }
+
+    const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
+    streamMsg._key = 'stream-' + Date.now()
+
+    await ocStore.streamPrompt(sessionId, userPrompt, descripcionData.provider, ocStore.selectedModel || descripcionData.model, ocStore.selectedThinking || descripcionData.thinking, ocStore.selectedMode || descripcionData.mode, temperature, {
+      onChunk(content) {
+        ocChunk.value += content
+        chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].content = ocChunk.value
+        }
+      },
+      onThinking(content) {
+        ocThinking.value += content
+        chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+        }
+      },
+      onControl(control) {
+        const controlMsg = {
+          role: 'opencode_control',
+          content: JSON.stringify(control),
+          controlData: control,
+          _key: 'control-' + Date.now(),
+        }
+        chat._saveMessageToDb(sessionId, controlMsg)
+        if (isActiveSession(sessionId)) {
+          chat.pushMessage(controlMsg)
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+      onDone(json, fullText) {
+        chat.setOcStreaming(sessionId, false)
+        chat.clearOcStreamCache(sessionId)
+        ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+        if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+        const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
+        const thinking = json.thinking || ocThinking.value || null
+        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse, thinking })
+        if (isActiveSession(sessionId)) {
+          for (let i = chat.messages.length - 1; i >= 0; i--) {
+            const m = chat.messages[i]
+            if (m.controlData && m.controlData.controlType === 'descripcion_result') {
+              chat.messages[i] = {
+                role: 'result',
+                content: m.controlData.description || '(descripción anterior)',
+                _key: 'old-result-' + Date.now(),
+              }
+              break
+            }
+          }
+          const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (streamIdx >= 0) {
+            chat.messages[streamIdx] = {
+              role: 'opencode_control',
+              controlData: {
+                controlId: 'descripcion-result-' + Date.now(),
+                controlType: 'descripcion_result',
+                description: fullResponse,
+                loading: false,
+                ticket,
+              },
+              _key: 'control-' + Date.now(),
+            }
+          }
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+      onError(msg) {
+        chat.setOcStreaming(sessionId, false)
+        chat.clearOcStreamCache(sessionId)
+        ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+        if (sessionId) chat.setSessionStatus(sessionId, 'error')
+        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
+        if (isActiveSession(sessionId)) {
+          const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (streamIdx >= 0) {
+            chat.messages[streamIdx].content = '[Error: ' + msg + ']'
+            chat.messages[streamIdx].streaming = false
+          }
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+    })
+  }
+
+  async function opencodeStreamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature) {
+    ocStreaming.value = true
+    ocChunk.value = ''
+    ocThinking.value = ''
+    streamSessionId.value = sessionId
+    if (sessionId) chat.setSessionStatus(sessionId, 'executing')
+    chat.setOcStreaming(sessionId, true)
+
+    const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
+    streamMsg._key = 'stream-' + Date.now()
+
+    if (mode === 'Build') {
+      streamingConsole.value = true
+    }
+
+    await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
+      onChunk(content) {
+        ocChunk.value += content
+        chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].content = ocChunk.value
+        }
+      },
+      onThinking(content) {
+        ocThinking.value += content
+        chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+        }
+      },
+      onControl(control) {
+        const controlMsg = {
+          role: 'opencode_control',
+          content: JSON.stringify(control),
+          controlData: control,
+          _key: 'control-' + Date.now(),
+        }
+        chat._saveMessageToDb(sessionId, controlMsg)
+        if (isActiveSession(sessionId)) {
+          chat.pushMessage(controlMsg)
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+      async onDone(json, fullText) {
+        chat.setOcStreaming(sessionId, false)
+        chat.clearOcStreamCache(sessionId)
+        ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+        if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+        const content = json.fullResponse || fullText || '(sin respuesta)'
+        const thinking = json.thinking || ocThinking.value || null
+        await chat._saveMessageToDb(sessionId, { role: 'opencode_result', content, thinking })
+        if (!isActiveSession(sessionId)) {
+          chat.pendingNotifications[sessionId] = Date.now()
+          return
+        }
+
+        const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+        if (idx >= 0) {
+          chat.messages[idx] = {
+            role: 'opencode_result',
+            content,
+            thinking,
+            _key: 'result-' + Date.now(),
+          }
+        }
+        fetchGitBranch()
+        streamingConsole.value = false
+      },
+      onError(msg) {
+        streamingConsole.value = false
+        chat.setOcStreaming(sessionId, false)
+        chat.clearOcStreamCache(sessionId)
+        ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+        if (sessionId) chat.setSessionStatus(sessionId, 'error')
+        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) {
+            chat.messages[idx].streaming = false
+            chat.messages[idx].role = 'opencode_result'
+            chat.messages[idx].content = '[Error: ' + msg + ']'
+          }
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+    })
+  }
+
+  async function opencodeStreamPromptCommit(sessionId, prompt, provider, model, thinking, mode, temperature) {
+    ocStreaming.value = true
+    ocChunk.value = ''
+    ocThinking.value = ''
+    streamSessionId.value = sessionId
+    if (sessionId) chat.setSessionStatus(sessionId, 'executing')
+    chat.setOcStreaming(sessionId, true)
+
+    const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
+    streamMsg._key = 'stream-' + Date.now()
+
+    await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
+      onChunk(content) {
+        ocChunk.value += content
+        chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].content = ocChunk.value
+        }
+      },
+      onThinking(content) {
+        ocThinking.value += content
+        chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+        }
+      },
+      onControl(control) {
+        const controlMsg = {
+          role: 'opencode_control',
+          content: JSON.stringify(control),
+          controlData: control,
+          _key: 'control-' + Date.now(),
+        }
+        chat._saveMessageToDb(sessionId, controlMsg)
+        if (isActiveSession(sessionId)) {
+          chat.pushMessage(controlMsg)
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+      async onDone(json, fullText) {
+        const opencodeResponse = json.fullResponse || fullText || '(sin respuesta)'
+        const thinking = json.thinking || ocThinking.value || null
+        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: opencodeResponse, thinking })
+        chat.setOcStreaming(sessionId, false)
+        chat.clearOcStreamCache(sessionId)
+        ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+        if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+        if (!isActiveSession(sessionId)) {
+          chat.pendingNotifications[sessionId] = Date.now()
+          return
+        }
+
+        try {
+          const systemPrompt = 'Eres un asistente que reduce mensajes de commit. Recibes un mensaje de commit y debes acortarlo a un máximo de 256 caracteres manteniendo el significado y la claridad. Devuelve ÚNICAMENTE el mensaje reducido, sin explicaciones ni formato adicional.'
+
+          const res = await fetch('/api/chat/refine', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ text: opencodeResponse, systemPrompt, sessionId }),
+          })
+
+          if (!res.ok) {
+            let errMsg = 'Error al reducir mensaje de commit'
+            try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
+            throw new Error(errMsg)
+          }
+
+          let refinedText = ''
+          ocChunk.value = ''
+          ocThinking.value = ''
+
+          const reader = res.body.getReader()
+          const decoder = new TextDecoder()
+          let buf = ''
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buf += decoder.decode(value, { stream: true })
+            const lines = buf.split('\n')
+            buf = lines.pop() || ''
+
+            for (const line of lines) {
+              const t = line.trim()
+              if (!t || !t.startsWith('data: ')) continue
+              try {
+                const j = JSON.parse(t.slice(6))
+                if (j.type === 'response') {
+                  refinedText += j.content
+                  ocChunk.value += j.content
+                  chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+                  if (isActiveSession(sessionId)) {
+                    const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+                    if (idx >= 0) {
+                      chat.messages[idx].content = refinedText
+                    }
+                  }
+                } else if (j.type === 'thinking') {
+                  if (isActiveSession(sessionId)) ocThinking.value += j.content
+                } else if (j.type === 'error') {
+                  throw new Error(j.content)
+                }
+              } catch (e) {
+                if (e.message && e.message !== 'Unexpected end of JSON input') throw e
+              }
+            }
+          }
+
+          ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+          if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+
+          if (isActiveSession(sessionId)) {
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) {
+              const finalMessage = refinedText || opencodeResponse
+              chat.messages[idx] = {
+                role: 'opencode_control',
+                controlData: {
+                  controlId: 'commit-result-' + Date.now(),
+                  controlType: 'commit_result',
+                  message: finalMessage,
+                  loading: false,
+                  modo_envio: 'encolar',
+                },
+                _key: 'control-' + Date.now(),
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error al refinar mensaje de commit:', err.message)
+          ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+          if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+          if (isActiveSession(sessionId)) {
+            const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+            if (idx >= 0) {
+              const fallbackMessage = opencodeResponse + (err ? '\n\n[Error al reducir: ' + err.message + ']' : '')
+              chat.messages[idx] = {
+                role: 'opencode_control',
+                controlData: {
+                  controlId: 'commit-result-' + Date.now(),
+                  controlType: 'commit_result',
+                  message: fallbackMessage,
+                  loading: false,
+                  modo_envio: 'encolar',
+                },
+                _key: 'control-' + Date.now(),
+              }
+            }
+          }
+        }
+        fetchGitBranch()
+      },
+      onError(msg) {
+        chat.setOcStreaming(sessionId, false)
+        chat.clearOcStreamCache(sessionId)
+        ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+        if (sessionId) chat.setSessionStatus(sessionId, 'error')
+        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) {
+            chat.messages[idx].streaming = false
+            chat.messages[idx].role = 'opencode_result'
+            chat.messages[idx].content = '[Error: ' + msg + ']'
+          }
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+    })
+  }
+
+  async function opencodeStreamPromptTestingNotes(sessionId, prompt, provider, model, thinking, mode, temperature, origen, destino) {
+    if (!isActiveSession(sessionId)) {
+      console.log('[testing-notes] sesión inactiva, ignorando')
+      return
+    }
+    ocStreaming.value = true
+    if (sessionId) chat.setSessionStatus(sessionId, 'ai-thinking')
+    ocChunk.value = ''
+    ocThinking.value = ''
+    chat.setOcStreaming(sessionId, true)
+
+    const streamMsg = {
+      role: 'opencode_stream',
+      content: '',
+      thinking: null,
+      streaming: true,
+      _key: 'stream-' + Date.now(),
+    }
+    chat.pushMessage(streamMsg)
+
+    await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
+      onChunk(text) {
+        ocChunk.value += text
+        chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].content = ocChunk.value
+        }
+      },
+      onThinking(text) {
+        ocThinking.value += text
+        chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+        }
+      },
+      onControl(control) {
+        if (!isActiveSession(sessionId)) return
+        console.log('[testing-notes] control:', control)
+      },
+      async onDone(json, fullText) {
+        const opencodeResponse = json.fullResponse || fullText || '(sin respuesta)'
+        const thinking = json.thinking || ocThinking.value || null
+        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: opencodeResponse, thinking })
+        chat.setOcStreaming(sessionId, false)
+        chat.clearOcStreamCache(sessionId)
+        ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+        if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+        if (!isActiveSession(sessionId)) {
+          chat.pendingNotifications[sessionId] = Date.now()
+          return
+        }
+
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'opencode_control',
+              controlData: {
+                controlId: 'ambientes-diff-comment-' + Date.now(),
+                controlType: 'ambientes_diff_comment',
+                message: opencodeResponse,
+                sourceEnv: origen,
+                targetEnv: destino,
+                modo_envio: 'encolar',
+                fromTestingNotes: true,
+              },
+              _key: 'control-' + Date.now(),
+            }
+          }
+        }
+      },
+      onError(msg) {
+        console.error('[testing-notes] error:', msg)
+        chat.setOcStreaming(sessionId, false)
+        chat.clearOcStreamCache(sessionId)
+        ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+        if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) {
+            chat.messages[idx].streaming = false
+            chat.messages[idx].role = 'opencode_result'
+            chat.messages[idx].content = '[Error: ' + msg + ']'
+          }
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+    })
+  }
+
+  async function opencodeStreamPromptDocUpdate(sessionId, prompt, provider, model, thinking, mode, temperature, proyectoId, tipo) {
+    ocStreaming.value = true
+    ocChunk.value = ''
+    ocThinking.value = ''
+    streamSessionId.value = sessionId
+    if (sessionId) chat.setSessionStatus(sessionId, 'executing')
+    chat.setOcStreaming(sessionId, true)
+
+    const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
+    streamMsg._key = 'stream-' + Date.now()
+
+    await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
+      onChunk(content) {
+        ocChunk.value += content
+        chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].content = ocChunk.value
+        }
+      },
+      onThinking(content) {
+        ocThinking.value += content
+        chat.updateOcStreamCache(sessionId, ocChunk.value, ocThinking.value, streamMsg._key)
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) chat.messages[idx].thinking = ocThinking.value
+        }
+      },
+      onControl(control) {
+        const controlMsg = {
+          role: 'opencode_control',
+          content: JSON.stringify(control),
+          controlData: control,
+          _key: 'control-' + Date.now(),
+        }
+        chat._saveMessageToDb(sessionId, controlMsg)
+        if (isActiveSession(sessionId)) {
+          chat.pushMessage(controlMsg)
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+      async onDone(json, fullText) {
+        chat.setOcStreaming(sessionId, false)
+        chat.clearOcStreamCache(sessionId)
+        ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+        if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+        const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
+        const thinking = json.thinking || ocThinking.value || null
+        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse, thinking })
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) {
+            chat.messages[idx].streaming = false
+            chat.messages[idx].role = 'opencode_result'
+            chat.messages[idx].content = fullResponse
+            chat.messages[idx].thinking = thinking
+          }
+
+          try {
+            const label = DOC_LABELS[tipo] || tipo
+            const res = await fetch(`/api/documentacion/${tipo}/${encodeURIComponent(proyectoId)}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ data: fullResponse }),
+            })
+            if (!res.ok) {
+              const errData = await res.json()
+              throw new Error(errData.error || 'Error al guardar documentación')
+            }
+            chat.pushMessage({
+              role: 'result',
+              content: `Documentación de ${label} actualizada correctamente para el proyecto "${proyectoId}".`,
+              _key: 'result-' + Date.now(),
+            })
+          } catch (err) {
+            console.error('Error al guardar documentación:', err.message)
+            chat.pushMessage({
+              role: 'result',
+              content: 'Error al guardar documentación: ' + err.message,
+              _key: 'result-' + Date.now(),
+            })
+          }
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+      onError(msg) {
+        chat.setOcStreaming(sessionId, false)
+        chat.clearOcStreamCache(sessionId)
+        ocStreaming.value = chat.getIsOcStreaming(chat.activeSessionId)
+        if (sessionId) chat.setSessionStatus(sessionId, 'error')
+        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
+        if (isActiveSession(sessionId)) {
+          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (idx >= 0) {
+            chat.messages[idx].content = '[Error: ' + msg + ']'
+            chat.messages[idx].streaming = false
+          }
+        } else {
+          chat.pendingNotifications[sessionId] = Date.now()
+        }
+      },
+    })
+  }
+
+  return {
+    ocStreaming, ocChunk, ocThinking, streamSessionId, streamingConsole,
+    isActiveSession, _getProyectoId, resolveInput, fetchGitBranch, addMessage,
+    opencodeStreamPrompt, opencodeStreamPromptCommit, opencodeStreamPromptTestingNotes,
+    opencodeStreamPromptDocUpdate, opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
+    DOC_LABELS,
+  }
+}

@@ -505,6 +505,15 @@ export const useChatStore = defineStore('chat', () => {
           activeSessionId.value = null
           messages.value = []
         }
+        try {
+          const { useOpencodeStore } = await import('./opencode.js')
+          const ocStore = useOpencodeStore()
+          if (ocStore.sessionsMap[String(sessionId)]) {
+            delete ocStore.sessionsMap[String(sessionId)]
+          }
+        } catch (e) {
+          console.error('Error limpiando opencode para sesión eliminada:', e.message)
+        }
     delete _streamingSessions.value[sessionId]
     delete _ocStreamingSessions.value[sessionId]
     delete _sessionStreamCache.value[sessionId]
@@ -554,6 +563,14 @@ export const useChatStore = defineStore('chat', () => {
     sessionTickets.value = {}
     _sessionStreamCache.value = {}
     _ocSessionStreamCache.value = {}
+    import('./opencode.js').then(({ useOpencodeStore }) => {
+      try {
+        const ocStore = useOpencodeStore()
+        ocStore.clearAllSessions()
+      } catch (e) {
+        console.error('Error limpiando opencode en stopAllExecutions:', e.message)
+      }
+    }).catch(e => console.error('Error importando opencode store:', e.message))
   }
 
   async function pushMessage(msg, targetSessionId) {
@@ -608,6 +625,11 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function getIsOcStreaming(sessionId) {
+    if (!sessionId) return false
+    return !!_ocStreamingSessions.value[String(sessionId)]
+  }
+
   function updateOcStreamCache(sessionId, chunk, thinking, msgKey) {
     if (!sessionId) return
     if (!_ocSessionStreamCache.value[sessionId]) {
@@ -658,7 +680,7 @@ export const useChatStore = defineStore('chat', () => {
     loadingMore, hasMoreMessages,
     sendMessage, deleteMessage, deleteSession, clearMessages, stopAllExecutions,
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
-    setOcStreaming, updateOcStreamCache, clearOcStreamCache,
+    setOcStreaming, getIsOcStreaming, updateOcStreamCache, clearOcStreamCache,
     sessionTickets, activeSessionTicket, setSessionTicket, clearSessionTicket,
     _saveMessageToDb, clearPendingNotification, ledFlash, flashLed,
     saveUiState,

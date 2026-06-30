@@ -31,6 +31,7 @@
       <RedmineCommentsSendControl v-else-if="parsedControl && parsedControl.controlType === 'redmine_comments_send'" :comentarios_ids="parsedControl.comentarios_ids || []" :ticket_redmine_id="parsedControl.ticket_redmine_id || 0" :mensaje="parsedControl.mensaje || ''" :cantidad="parsedControl.cantidad || 0" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <AmbientesDiffCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ambientes_diff_comment'" :message="parsedControl.message || ''" :sourceEnv="parsedControl.sourceEnv || ''" :targetEnv="parsedControl.targetEnv || ''" :modoEnvioInicial="parsedControl.modo_envio || 'encolar'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <TicketCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_comment'" :ticketId="parsedControl.ticketId" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <DeployConfigForm v-else-if="parsedControl && parsedControl.controlType === 'deploy_config_form'" :initialSubprojects="parsedControl.initialSubprojects || []" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <ChatCdSelector v-else-if="parsedControl && parsedControl.controlType === 'cd_selector'" :current-dir="parsedControl.currentDir || '/' " @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <PeticionFormControl v-else-if="parsedControl && parsedControl.controlType === 'peticion'" :sending="parsedControl.sending || false" :progressText="parsedControl.progressText || ''" :initialData="parsedControl.initialData || null" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <PeticionResultDisplay v-else-if="parsedControl && parsedControl.controlType === 'peticion_result'" :payload="parsedControl.payload || {}" />
@@ -121,6 +122,7 @@
 import ControlSelect from '../chat-controls/ChatControlSelect.vue'
 import ControlTextarea from '../chat-controls/ChatControlTextarea.vue'
 import ChatCdSelector from '../chat-controls/ChatCdSelector.vue'
+import DeployConfigForm from '../chat-controls/DeployConfigForm.vue'
 import ChatComandoEditControl from '../chat-controls/ChatComandoEditControl.vue'
 import ChatControlButtons from '../chat-controls/ChatControlButtons.vue'
 import ChatControlFollowup from '../chat-controls/ChatControlFollowup.vue'
@@ -145,7 +147,7 @@ import PeticionResultDisplay from '../peticiones/PeticionResultDisplay.vue'
 let counter = 0
 
 export default {
-  components: { ControlSelect, ControlTextarea, ChatCdSelector, ChatControlFollowup, ChatOpencodeForm, ChatGenerarCommitForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, TicketCreateControl, DescripcionEditControl, DescripcionInputControl, DescripcionResultControl, CommitResultControl, ChatControlButtons, ResolutionSelectControl, RedmineCommentsSendControl, AmbientesDiffCommentControl, TicketCommentControl, ChatComandoEditControl, PeticionFormControl, PeticionResultDisplay },
+  components: { ControlSelect, ControlTextarea, ChatCdSelector, DeployConfigForm, ChatControlFollowup, ChatOpencodeForm, ChatGenerarCommitForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, TicketCreateControl, DescripcionEditControl, DescripcionInputControl, DescripcionResultControl, CommitResultControl, ChatControlButtons, ResolutionSelectControl, RedmineCommentsSendControl, AmbientesDiffCommentControl, TicketCommentControl, ChatComandoEditControl, PeticionFormControl, PeticionResultDisplay },
   props: {
     msg: { type: Object, required: true },
     rawMsgKeys: { type: Set, default: () => new Set() },

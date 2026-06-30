@@ -35,7 +35,7 @@
             @click="seleccionarNota(n)" role="button">
             <div class="doc-nota-info min-width-0 flex-grow-1">
               <div class="doc-nota-clave text-truncate small fw-semibold">{{ n.clave }}</div>
-              <div class="doc-nota-ticket text-muted" style="font-size: 0.6rem;">#{{ n.id_ticket }}</div>
+              <div class="doc-nota-ticket text-muted" style="font-size: 0.6rem;">{{ n.id_ticket ? '#' + n.id_ticket : 'General' }}</div>
             </div>
             <button class="doc-nota-delete-btn" title="Eliminar nota" @click.stop="eliminarNota(n)">×</button>
           </div>
@@ -48,7 +48,7 @@
             <input v-if="!previewMode" ref="claveEditInput" v-model="editClave" @input="sanitizeClave"
               class="doc-nota-clave-input flex-grow-1" maxlength="255" />
             <span v-else class="small text-light fw-semibold text-truncate">{{ selectedNota.clave }}</span>
-            <span class="text-muted" style="font-size: 0.6rem;">#{{ selectedNota.id_ticket }}</span>
+            <span class="text-muted" style="font-size: 0.6rem;">{{ selectedNota.id_ticket ? '#' + selectedNota.id_ticket : 'General' }}</span>
             <label class="d-flex align-items-center gap-1 ms-2" style="cursor: pointer; font-size: 0.65rem; color: #9ca3af; user-select: none;">
               <span>{{ isJson ? 'JSON' : 'MD' }}</span>
               <input type="checkbox" v-model="previewMode" class="form-check-input m-0" style="width: 14px; height: 14px; cursor: pointer;" />
@@ -100,9 +100,27 @@
             style="font-size: 0.75rem;" placeholder="nombre_de_la_nota" maxlength="255" />
         </div>
         <div class="mb-2">
+          <label class="small text-secondary mb-1">Tipo de documentación</label>
+          <div class="d-flex gap-3">
+            <label class="d-flex align-items-center gap-1" style="cursor:pointer;font-size:0.75rem;color:#cbd5e1;">
+              <input type="radio" value="general" v-model="createTicketType" class="form-check-input m-0" />
+              General
+            </label>
+            <label class="d-flex align-items-center gap-1" style="cursor:pointer;font-size:0.75rem;color:#cbd5e1;">
+              <input type="radio" value="especifica" v-model="createTicketType" class="form-check-input m-0" />
+              Específica
+            </label>
+          </div>
+        </div>
+        <div v-if="createTicketType === 'especifica'" class="mb-2">
           <label class="small text-secondary mb-1">Ticket Redmine</label>
-          <input v-model="createTicket" class="form-control form-control-sm bg-dark text-light border-secondary"
-            style="font-size: 0.75rem;" placeholder="ID del ticket" type="number" />
+          <select v-model="createTicket" class="form-select form-select-sm bg-dark text-light border-secondary"
+            style="font-size: 0.75rem;">
+            <option value="" disabled>Seleccione un ticket</option>
+            <option v-for="t in tickets" :key="t.redmine_id" :value="t.redmine_id">
+              #{{ t.redmine_id }} — {{ t.subject }}
+            </option>
+          </select>
         </div>
         <div class="mb-2">
           <label class="small text-secondary mb-1">Valor</label>
@@ -114,7 +132,7 @@
         </div>
         <div class="d-flex gap-2 justify-content-end mt-3">
           <button class="btn btn-sm btn-outline-secondary py-0 px-3" style="font-size: 0.7rem;" @click="cerrarCrear">Cancelar</button>
-          <button class="btn btn-sm btn-outline-success py-0 px-3" style="font-size: 0.7rem;" @click="crearNota" :disabled="!createClave || !createValor || !createTicket">Crear</button>
+          <button class="btn btn-sm btn-outline-success py-0 px-3" style="font-size: 0.7rem;" @click="crearNota" :disabled="!createClave || !createValor || (createTicketType === 'especifica' && !createTicket)">Crear</button>
         </div>
         <div v-if="createError" class="text-danger small mt-2">{{ createError }}</div>
       </div>
@@ -177,6 +195,9 @@ export default {
     const createClave = ref('')
     const createValor = ref('')
     const createTicket = ref('')
+    const createTicketType = ref('general')
+    const tickets = ref([])
+    const ticketsLoading = ref(false)
     const createError = ref('')
     const claveInput = ref(null)
 
@@ -335,8 +356,10 @@ export default {
       createClave.value = ''
       createValor.value = ''
       createTicket.value = props.ticketId || ''
+      createTicketType.value = props.ticketId ? 'especifica' : 'general'
       createError.value = ''
       showCreateModal.value = true
+      loadTickets()
       nextTick(() => {
         if (claveInput.value) claveInput.value.focus()
       })
@@ -348,18 +371,20 @@ export default {
 
     async function crearNota() {
       if (!createClave.value || !createValor.value) return
-      const ticketVal = parseInt(createTicket.value, 10)
-      if (!ticketVal || ticketVal <= 0) {
-        createError.value = 'ID de ticket requerido'
+      if (createTicketType.value === 'especifica' && !createTicket.value) {
+        createError.value = 'Debe seleccionar un ticket para documentación específica'
         return
       }
+      const payload = {
+        id_proyecto: props.proyectoId,
+        clave: createClave.value,
+        valor: createValor.value,
+      }
+      if (createTicketType.value === 'especifica') {
+        payload.id_ticket = parseInt(createTicket.value, 10)
+      }
       try {
-        await store.createNota({
-          id_proyecto: props.proyectoId,
-          clave: createClave.value,
-          valor: createValor.value,
-          id_ticket: ticketVal,
-        })
+        await store.createNota(payload)
         cerrarCrear()
       } catch (err) {
         createError.value = err.message
@@ -389,6 +414,23 @@ export default {
         }
       } catch (err) {
         console.error('Error al cargar prompt del agente:', err)
+      }
+    }
+
+    async function loadTickets() {
+      if (!props.proyectoId) return
+      ticketsLoading.value = true
+      try {
+        const res = await fetch(`/api/tickets?proyecto_id=${encodeURIComponent(props.proyectoId)}`, { credentials: 'include' })
+        if (res.ok) {
+          const data = await res.json()
+          tickets.value = data.tickets || []
+        }
+      } catch (err) {
+        console.error('Error al cargar tickets:', err)
+        tickets.value = []
+      } finally {
+        ticketsLoading.value = false
       }
     }
 
@@ -527,6 +569,9 @@ export default {
       createClave,
       createValor,
       createTicket,
+      createTicketType,
+      tickets,
+      ticketsLoading,
       createError,
       claveInput,
       onSplitStart,

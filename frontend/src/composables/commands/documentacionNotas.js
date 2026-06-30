@@ -52,7 +52,10 @@ register({
     const data = await res.json();
     if (!data || data.length === 0) return '(sin notas de documentación)';
 
-    const lines = data.map(n => `  [${n.id}] ${n.clave} (ticket #${n.id_ticket})`);
+    const lines = data.map(n => {
+      const ticketLabel = n.id_ticket ? `ticket #${n.id_ticket}` : 'general';
+      return `  [${n.id}] ${n.clave} (${ticketLabel})`;
+    });
     return `Notas de documentación para ${proyectoId}:\n${lines.join('\n')}`;
   },
 });
@@ -60,7 +63,7 @@ register({
 register({
   name: '/doc_nota_crear',
   category: 'Documentación',
-  description: 'Crea una nota de documentación. El ticket se toma del contexto de sesión.',
+  description: 'Crea una nota de documentación. Si hay ticket vinculado a la sesión se asocia automáticamente; si no, se crea como documentación general.',
   usage: '/doc_nota_crear --clave=<key> --valor=<text> [--proyecto-id=<id>]',
   async autocomplete(args, cmdStore) {
     const last = args[args.length - 1] || '';
@@ -95,6 +98,12 @@ register({
     const proyectoId = await _resolveProyectoId(args, chatStore, sessionId);
     if (!proyectoId) throw new Error('No hay proyecto seleccionado. Use /chat_set_proyecto o --proyecto-id.');
 
+    const payload = {
+      id_proyecto: proyectoId,
+      clave: params.clave,
+      valor: params.valor,
+    };
+
     let idTicket = _getSessionTicketId(chatStore.sessions, sessionId);
     if (!idTicket) {
       try {
@@ -102,26 +111,24 @@ register({
         const data = await res.json();
         idTicket = data.idTicketRedmine || null;
       } catch {
-        throw new Error('No hay ticket vinculado a esta sesión. Use /chat_set_ticket primero o vincule un ticket.');
+        idTicket = null
       }
     }
-    if (!idTicket) throw new Error('No hay ticket vinculado a esta sesión. Use /chat_set_ticket primero.');
+    if (idTicket) {
+      payload.id_ticket = parseInt(idTicket, 10);
+    }
 
     const res = await fetch(`${API_BASE}/notas`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({
-        id_proyecto: proyectoId,
-        clave: params.clave,
-        valor: params.valor,
-        id_ticket: parseInt(idTicket, 10),
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error al crear nota');
 
-    return `✓ Nota "${params.clave}" creada (id: ${data.id})`;
+    const ticketInfo = payload.id_ticket ? ` (ticket #${payload.id_ticket})` : ' (general)';
+    return `✓ Nota "${params.clave}" creada${ticketInfo} (id: ${data.id})`;
   },
 });
 
@@ -149,7 +156,8 @@ register({
       throw new Error(errData.error || 'Error al obtener nota');
     }
     const data = await res.json();
-    return `Nota: ${data.clave} (ticket #${data.id_ticket})\n---\n${data.valor || '(sin contenido)'}\n---\nCreada: ${data.created_at} | Editada: ${data.updated_at}`;
+    const ticketLabel = data.id_ticket ? `ticket #${data.id_ticket}` : 'general';
+    return `Nota: ${data.clave} (${ticketLabel})\n---\n${data.valor || '(sin contenido)'}\n---\nCreada: ${data.created_at} | Editada: ${data.updated_at}`;
   },
 });
 

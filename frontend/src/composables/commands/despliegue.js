@@ -32,7 +32,7 @@ function parseResolutionArg(args) {
 register({
   name: '/despliegue_actualizar_config',
   category: 'Despliegue',
-  description: 'Lee deploy.json del directorio del proyecto y guarda la configuración de despliegue en la base de datos.',
+  description: 'Lee deploy.json del directorio del proyecto y guarda la configuración de despliegue. Si no existe deploy.json, muestra un formulario para crearlo.',
   usage: '/despliegue_actualizar_config',
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
@@ -47,11 +47,23 @@ register({
     });
 
     const data = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Error al actualizar configuración de despliegue.');
+    if (data.success) {
+      return data.message;
     }
 
-    return data.message;
+    if (data.code === 'MISSING_DEPLOY_JSON') {
+      return {
+        role: 'opencode_control',
+        controlData: {
+          controlType: 'deploy_config_form',
+          controlId: 'deploy-config-' + Date.now(),
+          initialSubprojects: [],
+          sessionId,
+        },
+      };
+    }
+
+    throw new Error(data.error || 'Error al actualizar configuración de despliegue.');
   },
 });
 

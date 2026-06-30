@@ -32,8 +32,10 @@ router.post('/upd-config', async (req, res) => {
     const deployPath = path.resolve(projectDir, 'deploy.json');
 
     if (!fs.existsSync(deployPath)) {
-      return res.status(404).json({
+      return res.json({
         success: false,
+        code: 'MISSING_DEPLOY_JSON',
+        cwd: projectDir,
         error: `No se pudo obtener configuración de despliegue: falta el archivo "deploy.json". Se esperaba en: ${deployPath}`,
       });
     }
@@ -57,6 +59,61 @@ router.post('/upd-config', async (req, res) => {
   } catch (err) {
     console.log('Error en POST /api/despliegue/upd-config:', err);
     res.status(500).json({ success: false, error: 'Error al actualizar configuración de despliegue.' });
+  }
+});
+
+router.post('/save-config', async (req, res) => {
+  try {
+    const { sessionId, subprojects } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'Se requiere sessionId.' });
+    }
+
+    if (!subprojects || !Array.isArray(subprojects) || subprojects.length === 0) {
+      return res.status(400).json({ success: false, error: 'Se requiere un array de subproyectos (subprojects).' });
+    }
+
+    for (const sp of subprojects) {
+      if (!sp.cwd || !sp.type) {
+        return res.status(400).json({ success: false, error: 'Cada subproyecto debe tener cwd y type.' });
+      }
+      if (sp.type !== 'backend' && sp.type !== 'frontend') {
+        return res.status(400).json({ success: false, error: `Tipo inválido "${sp.type}" para "${sp.cwd}". Debe ser "backend" o "frontend".` });
+      }
+    }
+
+    const session = await db('chat_sessions')
+      .where({ id: sessionId, user_id: req.session.userId })
+      .select('proyecto_id', 'cwd')
+      .first();
+
+    if (!session || !session.proyecto_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'La sesión de chat no está vinculada a un proyecto. Use /chat_set_proyecto para seleccionar un proyecto.',
+      });
+    }
+
+    const projectDir = session.cwd || process.cwd();
+
+    const deployConfig = {
+      install: subprojects.map(sp => ({ cwd: sp.cwd })),
+      pm2: subprojects.filter(sp => sp.type === 'backend').map(sp => ({ cwd: sp.cwd })),
+      build: subprojects.filter(sp => sp.type === 'frontend').map(sp => ({ cwd: sp.cwd })),
+    };
+
+    const deployPath = path.resolve(projectDir, 'deploy.json');
+    fs.writeFileSync(deployPath, JSON.stringify(deployConfig, null, 2), 'utf-8');
+
+    await db('proyectos')
+      .where({ id: session.proyecto_id })
+      .update({ despliegue_config: JSON.stringify(deployConfig) });
+
+    res.json({ success: true, message: 'Configuración de despliegue creada y guardada correctamente.' });
+  } catch (err) {
+    console.log('Error en POST /api/despliegue/save-config:', err);
+    res.status(500).json({ success: false, error: 'Error al guardar configuración de despliegue.' });
   }
 });
 

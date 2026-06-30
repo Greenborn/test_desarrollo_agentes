@@ -147,7 +147,7 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/despliegue_actualizar_config` | Lee `deploy.json` del directorio del proyecto y guarda la configuración de despliegue en la base de datos | `/despliegue_actualizar_config` |
+| `/despliegue_actualizar_config` | Lee `deploy.json` del directorio del proyecto y guarda la configuración de despliegue. Si no existe `deploy.json`, muestra un formulario interactivo para crearlo | `/despliegue_actualizar_config` |
 | `/despliegue_mostrar_config` | Muestra la configuración de despliegue guardada para el proyecto actual como JSON formateado | `/despliegue_mostrar_config` |
 | `/despliegue_iniciar_instancia` | Lee la configuración de despliegue, ejecuta `npm ci` en paralelo en cada subproyecto e inicia los procesos de desarrollo | `/despliegue_iniciar_instancia [--resolucion=ID]` |
 | `/despliegue_detener_instancia` | Detiene todos los procesos de desarrollo iniciados con `/despliegue_iniciar_instancia` | `/despliegue_detener_instancia` |
@@ -183,7 +183,7 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 | Comando | Descripción | Uso |
 |---------|-------------|-----|
 | `/doc_nota_listar` | Lista todas las notas de documentación del proyecto. Si no se especifica proyecto, usa el de la sesión actual | `/doc_nota_listar [--proyecto-id=<id>]` |
-| `/doc_nota_crear` | Crea una nota de documentación. El ticket se toma del contexto de la sesión (obligatorio) | `/doc_nota_crear --clave=<key> --valor=<text> [--proyecto-id=<id>]` |
+| `/doc_nota_crear` | Crea una nota de documentación. Si hay ticket vinculado a la sesión se asocia automáticamente; si no, la nota se crea como documentación general | `/doc_nota_crear --clave=<key> --valor=<text> [--proyecto-id=<id>]` |
 | `/doc_nota_ver` | Muestra el contenido completo de una nota de documentación | `/doc_nota_ver --clave=<key> [--proyecto-id=<id>]` |
 | `/doc_nota_editar` | Actualiza el contenido de una nota de documentación existente | `/doc_nota_editar --clave=<key> [--valor=<text>] [--proyecto-id=<id>]` |
 | `/doc_nota_eliminar` | Elimina una nota de documentación | `/doc_nota_eliminar --clave=<key> [--proyecto-id=<id>]` |
@@ -192,7 +192,7 @@ Las notas de documentación se gestionan desde:
 - **Panel lateral derecho** → pestaña **Documentación**: lista de claves (izquierda) y editor de texto (derecha), con columnas redimensionables y persistencia de ancho.
 - **Chat**: mediante los comandos `/doc_nota_*` listados arriba.
 
-Cada nota se guarda en la tabla `documentacion_notas` y está asociada a un proyecto y un ticket de Redmine. El contenido está limitado a 16KB.
+Cada nota se guarda en la tabla `documentacion_notas` y está asociada a un proyecto. Opcionalmente puede asociarse a un ticket de Redmine (si no, es documentación general). El contenido está limitado a 16KB.
 
 ---
 

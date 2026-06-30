@@ -7,15 +7,26 @@
           <button class="btn btn-sm p-0 border-0" style="color: #9ca3af; line-height: 1;" @click="close" title="Cerrar">&times;</button>
         </div>
         <div class="fab-bubble-body px-3 py-2">
-          <textarea
-            ref="textareaRef"
-            v-model="text"
-            class="form-control bg-dark text-light border-secondary font-monospace"
-            rows="4"
-            placeholder="Escribe tu mensaje... (Enter para enviar)"
-            @keydown.enter.exact.prevent="send"
-            @input="onInput"
-          ></textarea>
+          <div class="position-relative">
+            <textarea
+              ref="textareaRef"
+              v-model="text"
+              class="form-control bg-dark text-light border-secondary font-monospace"
+              rows="4"
+              placeholder="Escribe tu mensaje... (Enter para enviar)"
+              @keydown="onFabTextareaKeydown"
+              @input="onFabTextareaInput"
+              @click="onFabTextareaInput"
+              @blur="onFabTextareaBlur"
+            ></textarea>
+            <VariableAutocomplete
+              :show="fabAC.show"
+              :items="fabAC.filteredVariables"
+              :selected-index="fabAC.selectedIndex"
+              @select="selectFabVariable"
+              @update:selected-index="fabAC.selectedIndex = $event"
+            />
+          </div>
         </div>
         <div class="fab-bubble-footer d-flex justify-content-end gap-2 px-3 py-2">
           <button class="btn btn-sm btn-outline-secondary" @click="close">Cancelar</button>
@@ -36,11 +47,16 @@
 </template>
 
 <script>
-import { ref, watch, nextTick, onUnmounted } from 'vue'
+import { ref, watch, nextTick, onUnmounted, reactive } from 'vue'
+import { useMustacheAutocomplete } from '../../composables/useMustacheAutocomplete.js'
+import { useChatStore } from '../../stores/chat.js'
+import { useProjectVariablesStore } from '../../stores/projectVariables.js'
+import VariableAutocomplete from './VariableAutocomplete.vue'
 
 const DRAFT_KEY = 'ds_fab_draft'
 
 export default {
+  components: { VariableAutocomplete },
   props: {
     activeSessionId: { type: [String, Number], default: null },
   },
@@ -49,6 +65,9 @@ export default {
     const open = ref(false)
     const text = ref('')
     const textareaRef = ref(null)
+    const chatStore = useChatStore()
+    const projectVarStore = useProjectVariablesStore()
+    const fabAC = reactive(useMustacheAutocomplete())
 
     function draftKey() {
       return props.activeSessionId ? DRAFT_KEY + '_' + props.activeSessionId : DRAFT_KEY
@@ -117,6 +136,66 @@ export default {
       }
     }
 
+    async function onFabTextareaInput() {
+      saveDraft()
+      await nextTick()
+      const ta = textareaRef.value
+      if (!ta) { fabAC.close(); return }
+      const sid = props.activeSessionId
+      if (!sid) { fabAC.close(); return }
+      const session = chatStore.sessions.find(s => Number(s.id) === Number(sid))
+      const pid = session?.proyecto_id
+      if (!pid) { fabAC.close(); return }
+      if (!projectVarStore.variablesByProject[pid]) {
+        await projectVarStore.loadVariables(pid)
+      }
+      fabAC.update(text.value, ta.selectionStart, projectVarStore.variablesByProject[pid] || [])
+    }
+
+    function onFabTextareaKeydown(e) {
+      if (fabAC.show) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault()
+          const key = fabAC.getSelectedKey()
+          if (key) selectFabVariable(key)
+          return
+        }
+        if (e.key === 'ArrowDown') { e.preventDefault(); fabAC.navigate('down'); return }
+        if (e.key === 'ArrowUp') { e.preventDefault(); fabAC.navigate('up'); return }
+        if (e.key === 'Escape') { e.preventDefault(); fabAC.close(); return }
+        if (e.key === 'Tab') {
+          e.preventDefault()
+          const key = fabAC.getSelectedKey()
+          if (key) selectFabVariable(key)
+          return
+        }
+        return
+      }
+      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault()
+        send()
+      }
+    }
+
+    function onFabTextareaBlur() {
+      setTimeout(() => { fabAC.close() }, 200)
+    }
+
+    function selectFabVariable(key) {
+      const newText = fabAC.insert(key)
+      if (newText !== null) {
+        text.value = newText
+        nextTick(() => {
+          const ta = textareaRef.value
+          if (ta) {
+            const pos = fabAC.beforeOpen.length + key.length + 4
+            ta.focus()
+            ta.setSelectionRange(pos, pos)
+          }
+        })
+      }
+    }
+
     watch(() => props.activeSessionId, () => {
       if (open.value) {
         loadDraft()
@@ -132,7 +211,7 @@ export default {
       }
     })
 
-    return { open, text, textareaRef, toggle, send, close, onInput }
+    return { open, text, textareaRef, fabAC, toggle, send, close, onInput, onFabTextareaInput, onFabTextareaKeydown, onFabTextareaBlur, selectFabVariable }
   },
 }
 </script>

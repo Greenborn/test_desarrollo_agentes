@@ -62,8 +62,10 @@
       </div>
       <div v-else-if="variables.length === 0" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
         <span>No hay variables definidas para este proyecto</span>
+        <button class="btn btn-sm btn-outline-argentina mt-2" style="font-size: 0.7rem;" @click.stop="agregarVariable">+ Agregar variable</button>
       </div>
       <div v-else class="variables-list flex-grow-1 overflow-y-auto px-2 py-1">
+        <button class="btn btn-sm btn-outline-argentina w-100 mb-2" style="font-size: 0.7rem;" @click.stop="agregarVariable">+ Agregar variable</button>
         <div v-for="v in variables" :key="v.key" class="variable-item d-flex align-items-start px-2 py-2 mb-1 rounded"
           @click="openVariableDetail(v)" role="button">
           <span class="variable-key text-nowrap">{{ v.key }}</span>
@@ -205,13 +207,14 @@ import { useModalStore } from '../../stores/modal.js'
 import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
 import { settingSet, settingGet } from '../../services/settingService.js'
 import VariableDetailModal from '../modals/VariableDetailModal.vue'
+import CreateVariableModal from '../modals/CreateVariableModal.vue'
 import CapturaDetailModal from '../modals/CapturaDetailModal.vue'
 import FileTreePanel from '../files/FileTreePanel.vue'
 import FilePreviewPanel from '../files/FilePreviewPanel.vue'
 import DocumentacionPanel from '../documentation/DocumentacionPanel.vue'
 
 export default {
-  components: { FileTreePanel, FilePreviewPanel, DocumentacionPanel },
+  components: { FileTreePanel, FilePreviewPanel, DocumentacionPanel, CreateVariableModal },
   setup() {
     const ui = useUiStore()
     const chat = useChatStore()
@@ -659,6 +662,10 @@ export default {
       modal.open(VariableDetailModal, { variable }, { title: variable.key })
     }
 
+    function agregarVariable() {
+      modal.open(CreateVariableModal, {}, { title: 'Nueva Variable' })
+    }
+
     async function deleteComment(c) {
       if (!confirm('¿Eliminar este comentario?')) return
       try {
@@ -980,6 +987,7 @@ export default {
       deleteSentComments,
       truncateValue,
       openVariableDetail,
+      agregarVariable,
       ejecutarComando,
       detenerComando,
       crearComando,

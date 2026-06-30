@@ -149,7 +149,7 @@ function start() {
   }
 
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '200mb' }));
   app.use('/api/gestor', authMiddleware, gestorRoutes);
   app.use('/api/gestor', authMiddleware, servicesRoutes);
 

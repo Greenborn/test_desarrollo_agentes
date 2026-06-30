@@ -846,7 +846,14 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Lee el archivo `deploy.json` del directorio de trabajo de la sesión (campo `cwd` de `chat_sessions`) y guarda su contenido como JSON en la columna `despliegue_config` de la tabla `proyectos` para el proyecto vinculado a la sesión.
 - **Respuesta 200:** `{ success: true, message: "Configuración de despliegue guardada correctamente." }`
 - **Respuesta 400:** `{ success: false, error: "La sesión de chat no está vinculada a un proyecto. Use /chat_set_proyecto para seleccionar un proyecto." }`
-- **Respuesta 404:** `{ success: false, error: "No se pudo obtener configuración de despliegue: falta el archivo \"deploy.json\". Se esperaba en: <ruta>" }`
+- **Respuesta (cuando no existe deploy.json):** `{ success: false, code: "MISSING_DEPLOY_JSON", cwd: "<ruta>", error: "No se pudo obtener configuración de despliegue: falta el archivo \"deploy.json\". Se esperaba en: <ruta>" }`
+
+### `POST /api/despliegue/save-config`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number, subprojects: [{ cwd: string, type: "backend"|"frontend" }] }`
+- **Descripción:** Crea el archivo `deploy.json` en el directorio de trabajo de la sesión a partir de los subproyectos definidos en el formulario. Construye la estructura `{ install: [{cwd}], pm2: [{cwd}…], build: [{cwd}…] }` según el tipo de cada subproyecto y guarda la configuración en la columna `despliegue_config` del proyecto vinculado.
+- **Respuesta 200:** `{ success: true, message: "Configuración de despliegue creada y guardada correctamente." }`
+- **Respuesta 400:** `{ success: false, error: "..." }` (sin sesión, sin subproyectos, subproyecto inválido, sin proyecto vinculado)
 
 ### `GET /api/despliegue/config`
 - **Auth:** Requerida
@@ -967,7 +974,8 @@ Endpoint base: `http://localhost:4099/api/documentacion`
   }
   ```
 - **Descripción:** Crea una nueva nota de documentación.
-- **Campos requeridos:** `id_proyecto`, `clave`, `valor`, `id_ticket`
+- **Campos requeridos:** `id_proyecto`, `clave`, `valor`
+- **Campos opcionales:** `id_ticket` — si se omite, la nota se crea como documentación general (sin asociación a ticket)
 - **Restricciones:** `valor` ≤ 16384 caracteres; la combinación `(id_proyecto, clave)` debe ser única.
 - **Respuesta 201:** `{ id, id_proyecto, clave, valor, id_ticket, created_at, updated_at }`
 - **Respuesta 400:** Error de validación (campo faltante, valor muy largo)
@@ -985,7 +993,8 @@ Endpoint base: `http://localhost:4099/api/documentacion`
   }
   ```
 - **Descripción:** Actualiza una nota existente.
-- **Campos requeridos:** `clave`, `valor`, `id_ticket`
+- **Campos requeridos:** `clave`, `valor`
+- **Campos opcionales:** `id_ticket` — si se omite, la nota se marca como documentación general (id_ticket = null)
 - **Restricciones:** `valor` ≤ 16384 caracteres; la combinación `(id_proyecto, clave)` debe ser única.
 - **Respuesta 200:** `{ id, id_proyecto, clave, valor, id_ticket, created_at, updated_at }`
 - **Respuesta 404:** `{ error: "Nota no encontrada" }`

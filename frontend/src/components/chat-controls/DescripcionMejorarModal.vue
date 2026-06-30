@@ -270,7 +270,7 @@ export default {
       localStorage.setItem(FONT_SIZE_KEY, String(fontSize.value))
     }
 
-    return { objetivo, notasReunion, textoAdicional, response, loading, viewMode, fontSize, generar, aplicar, cancelar, copiarTexto, aumentarFont, disminuirFont }
+    return { objetivo, notasReunion, textoAdicional, response, aiResponse, loading, viewMode, fontSize, generar, aplicar, cancelar, copiarTexto, aumentarFont, disminuirFont }
   },
 }
 </script>

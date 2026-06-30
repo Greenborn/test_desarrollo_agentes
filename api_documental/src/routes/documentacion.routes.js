@@ -74,13 +74,15 @@ router.post('/notas', async (req, res) => {
     const { id_proyecto, clave, valor, id_ticket } = req.body;
     if (!id_proyecto) return res.status(400).json({ error: 'id_proyecto requerido' });
     if (!clave) return res.status(400).json({ error: 'clave requerida' });
-    if (!id_ticket && id_ticket !== 0) return res.status(400).json({ error: 'id_ticket requerido' });
     if (!valor) return res.status(400).json({ error: 'valor requerido' });
     if (valor.length > MAX_VALOR_LENGTH) {
       return res.status(400).json({ error: `valor no puede exceder ${MAX_VALOR_LENGTH} caracteres` });
     }
 
-    const [id] = await db('documentacion_notas').insert({ id_proyecto, clave, valor, id_ticket });
+    const insertData = { id_proyecto, clave, valor };
+    if (id_ticket || id_ticket === 0) insertData.id_ticket = id_ticket;
+
+    const [id] = await db('documentacion_notas').insert(insertData);
     const row = await db('documentacion_notas').where({ id }).first();
     res.status(201).json(row);
   } catch (err) {
@@ -97,15 +99,17 @@ router.put('/notas/:id', async (req, res) => {
     const { id } = req.params;
     const { clave, valor, id_ticket } = req.body;
     if (!clave) return res.status(400).json({ error: 'clave requerida' });
-    if (!id_ticket && id_ticket !== 0) return res.status(400).json({ error: 'id_ticket requerido' });
     if (!valor) return res.status(400).json({ error: 'valor requerido' });
     if (valor.length > MAX_VALOR_LENGTH) {
       return res.status(400).json({ error: `valor no puede exceder ${MAX_VALOR_LENGTH} caracteres` });
     }
 
+    const updateData = { clave, valor, updated_at: db.fn.now() };
+    if (id_ticket || id_ticket === 0) updateData.id_ticket = id_ticket;
+
     const updated = await db('documentacion_notas')
       .where({ id })
-      .update({ clave, valor, id_ticket, updated_at: db.fn.now() });
+      .update(updateData);
     if (!updated) {
       return res.status(404).json({ error: 'Nota no encontrada' });
     }

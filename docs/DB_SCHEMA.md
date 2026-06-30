@@ -454,7 +454,7 @@ El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos
 | `id_proyecto` | VARCHAR(255) | NOT NULL — FK lógica → `proyectos(id)` |
 | `clave` | VARCHAR(255) | NOT NULL |
 | `valor` | MEDIUMTEXT | nullable — contenido de la nota (≤ 16KB validado por API) |
-| `id_ticket` | INTEGER | NOT NULL — FK lógica → `tickets(redmine_id)` |
+| `id_ticket` | INTEGER | nullable — FK lógica → `tickets(redmine_id)`. NULL = documentación general |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP |
 
