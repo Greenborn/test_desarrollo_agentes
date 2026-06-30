@@ -60,8 +60,8 @@
 
 <script>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { usePlaywrightLogsStore } from '../stores/playwrightLogs.js'
-import { useChatStore } from '../stores/chat.js'
+import { usePlaywrightLogsStore } from '../../stores/playwrightLogs.js'
+import { useChatStore } from '../../stores/chat.js'
 
 export default {
   setup() {

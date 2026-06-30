@@ -64,9 +64,9 @@
 
 <script>
 import { ref, onMounted } from 'vue'
-import { useTemplatesStore } from '../stores/templates.js'
-import { useChatStore } from '../stores/chat.js'
-import ChatFormatter from './ChatFormatter.vue'
+import { useTemplatesStore } from '../../stores/templates.js'
+import { useChatStore } from '../../stores/chat.js'
+import ChatFormatter from '../chat/ChatFormatter.vue'
 
 export default {
   components: { ChatFormatter },

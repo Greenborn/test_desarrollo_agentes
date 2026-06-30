@@ -11,14 +11,45 @@ register({
   category: 'Proyecto',
   description: 'Elimina una variable de un proyecto.',
   usage: '/proyecto_var_eliminar --key=nombre [--id=proyecto]',
-  autocomplete(args, cmdStore) {
+  async autocomplete(args, cmdStore) {
     const usedFlags = args.filter(a => a.startsWith('--'))
     const hasKey = usedFlags.some(a => a.startsWith('--key='))
     const hasId = usedFlags.some(a => a.startsWith('--id='))
+
+    if (!hasKey) {
+      const idFlag = args.find(a => a.startsWith('--id='))
+      let proyectoId = idFlag ? idFlag.slice(5) : null
+      if (!proyectoId) {
+        const chatStore = (await import('../../stores/chat.js')).useChatStore()
+        const activeSessionId = chatStore.activeSessionId
+        if (activeSessionId) {
+          const session = chatStore.sessions.find(s => s.id === activeSessionId)
+          proyectoId = session?.proyecto_id || null
+        }
+      }
+      if (proyectoId) {
+        try {
+          const auth = useAuthStore()
+          const data = await wsClient.send('proyectoVarListar', {
+            sessionToken: auth.getSessionToken(),
+            proyectoId,
+          })
+          if (data.variables && data.variables.length > 0) {
+            const projectKeys = data.variables.map(v => `--key=${v.key}`)
+            cmdStore.showAutocomplete(projectKeys)
+            return
+          }
+        } catch (err) {
+          console.error('Error al obtener variables para autocomplete:', err.message)
+        }
+      }
+      cmdStore.showAutocomplete(['--key='])
+      return
+    }
+
     const suggestions = []
-    if (!hasKey) suggestions.push('--key=')
     if (!hasId) suggestions.push('--id=')
-    return suggestions
+    cmdStore.showAutocomplete(suggestions)
   },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {

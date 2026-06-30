@@ -47,7 +47,7 @@
 <script>
 import { computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useServiciosStore } from '../stores/servicios.js'
+import { useServiciosStore } from '../../stores/servicios.js'
 
 export default {
   setup() {

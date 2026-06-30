@@ -26,8 +26,9 @@
         <span>No hay comentarios encolados para este ticket</span>
       </div>
       <div v-else class="comments-list flex-grow-1 overflow-y-auto px-2 py-1">
-        <div v-if="hasSentComments" class="d-flex px-1 pb-1">
-          <button class="btn btn-sm btn-outline-secondary ms-auto py-0 px-2" style="font-size: 0.65rem;" @click="deleteSentComments">Limpiar enviados</button>
+        <div v-if="comments.length > 0" class="d-flex px-1 pb-1 gap-1">
+          <button v-if="hasPendingComments" class="btn btn-sm btn-outline-success py-0 px-2" style="font-size: 0.65rem;" @click="enviarComentariosPendientes">▶ Enviar pendientes</button>
+          <button v-if="hasSentComments" class="btn btn-sm btn-outline-secondary ms-auto py-0 px-2" style="font-size: 0.65rem;" @click="deleteSentComments">Limpiar enviados</button>
         </div>
         <div v-for="c in comments" :key="c.id" class="comment-item d-flex flex-column px-2 py-2 mb-1 rounded">
           <button class="delete-btn" @click.stop="deleteComment(c)" title="Eliminar comentario">×</button>
@@ -148,6 +149,14 @@
               <div class="text-light">{{ capturaSeleccionada.nombre_original }}</div>
               <div class="text-muted">{{ (capturaSeleccionada.tamano / 1024).toFixed(1) }} KB — {{ formatDate(capturaSeleccionada.created_at) }}</div>
             </div>
+            <div class="captura-toolbar mt-2 pt-2 border-top border-secondary w-100 d-flex align-items-center justify-content-center gap-1 small text-muted">
+              <button class="toolbar-btn disabled" title="Recortar" disabled>✂</button>
+              <button class="toolbar-btn disabled" title="Rotar" disabled>🔄</button>
+              <button class="toolbar-btn disabled" title="Anotar" disabled>✏</button>
+              <button class="toolbar-btn disabled" title="Escalar" disabled>🔲</button>
+              <span class="mx-1 text-secondary" style="font-size: 0.6rem; opacity: 0.4;">|</span>
+              <span style="font-size: 0.6rem; opacity: 0.6;">🔧 En construcción</span>
+            </div>
           </div>
           <div v-else class="captura-preview flex-grow-1 d-flex align-items-center justify-content-center text-secondary small px-3 text-center">
             <span>Seleccione una captura para previsualizar</span>
@@ -186,20 +195,20 @@
 <script>
 import { watch, ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useUiStore } from '../stores/ui.js'
-import { useChatStore } from '../stores/chat.js'
-import { useRedmineCommentsStore } from '../stores/redmineComments.js'
-import { useProjectVariablesStore } from '../stores/projectVariables.js'
-import { useComandosPersonalizadosStore } from '../stores/comandosPersonalizados.js'
-import { useDocumentacionNotasStore } from '../stores/documentacionNotas.js'
-import { useModalStore } from '../stores/modal.js'
-import { useCommandRegistry } from '../composables/useCommandRegistry.js'
-import { settingSet, settingGet } from '../services/settingService.js'
-import VariableDetailModal from './VariableDetailModal.vue'
-import CapturaDetailModal from './CapturaDetailModal.vue'
-import FileTreePanel from './FileTreePanel.vue'
-import FilePreviewPanel from './FilePreviewPanel.vue'
-import DocumentacionPanel from './DocumentacionPanel.vue'
+import { useUiStore } from '../../stores/ui.js'
+import { useChatStore } from '../../stores/chat.js'
+import { useRedmineCommentsStore } from '../../stores/redmineComments.js'
+import { useProjectVariablesStore } from '../../stores/projectVariables.js'
+import { useComandosPersonalizadosStore } from '../../stores/comandosPersonalizados.js'
+import { useDocumentacionNotasStore } from '../../stores/documentacionNotas.js'
+import { useModalStore } from '../../stores/modal.js'
+import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
+import { settingSet, settingGet } from '../../services/settingService.js'
+import VariableDetailModal from '../modals/VariableDetailModal.vue'
+import CapturaDetailModal from '../modals/CapturaDetailModal.vue'
+import FileTreePanel from '../files/FileTreePanel.vue'
+import FilePreviewPanel from '../files/FilePreviewPanel.vue'
+import DocumentacionPanel from '../documentation/DocumentacionPanel.vue'
 
 export default {
   components: { FileTreePanel, FilePreviewPanel, DocumentacionPanel },
@@ -227,6 +236,7 @@ export default {
     })
     const loading = computed(() => redmineComments.loadingBySession[activeSessionId.value] || false)
     const hasSentComments = computed(() => comments.value.some(c => c.estado === 'enviado'))
+    const hasPendingComments = computed(() => comments.value.some(c => c.estado === 'pendiente'))
 
     const proyectoId = computed(() => activeSession.value?.proyecto_id || null)
     const activeTicketId = computed(() => activeSession.value?.id_ticket_redmine || null)
@@ -515,6 +525,21 @@ export default {
       } catch (err) {
         console.error('Error al eliminar captura:', err)
       }
+    }
+
+    async function enviarComentariosPendientes() {
+      const sid = activeSessionId.value
+      if (!sid) return
+
+      const cmd = find('/dev_redmine_comentarios_enviar')
+      if (!cmd) {
+        console.error('Comando /dev_redmine_comentarios_enviar no encontrado')
+        return
+      }
+
+      await chat.runCommand('/dev_redmine_comentarios_enviar', async (loadingIdx, sessionId) => {
+        return cmd.execute([], { chatStore: chat, sessionId })
+      })
     }
 
     async function tomarCaptura() {
@@ -942,6 +967,8 @@ export default {
       comments,
       loading,
       hasSentComments,
+      hasPendingComments,
+      enviarComentariosPendientes,
       proyectoId,
       variables,
       loadingVariables,
@@ -1212,6 +1239,31 @@ export default {
 }
 .captura-preview-info {
   font-size: 0.7rem;
+}
+.captura-toolbar {
+  background: #1a2744;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+.toolbar-btn {
+  background: none;
+  border: 1px solid transparent;
+  color: #6b7280;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  line-height: 1.2;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.toolbar-btn:hover:not(.disabled) {
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #374151;
+}
+.toolbar-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .capturas-splitter {
   width: 6px;

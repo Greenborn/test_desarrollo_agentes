@@ -30,6 +30,7 @@
                :href="`${s.session_redmine_url || redmineUrl}/issues/${s.id_ticket_redmine}`"
                target="_blank" rel="noopener noreferrer"
                @click.stop
+               :style="ticketBadgeStyle(s)"
                title="Abrir ticket en Redmine">#{{ s.id_ticket_redmine }}</a>
           <div class="d-flex flex-column flex-grow-1 min-width-0">
             <span class="text-truncate">{{ s.title }}</span>
@@ -61,13 +62,13 @@
 <script>
 import { computed, watch, ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useChatStore } from '../stores/chat.js'
-import { useCommandStore } from '../stores/command.js'
-import { useUiStore } from '../stores/ui.js'
-import { useSettingsStore } from '../stores/settings.js'
-import { useWorkspaceStore } from '../stores/workspace.js'
-import { contrastTextColor } from '../utils/color.js'
-import ServiciosPanel from './ServiciosPanel.vue'
+import { useChatStore } from '../../stores/chat.js'
+import { useCommandStore } from '../../stores/command.js'
+import { useUiStore } from '../../stores/ui.js'
+import { useSettingsStore } from '../../stores/settings.js'
+import { useWorkspaceStore } from '../../stores/workspace.js'
+import { contrastTextColor } from '../../utils/color.js'
+import ServiciosPanel from '../services/ServiciosPanel.vue'
 
 export default {
   components: { ServiciosPanel },
@@ -96,6 +97,12 @@ export default {
     function workspaceBadgeStyle(ws) {
       if (!ws || !ws.color) return {}
       return { backgroundColor: ws.color, color: contrastTextColor(ws.color) }
+    }
+
+    function ticketBadgeStyle(s) {
+      const ws = workspaceMap.value[s.workspace_id]
+      if (ws && ws.color) return { color: ws.color }
+      return {}
     }
 
     const sidebarTransitioning = ref(false)
@@ -236,6 +243,7 @@ export default {
       ticketPriorityClass,
       onResizeStart,
       workspaceBadgeStyle,
+      ticketBadgeStyle,
     }
   },
 }
@@ -392,14 +400,13 @@ export default {
   display: inline-block;
   font-size: 10px;
   font-weight: 600;
-  color: #60a5fa;
   margin-right: 4px;
   flex-shrink: 0;
   text-decoration: none;
   cursor: pointer;
 }
 .ticket-badge:hover {
-  color: #93c5fd;
+  filter: brightness(1.3);
   text-decoration: underline;
 }
 .workspace-badge {

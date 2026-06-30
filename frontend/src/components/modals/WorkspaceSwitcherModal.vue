@@ -31,9 +31,9 @@
 <script>
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useWorkspaceStore } from '../stores/workspace.js'
-import { useAuthStore } from '../stores/auth.js'
-import { useChatStore } from '../stores/chat.js'
+import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useAuthStore } from '../../stores/auth.js'
+import { useChatStore } from '../../stores/chat.js'
 
 export default {
   emits: ['close'],

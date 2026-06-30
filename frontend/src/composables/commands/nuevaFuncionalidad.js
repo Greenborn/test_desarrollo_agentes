@@ -1,6 +1,6 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { useModalStore } from '../../stores/modal.js';
-import FuncionalidadWizard from '../../components/FuncionalidadWizard.vue';
+import FuncionalidadWizard from '../../components/wizards/FuncionalidadWizard.vue';
 
 const { register } = useCommandRegistry();
 

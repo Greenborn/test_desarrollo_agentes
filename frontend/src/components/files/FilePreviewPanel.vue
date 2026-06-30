@@ -54,8 +54,8 @@
 import { ref, watch, computed } from 'vue'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/atom-one-dark.css'
-import ChatFormatter from './ChatFormatter.vue'
-import { useSettingsStore } from '../stores/settings.js'
+import ChatFormatter from '../chat/ChatFormatter.vue'
+import { useSettingsStore } from '../../stores/settings.js'
 
 const EXT_TO_LANG = {
   js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',

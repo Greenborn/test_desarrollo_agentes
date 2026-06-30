@@ -41,8 +41,8 @@
 
 <script>
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
-import { useModalStore } from '../stores/modal.js'
-import { useFileTreeStore } from '../stores/fileTree.js'
+import { useModalStore } from '../../stores/modal.js'
+import { useFileTreeStore } from '../../stores/fileTree.js'
 import FileEditorModal from './FileEditorModal.vue'
 
 const FILE_ICONS = {

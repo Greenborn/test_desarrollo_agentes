@@ -92,7 +92,24 @@ Motor: **MariaDB** vía **Knex** (query builder).
 
 ---
 
-## 5. `user_settings`
+## 6. `global_settings`
+
+Settings globales compartidas entre todos los workspaces (sin dependencia de workspace_id).
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `setting_key` | VARCHAR(100) | PK |
+| `setting_value` | TEXT | NOT NULL |
+| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+
+**Keys del sistema:**
+| Key | Default | Descripción |
+|---|---|---|
+| `ticket_descripcion_mejorar_prompt` | `'Eres un asistente experto...'` | Prompt del agente DeepSeek para mejorar descripciones de tickets. Configurable desde Settings → Configuración General |
+
+---
+
+## 7. `user_settings`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -227,10 +244,13 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `proyecto_id` | VARCHAR(255) | NOT NULL, FK → `proyectos(id)` ON DELETE CASCADE |
 | `key` | VARCHAR(255) | NOT NULL — nombre de la variable |
 | `value` | TEXT | NOT NULL, DEFAULT `''` |
+| `type` | VARCHAR(20) | NOT NULL, DEFAULT `'db'` — `'db'` (persistente) o `'memory'` (no persistente, en api_memoria) |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 
 **UNIQUE compuesto:** `(proyecto_id, key)` — cada variable se identifica por proyecto + nombre.
+
+Las variables `type='memory'` almacenan su valor real en el servicio `api_memoria` (caché en RAM). La columna `value` se guarda vacía y solo el registro metadata persiste en la DB. Se usan para datos volátiles como logs de consola del navegador.
 
 ---
 

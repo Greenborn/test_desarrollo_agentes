@@ -183,15 +183,29 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `omnifilter_debounce_ms`, `screen_resolutions`, `request_response_max_size_kb`
 - **Respuesta:** `{ success: true }`
 
+### `GET /api/settings/global`
+- **Auth:** Requerida
+- **Descripción:** Devuelve todas las configuraciones globales (compartidas entre todos los workspaces). Estas settings no dependen de ningún workspace.
+- **Respuesta:** `{ ticket_descripcion_mejorar_prompt: string, ... }`
+
+### `POST /api/settings/global`
+- **Auth:** Requerida
+- **Descripción:** Guarda o actualiza una configuración global (sin workspace asociado).
+- **Body:** `{ key: string, value: string }`
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 400:** `{ error: "key es requerido" }`
+
 ### `GET /api/settings/export-all`
 - **Auth:** Requerida
-- **Descripción:** Exporta todas las configuraciones de todos los workspaces, incluyendo settings y ambientes (DEV/TST/PRD). Los valores encriptados (`deepseek_key`, `redmine_token`) se devuelven en texto plano. Sin hardcoding de keys — incluye automáticamente cualquier key presente en la DB.
+- **Descripción:** Exporta todas las configuraciones de todos los workspaces, incluyendo settings, ambientes (DEV/TST/PRD) y configuraciones globales. Los valores encriptados (`deepseek_key`, `redmine_token`) se devuelven en texto plano. Sin hardcoding de keys — incluye automáticamente cualquier key presente en la DB.
 - **Respuesta 200:**
 ```json
 {
   "version": 1,
   "exported_at": "2026-06-23T12:00:00.000Z",
-  "configuracion_general": {},
+  "configuracion_general": {
+    "ticket_descripcion_mejorar_prompt": "Eres un asistente experto..."
+  },
   "workspaces": {
     "Por Defecto": {
       "deepseek_key": "sk-plain-text",
@@ -211,7 +225,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 
 ### `POST /api/settings/import-all`
 - **Auth:** Requerida
-- **Body:** Misma estructura que `GET /api/settings/export-all`
+- **Body:** Misma estructura que `GET /api/settings/export-all`. El campo `configuracion_general` se restaura en la tabla `global_settings` (compartido entre workspaces).
 - **Descripción:** Importa configuraciones desde un JSON. Busca cada workspace por **nombre** en la DB. Las credenciales (`deepseek_key`, `redmine_token`) se re-encriptan antes de almacenar. Los ambientes se actualizan por nombre dentro de cada workspace. Las keys nuevas se crean automáticamente sin necesidad de actualizar el código.
 - **Respuesta 200:** `{ success: true }`
 - **Respuesta 400:** `{ error: "workspaces es requerido" }`

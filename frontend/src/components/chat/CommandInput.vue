@@ -42,13 +42,14 @@
 <script>
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useCommandStore } from '../stores/command.js'
-import { useCommandRegistry } from '../composables/useCommandRegistry.js'
-import { useChatStore } from '../stores/chat.js'
-import { useUiStore } from '../stores/ui.js'
-import { useSettingsStore } from '../stores/settings.js'
-import { useProjectStore } from '../stores/project.js'
-import { useGitStore } from '../stores/git.js'
+import { useCommandStore } from '../../stores/command.js'
+import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
+import { splitArgs } from '../../composables/parseCommandArgs.js'
+import { useChatStore } from '../../stores/chat.js'
+import { useUiStore } from '../../stores/ui.js'
+import { useSettingsStore } from '../../stores/settings.js'
+import { useProjectStore } from '../../stores/project.js'
+import { useGitStore } from '../../stores/git.js'
 
 export default {
   setup() {
@@ -138,7 +139,7 @@ export default {
         if (!sessionId) return
       }
 
-      const parts = raw.split(/\s+/)
+      const parts = splitArgs(raw)
       const cmdName = parts[0].toLowerCase()
 
       const known = find(cmdName)
@@ -193,7 +194,7 @@ export default {
 
     async function handleTab() {
       const trimmed = buffer.value.trim()
-      const parts = buffer.value.split(/\s+/)
+      const parts = splitArgs(buffer.value)
 
       if (!trimmed) {
         cmdStore.showAutocomplete(suggest(''))
@@ -219,7 +220,7 @@ export default {
 
     function pickAutocomplete(opt) {
       const value = typeof opt === 'object' ? opt.value : opt
-      const parts = buffer.value.split(/\s+/)
+      const parts = splitArgs(buffer.value)
       const isCommand = value.startsWith('/') && parts.length === 1
       if (isCommand) {
         buffer.value = value + ' '

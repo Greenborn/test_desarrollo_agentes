@@ -11,12 +11,11 @@ register({
   usage: '/proyecto_var_listar [--id=proyecto]',
   autocomplete(args, cmdStore) {
     const used = args.filter(a => a.startsWith('--id='))
-    if (used.length > 0) return []
-    const last = args[args.length - 1] || ''
-    if (last.startsWith('--id=') || last === '--id') {
-      return ['--id=']
+    if (used.length > 0) {
+      cmdStore.hideAutocomplete()
+      return
     }
-    return ['--id=']
+    cmdStore.showAutocomplete(['--id='])
   },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {

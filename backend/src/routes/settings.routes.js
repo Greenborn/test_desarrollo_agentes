@@ -119,6 +119,47 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/global', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const rows = await db('global_settings').select('setting_key', 'setting_value');
+    const keys = {};
+    for (const row of rows) {
+      keys[row.setting_key] = row.setting_value;
+    }
+    const defaults = {
+      ticket_descripcion_mejorar_prompt: 'Eres un asistente experto en redactar prompts técnicos para agentes OpenCode a partir de notas de reunión. Toma el contenido proporcionado (notas de reunión y datos adicionales) y genera un prompt claro, estructurado y autosuficiente que un agente OpenCode pueda ejecutar. El prompt debe incluir contexto técnico, objetivo y pasos concretos si aplica. No inventes información. Devuelve únicamente el prompt, sin comentarios adicionales.',
+      ticket_objetivo_prompt: 'Eres un asistente experto en redactar objetivos técnicos a partir de notas de reunión. Genera un objetivo claro y conciso que resuma el propósito del ticket. Devuelve únicamente el objetivo, sin comentarios adicionales.',
+      ticket_plantilla_descripcion: '## Objetivo\n{{objetivo}}\n## Notas Reunión\n{{notas_reunion}}\n## Promt Agente\n{{promt_opencode}}',
+    };
+    for (const [key, def] of Object.entries(defaults)) {
+      if (!keys[key]) keys[key] = def;
+    }
+    res.json(keys);
+  } catch (err) {
+    console.log('Error al obtener settings globales:', err.message);
+    res.status(500).json({});
+  }
+});
+
+router.post('/global', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { key, value } = req.body;
+    if (!key) {
+      return res.status(400).json({ error: 'key es requerido' });
+    }
+    await db('global_settings')
+      .insert({ setting_key: key, setting_value: String(value) })
+      .onConflict('setting_key')
+      .merge();
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al guardar setting global:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
@@ -190,10 +231,16 @@ router.get('/export-all', async (req, res) => {
       configuracionGeneral[ws.name] = wsData;
     }
 
+    const globalRows = await db('global_settings').select('setting_key', 'setting_value');
+    const globalKeys = {};
+    for (const row of globalRows) {
+      globalKeys[row.setting_key] = row.setting_value;
+    }
+
     res.json({
       version: 1,
       exported_at: new Date().toISOString(),
-      configuracion_general: {},
+      configuracion_general: globalKeys,
       workspaces: configuracionGeneral,
     });
   } catch (err) {
@@ -205,9 +252,18 @@ router.get('/export-all', async (req, res) => {
 router.post('/import-all', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { workspaces } = req.body;
+    const { workspaces, configuracion_general } = req.body;
     if (!workspaces || typeof workspaces !== 'object') {
       return res.status(400).json({ error: 'workspaces es requerido' });
+    }
+
+    if (configuracion_general && typeof configuracion_general === 'object') {
+      for (const [key, value] of Object.entries(configuracion_general)) {
+        await db('global_settings')
+          .insert({ setting_key: key, setting_value: String(value) })
+          .onConflict('setting_key')
+          .merge();
+      }
     }
 
     for (const [wsName, wsData] of Object.entries(workspaces)) {

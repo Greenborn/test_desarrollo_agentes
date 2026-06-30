@@ -43,8 +43,8 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import { useWorkspaceStore } from '../stores/workspace.js'
-import { contrastTextColor } from '../utils/color.js'
+import { useWorkspaceStore } from '../../stores/workspace.js'
+import { contrastTextColor } from '../../utils/color.js'
 
 export default {
   props: {

@@ -47,7 +47,7 @@
 
 <script>
 import { computed, onMounted } from 'vue';
-import { useFuncionalidadStore } from '../stores/funcionalidad.js';
+import { useFuncionalidadStore } from '../../stores/funcionalidad.js';
 
 export default {
   props: {

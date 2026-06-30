@@ -25,7 +25,7 @@
 
 <script>
 import { computed } from 'vue'
-import { useGitStore } from '../stores/git.js'
+import { useGitStore } from '../../stores/git.js'
 
 export default {
   props: {

@@ -2,7 +2,7 @@ import { useCommandRegistry } from '../useCommandRegistry.js';
 import { parseCommandArgs } from '../parseCommandArgs.js';
 import { useModalStore } from '../../stores/modal.js';
 import { useTemplatesStore } from '../../stores/templates.js';
-import TemplateEditorModal from '../../components/TemplateEditorModal.vue';
+import TemplateEditorModal from '../../components/modals/TemplateEditorModal.vue';
 
 const { register } = useCommandRegistry();
 

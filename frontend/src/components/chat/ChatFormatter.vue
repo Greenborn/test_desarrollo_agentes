@@ -1,11 +1,11 @@
 <template>
   <JsonTreeView v-if="parsedJson" :data="parsedJson" />
-  <div v-else-if="parsedHtml" style="overflow-x: auto; max-width: 100%;"><div v-html="parsedHtml" style="white-space: pre-wrap;"></div></div>
-  <div v-else style="white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word;">{{ text }}</div>
+  <div v-else-if="parsedHtml" style="overflow-x: hidden; max-width: 100%; word-break: break-word; overflow-wrap: break-word;"><div v-html="parsedHtml" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; max-width: 100%;"></div></div>
+  <div v-else style="white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; max-width: 100%; overflow: hidden;">{{ text }}</div>
 </template>
 
 <script>
-import JsonTreeView from './JsonTreeView.vue'
+import JsonTreeView from '../utils/JsonTreeView.vue'
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

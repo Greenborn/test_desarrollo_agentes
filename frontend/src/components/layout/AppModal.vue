@@ -27,7 +27,7 @@
 <script>
 import { watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useModalStore } from '../stores/modal.js'
+import { useModalStore } from '../../stores/modal.js'
 
 export default {
   setup() {

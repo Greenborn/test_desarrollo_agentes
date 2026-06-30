@@ -289,7 +289,7 @@ router.post('/proyecto/:id/variables', async (req, res) => {
 
 router.put('/proyecto/:id/variables/:key', async (req, res) => {
   if (!authGuard(req, res)) return;
-  const { value } = req.body;
+  const { value, type } = req.body;
   if (value === undefined || value === null) {
     return res.status(400).json({ error: 'value es requerido' });
   }
@@ -310,14 +310,30 @@ router.put('/proyecto/:id/variables/:key', async (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: `Variable "${req.params.key}" no encontrada` });
     }
-    if (existing.type === 'memory') {
-      const memNamespace = `proyecto:${req.params.id}`;
+
+    const newType = type === 'memory' ? 'memory' : 'db';
+    const memNamespace = `proyecto:${req.params.id}`;
+
+    if (newType !== existing.type) {
+      if (existing.type === 'memory') {
+        try { await memoriaClient.del(memNamespace, req.params.key); } catch (err) { console.log('Error al eliminar variable de memoria:', err.message); }
+        await db('project_variables')
+          .where({ proyecto_id: req.params.id, key: req.params.key })
+          .update({ value: String(value), type: 'db', updated_at: db.fn.now() });
+      } else {
+        await memoriaClient.set(memNamespace, req.params.key, value);
+        await db('project_variables')
+          .where({ proyecto_id: req.params.id, key: req.params.key })
+          .update({ value: '', type: 'memory', updated_at: db.fn.now() });
+      }
+    } else if (existing.type === 'memory') {
       await memoriaClient.set(memNamespace, req.params.key, value);
     } else {
       await db('project_variables')
         .where({ proyecto_id: req.params.id, key: req.params.key })
         .update({ value: String(value), updated_at: db.fn.now() });
     }
+
     res.json({ success: true });
   } catch (err) {
     console.log('Error al actualizar variable:', err.message);

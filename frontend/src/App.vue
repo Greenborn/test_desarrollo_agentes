@@ -5,7 +5,7 @@
 
 <script>
 import { onMounted, watch } from 'vue'
-import AppModal from './components/AppModal.vue'
+import AppModal from './components/layout/AppModal.vue'
 import { useAuthStore } from './stores/auth.js'
 import { useSettingsStore } from './stores/settings.js'
 

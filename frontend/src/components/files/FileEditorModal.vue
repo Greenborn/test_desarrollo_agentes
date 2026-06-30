@@ -37,7 +37,7 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import ChatFormatter from './ChatFormatter.vue'
+import ChatFormatter from '../chat/ChatFormatter.vue'
 
 const API = '/api'
 

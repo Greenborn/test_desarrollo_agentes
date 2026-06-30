@@ -1,3 +1,26 @@
+export function splitArgs(input) {
+  const args = []
+  let current = ''
+  let inSingleQuote = false
+
+  for (const ch of input) {
+    if (ch === "'") {
+      inSingleQuote = !inSingleQuote
+      current += ch
+    } else if (ch === ' ' && !inSingleQuote) {
+      if (current.length > 0) {
+        args.push(current)
+        current = ''
+      }
+    } else {
+      current += ch
+    }
+  }
+  if (current.length > 0) args.push(current)
+
+  return args
+}
+
 export function getUsedFlags(args) {
   return args
     .filter(a => a.startsWith('--'))
@@ -16,10 +39,14 @@ export function parseCommandArgs(args, schema = {}) {
       const eqIdx = arg.indexOf('=')
       const key = eqIdx >= 0 ? arg.slice(2, eqIdx) : arg.slice(2)
       if (!key) continue
-      const rawVal = eqIdx >= 0 ? arg.slice(eqIdx + 1) : 'true'
-      const val = rawVal.replace(/^["']|["']$/g, '')
+      let rawVal = eqIdx >= 0 ? arg.slice(eqIdx + 1) : 'true'
+      if (rawVal.startsWith("'") && rawVal.endsWith("'")) {
+        rawVal = rawVal.slice(1, -1)
+      } else if (rawVal.startsWith('"') && rawVal.endsWith('"')) {
+        rawVal = rawVal.slice(1, -1)
+      }
       const def = schema[key]
-      params[key] = def?.type === 'number' ? Number(val) : val
+      params[key] = def?.type === 'number' ? Number(rawVal) : rawVal
     }
   }
 

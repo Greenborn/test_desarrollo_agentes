@@ -45,10 +45,10 @@
 <script>
 import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useChatStore } from '../stores/chat.js'
-import { useTicketStore } from '../stores/ticket.js'
-import { useUiStore } from '../stores/ui.js'
-import { useProjectStore } from '../stores/project.js'
+import { useChatStore } from '../../stores/chat.js'
+import { useTicketStore } from '../../stores/ticket.js'
+import { useUiStore } from '../../stores/ui.js'
+import { useProjectStore } from '../../stores/project.js'
 
 export default {
   setup() {

@@ -73,8 +73,8 @@
 <script>
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useProjectStore } from '../stores/project.js'
-import JsonTreeView from './JsonTreeView.vue'
+import { useProjectStore } from '../../stores/project.js'
+import JsonTreeView from '../utils/JsonTreeView.vue'
 
 export default {
   components: { JsonTreeView },

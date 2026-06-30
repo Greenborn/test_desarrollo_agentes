@@ -35,7 +35,7 @@ export const useProjectVariablesStore = defineStore('projectVariables', () => {
     }
   }
 
-  async function saveVariable(proyectoId, key, value) {
+  async function saveVariable(proyectoId, key, value, type) {
     if (!proyectoId) return
     const auth = useAuthStore()
     const existing = (variablesByProject.value[proyectoId] || []).find(v => v.key === key)
@@ -46,11 +46,13 @@ export const useProjectVariablesStore = defineStore('projectVariables', () => {
           proyectoId,
           key,
           value,
+          type: type || undefined,
         })
         if (!data.success) throw new Error(data.error || 'Error al actualizar variable')
         const idx = variablesByProject.value[proyectoId].findIndex(v => v.key === key)
         if (idx !== -1) {
           variablesByProject.value[proyectoId][idx].value = value
+          if (type) variablesByProject.value[proyectoId][idx].type = type
         }
       } else {
         const data = await wsClient.send('proyectoVarCrear', {
@@ -58,10 +60,10 @@ export const useProjectVariablesStore = defineStore('projectVariables', () => {
           proyectoId,
           key,
           value,
-          type: 'db',
+          type: type || 'db',
         })
         if (!data.success) throw new Error(data.error || 'Error al crear variable')
-        variablesByProject.value[proyectoId].push({ key, value, type: 'db' })
+        variablesByProject.value[proyectoId].push({ key, value, type: type || 'db' })
       }
     } catch (err) {
       console.error('Error en saveVariable:', err.message)

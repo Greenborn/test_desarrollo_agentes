@@ -49,7 +49,7 @@
 <script>
 import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useUiStore } from '../stores/ui.js'
+import { useUiStore } from '../../stores/ui.js'
 
 export default {
   setup() {

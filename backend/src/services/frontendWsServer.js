@@ -204,7 +204,7 @@ async function handleProyectoVarActualizar(payload) {
   const session = await getSessionFromToken(sessionToken);
   if (!session || !session.userId) return { type: 'error', error: 'Sesión no válida' };
 
-  const { proyectoId, key, value } = payload;
+  const { proyectoId, key, value, type } = payload;
   if (!proyectoId) return { type: 'error', error: 'proyectoId requerido' };
   if (!key) return { type: 'error', error: 'key requerido' };
   if (value === undefined || value === null) return { type: 'error', error: 'value requerido' };
@@ -216,7 +216,17 @@ async function handleProyectoVarActualizar(payload) {
   const existing = await db('project_variables').select('type').where({ proyecto_id: proyectoId, key }).first();
   if (!existing) return { type: 'error', error: `Variable "${key}" no encontrada` };
 
-  if (existing.type === 'memory') {
+  const newType = type === 'memory' ? 'memory' : 'db';
+
+  if (newType !== existing.type) {
+    if (existing.type === 'memory') {
+      try { await memoriaClient.del(`proyecto:${proyectoId}`, key); } catch (err) { console.log('[frontendWs] Error al eliminar variable de memoria:', err.message); }
+      await db('project_variables').where({ proyecto_id: proyectoId, key }).update({ value: String(value), type: 'db', updated_at: db.fn.now() });
+    } else {
+      await memoriaClient.set(`proyecto:${proyectoId}`, key, value);
+      await db('project_variables').where({ proyecto_id: proyectoId, key }).update({ value: '', type: 'memory', updated_at: db.fn.now() });
+    }
+  } else if (existing.type === 'memory') {
     await memoriaClient.set(`proyecto:${proyectoId}`, key, value);
   } else {
     await db('project_variables').where({ proyecto_id: proyectoId, key }).update({ value: String(value), updated_at: db.fn.now() });

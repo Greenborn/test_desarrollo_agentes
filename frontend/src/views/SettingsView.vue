@@ -202,6 +202,33 @@
               <button class="btn btn-sm mt-1 btn-argentina" @click="saveRefinarPrompt">Guardar Prompt</button>
             </div>
 
+            <div v-if="matches('global mejorar prompt configuración general')" class="mt-3 pt-3 border-top border-secondary">
+              <h6 class="font-monospace mb-2" style="color: #75AADB;">⚙️ Configuración General</h6>
+              <label class="form-label small mb-1">Prompt — Generar Prompt Agente (ticket_descripcion_mejorar_prompt)</label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="3"
+                v-model="ticketDescripcionMejorarPromptInput"
+              ></textarea>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveTicketDescripcionMejorarPrompt">Guardar</button>
+
+              <label class="form-label small mb-1 mt-3">Prompt — Generar Objetivo (ticket_objetivo_prompt)</label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="3"
+                v-model="ticketObjetivoPromptInput"
+              ></textarea>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveTicketObjetivoPrompt">Guardar</button>
+
+              <label class="form-label small mb-1 mt-3">Plantilla — Descripción Ticket (ticket_plantilla_descripcion)</label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="5"
+                v-model="ticketPlantillaDescripcionInput"
+              ></textarea>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveTicketPlantillaDescripcion">Guardar</button>
+            </div>
+
             <div v-if="matches('deteccion funcionalidades prompt deteccion_funcionalidades')">
               <label class="form-label small mb-1">Prompt — Detección de Funcionalidades</label>
               <textarea
@@ -394,7 +421,7 @@ import { useChatStore } from '../stores/chat.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useModalStore } from '../stores/modal.js'
 import { useEnvironmentsStore } from '../stores/environments.js'
-import WorkspaceFormModal from '../components/WorkspaceFormModal.vue'
+import WorkspaceFormModal from '../components/modals/WorkspaceFormModal.vue'
 
 export default {
   setup() {
@@ -421,6 +448,9 @@ export default {
     const descripcionPromptInput = ref('')
     const refinarPromptInput = ref('')
     const deteccionPromptInput = ref('')
+    const ticketDescripcionMejorarPromptInput = ref('')
+    const ticketObjetivoPromptInput = ref('')
+    const ticketPlantillaDescripcionInput = ref('')
     const codeExtensionsInput = ref('.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql')
     const codeMaxSizeInput = ref(100)
     const omnifilterDebounceInput = ref(2000)
@@ -479,6 +509,7 @@ export default {
       }
       await settings.load(selectedWId.value)
       await envStore.load(selectedWId.value)
+      await loadGlobalSettings()
     })
 
     watch(() => settings.systemPrompt, (val) => {
@@ -661,6 +692,50 @@ export default {
     function saveDeteccionPrompt() {
       settings.clearFeedback()
       settings.save('deteccion_funcionalidades_prompt', deteccionPromptInput.value, selectedWId.value)
+    }
+
+    async function loadGlobalSettings() {
+      try {
+        const res = await fetch('/api/settings/global', { credentials: 'include' })
+        const keys = await res.json()
+        ticketDescripcionMejorarPromptInput.value = keys.ticket_descripcion_mejorar_prompt || ''
+        ticketObjetivoPromptInput.value = keys.ticket_objetivo_prompt || ''
+        ticketPlantillaDescripcionInput.value = keys.ticket_plantilla_descripcion || ''
+      } catch (err) {
+        console.error('Error al cargar configuración general:', err)
+      }
+    }
+
+    function saveTicketDescripcionMejorarPrompt() {
+      saveSettingGlobal('ticket_descripcion_mejorar_prompt', ticketDescripcionMejorarPromptInput.value)
+    }
+
+    async function saveSettingGlobal(key, value) {
+      settings.clearFeedback()
+      try {
+        const res = await fetch('/api/settings/global', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ key, value }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          settings.saveSuccess = 'Guardado correctamente'
+        } else {
+          settings.saveError = data.error || 'Error al guardar'
+        }
+      } catch (err) {
+        settings.saveError = 'Error de conexión'
+      }
+    }
+
+    function saveTicketObjetivoPrompt() {
+      saveSettingGlobal('ticket_objetivo_prompt', ticketObjetivoPromptInput.value)
+    }
+
+    function saveTicketPlantillaDescripcion() {
+      saveSettingGlobal('ticket_plantilla_descripcion', ticketPlantillaDescripcionInput.value)
     }
 
     function saveCodeConfig() {

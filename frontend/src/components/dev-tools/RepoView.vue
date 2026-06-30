@@ -89,8 +89,8 @@
 <script>
 import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useChatStore } from '../stores/chat.js'
-import { useGitStore } from '../stores/git.js'
+import { useChatStore } from '../../stores/chat.js'
+import { useGitStore } from '../../stores/git.js'
 import GitGraphSvg from './GitGraphSvg.vue'
 
 export default {

@@ -139,11 +139,11 @@
 <script>
 import { watch, ref, computed, onMounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useDocumentacionNotasStore } from '../stores/documentacionNotas.js'
-import { useChatStore } from '../stores/chat.js'
-import { settingGet, settingSet } from '../services/settingService.js'
-import ChatFormatter from './ChatFormatter.vue'
-import JsonTreeView from './JsonTreeView.vue'
+import { useDocumentacionNotasStore } from '../../stores/documentacionNotas.js'
+import { useChatStore } from '../../stores/chat.js'
+import { settingGet, settingSet } from '../../services/settingService.js'
+import ChatFormatter from '../chat/ChatFormatter.vue'
+import JsonTreeView from '../utils/JsonTreeView.vue'
 
 const LIST_WIDTH_KEY = 'doc_notas_list_width'
 const LIST_MIN = 100

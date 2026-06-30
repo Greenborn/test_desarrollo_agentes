@@ -125,8 +125,8 @@
 
 <script>
 import { storeToRefs } from 'pinia'
-import { useTicketStore } from '../stores/ticket.js'
-import { useAttachmentsStore } from '../stores/attachments.js'
+import { useTicketStore } from '../../stores/ticket.js'
+import { useAttachmentsStore } from '../../stores/attachments.js'
 
 export default {
   setup() {

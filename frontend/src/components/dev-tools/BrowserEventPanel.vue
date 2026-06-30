@@ -294,14 +294,14 @@
 
 <script>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { usePlaywrightLogsStore } from '../stores/playwrightLogs.js'
-import { useChatStore } from '../stores/chat.js'
-import { useProjectStore } from '../stores/project.js'
-import { useBrowserStore } from '../stores/browser.js'
-import { useCommandRegistry } from '../composables/useCommandRegistry.js'
-import { useCommandStore } from '../stores/command.js'
-import { useSettingsStore } from '../stores/settings.js'
-import { useUiStore } from '../stores/ui.js'
+import { usePlaywrightLogsStore } from '../../stores/playwrightLogs.js'
+import { useChatStore } from '../../stores/chat.js'
+import { useProjectStore } from '../../stores/project.js'
+import { useBrowserStore } from '../../stores/browser.js'
+import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
+import { useCommandStore } from '../../stores/command.js'
+import { useSettingsStore } from '../../stores/settings.js'
+import { useUiStore } from '../../stores/ui.js'
 import { storeToRefs } from 'pinia'
 
 export default {

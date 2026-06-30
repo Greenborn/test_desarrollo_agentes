@@ -17,11 +17,11 @@
 
 <script>
 import { ref } from 'vue'
-import { useChatStore } from '../stores/chat.js'
-import { useCommandStore } from '../stores/command.js'
-import { useProjectStore } from '../stores/project.js'
-import { useAuthStore } from '../stores/auth.js'
-import { useWorkspaceStore } from '../stores/workspace.js'
+import { useChatStore } from '../../stores/chat.js'
+import { useCommandStore } from '../../stores/command.js'
+import { useProjectStore } from '../../stores/project.js'
+import { useAuthStore } from '../../stores/auth.js'
+import { useWorkspaceStore } from '../../stores/workspace.js'
 
 export default {
   emits: ['close'],

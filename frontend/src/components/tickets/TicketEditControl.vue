@@ -81,7 +81,7 @@
 
 <script>
 import { ref, reactive, onMounted, computed } from 'vue'
-import { useTicketFormStore } from '../stores/ticketForm.js'
+import { useTicketFormStore } from '../../stores/ticketForm.js'
 
 export default {
   props: {

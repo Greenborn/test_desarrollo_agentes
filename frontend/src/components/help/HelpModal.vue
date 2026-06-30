@@ -11,7 +11,7 @@
 </template>
 
 <script>
-import { useCommandRegistry } from '../composables/useCommandRegistry.js'
+import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
 
 export default {
   setup() {

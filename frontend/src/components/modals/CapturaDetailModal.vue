@@ -64,12 +64,13 @@
         </div>
         <div v-else class="metadata-list">
           <div v-for="m in filteredMetadata" :key="m.id" class="metadata-item mb-2 p-2 rounded">
-            <div class="d-flex align-items-center gap-2 mb-1">
+            <div class="d-flex align-items-center gap-2 mb-1" role="button" @click="toggleCollapsed(m.id)" style="cursor: pointer;">
+              <span class="collapse-toggle small" style="width: 14px; text-align: center; color: #6b7280; font-size: 0.65rem;">{{ collapsedItems[m.id] ? '▶' : '▼' }}</span>
               <span class="metadata-key small fw-semibold">{{ m.key }}</span>
               <span class="text-muted" style="font-size: 0.6rem;">{{ formatDate(m.created_at) }}</span>
-              <button class="btn btn-sm btn-outline-danger ms-auto py-0 px-2" style="font-size: 0.6rem;" @click="eliminarMetadata(m)">✕</button>
+              <button class="btn btn-sm btn-outline-danger ms-auto py-0 px-2" style="font-size: 0.6rem;" @click.stop="eliminarMetadata(m)">✕</button>
             </div>
-            <div class="metadata-value-box p-2 rounded">
+            <div v-if="!collapsedItems[m.id]" class="metadata-value-box p-2 rounded">
               <pre class="mb-0"><code>{{ m.value }}</code></pre>
             </div>
           </div>
@@ -151,7 +152,7 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import { settingSet, settingGet } from '../services/settingService.js'
+import { settingSet, settingGet } from '../../services/settingService.js'
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
@@ -198,6 +199,12 @@ export default {
     const filteredMetadata = computed(() => {
       return metadata.value.filter(m => m.key !== 'quick_notes')
     })
+
+    const collapsedItems = ref({})
+
+    function toggleCollapsed(id) {
+      collapsedItems.value[id] = !collapsedItems.value[id]
+    }
 
     function onImageLoad() {
       if (!imageRef.value || !detectedInputs.value) return
@@ -453,6 +460,8 @@ export default {
       rightWidth,
       detectedInputs,
       filteredMetadata,
+      collapsedItems,
+      toggleCollapsed,
       onImageLoad,
       rectStyle,
       onRectHover,

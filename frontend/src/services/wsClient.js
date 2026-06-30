@@ -128,7 +128,7 @@ async function send(type, payload = {}) {
   }
 
   const id = getNextId()
-  const msg = JSON.stringify({ id, type, ...payload })
+  const msg = JSON.stringify({ id, ...payload, type })
 
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject })
