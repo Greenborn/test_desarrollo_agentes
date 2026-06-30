@@ -218,47 +218,60 @@ class OpenCodeServer {
   }
 }
 
-async function getOrStartServer(directory, locale) {
-  if (servers[directory]) return servers[directory];
+async function getOrStartServer(directory, chatSessionId, locale) {
+  if (chatSessionId && servers[chatSessionId]) {
+    return servers[chatSessionId].server;
+  }
   const port = nextPort++;
   const srv = new OpenCodeServer(directory, port, locale);
-  servers[directory] = srv;
+  if (chatSessionId) {
+    servers[chatSessionId] = { server: srv, directory };
+  }
   await srv.start();
   await srv.waitForReady();
   return srv;
 }
 
-function stopServer(directory) {
-  if (servers[directory]) {
-    servers[directory].stop();
-    delete servers[directory];
+function stopServer(chatSessionId) {
+  if (servers[chatSessionId]) {
+    servers[chatSessionId].server.stop();
+    delete servers[chatSessionId];
+  }
+}
+
+function stopServerByDirectory(directory) {
+  for (const [chatSessionId, entry] of Object.entries(servers)) {
+    if (entry.directory === directory) {
+      entry.server.stop();
+      delete servers[chatSessionId];
+    }
   }
 }
 
 function stopAllServers() {
-  for (const dir of Object.keys(servers)) {
-    servers[dir].stop();
+  for (const entry of Object.values(servers)) {
+    entry.server.stop();
   }
 }
 
-async function getModels(directory, locale) {
-  const server = await getOrStartServer(directory, locale);
+async function getModels(directory, chatSessionId, locale) {
+  const server = await getOrStartServer(directory, chatSessionId, locale);
   return server.api('/config/providers');
 }
 
-async function abortSessionInDir(directory, ocSessionId) {
-  if (servers[directory]) {
-    await servers[directory].abortSession(ocSessionId);
+async function abortSessionInDir(chatSessionId, ocSessionId) {
+  if (servers[chatSessionId]) {
+    await servers[chatSessionId].server.abortSession(ocSessionId);
   }
 }
 
 async function abortSession(ocSessionId) {
-  for (const dir of Object.keys(servers)) {
+  for (const [csId, entry] of Object.entries(servers)) {
     try {
-      await servers[dir].abortSession(ocSessionId);
+      await entry.server.abortSession(ocSessionId);
       return;
     } catch (abortErr) {
-      console.log(`[opencode] abortSession falló en ${dir}:`, abortErr.message);
+      console.log(`[opencode] abortSession falló en sesión ${csId}:`, abortErr.message);
     }
   }
 }
@@ -266,6 +279,7 @@ async function abortSession(ocSessionId) {
 export default {
   getOrStartServer,
   stopServer,
+  stopServerByDirectory,
   stopAllServers,
   getModels,
   abortSessionInDir,

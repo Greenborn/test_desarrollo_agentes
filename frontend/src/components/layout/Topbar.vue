@@ -205,7 +205,7 @@ export default {
           }, sessionId)
         }
 
-        const data = await ocStore.start()
+        const data = await ocStore.start(sessionId)
         if (!data) return
 
         const providerList = ocStore.getAvailableProviders()
@@ -403,7 +403,7 @@ export default {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, directory: cmdStore.currentDir || undefined }),
+            body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, sessionId: chatStore.activeSessionId }),
           })
         } catch (err) {
           console.error('Error en /dev_opencode_finalizar:', err)

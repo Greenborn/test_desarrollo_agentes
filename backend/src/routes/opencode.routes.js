@@ -60,11 +60,17 @@ async function saveLongMessage(sessionId, role, content, extraFields = {}) {
 router.get('/start', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
+    const { sessionId } = req.query;
+    let cwd = process.cwd();
+    if (sessionId) {
+      const chatSession = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+      if (chatSession && chatSession.cwd) cwd = chatSession.cwd;
+    }
     const wsIds = req.session.workspaceIds || [1];
     const wsId = wsIds[0] || 1;
     const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
-    const providerData = await opencode.getModels(process.cwd(), locale);
+    const providerData = await opencode.getModels(cwd, sessionId || null, locale);
     const savedProvider = await getUserSetting(req.session.userId, 'opencode_last_provider');
     const savedModel = await getUserSetting(req.session.userId, 'opencode_last_model');
     const savedThinking = await getUserSetting(req.session.userId, 'opencode_last_thinking');
@@ -116,7 +122,7 @@ router.post('/send', async (req, res) => {
     const wsId = wsIds[0] || 1;
     const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
-    const server = await opencode.getOrStartServer(cwd, locale);
+    const server = await opencode.getOrStartServer(cwd, sessionId, locale);
 
     let ocSessionId = existingOcSessionId;
     if (!ocSessionId) {
@@ -358,12 +364,7 @@ router.post('/abort', async (req, res) => {
 
     if (ocSessionId) {
       if (sessionId) {
-        const chatSession = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
-        if (chatSession && chatSession.cwd) {
-          await opencode.abortSessionInDir(chatSession.cwd, ocSessionId);
-        } else {
-          await opencode.abortSession(ocSessionId);
-        }
+        await opencode.abortSessionInDir(sessionId, ocSessionId);
       } else {
         await opencode.abortSession(ocSessionId);
       }
@@ -378,15 +379,15 @@ router.post('/abort', async (req, res) => {
 router.post('/finish', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { ocSessionId, directory } = req.body;
-    if (!directory) return res.status(400).json({ error: 'directory requerido' });
+    const { ocSessionId, sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ error: 'sessionId requerido' });
 
     if (ocSessionId) {
-      try { await opencode.abortSessionInDir(directory, ocSessionId); } catch (abortErr) {
+      try { await opencode.abortSessionInDir(sessionId, ocSessionId); } catch (abortErr) {
         console.log('Error al abortar sesión OpenCode en /finish:', abortErr.message);
       }
     }
-    opencode.stopServer(directory);
+    opencode.stopServer(sessionId);
 
     res.json({ success: true, hash: ocSessionId });
   } catch (err) {

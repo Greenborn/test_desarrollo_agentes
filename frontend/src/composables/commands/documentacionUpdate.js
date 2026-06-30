@@ -52,7 +52,7 @@ register({
     }
 
     const ocStore = useOpencodeStore();
-    const data = await ocStore.start();
+    const data = await ocStore.start(sessionId);
     if (!data) {
       throw new Error('Error al iniciar OpenCode.');
     }

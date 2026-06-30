@@ -326,6 +326,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 
 ### `GET /api/opencode/start`
 - **Auth:** Requerida
+- **Query:** `?sessionId=<chatSessionId>` (opcional — asigna el servidor OpenCode a una sesión de chat específica)
 - **Respuesta:** `{ providers, defaultModels, savedProvider, savedModel, savedThinking, savedMode }`
 
 ### `POST /api/opencode/select`
@@ -351,7 +352,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 
 ### `POST /api/opencode/finish`
 - **Auth:** Requerida
-- **Body:** `{ ocSessionId?: string, directory: string }`
+- **Body:** `{ ocSessionId?: string, sessionId: number }` — detiene y elimina el servidor OpenCode asociado a la sesión de chat
 - **Respuesta:** `{ success: true, hash: string|null }`
 
 ---

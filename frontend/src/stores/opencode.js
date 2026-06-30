@@ -140,9 +140,10 @@ export const useOpencodeStore = defineStore('opencode', () => {
     return caps ? caps.reasoning || false : false
   }
 
-  async function start() {
+  async function start(chatSessionId) {
     try {
-      const res = await fetch(`${API}/opencode/start`, { credentials: 'include' })
+      const params = chatSessionId ? `?sessionId=${encodeURIComponent(chatSessionId)}` : '';
+      const res = await fetch(`${API}/opencode/start${params}`, { credentials: 'include' })
       const data = await res.json()
       if (data.error) {
         console.error('Error en opencode start:', data.error)

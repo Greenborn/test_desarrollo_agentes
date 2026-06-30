@@ -136,7 +136,7 @@ register({
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
-              body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, directory: cmdStore.currentDir || undefined }),
+              body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, sessionId }),
             })
           } catch (err) {
             console.error('Error al cerrar sesión OpenCode previa:', err)
@@ -144,7 +144,7 @@ register({
           ocStore.finish()
         }
 
-        const startData = await ocStore.start()
+        const startData = await ocStore.start(sessionId)
         if (!startData) return
 
         const providerList = ocStore.getAvailableProviders()

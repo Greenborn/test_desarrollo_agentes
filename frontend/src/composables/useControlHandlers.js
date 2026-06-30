@@ -1856,7 +1856,7 @@ export function useControlHandlers(api) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, directory: cmdStore.currentDir || undefined }),
+          body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, sessionId }),
         })
       } catch (finishErr) {
         console.error('Error al finalizar sesión OpenCode tras commit:', finishErr.message)
@@ -1964,7 +1964,7 @@ export function useControlHandlers(api) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, directory: cmdStore.currentDir || undefined }),
+            body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, sessionId }),
           })
         } catch (finishErr) {
           console.error('Error al cerrar sesión OpenCode:', finishErr.message)

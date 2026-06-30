@@ -250,7 +250,7 @@ export default {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, directory: cmdStore.currentDir || undefined }),
+          body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, sessionId: chat.activeSessionId }),
         })
       } catch (err) {
         console.error('Error al finalizar OpenCode:', err.message)
