@@ -25,7 +25,7 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/cd` | Cambia el directorio de trabajo de la sesión. Soporta rutas absolutas, relativas, `.`, `..`, `~` y autocompletado con Tab | `/cd --dir=<ruta>` |
+| `/cd` | Cambia el directorio de trabajo de la sesión. Sin argumentos muestra un selector interactivo de directorios. Soporta rutas absolutas, relativas, `.`, `..`, `~` y autocompletado con Tab | `/cd [--dir=<ruta>]` |
 | `/ls` | Lista el contenido del directorio actual o del especificado | `/ls [--dir=<ruta>]` |
 | `/arbol_directorios` | Muestra el árbol de directorios en formato JSON respetando `.gitignore`. Usar `--gitignore=false` para mostrar todo el listado completo. Usar `--filter-extension="sql,md,js"` para mostrar solo directorios que contengan archivos con esas extensiones | `/arbol_directorios [--dir=<ruta>] [--gitignore=<bool>] [--filter-extension=<ext1,ext2>]` |
 
@@ -81,11 +81,11 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/chat_get_repositorio_url` | Muestra la URL del repositorio configurada para el proyecto actual | `/chat_get_repositorio_url` |
 | `/chat_set_ticket` | Asigna un ticket de Redmine a la sesión actual. Autocompletado filtrado por el proyecto de la sesión | `/chat_set_ticket --id=<id_ticket_redmine>` |
 | `/chat_get_ticket` | Muestra el ticket de Redmine asignado a la sesión actual, incluyendo su descripción. Con `--comments` muestra también los comentarios. Los adjuntos se listan al final: las imágenes se muestran inline y los archivos se pueden descargar mediante enlace. Con `--field=<campo>` muestra solo el valor de un campo específico (subject, status_name, priority_name, assigned_to_name, description, idTicketRedmine, etc.) | `/chat_get_ticket [--comments] [--field=<campo>]` |
-| `/chat_edit_ticket` | Abre un editor inline para modificar los datos del ticket de Redmine asignado a la sesión actual (asunto, descripción, estado, prioridad, asignado, + nuevo comentario). Con `--mode=descripcion` abre un asistente con OpenCode para redactar una descripción del ticket usando IA. | `/chat_edit_ticket [--mode=descripcion]` |
+| `/chat_edit_ticket` | Abre un editor inline para modificar los datos del ticket de Redmine asignado a la sesión actual (asunto, descripción, estado, prioridad, asignado, + nuevo comentario). Con `--mode=descripcion` abre un textarea directo con la descripción actual del ticket para editarla, con botón "Mejorar con IA" que abre un modal con agente DeepSeek para mejorar la descripción, y botón "Deshacer" para restaurar el valor original. | `/chat_edit_ticket [--mode=descripcion]` |
 | `/chat_ticket_comentar` | Abre un editor inline para agregar un comentario al ticket de Redmine vinculado a la sesión. El texto se pega tal cual (sin formato de commit). Se puede encolar o enviar directamente. | `/chat_ticket_comentar` |
 | `/proyecto_var_listar` | Lista las variables definidas para un proyecto. Sin `--id` usa el proyecto de la sesión actual | `/proyecto_var_listar [--id=proyecto]` |
-| `/proyecto_var_crear` | Crea una nueva variable en un proyecto. Sin `--id` usa el proyecto de la sesión actual | `/proyecto_var_crear --key=nombre --value=valor [--id=proyecto]` |
-| `/proyecto_var_actualizar` | Actualiza el valor de una variable existente en un proyecto. Sin `--id` usa el proyecto de la sesión actual | `/proyecto_var_actualizar --key=nombre --value=valor [--id=proyecto]` |
+| `/proyecto_var_crear` | Crea una nueva variable en un proyecto. Sin `--id` usa el proyecto de la sesión actual. Usar `--type=memory` para no persistente (db por defecto) | `/proyecto_var_crear --key=nombre --value=valor [--id=proyecto] [--type=db\|memory]` |
+| `/proyecto_var_actualizar` | Actualiza el valor de una variable existente en un proyecto. Sin `--id` usa el proyecto de la sesión actual. Usar `--type=memory\|db` para cambiar persistencia | `/proyecto_var_actualizar --key=nombre --value=valor [--id=proyecto] [--type=db\|memory]` |
 | `/proyecto_var_eliminar` | Elimina una variable de un proyecto. Sin `--id` usa el proyecto de la sesión actual | `/proyecto_var_eliminar --key=nombre [--id=proyecto]` |
 | `/archivos_listar` | Lista los archivos del proyecto vinculado a la sesión actual o del especificado | `/archivos_listar [--id=proyecto]` |
 | `/archivos_eliminar` | Elimina un archivo del proyecto por su ID | `/archivos_eliminar --id=<id_archivo>` |

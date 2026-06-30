@@ -25,24 +25,24 @@
 <script>
 import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useAuthStore } from '../stores/auth.js'
+import { useAuthStore } from '../../stores/auth.js'
 import { useRouter } from 'vue-router'
-import { useCommandStore } from '../stores/command.js'
-import { useModalStore } from '../stores/modal.js'
-import { useOpencodeStore } from '../stores/opencode.js'
-import { useBrowserStore } from '../stores/browser.js'
-import { useCommandRegistry } from '../composables/useCommandRegistry.js'
-import { parseCommandArgs } from '../composables/parseCommandArgs.js'
-import { useChatStore } from '../stores/chat.js'
-import { useWorkspaceStore } from '../stores/workspace.js'
-import { contrastTextColor } from '../utils/color.js'
-import wsClient from '../services/wsClient.js'
-import CommandInput from './CommandInput.vue'
+import { useCommandStore } from '../../stores/command.js'
+import { useModalStore } from '../../stores/modal.js'
+import { useOpencodeStore } from '../../stores/opencode.js'
+import { useBrowserStore } from '../../stores/browser.js'
+import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
+import { parseCommandArgs } from '../../composables/parseCommandArgs.js'
+import { useChatStore } from '../../stores/chat.js'
+import { useWorkspaceStore } from '../../stores/workspace.js'
+import { contrastTextColor } from '../../utils/color.js'
+import wsClient from '../../services/wsClient.js'
+import CommandInput from '../chat/CommandInput.vue'
 import LayoutControls from './LayoutControls.vue'
-import HelpContent from './HelpModal.vue'
-import CrearProyectoModal from './CrearProyectoModal.vue'
-import WorkspaceSwitcherModal from './WorkspaceSwitcherModal.vue'
-import SettingsView from '../views/SettingsView.vue'
+import HelpContent from '../help/HelpModal.vue'
+import CrearProyectoModal from '../projects/CrearProyectoModal.vue'
+import WorkspaceSwitcherModal from '../modals/WorkspaceSwitcherModal.vue'
+import SettingsView from '../../views/SettingsView.vue'
 
 export default {
   components: { CommandInput, LayoutControls },
@@ -78,48 +78,6 @@ export default {
       usage: '/help',
       async execute(args, { cmdStore }) {
         modal.open(HelpContent, {})
-      },
-    })
-
-    register({
-      name: '/cd',
-      category: 'Navegación',
-      description: 'Cambia el directorio de trabajo. Soporta rutas absolutas, relativas, ".", "..", "~" y autocompletado con Tab.',
-      usage: '/cd --dir=&lt;ruta&gt;',
-      autocomplete(args, cmdStore) {
-        const dirArg = args.find(a => a.startsWith('--dir='))
-        if (dirArg) {
-          const prefix = dirArg.slice('--dir='.length) || '/'
-          cmdStore.fetchAutocomplete(prefix, cmdStore.currentDir)
-        } else {
-          cmdStore.showAutocomplete(['--dir='])
-        }
-      },
-      async execute(args, { cmdStore, chatStore, sessionId }) {
-        const { params, errors } = parseCommandArgs(args, { dir: { required: true } })
-        if (errors.length > 0) {
-          console.error('Error en /cd:', errors.join('. '))
-          return
-        }
-        const dir = params.dir
-        try {
-          const res = await fetch('/api/command/execute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ command: `/cd ${dir}`, sessionId }),
-          })
-          const data = await res.json()
-          if (data.success) {
-            cmdStore.currentDir = data.result
-            return data.result
-          } else {
-            console.error('Error en /cd:', data.result)
-            return data.result
-          }
-        } catch (err) {
-          console.error('Error en /cd:', err)
-        }
       },
     })
 

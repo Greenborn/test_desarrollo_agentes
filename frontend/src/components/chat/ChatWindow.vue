@@ -95,30 +95,30 @@
 <script>
 import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useChatStore } from '../stores/chat.js'
-import { useCommandStore } from '../stores/command.js'
-import { useModalStore } from '../stores/modal.js'
-import { useOpencodeStore } from '../stores/opencode.js'
-import { useSettingsStore } from '../stores/settings.js'
-import { useGitStore } from '../stores/git.js'
-import { useDevInstanceStore } from '../stores/devInstance.js'
-import { useProjectVariablesStore } from '../stores/projectVariables.js'
-import { useRedmineCommentsStore } from '../stores/redmineComments.js'
-import { useComandosPersonalizadosStore } from '../stores/comandosPersonalizados.js'
-import { settingSet } from '../services/settingService.js'
-import { useTicketStore } from '../stores/ticket.js'
-import { useWorkspaceStore } from '../stores/workspace.js'
-import { useAuthStore } from '../stores/auth.js'
-import { deteccionState, abortDeteccion } from '../composables/commands/deteccionFuncionalidades.js'
-import { useCommandRegistry } from '../composables/useCommandRegistry.js'
-import { useProjectVariables } from '../composables/useProjectVariables.js'
-import { useConsoleLogStream } from '../composables/useConsoleLogStream.js'
-import { useNetworkLogStream } from '../composables/useNetworkLogStream.js'
+import { useChatStore } from '../../stores/chat.js'
+import { useCommandStore } from '../../stores/command.js'
+import { useModalStore } from '../../stores/modal.js'
+import { useOpencodeStore } from '../../stores/opencode.js'
+import { useSettingsStore } from '../../stores/settings.js'
+import { useGitStore } from '../../stores/git.js'
+import { useDevInstanceStore } from '../../stores/devInstance.js'
+import { useProjectVariablesStore } from '../../stores/projectVariables.js'
+import { useRedmineCommentsStore } from '../../stores/redmineComments.js'
+import { useComandosPersonalizadosStore } from '../../stores/comandosPersonalizados.js'
+import { settingSet } from '../../services/settingService.js'
+import { useTicketStore } from '../../stores/ticket.js'
+import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useAuthStore } from '../../stores/auth.js'
+import { deteccionState, abortDeteccion } from '../../composables/commands/deteccionFuncionalidades.js'
+import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
+import { useProjectVariables } from '../../composables/useProjectVariables.js'
+import { useConsoleLogStream } from '../../composables/useConsoleLogStream.js'
+import { useNetworkLogStream } from '../../composables/useNetworkLogStream.js'
 import TicketInfoBar from './TicketInfoBar.vue'
 import ChatMessage from './ChatMessage.vue'
 import DeepSeekChatFab from './DeepSeekChatFab.vue'
-import HelpContent from './HelpModal.vue'
-import FuncionalidadWizard from './FuncionalidadWizard.vue'
+import HelpContent from '../help/HelpModal.vue'
+import FuncionalidadWizard from '../wizards/FuncionalidadWizard.vue'
 
 export default {
   components: { TicketInfoBar, ChatMessage, DeepSeekChatFab },
@@ -942,7 +942,7 @@ export default {
       } else if (stepType === 'deteccion_model_setup') {
         const subStepType = controlMsg.controlData.subStepType
         if (subStepType === 'model') {
-          const { startDeteccionProcessing } = await import('../composables/commands/deteccionFuncionalidades.js')
+          const { startDeteccionProcessing } = await import('../../composables/commands/deteccionFuncionalidades.js')
           const ocStore = useOpencodeStore()
           await ocStore.select('model', value)
           const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
@@ -971,7 +971,7 @@ export default {
             _key: 'ctrl-thinking-' + Date.now(),
           })
         } else if (subStepType === 'thinking') {
-          const { startDeteccionProcessing } = await import('../composables/commands/deteccionFuncionalidades.js')
+          const { startDeteccionProcessing } = await import('../../composables/commands/deteccionFuncionalidades.js')
           const ocStore = useOpencodeStore()
           await ocStore.select('thinking', value)
           const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
@@ -1007,6 +1007,50 @@ export default {
           await handleTicketDescripcion(controlId, value, controlMsg)
           return
         }
+      } else if (controlType === 'descripcion_edit') {
+        if (value === null) {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = { role: 'result', content: 'Edición de descripción cancelada.', _key: 'result-' + Date.now() }
+          }
+          return
+        }
+        try {
+          const res = await fetch(`/api/tickets/session/${chat.activeSessionId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ description: value.description }),
+          })
+          const data = await res.json()
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            if (data.success) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: `✓ Descripción del ticket #${data.ticket.redmine_id} actualizada correctamente.`,
+                _key: 'result-' + Date.now(),
+              }
+            } else {
+              chat.messages[idx] = {
+                role: 'result',
+                content: `Error: ${data.error || 'Error al actualizar la descripción'}`,
+                _key: 'err-' + Date.now(),
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error al actualizar descripción:', err)
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Error de conexión al actualizar la descripción.',
+              _key: 'err-' + Date.now(),
+            }
+          }
+        }
+        return
       } else if (stepType === 'repo_crear_rama') {
         await handleRepoCrearRama(controlId, value, controlMsg)
         return
@@ -1498,6 +1542,46 @@ export default {
             await projectVarStore.saveVariable(proyectoId, 'peticion_datos', JSON.stringify(value))
           } catch (err) {
             console.error('Error al guardar peticion_datos:', err.message)
+          }
+        }
+        return
+      } else if (controlType === 'cd_selector') {
+        try {
+          const res = await fetch('/api/command/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: `/cd ${value}`, sessionId: chat.activeSessionId }),
+          })
+          const data = await res.json()
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (data.success) {
+            cmdStore.currentDir = data.result
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: `✓ Directorio cambiado a: ${data.result}`,
+                _key: 'result-' + Date.now(),
+              }
+            }
+          } else {
+            if (idx >= 0) {
+              chat.messages[idx] = {
+                role: 'result',
+                content: 'Error: ' + (data.result || 'Error al cambiar de directorio'),
+                _key: 'err-' + Date.now(),
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error en /cd:', err.message)
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Error de conexión: ' + err.message,
+              _key: 'err-' + Date.now(),
+            }
           }
         }
         return

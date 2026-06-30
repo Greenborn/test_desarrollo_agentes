@@ -22,6 +22,7 @@
       <RedmineProjectList v-else-if="parsedControl && parsedControl.controlType === 'redmine_projects'" :projects="parsedControl.projects || []" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <TicketEditControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_edit'" :ticket="parsedControl.ticket" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <TicketCreateControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_create'" :project-id="parsedControl.projectId" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <DescripcionEditControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_edit'" :initial-description="parsedControl.description || ''" :ticket-subject="parsedControl.ticketSubject || ''" :ticket-id="parsedControl.ticketId || ''" :session-id="String(parsedControl.sessionId ?? '')" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DescripcionInputControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_input'" :placeholder="parsedControl.placeholder || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DescripcionResultControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_result'" :description="parsedControl.description || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DescripcionResultControl v-else-if="parsedControl && parsedControl.controlType === 'refinar_result'" :description="parsedControl.description || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
@@ -30,6 +31,7 @@
       <RedmineCommentsSendControl v-else-if="parsedControl && parsedControl.controlType === 'redmine_comments_send'" :comentarios_ids="parsedControl.comentarios_ids || []" :ticket_redmine_id="parsedControl.ticket_redmine_id || 0" :mensaje="parsedControl.mensaje || ''" :cantidad="parsedControl.cantidad || 0" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <AmbientesDiffCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ambientes_diff_comment'" :message="parsedControl.message || ''" :sourceEnv="parsedControl.sourceEnv || ''" :targetEnv="parsedControl.targetEnv || ''" :modoEnvioInicial="parsedControl.modo_envio || 'encolar'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <TicketCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_comment'" :ticketId="parsedControl.ticketId" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <ChatCdSelector v-else-if="parsedControl && parsedControl.controlType === 'cd_selector'" :current-dir="parsedControl.currentDir || '/' " @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <PeticionFormControl v-else-if="parsedControl && parsedControl.controlType === 'peticion'" :sending="parsedControl.sending || false" :progressText="parsedControl.progressText || ''" :initialData="parsedControl.initialData || null" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <PeticionResultDisplay v-else-if="parsedControl && parsedControl.controlType === 'peticion_result'" :payload="parsedControl.payload || {}" />
       <div v-else class="d-flex flex-column gap-2">
@@ -116,32 +118,34 @@
 </template>
 
 <script>
-import ControlSelect from './ChatControlSelect.vue'
-import ControlTextarea from './ChatControlTextarea.vue'
-import ChatComandoEditControl from './ChatComandoEditControl.vue'
-import ChatControlButtons from './ChatControlButtons.vue'
-import ChatControlFollowup from './ChatControlFollowup.vue'
-import ChatOpencodeForm from './ChatOpencodeForm.vue'
-import ChatGenerarCommitForm from './ChatGenerarCommitForm.vue'
+import ControlSelect from '../chat-controls/ChatControlSelect.vue'
+import ControlTextarea from '../chat-controls/ChatControlTextarea.vue'
+import ChatCdSelector from '../chat-controls/ChatCdSelector.vue'
+import ChatComandoEditControl from '../chat-controls/ChatComandoEditControl.vue'
+import ChatControlButtons from '../chat-controls/ChatControlButtons.vue'
+import ChatControlFollowup from '../chat-controls/ChatControlFollowup.vue'
+import ChatOpencodeForm from '../chat-controls/ChatOpencodeForm.vue'
+import ChatGenerarCommitForm from '../chat-controls/ChatGenerarCommitForm.vue'
 import ChatFormatter from './ChatFormatter.vue'
-import FuncionalidadListControl from './FuncionalidadListControl.vue'
-import RedmineProjectList from './RedmineProjectList.vue'
-import TicketEditControl from './TicketEditControl.vue'
-import TicketCreateControl from './TicketCreateControl.vue'
-import DescripcionInputControl from './DescripcionInputControl.vue'
-import DescripcionResultControl from './DescripcionResultControl.vue'
-import CommitResultControl from './CommitResultControl.vue'
-import ResolutionSelectControl from './ResolutionSelectControl.vue'
-import RedmineCommentsSendControl from './RedmineCommentsSendControl.vue'
-import AmbientesDiffCommentControl from './AmbientesDiffCommentControl.vue'
-import TicketCommentControl from './TicketCommentControl.vue'
-import PeticionFormControl from './PeticionFormControl.vue'
-import PeticionResultDisplay from './PeticionResultDisplay.vue'
+import FuncionalidadListControl from '../chat-controls/FuncionalidadListControl.vue'
+import RedmineProjectList from '../redmine/RedmineProjectList.vue'
+import TicketEditControl from '../tickets/TicketEditControl.vue'
+import TicketCreateControl from '../tickets/TicketCreateControl.vue'
+import DescripcionEditControl from '../chat-controls/DescripcionEditControl.vue'
+import DescripcionInputControl from '../chat-controls/DescripcionInputControl.vue'
+import DescripcionResultControl from '../chat-controls/DescripcionResultControl.vue'
+import CommitResultControl from '../chat-controls/CommitResultControl.vue'
+import ResolutionSelectControl from '../chat-controls/ResolutionSelectControl.vue'
+import RedmineCommentsSendControl from '../redmine/RedmineCommentsSendControl.vue'
+import AmbientesDiffCommentControl from '../redmine/AmbientesDiffCommentControl.vue'
+import TicketCommentControl from '../tickets/TicketCommentControl.vue'
+import PeticionFormControl from '../peticiones/PeticionFormControl.vue'
+import PeticionResultDisplay from '../peticiones/PeticionResultDisplay.vue'
 
 let counter = 0
 
 export default {
-  components: { ControlSelect, ControlTextarea, ChatControlFollowup, ChatOpencodeForm, ChatGenerarCommitForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, TicketCreateControl, DescripcionInputControl, DescripcionResultControl, CommitResultControl, ChatControlButtons, ResolutionSelectControl, RedmineCommentsSendControl, AmbientesDiffCommentControl, TicketCommentControl, ChatComandoEditControl, PeticionFormControl, PeticionResultDisplay },
+  components: { ControlSelect, ControlTextarea, ChatCdSelector, ChatControlFollowup, ChatOpencodeForm, ChatGenerarCommitForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, TicketCreateControl, DescripcionEditControl, DescripcionInputControl, DescripcionResultControl, CommitResultControl, ChatControlButtons, ResolutionSelectControl, RedmineCommentsSendControl, AmbientesDiffCommentControl, TicketCommentControl, ChatComandoEditControl, PeticionFormControl, PeticionResultDisplay },
   props: {
     msg: { type: Object, required: true },
     rawMsgKeys: { type: Set, default: () => new Set() },
