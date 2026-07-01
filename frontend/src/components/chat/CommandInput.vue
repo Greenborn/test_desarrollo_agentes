@@ -27,7 +27,7 @@
     >
       <button
         v-for="(opt, i) in autocompleteOptions"
-        :key="opt"
+        :key="i"
         class="d-block w-100 text-start px-2 py-1 btn btn-sm text-light font-monospace"
         :class="{ 'bg-primary': i === arrowIndex }"
         @mousedown.prevent="pickAutocomplete(opt)"
@@ -125,11 +125,10 @@ export default {
       if (raw.startsWith('/')) {
         uiStore.setOmnifilter('')
         execute(raw)
+        cmdStore.loadHistory(chatStore.activeSessionId)
       } else {
         uiStore.setOmnifilter(raw)
       }
-
-      cmdStore.loadHistory(chatStore.activeSessionId)
     }
 
     async function execute(raw) {
@@ -193,6 +192,8 @@ export default {
     }
 
     async function handleTab() {
+      cmdStore.hideAutocomplete()
+
       const trimmed = buffer.value.trim()
       const parts = splitArgs(buffer.value)
 

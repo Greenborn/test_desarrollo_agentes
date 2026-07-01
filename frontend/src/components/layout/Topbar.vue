@@ -132,7 +132,7 @@ export default {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ command: '/history' }),
+            body: JSON.stringify({ command: '/history', sessionId }),
           })
           const data = await res.json()
           if (!data.success) {
@@ -290,12 +290,14 @@ export default {
         if (urlArg) {
           if (urlArg.slice('--url='.length)) {
             cmdStore.hideAutocomplete()
+          } else {
+            cmdStore.hideAutocomplete()
           }
         } else {
           cmdStore.showAutocomplete(['--url='])
         }
       },
-      async execute(args, { cmdStore, chatStore }) {
+      async execute(args, { cmdStore, chatStore, sessionId }) {
         const { params, errors } = parseCommandArgs(args, { url: { required: true } })
         if (errors.length > 0) {
           console.error('Error en /navegador_ir_url:', errors.join('. '))
@@ -368,7 +370,7 @@ export default {
       description: 'Finaliza la sesión de navegador activa. Si no hay sesión iniciada, muestra error.',
       usage: '/navegador_finalizar',
       async execute(args, { cmdStore, chatStore, sessionId }) {
-        if (!navegadorSessionId.value) {
+        if (!browserStore.navegadorSessionId) {
           console.error('Error en /navegador_finalizar: no hay sesión de navegador activa')
           return 'Error: No hay sesión de navegador activa. Usá /navegador_iniciar primero.'
         }
@@ -377,7 +379,7 @@ export default {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ id_session: navegadorSessionId.value, sessionId }),
+            body: JSON.stringify({ id_session: browserStore.navegadorSessionId, sessionId }),
           })
           const data = await res.json()
           if (data.error) {
@@ -397,13 +399,13 @@ export default {
       category: 'Desarrollo',
       description: 'Finaliza la sesión OpenCode activa.',
       usage: '/dev_opencode_finalizar',
-      async execute(args, { cmdStore, chatStore }) {
+      async execute(args, { cmdStore, chatStore, sessionId }) {
         try {
           await fetch('/api/opencode/finish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, sessionId: chatStore.activeSessionId }),
+            body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, sessionId }),
           })
         } catch (err) {
           console.error('Error en /dev_opencode_finalizar:', err)

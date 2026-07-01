@@ -73,6 +73,7 @@ export default {
       const modal = useModalStore()
       modal.open(DescripcionMejorarModal, {
         sessionId: props.sessionId,
+        ticketId: props.ticketId,
         onApply: (improved) => {
           text.value = improved
         },

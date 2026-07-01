@@ -82,7 +82,7 @@ register({
             cmdStore.showAutocomplete(filtered.map(p => ({ display: p.id, value: `--proyecto-id=${p.id}` })));
           }
         }
-      } catch { cmdStore.hideAutocomplete(); }
+      } catch (err) { console.error('Error en autocomplete de /doc_nota_crear:', err); cmdStore.hideAutocomplete(); }
     }
   },
   async execute(args, { chatStore, sessionId }) {
@@ -110,7 +110,8 @@ register({
         const res = await fetch(`/api/tickets/session/${sessionId}`, { credentials: 'include' });
         const data = await res.json();
         idTicket = data.idTicketRedmine || null;
-      } catch {
+      } catch (err) {
+        console.error('Error al obtener ticket de sesión:', err);
         idTicket = null
       }
     }

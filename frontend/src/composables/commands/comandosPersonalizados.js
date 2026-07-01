@@ -79,8 +79,11 @@ register({
   description: 'Lista los comandos personalizados del proyecto de la sesión o del especificado.',
   usage: '/comando_listar [--id=proyecto]',
   autocomplete(args, cmdStore) {
-    if (!args.some(a => a.startsWith('--id='))) return ['--id=']
-    return []
+    if (!args.some(a => a.startsWith('--id='))) {
+      cmdStore.showAutocomplete(['--id='])
+    } else {
+      cmdStore.hideAutocomplete()
+    }
   },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) throw new Error('Primero debe iniciar una sesión de chat.')
@@ -137,8 +140,11 @@ register({
   description: 'Abre un formulario inline para editar un comando personalizado existente.',
   usage: '/comando_editar --id=ID',
   autocomplete(args, cmdStore) {
-    if (!args.some(a => a.startsWith('--id='))) return ['--id=']
-    return []
+    if (!args.some(a => a.startsWith('--id='))) {
+      cmdStore.showAutocomplete(['--id='])
+    } else {
+      cmdStore.hideAutocomplete()
+    }
   },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) throw new Error('Primero debe iniciar una sesión de chat.')
@@ -188,8 +194,11 @@ register({
   description: 'Elimina un comando personalizado.',
   usage: '/comando_eliminar --id=ID',
   autocomplete(args, cmdStore) {
-    if (!args.some(a => a.startsWith('--id='))) return ['--id=']
-    return []
+    if (!args.some(a => a.startsWith('--id='))) {
+      cmdStore.showAutocomplete(['--id='])
+    } else {
+      cmdStore.hideAutocomplete()
+    }
   },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) throw new Error('Primero debe iniciar una sesión de chat.')
@@ -214,8 +223,11 @@ register({
   description: 'Ejecuta un comando personalizado por su ID. Los resultados parciales se muestran en vivo.',
   usage: '/comando_ejecutar --id=ID',
   autocomplete(args, cmdStore) {
-    if (!args.some(a => a.startsWith('--id='))) return ['--id=']
-    return []
+    if (!args.some(a => a.startsWith('--id='))) {
+      cmdStore.showAutocomplete(['--id='])
+    } else {
+      cmdStore.hideAutocomplete()
+    }
   },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) throw new Error('Primero debe iniciar una sesión de chat.')
