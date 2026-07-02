@@ -88,6 +88,15 @@ class OpenCodeServer {
     }
   }
 
+  async isAlive() {
+    try {
+      const res = await fetch(`${this.baseUrl()}/global/health`, { signal: AbortSignal.timeout(3000) });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
   async api(path, options = {}) {
     const url = `${this.baseUrl()}${path}`;
     const res = await fetch(url, {
@@ -127,74 +136,52 @@ class OpenCodeServer {
   }
 
   async* streamSession(sessionId, parts, options = {}) {
-    const TIMEOUT_MS = 120000;
-    const abortController = new AbortController();
-    let timeoutId = null;
+    const eventRes = await fetch(`${this.baseUrl()}/event`);
+    if (!eventRes.ok || !eventRes.body) {
+      throw new Error('No se pudo conectar al stream de eventos de OpenCode');
+    }
 
-    const resetTimeout = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        console.log(`[opencode ${this.port}] timeout ${TIMEOUT_MS}ms sin eventos, abortando`);
-        abortController.abort();
-      }, TIMEOUT_MS);
-    };
+    await this.sendPromptAsync(sessionId, parts, options);
 
-    try {
-      const eventRes = await fetch(`${this.baseUrl()}/event`, {
-        signal: abortController.signal,
-      });
-      if (!eventRes.ok || !eventRes.body) {
-        throw new Error('No se pudo conectar al stream de eventos de OpenCode');
+    const reader = eventRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let done = false;
+
+    while (!done) {
+      let readerResult;
+      try {
+        readerResult = await reader.read();
+      } catch (readErr) {
+        console.log(`[opencode ${this.port}] error leyendo evento:`, readErr.message);
+        break;
       }
+      const { done: readerDone, value } = readerResult;
+      if (readerDone) break;
 
-      await this.sendPromptAsync(sessionId, parts, options);
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      const last = lines.pop();
+      buffer = last !== undefined ? last : '';
 
-      const reader = eventRes.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let done = false;
-
-      resetTimeout();
-
-      while (!done) {
-        let readerResult;
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
         try {
-          readerResult = await reader.read();
-        } catch (readErr) {
-          if (abortController.signal.aborted) {
-            console.log(`[opencode ${this.port}] lectura abortada por timeout`);
-          } else {
-            console.log(`[opencode ${this.port}] error leyendo evento:`, readErr.message);
+          const event = JSON.parse(trimmed.slice(6));
+          yield event;
+          if (event.type === 'session.status' && event.properties?.status?.type === 'idle') {
+            done = true;
           }
-          break;
-        }
-        const { done: readerDone, value } = readerResult;
-        if (readerDone) break;
-
-        resetTimeout();
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        const last = lines.pop();
-        buffer = last !== undefined ? last : '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith('data: ')) continue;
-          try {
-            const event = JSON.parse(trimmed.slice(6));
-            yield event;
-            if (event.type === 'session.status' && event.properties?.status?.type === 'idle') {
-              done = true;
-            }
-          } catch (parseErr) {
-            console.log(`[opencode ${this.port}] error parseando evento SSE:`, parseErr.message);
-          }
+        } catch (parseErr) {
+          console.log(`[opencode ${this.port}] error parseando evento SSE:`, parseErr.message);
         }
       }
+    }
+    try {
       reader.cancel();
-    } finally {
-      if (timeoutId) clearTimeout(timeoutId);
-      abortController.abort();
+    } catch (cancelErr) {
+      console.log(`[opencode ${this.port}] error cancelando reader:`, cancelErr.message);
     }
   }
 
@@ -223,7 +210,11 @@ class OpenCodeServer {
 async function getOrStartServer(directory, chatSessionId, locale, customKey = null) {
   const key = customKey || chatSessionId;
   if (key && servers[key]) {
-    return servers[key].server;
+    const alive = await servers[key].server.isAlive();
+    if (alive) return servers[key].server;
+    console.log(`[opencode] servidor ${key} no responde, limpiando y reiniciando`);
+    servers[key].server.stop();
+    delete servers[key];
   }
   const port = nextPort++;
   const srv = new OpenCodeServer(directory, port, locale);

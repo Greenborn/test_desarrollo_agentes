@@ -144,6 +144,11 @@ router.post('/send', async (req, res) => {
       'Connection': 'keep-alive',
     });
 
+    const keepAlive = setInterval(() => {
+      try { res.write(':ping\n\n'); } catch { clearInterval(keepAlive); }
+    }, 30000);
+    res.on('close', () => clearInterval(keepAlive));
+
     async function registrarGastos(sessionId, ocSessionId, server, fullResponse) {
       if (!sessionId) return;
       try {
@@ -462,6 +467,11 @@ router.post('/editor-send', async (req, res) => {
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
     });
+
+    const keepAliveEditor = setInterval(() => {
+      try { res.write(':ping\n\n'); } catch { clearInterval(keepAliveEditor); }
+    }, 30000);
+    res.on('close', () => clearInterval(keepAliveEditor));
 
     const processControl = async (controlEvent) => {
       return new Promise((resolve) => {
