@@ -23,7 +23,10 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
 
   async function fetchStatus() {
     try {
-      const res = await fetch(`${API}/despliegue/estado-instancia-dev`, { credentials: 'include' })
+      const chatStore = useChatStore()
+      const sid = chatStore.activeSessionId
+      const url = sid ? `${API}/despliegue/estado-instancia-dev?sessionId=${sid}` : `${API}/despliegue/estado-instancia-dev`
+      const res = await fetch(url, { credentials: 'include' })
       const data = await res.json()
       if (data.success) {
         processes.value = data.processes || []
@@ -44,10 +47,13 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
   }
 
   async function fetchLogs() {
+    const chatStore = useChatStore()
+    const sid = chatStore.activeSessionId
+    if (!sid) return
     const names = processNames.value
     for (const name of names) {
       try {
-        const res = await fetch(`${API}/despliegue/logs?name=${encodeURIComponent(name)}`, { credentials: 'include' })
+        const res = await fetch(`${API}/despliegue/logs?sessionId=${sid}&name=${encodeURIComponent(name)}`, { credentials: 'include' })
         const data = await res.json()
         if (data.success) {
           logsMap[name] = data.logs || []
@@ -61,11 +67,13 @@ export const useDevInstanceStore = defineStore('devInstance', () => {
   async function detener() {
     deteniendo.value = true
     try {
+      const chatStore = useChatStore()
+      const body = chatStore.activeSessionId ? { sessionId: chatStore.activeSessionId } : {}
       await fetch(`${API}/despliegue/detener-instancia-dev`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({}),
+        body: JSON.stringify(body),
       })
       processes.value = []
       frontendPorts.value = []

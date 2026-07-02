@@ -212,6 +212,8 @@ Los comandos personalizados se gestionan desde:
 
 Cada comando se guarda en la tabla `comandos_personalizados_proyectos` y se ejecuta como comando shell (`/bin/sh -c`) en el directorio de trabajo de la sesión.
 
+**Interpolación de variables:** El cuerpo del comando admite la sintaxis `{{nombre_variable}}`. Al ejecutar el comando, el sistema resuelve automáticamente las variables del proyecto (tanto persistentes `type=db` como no persistentes `type=memory`) reemplazando `{{nombre}}` por su valor actual.
+
 ---
 
 ## Notas

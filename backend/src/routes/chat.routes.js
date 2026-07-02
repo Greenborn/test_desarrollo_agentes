@@ -24,6 +24,7 @@ router.get('/sessions', async (req, res) => {
     const wsIds = req.session.workspaceIds || [1];
     const sessions = await db('chat_sessions')
       .where({ 'chat_sessions.user_id': req.session.userId })
+      .where('chat_sessions.archived', false)
       .whereIn('chat_sessions.workspace_id', wsIds)
       .orderBy('chat_sessions.updated_at', 'desc')
       .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
@@ -65,6 +66,48 @@ router.post('/sessions', async (req, res) => {
   } catch (err) {
     console.log('Error al crear sesión:', err.message);
     res.status(500).json({ session: null, error: err.message });
+  }
+});
+
+router.post('/sessions/:id/workspace', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { workspaceId } = req.body;
+    if (!workspaceId) {
+      return res.status(400).json({ error: 'workspaceId es requerido' });
+    }
+
+    const ws = await db('workspaces').where({ id: workspaceId }).first();
+    if (!ws) {
+      return res.status(400).json({ error: 'Workspace no encontrado' });
+    }
+
+    const session = await db('chat_sessions')
+      .where({ id: req.params.id, user_id: req.session.userId })
+      .first();
+    if (!session) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+
+    await db('chat_sessions')
+      .where({ id: req.params.id })
+      .update({ workspace_id: workspaceId, updated_at: db.fn.now() });
+
+    const oldIds = req.session.workspaceIds || [1];
+    if (!oldIds.includes(workspaceId)) {
+      const newIds = [...oldIds, workspaceId];
+      req.session.workspaceIds = newIds;
+      await new Promise(resolve => req.session.save(resolve));
+      await db('user_settings')
+        .insert({ user_id: req.session.userId, key: 'selected_workspace_id', value: JSON.stringify(newIds) })
+        .onConflict(['user_id', 'key'])
+        .merge();
+    }
+
+    res.json({ success: true, workspaceIds: req.session.workspaceIds || [1] });
+  } catch (err) {
+    console.log('Error al asignar workspace a sesión:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -551,6 +594,75 @@ router.post('/summarize-files-batch', async (req, res) => {
   } catch (err) {
     console.log('Error en summarize-files-batch:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/sessions/archived', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const wsIds = req.session.workspaceIds || [1];
+    const sessions = await db('chat_sessions')
+      .where({ 'chat_sessions.user_id': req.session.userId })
+      .where('chat_sessions.archived', true)
+      .whereIn('chat_sessions.workspace_id', wsIds)
+      .orderBy('chat_sessions.updated_at', 'desc')
+      .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
+      .leftJoin('tickets', 'chat_sessions.id_ticket_redmine', 'tickets.redmine_id')
+      .leftJoin('settings as ws_redmine', function () {
+        this.on('chat_sessions.workspace_id', '=', 'ws_redmine.workspace_id')
+          .andOn('ws_redmine.setting_key', '=', db.raw('?', ['redmine_url']));
+      })
+      .select(
+        'chat_sessions.id',
+        'title',
+        'chat_sessions.updated_at',
+        'cwd',
+        'chat_sessions.proyecto_id',
+        'id_ticket_redmine',
+        'chat_sessions.workspace_id',
+        'ws_redmine.setting_value as session_redmine_url',
+        'proyectos.descripcion as proyecto_descripcion',
+        'tickets.priority_id',
+        'tickets.priority_name'
+      );
+    res.json({ sessions });
+  } catch (err) {
+    console.log('Error al cargar sesiones archivadas:', err.message);
+    res.status(500).json({ sessions: [], error: err.message });
+  }
+});
+
+router.post('/sessions/:id/archive', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const session = await db('chat_sessions')
+      .where({ id: req.params.id, user_id: req.session.userId })
+      .first();
+    if (!session) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+    await db('chat_sessions').where({ id: req.params.id }).update({ archived: true, updated_at: db.fn.now() });
+    res.json({ success: true, sessionId: req.params.id });
+  } catch (err) {
+    console.log('Error al archivar sesión:', err.message);
+    res.status(500).json({ success: false, sessionId: req.params.id, error: err.message });
+  }
+});
+
+router.post('/sessions/:id/unarchive', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const session = await db('chat_sessions')
+      .where({ id: req.params.id, user_id: req.session.userId })
+      .first();
+    if (!session) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+    await db('chat_sessions').where({ id: req.params.id }).update({ archived: false, updated_at: db.fn.now() });
+    res.json({ success: true, sessionId: req.params.id });
+  } catch (err) {
+    console.log('Error al desarchivar sesión:', err.message);
+    res.status(500).json({ success: false, sessionId: req.params.id, error: err.message });
   }
 });
 

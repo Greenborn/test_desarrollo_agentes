@@ -9,10 +9,10 @@ export function useConsoleLogStream(sessionIdRef, enabledRef, onBatch) {
   const chat = useChatStore()
   let abortController = null
   let buffer = []
+  let bufferSessionId = null
   let debounceTimer = null
   let reconnectTimer = null
   let reader = null
-  let activeStream = false
 
   function flushBuffer() {
     if (debounceTimer) {
@@ -21,6 +21,8 @@ export function useConsoleLogStream(sessionIdRef, enabledRef, onBatch) {
     }
     if (buffer.length === 0) return
 
+    const sid = bufferSessionId
+    bufferSessionId = null
     const batch = buffer.splice(0, MAX_ERRORS_PER_BATCH)
     const errors = batch.filter(l => l.type === 'error')
     const warnings = batch.filter(l => l.type === 'warn')
@@ -33,7 +35,7 @@ export function useConsoleLogStream(sessionIdRef, enabledRef, onBatch) {
         summary: `Se detectaron ${errors.length} error(es) y ${warnings.length} advertencia(s) en la consola del navegador`,
       }),
       _key: 'console-err-' + Date.now(),
-    })
+    }, sid)
 
     if (typeof onBatch === 'function') {
       onBatch(batch)
@@ -41,6 +43,9 @@ export function useConsoleLogStream(sessionIdRef, enabledRef, onBatch) {
   }
 
   function pushToBuffer(event) {
+    if (!bufferSessionId) {
+      bufferSessionId = typeof sessionIdRef === 'function' ? sessionIdRef() : sessionIdRef.value
+    }
     buffer.push(event)
     if (debounceTimer) {
       clearTimeout(debounceTimer)
@@ -53,24 +58,27 @@ export function useConsoleLogStream(sessionIdRef, enabledRef, onBatch) {
 
   async function connect() {
     const sid = typeof sessionIdRef === 'function' ? sessionIdRef() : sessionIdRef.value
-    if (!sid || activeStream) return
+    if (!sid || abortController) return
 
-    activeStream = true
-    abortController = new AbortController()
+    const controller = new AbortController()
+    abortController = controller
 
     try {
       const res = await fetch(`/api/playwright-logs/console/stream?chat_session_id=${sid}`, {
         credentials: 'include',
-        signal: abortController.signal,
+        signal: controller.signal,
       })
 
       if (!res.ok) {
         console.error('[consoleLogStream] Error al conectar SSE:', res.status, res.statusText)
-        activeStream = false
+        if (abortController === controller) {
+          abortController = null
+        }
         scheduleReconnect()
         return
       }
 
+      bufferSessionId = sid
       const streamReader = res.body.getReader()
       reader = streamReader
       const decoder = new TextDecoder()
@@ -109,9 +117,10 @@ export function useConsoleLogStream(sessionIdRef, enabledRef, onBatch) {
         scheduleReconnect()
       }
     } finally {
-      reader = null
-      abortController = null
-      activeStream = false
+      if (abortController === controller) {
+        reader = null
+        abortController = null
+      }
     }
   }
 
@@ -137,7 +146,7 @@ export function useConsoleLogStream(sessionIdRef, enabledRef, onBatch) {
     if (buffer.length > 0) {
       flushBuffer()
     }
-    activeStream = false
+    bufferSessionId = null
     if (abortController) {
       abortController.abort()
       abortController = null
@@ -153,11 +162,12 @@ export function useConsoleLogStream(sessionIdRef, enabledRef, onBatch) {
       const sid = typeof sessionIdRef === 'function' ? sessionIdRef() : sessionIdRef.value
       return { enabled: !!enabled, sid }
     },
-    ({ enabled, sid }) => {
+    ({ enabled, sid }, oldState) => {
+      if (oldState && (sid !== oldState.sid || enabled !== oldState.enabled)) {
+        disconnect()
+      }
       if (enabled && sid) {
         connect()
-      } else {
-        disconnect()
       }
     },
     { immediate: true }

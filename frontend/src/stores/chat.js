@@ -8,6 +8,7 @@ const SESSION_KEY = 'oc_active_session_id'
 
 export const useChatStore = defineStore('chat', () => {
   const sessions = ref([])
+  const archivedSessions = ref([])
   const activeSessionId = ref(null)
   const messages = ref([])
   const creating = ref(false)
@@ -135,9 +136,10 @@ export const useChatStore = defineStore('chat', () => {
       _sessionCmdCount.value[sid] = (_sessionCmdCount.value[sid] || 0) + 1
       sessionStatus.value[sid] = 'executing'
     }
+    const cmdKey = 'cmd-' + Date.now()
     const loadingKey = 'loading-' + Date.now()
 
-    messages.value.push({ role: 'command', content: raw, _key: 'cmd-' + Date.now() })
+    messages.value.push({ role: 'command', content: raw, _key: cmdKey })
     flashLed(sid)
     const loadingIdx = messages.value.length
     messages.value.push({ role: 'result', content: '⏳ Ejecutando comando...', _key: loadingKey })
@@ -145,34 +147,56 @@ export const useChatStore = defineStore('chat', () => {
 
     try {
       const result = await executeFn(loadingIdx, sid)
-      await _saveCommandMessages(sid, raw, result)
-      if (sid && raw.startsWith('/')) {
-        try {
-          await fetch(`${API}/command/history`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ command: raw, sessionId: sid }),
-          })
-        } catch (err) {
-          console.error('Error al guardar en command_history:', err)
+
+      // Silent execution — command message hidden, persistence skipped, but live output shown
+      const isSilent = result && typeof result === 'object' && result.__silent === true
+
+      if (!isSilent) {
+        await _saveCommandMessages(sid, raw, result)
+        if (sid && raw.startsWith('/')) {
+          try {
+            await fetch(`${API}/command/history`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ command: raw, sessionId: sid }),
+            })
+          } catch (err) {
+            console.error('Error al guardar en command_history:', err)
+          }
         }
       }
+
       if (Number(activeSessionId.value) === Number(sid)) {
-        const idx = messages.value.findIndex(m => m._key === loadingKey)
-        if (idx >= 0) {
-          if (result !== undefined && result !== null) {
-            if (typeof result === 'object' && result.role) {
-              messages.value[idx] = { ...result, _key: 'result-' + Date.now() }
+        if (isSilent) {
+          const cmdIdx = messages.value.findIndex(m => m._key === cmdKey)
+          if (cmdIdx >= 0) messages.value.splice(cmdIdx, 1)
+          const idx = messages.value.findIndex(m => m._key === loadingKey)
+          if (idx >= 0) {
+            const output = result.output !== undefined ? String(result.output) : null
+            if (output !== null) {
+              messages.value[idx] = { role: 'result', content: output, _key: 'result-' + Date.now() }
             } else {
-              messages.value[idx] = { role: 'result', content: String(result), _key: 'result-' + Date.now() }
+              messages.value.splice(idx, 1)
             }
-          } else {
-            messages.value.splice(idx, 1)
+            flashLed(sid)
           }
-          flashLed(sid)
+        } else {
+          const idx = messages.value.findIndex(m => m._key === loadingKey)
+          if (idx >= 0) {
+            if (result !== undefined && result !== null) {
+              if (typeof result === 'object' && result.role) {
+                messages.value[idx] = { ...result, _key: 'result-' + Date.now() }
+              } else {
+                messages.value[idx] = { role: 'result', content: String(result), _key: 'result-' + Date.now() }
+              }
+            } else {
+              messages.value.splice(idx, 1)
+            }
+            flashLed(sid)
+          }
         }
-      } else if (sid) {
+      } else if (sid && !isSilent) {
         pendingNotifications.value[sid] = Date.now()
       }
       _decSessionCount(sid)
@@ -182,17 +206,19 @@ export const useChatStore = defineStore('chat', () => {
     } catch (err) {
       console.error('Error ejecutando comando:', err)
       const errorResult = 'Error: ' + (err.message || 'Error desconocido')
-      await _saveCommandMessages(sid, raw, errorResult)
-      if (sid && raw.startsWith('/')) {
-        try {
-          await fetch(`${API}/command/history`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ command: raw, sessionId: sid }),
-          })
-        } catch (err) {
-          console.error('Error al guardar en command_history:', err)
+      if (!(err.__silent === true)) {
+        await _saveCommandMessages(sid, raw, errorResult)
+        if (sid && raw.startsWith('/')) {
+          try {
+            await fetch(`${API}/command/history`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ command: raw, sessionId: sid }),
+            })
+          } catch (err) {
+            console.error('Error al guardar en command_history:', err)
+          }
         }
       }
       if (Number(activeSessionId.value) === Number(sid)) {
@@ -201,7 +227,7 @@ export const useChatStore = defineStore('chat', () => {
           messages.value[idx] = { role: 'result', content: errorResult, _key: 'err-' + Date.now() }
           flashLed(sid)
         }
-      } else if (sid) {
+      } else if (sid && !(err.__silent === true)) {
         pendingNotifications.value[sid] = Date.now()
       }
       _decSessionCount(sid)
@@ -493,6 +519,58 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function loadArchivedSessions() {
+    try {
+      const res = await fetch(`${API}/chat/sessions/archived`, { credentials: 'include' })
+      const data = await res.json()
+      if (data.error) {
+        if (data.error !== 'Sesión no válida') {
+          console.error('Error al cargar sesiones archivadas:', data.error)
+        }
+        return
+      }
+      archivedSessions.value = data.sessions
+    } catch (err) {
+      console.error('Error al cargar sesiones archivadas:', err)
+    }
+  }
+
+  async function archiveSession(sessionId) {
+    try {
+      const res = await fetch(`${API}/chat/sessions/${sessionId}/archive`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (data.success) {
+        if (activeSessionId.value === sessionId) {
+          activeSessionId.value = null
+          messages.value = []
+        }
+        sessions.value = sessions.value.filter(s => Number(s.id) !== Number(sessionId))
+        await loadArchivedSessions()
+      }
+    } catch (err) {
+      console.error('Error al archivar sesión:', err)
+    }
+  }
+
+  async function unarchiveSession(sessionId) {
+    try {
+      const res = await fetch(`${API}/chat/sessions/${sessionId}/unarchive`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (data.success) {
+        archivedSessions.value = archivedSessions.value.filter(s => Number(s.id) !== Number(sessionId))
+        await loadSessions()
+      }
+    } catch (err) {
+      console.error('Error al desarchivar sesión:', err)
+    }
+  }
+
   async function deleteSession(sessionId) {
     try {
       const res = await fetch(`${API}/chat/sessions/${sessionId}`, {
@@ -673,10 +751,11 @@ export const useChatStore = defineStore('chat', () => {
   })
 
   return {
-    sessions, activeSessionId, messages,
+    sessions, archivedSessions, activeSessionId, messages,
     streaming, creating, executing, sessionStatus, currentChunk, currentThinking,
     pendingNotifications,
-    loadSessions, createSession, createSessionIfNeeded, runCommand, loadMessages, loadMoreMessages,
+    loadSessions, loadArchivedSessions, archiveSession, unarchiveSession,
+    createSession, createSessionIfNeeded, runCommand, loadMessages, loadMoreMessages,
     loadingMore, hasMoreMessages,
     sendMessage, deleteMessage, deleteSession, clearMessages, stopAllExecutions,
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,

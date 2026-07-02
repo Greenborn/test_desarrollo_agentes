@@ -14,9 +14,23 @@
     <template v-else-if="isMarkdown">
       <div class="preview-header small text-muted px-2 py-1 flex-shrink-0 text-truncate d-flex align-items-center justify-content-between">
         <span class="text-truncate">{{ fileName }}</span>
-        <button v-if="canCopy" class="btn btn-sm btn-outline-secondary border-0 py-0" style="font-size: 0.65rem;" @click="copyToClipboard" title="Copiar contenido">
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 2px;"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg> Copiar
-        </button>
+        <span>
+          <button class="btn btn-sm btn-outline-secondary border-0 py-0" style="font-size: 0.65rem;" @click="loadPreview" title="Recargar vista previa">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 2px;"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/></svg> Recargar
+          </button>
+          <button v-if="canCopy" class="btn btn-sm btn-outline-secondary border-0 py-0" style="font-size: 0.65rem;" @click="copyToClipboard" title="Copiar contenido">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 2px;"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg> Copiar
+          </button>
+        </span>
+      </div>
+      <div class="preview-content markdown-preview flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
+        <div v-if="loading" class="d-flex align-items-center justify-content-center text-secondary small py-4">
+          Cargando vista previa…
+        </div>
+        <div v-else-if="error" class="text-danger small py-2">
+          {{ error }}
+        </div>
+        <ChatFormatter v-else :text="content" />
       </div>
     </template>
     <template v-else-if="isCodeFile">
@@ -201,7 +215,7 @@ export default {
       loadPreview()
     })
 
-    return { content, loading, error, fileName, isMarkdown, isCodeFile, canCopy, copyToClipboard, isTooLarge, maxSizeKb, highlightedCode }
+    return { content, loading, error, fileName, isMarkdown, isCodeFile, canCopy, copyToClipboard, isTooLarge, maxSizeKb, highlightedCode, loadPreview }
   },
 }
 </script>
@@ -236,5 +250,10 @@ export default {
   background: transparent;
   padding: 8px;
   overflow-x: auto;
+}
+.markdown-preview {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #c9d1d9;
 }
 </style>

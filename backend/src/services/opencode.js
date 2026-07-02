@@ -101,10 +101,12 @@ class OpenCodeServer {
     return res.json();
   }
 
-  async createSession(title) {
+  async createSession(title, agent = null) {
+    const body = { title: title || 'Agent Orchestrator session' };
+    if (agent) body.agent = agent;
     return this.api('/session', {
       method: 'POST',
-      body: JSON.stringify({ title: title || 'Agent Orchestrator session' }),
+      body: JSON.stringify(body),
     });
   }
 
@@ -218,14 +220,15 @@ class OpenCodeServer {
   }
 }
 
-async function getOrStartServer(directory, chatSessionId, locale) {
-  if (chatSessionId && servers[chatSessionId]) {
-    return servers[chatSessionId].server;
+async function getOrStartServer(directory, chatSessionId, locale, customKey = null) {
+  const key = customKey || chatSessionId;
+  if (key && servers[key]) {
+    return servers[key].server;
   }
   const port = nextPort++;
   const srv = new OpenCodeServer(directory, port, locale);
-  if (chatSessionId) {
-    servers[chatSessionId] = { server: srv, directory };
+  if (key) {
+    servers[key] = { server: srv, directory };
   }
   await srv.start();
   await srv.waitForReady();
@@ -240,11 +243,19 @@ function stopServer(chatSessionId) {
 }
 
 function stopServerByDirectory(directory) {
-  for (const [chatSessionId, entry] of Object.entries(servers)) {
+  for (const [key, entry] of Object.entries(servers)) {
     if (entry.directory === directory) {
       entry.server.stop();
-      delete servers[chatSessionId];
+      delete servers[key];
     }
+  }
+}
+
+function stopEditorServer(directory) {
+  const key = `editor_${directory}`;
+  if (servers[key]) {
+    servers[key].server.stop();
+    delete servers[key];
   }
 }
 
@@ -254,14 +265,14 @@ function stopAllServers() {
   }
 }
 
-async function getModels(directory, chatSessionId, locale) {
-  const server = await getOrStartServer(directory, chatSessionId, locale);
+async function getModels(directory, chatSessionId, locale, customKey = null) {
+  const server = await getOrStartServer(directory, chatSessionId, locale, customKey);
   return server.api('/config/providers');
 }
 
-async function abortSessionInDir(chatSessionId, ocSessionId) {
-  if (servers[chatSessionId]) {
-    await servers[chatSessionId].server.abortSession(ocSessionId);
+async function abortSessionInDir(key, ocSessionId) {
+  if (servers[key]) {
+    await servers[key].server.abortSession(ocSessionId);
   }
 }
 
@@ -280,6 +291,7 @@ export default {
   getOrStartServer,
   stopServer,
   stopServerByDirectory,
+  stopEditorServer,
   stopAllServers,
   getModels,
   abortSessionInDir,

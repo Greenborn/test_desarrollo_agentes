@@ -125,6 +125,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - **Auth:** Requerida
 - **Workspace:** Filtra por `workspace_id` de la sesión
 - **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion, id_ticket_redmine, workspace_id, priority_id, priority_name }] }`
+- **Descripción:** Lista las sesiones activas (no archivadas) del usuario.
 
 ### `POST /api/chat/sessions`
 - **Auth:** Requerida
@@ -157,6 +158,24 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - **Body:** `{ files: [{ path: string, content: string }], model?: string, thinking?: string, sessionId?: number }`
 - **Respuesta:** `{ descriptions: { [path]: string } }`
 - **Descripción:** Envía múltiples archivos en un solo prompt a DeepSeek. Retorna un JSON con las rutas como claves y descripciones como valores. Usado por `/deteccion_funcionalidades` para procesar batches de 10 archivos en una sola llamada, reduciendo significativamente las requests a la API.
+
+### `GET /api/chat/sessions/archived`
+- **Auth:** Requerida
+- **Workspace:** Filtra por `workspace_id` de la sesión
+- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion, id_ticket_redmine, workspace_id, priority_id, priority_name }] }`
+- **Descripción:** Lista únicamente las sesiones archivadas del usuario. Misma estructura que `GET /sessions` pero filtrando `archived = true`.
+
+### `POST /api/chat/sessions/:id/archive`
+- **Auth:** Requerida
+- **Respuesta 200:** `{ success: true, sessionId }`
+- **Respuesta 404:** `{ error: "Sesión no encontrada" }`
+- **Descripción:** Marca la sesión como archivada (`archived = true`). La sesión deja de aparecer en `GET /sessions` y pasa a `GET /sessions/archived`.
+
+### `POST /api/chat/sessions/:id/unarchive`
+- **Auth:** Requerida
+- **Respuesta 200:** `{ success: true, sessionId }`
+- **Respuesta 404:** `{ error: "Sesión no encontrada" }`
+- **Descripción:** Desarchiva la sesión (`archived = false`). Vuelve a aparecer en `GET /sessions`.
 
 ### `DELETE /api/chat/sessions/:id`
 - **Auth:** Requerida

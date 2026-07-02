@@ -162,8 +162,7 @@ register({
       const typeLabel = r.type === 'backend' ? 'nodemon' : 'npm run dev';
       let line = `${icon} ${r.name} (${typeLabel}) — ${r.status}${r.error ? ': ' + r.error : ''}`;
       if (r.status === 'running') {
-        const fe = (data.frontendPorts || []).find(f => f.name === r.name);
-        if (fe) line += ` → ${fe.url}`;
+        if (r.url) line += ` → ${r.url}`;
         const bs = (data.browserSessions || []).find(b => b.name === r.name);
         if (bs) line += ` 🖥️${resLabel} (sesión: ${bs.idSession.slice(0, 8)}…)`;
       }
@@ -187,11 +186,12 @@ register({
   description: 'Detiene todos los procesos de desarrollo iniciados con /despliegue_iniciar_instancia.',
   usage: '/despliegue_detener_instancia',
   async execute(args, { chatStore }) {
+    const body = chatStore.activeSessionId ? { sessionId: chatStore.activeSessionId } : {};
     const res = await fetch('/api/despliegue/detener-instancia-dev', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({}),
+      body: JSON.stringify(body),
     });
 
     const data = await res.json();
@@ -227,8 +227,7 @@ register({
       const typeLabel = p.type === 'backend' ? 'nodemon' : 'npm run dev';
       let line = `${icon} ${p.name} (${typeLabel}) — ${p.status}`;
       if (p.status === 'running') {
-        const fe = (data.frontendPorts || []).find(f => f.name === p.name);
-        if (fe) line += ` → ${fe.url}`;
+        if (p.detectedUrl) line += ` → ${p.detectedUrl}`;
         const bs = (data.browserSessions || []).find(b => b.name === p.name);
         if (bs) line += ` 🖥️ (${bs.idSession.slice(0, 8)}…)`;
       }

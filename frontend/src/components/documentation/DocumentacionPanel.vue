@@ -90,78 +90,20 @@
       </div>
     </template>
 
-    <!-- CREATE MODAL -->
-    <div v-if="showCreateModal" class="doc-notas-modal-overlay" @click.self="cerrarCrear">
-      <div class="doc-notas-modal bg-dark rounded p-3" style="width: 360px; max-width: 90vw; border: 1px solid #374151;" @click.stop>
-        <h6 class="text-light mb-3" style="font-size: 0.85rem;">Nueva nota de documentación</h6>
-        <div class="mb-2">
-          <label class="small text-secondary mb-1">Clave</label>
-          <input ref="claveInput" v-model="createClave" class="form-control form-control-sm bg-dark text-light border-secondary"
-            style="font-size: 0.75rem;" placeholder="nombre_de_la_nota" maxlength="255" />
-        </div>
-        <div class="mb-2">
-          <label class="small text-secondary mb-1">Tipo de documentación</label>
-          <div class="d-flex gap-3">
-            <label class="d-flex align-items-center gap-1" style="cursor:pointer;font-size:0.75rem;color:#cbd5e1;">
-              <input type="radio" value="general" v-model="createTicketType" class="form-check-input m-0" />
-              General
-            </label>
-            <label class="d-flex align-items-center gap-1" style="cursor:pointer;font-size:0.75rem;color:#cbd5e1;">
-              <input type="radio" value="especifica" v-model="createTicketType" class="form-check-input m-0" />
-              Específica
-            </label>
-          </div>
-        </div>
-        <div v-if="createTicketType === 'especifica'" class="mb-2">
-          <label class="small text-secondary mb-1">Ticket Redmine</label>
-          <select v-model="createTicket" class="form-select form-select-sm bg-dark text-light border-secondary"
-            style="font-size: 0.75rem;">
-            <option value="" disabled>Seleccione un ticket</option>
-            <option v-for="t in tickets" :key="t.redmine_id" :value="t.redmine_id">
-              #{{ t.redmine_id }} — {{ t.subject }}
-            </option>
-          </select>
-        </div>
-        <div class="mb-2">
-          <label class="small text-secondary mb-1">Valor</label>
-          <textarea v-model="createValor" class="form-control form-control-sm bg-dark text-light border-secondary"
-            style="font-size: 0.75rem; min-height: 120px;" :maxlength="MAX_VALOR" placeholder="Contenido…"></textarea>
-          <div class="text-end" style="font-size: 0.6rem; color: #6b7280;">
-            {{ createValor?.length || 0 }} / {{ MAX_VALOR }}
-          </div>
-        </div>
-        <div class="d-flex gap-2 justify-content-end mt-3">
-          <button class="btn btn-sm btn-outline-secondary py-0 px-3" style="font-size: 0.7rem;" @click="cerrarCrear">Cancelar</button>
-          <button class="btn btn-sm btn-outline-success py-0 px-3" style="font-size: 0.7rem;" @click="crearNota" :disabled="!createClave || !createValor || (createTicketType === 'especifica' && !createTicket)">Crear</button>
-        </div>
-        <div v-if="createError" class="text-danger small mt-2">{{ createError }}</div>
-      </div>
-    </div>
-
-    <!-- AGENT PROMPT MODAL -->
-    <div v-if="showAgentPromptModal" class="doc-notas-modal-overlay" @click.self="closeAgentPromptModal">
-      <div class="doc-notas-modal bg-dark rounded p-3" style="width:480px;max-width:90vw;border:1px solid #374151;" @click.stop>
-        <h6 class="text-light mb-3" style="font-size:0.85rem;">Prompt del Sistema</h6>
-        <label class="small text-secondary mb-1">El prompt define el formato JSON de salida:</label>
-        <textarea v-model="editAgentPrompt" class="form-control form-control-sm bg-dark text-light border-secondary"
-          style="font-size:0.75rem;min-height:200px;" placeholder="Define el formato JSON de salida obligatorio..."></textarea>
-        <div class="d-flex gap-2 justify-content-end mt-3">
-          <button class="btn btn-sm btn-outline-secondary py-0 px-3" style="font-size:0.7rem;" @click="closeAgentPromptModal">Cancelar</button>
-          <button class="btn btn-sm btn-outline-success py-0 px-3" style="font-size:0.7rem;" @click="saveAgentPromptModal">Guardar</button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script>
-import { watch, ref, computed, onMounted, nextTick } from 'vue'
+import { watch, ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDocumentacionNotasStore } from '../../stores/documentacionNotas.js'
 import { useChatStore } from '../../stores/chat.js'
+import { useModalStore } from '../../stores/modal.js'
 import { settingGet, settingSet } from '../../services/settingService.js'
 import ChatFormatter from '../chat/ChatFormatter.vue'
 import JsonTreeView from '../utils/JsonTreeView.vue'
+import DocCreateModal from './DocCreateModal.vue'
+import DocAgentPromptModal from './DocAgentPromptModal.vue'
 
 const LIST_WIDTH_KEY = 'doc_notas_list_width'
 const LIST_MIN = 100
@@ -175,7 +117,7 @@ const TOOLS_DEFAULT = 120
 const AGENT_SYSTEM_PROMPT_KEY = 'doc_agent_system_prompt'
 
 export default {
-  components: { ChatFormatter, JsonTreeView },
+  components: { ChatFormatter, JsonTreeView, DocCreateModal, DocAgentPromptModal },
   props: {
     proyectoId: { type: [String, Number], default: null },
     ticketId: { type: [Number, String], default: null },
@@ -183,6 +125,7 @@ export default {
   setup(props) {
     const store = useDocumentacionNotasStore()
     const chat = useChatStore()
+    const modal = useModalStore()
 
     const listWidth = ref(LIST_DEFAULT)
     const toolsWidth = ref(TOOLS_DEFAULT)
@@ -191,22 +134,11 @@ export default {
     const editClave = ref('')
     const previewMode = ref(false)
     const claveEditInput = ref(null)
-    const showCreateModal = ref(false)
-    const createClave = ref('')
-    const createValor = ref('')
-    const createTicket = ref('')
-    const createTicketType = ref('general')
-    const tickets = ref([])
-    const ticketsLoading = ref(false)
-    const createError = ref('')
-    const claveInput = ref(null)
 
     const agentInstructions = ref('')
     const agentLoading = ref(false)
     const agentError = ref('')
     const agentSystemPrompt = ref('')
-    const showAgentPromptModal = ref(false)
-    const editAgentPrompt = ref('')
 
     const notas = computed(() => store.notasByProject[props.proyectoId] || [])
     const loading = computed(() => store.loadingByProject[props.proyectoId] || false)
@@ -353,42 +285,12 @@ export default {
     }
 
     function abrirCrear() {
-      createClave.value = ''
-      createValor.value = ''
-      createTicket.value = props.ticketId || ''
-      createTicketType.value = props.ticketId ? 'especifica' : 'general'
-      createError.value = ''
-      showCreateModal.value = true
-      loadTickets()
-      nextTick(() => {
-        if (claveInput.value) claveInput.value.focus()
+      modal.open(DocCreateModal, {
+        proyectoId: props.proyectoId,
+        ticketId: props.ticketId,
+      }, {
+        title: 'Nueva nota de documentación',
       })
-    }
-
-    function cerrarCrear() {
-      showCreateModal.value = false
-    }
-
-    async function crearNota() {
-      if (!createClave.value || !createValor.value) return
-      if (createTicketType.value === 'especifica' && !createTicket.value) {
-        createError.value = 'Debe seleccionar un ticket para documentación específica'
-        return
-      }
-      const payload = {
-        id_proyecto: props.proyectoId,
-        clave: createClave.value,
-        valor: createValor.value,
-      }
-      if (createTicketType.value === 'especifica') {
-        payload.id_ticket = parseInt(createTicket.value, 10)
-      }
-      try {
-        await store.createNota(payload)
-        cerrarCrear()
-      } catch (err) {
-        createError.value = err.message
-      }
     }
 
     async function eliminarNota(n) {
@@ -417,44 +319,19 @@ export default {
       }
     }
 
-    async function loadTickets() {
-      if (!props.proyectoId) return
-      ticketsLoading.value = true
-      try {
-        const res = await fetch(`/api/tickets?proyecto_id=${encodeURIComponent(props.proyectoId)}`, { credentials: 'include' })
-        if (res.ok) {
-          const data = await res.json()
-          tickets.value = data.tickets || []
-        }
-      } catch (err) {
-        console.error('Error al cargar tickets:', err)
-        tickets.value = []
-      } finally {
-        ticketsLoading.value = false
-      }
-    }
-
-    async function saveAgentSystemPrompt(val) {
-      try {
-        await settingSet(AGENT_SYSTEM_PROMPT_KEY, val)
-      } catch (err) {
-        console.error('Error al guardar prompt del agente:', err)
-      }
-    }
-
     function openAgentPromptModal() {
-      editAgentPrompt.value = agentSystemPrompt.value
-      showAgentPromptModal.value = true
-    }
-
-    function closeAgentPromptModal() {
-      showAgentPromptModal.value = false
-    }
-
-    async function saveAgentPromptModal() {
-      agentSystemPrompt.value = editAgentPrompt.value
-      await saveAgentSystemPrompt(editAgentPrompt.value)
-      showAgentPromptModal.value = false
+      modal.open(DocAgentPromptModal, {
+        initialPrompt: agentSystemPrompt.value,
+      }, {
+        title: 'Prompt del Sistema',
+        onClose() {
+          settingGet(AGENT_SYSTEM_PROMPT_KEY).then((result) => {
+            if (result.value) agentSystemPrompt.value = result.value
+          }).catch((err) => {
+            console.error('Error al recargar prompt del agente:', err)
+          })
+        },
+      })
     }
 
     async function generateJson() {
@@ -565,31 +442,16 @@ export default {
       sanitizeClave,
       claveEditInput,
       MAX_VALOR,
-      showCreateModal,
-      createClave,
-      createValor,
-      createTicket,
-      createTicketType,
-      tickets,
-      ticketsLoading,
-      createError,
-      claveInput,
       onSplitStart,
       onToolsSplitStart,
       seleccionarNota,
       guardarNota,
       abrirCrear,
-      cerrarCrear,
-      crearNota,
       eliminarNota,
       agentInstructions,
       agentLoading,
       agentError,
-      showAgentPromptModal,
-      editAgentPrompt,
       openAgentPromptModal,
-      closeAgentPromptModal,
-      saveAgentPromptModal,
       generateJson,
       isJson,
       parsedJson,
@@ -774,17 +636,5 @@ export default {
 }
 .doc-notas-clave-input:focus {
   border-bottom: 1px solid #75AADB;
-}
-.doc-notas-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1060;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 </style>

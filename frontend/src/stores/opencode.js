@@ -38,6 +38,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
   const streaming = ref(false)
   const streamText = ref('')
   const streamThinking = ref('')
+  const _sessionStreamData = ref({})
 
   const sessionsMap = ref({})
   const currentActiveChatSession = ref(null)
@@ -81,16 +82,43 @@ export const useOpencodeStore = defineStore('opencode', () => {
     return false
   }
 
+  function _resetValues() {
+    step.value = 'idle'
+    ocSessionId.value = null
+    chatSessionId.value = null
+    selectedProvider.value = ''
+    selectedModel.value = ''
+    selectedThinking.value = ''
+    selectedMode.value = ''
+    selectedTemperature.value = ''
+    messageQueue.value = []
+    processing.value = false
+    streaming.value = false
+    streamText.value = ''
+    streamThinking.value = ''
+  }
+
   function activateSession(chatSid) {
     if (!chatSid) return false
     if (currentActiveChatSession.value && String(currentActiveChatSession.value) !== String(chatSid)) {
       saveCurrentToMap(currentActiveChatSession.value)
+    }
+    currentActiveChatSession.value = chatSid
+    const loaded = loadFromMap(chatSid)
+    if (!loaded) {
+      _resetValues()
+    }
+    const sKey = String(chatSid)
+    const sd = _sessionStreamData.value[sKey]
+    if (sd) {
+      streaming.value = sd.streaming
+      streamText.value = sd.text
+      streamThinking.value = sd.thinking
+    } else {
       streaming.value = false
       streamText.value = ''
       streamThinking.value = ''
     }
-    currentActiveChatSession.value = chatSid
-    const loaded = loadFromMap(chatSid)
     return loaded
   }
 
@@ -177,12 +205,29 @@ export const useOpencodeStore = defineStore('opencode', () => {
   }
 
   async function streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, callbacks) {
+    const sKey = String(sessionId)
+    const isActiveSession = () => currentActiveChatSession.value && String(currentActiveChatSession.value) === sKey
+
     const body = { prompt, provider, model, thinking, mode, temperature, sessionId }
     if (ocSessionId.value) body.ocSessionId = ocSessionId.value
 
+    let localStreamText = ''
+    let localStreamThinking = ''
+    let doneReceived = false
+
+    if (!_sessionStreamData.value[sKey]) {
+      _sessionStreamData.value[sKey] = { text: '', thinking: '', streaming: true }
+    } else {
+      _sessionStreamData.value[sKey].text = ''
+      _sessionStreamData.value[sKey].thinking = ''
+      _sessionStreamData.value[sKey].streaming = true
+    }
+
     streaming.value = true
-    streamText.value = ''
-    streamThinking.value = ''
+    if (isActiveSession()) {
+      streamText.value = ''
+      streamThinking.value = ''
+    }
 
     try {
       const res = await fetch(`${API}/opencode/send`, {
@@ -196,6 +241,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
         let errMsg = 'Error en conexión con OpenCode'
         try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch (e) { console.error('Error al parsear error response:', e) }
         streaming.value = false
+        if (_sessionStreamData.value[sKey]) _sessionStreamData.value[sKey].streaming = false
         if (callbacks?.onError) await callbacks.onError(errMsg)
         return
       }
@@ -219,45 +265,50 @@ export const useOpencodeStore = defineStore('opencode', () => {
           try {
             const j = JSON.parse(t.slice(6))
             if (j.type === 'response') {
-              streamText.value += j.content
-              if (callbacks?.onChunk) callbacks.onChunk(j.content, streamText.value)
+              localStreamText += j.content
+              _sessionStreamData.value[sKey].text = localStreamText
+              if (isActiveSession()) streamText.value = localStreamText
+              if (callbacks?.onChunk) callbacks.onChunk(j.content, localStreamText)
             } else if (j.type === 'thinking') {
-              streamThinking.value += j.content
-              if (callbacks?.onThinking) callbacks.onThinking(j.content, streamThinking.value)
+              localStreamThinking += j.content
+              _sessionStreamData.value[sKey].thinking = localStreamThinking
+              if (isActiveSession()) streamThinking.value = localStreamThinking
+              if (callbacks?.onThinking) callbacks.onThinking(j.content, localStreamThinking)
             } else if (j.type === 'control_request') {
               if (callbacks?.onControl) callbacks.onControl(j.control)
             } else if (j.type === 'done') {
+              doneReceived = true
               const newOcSessionId = j.ocSessionId || j.hash || null
-              const sKey = String(sessionId)
               if (sessionsMap.value[sKey]) {
                 sessionsMap.value[sKey].ocSessionId = newOcSessionId
               }
-              if (currentActiveChatSession.value && String(currentActiveChatSession.value) === sKey) {
+              if (isActiveSession()) {
                 ocSessionId.value = newOcSessionId
               }
               streaming.value = false
-              if (callbacks?.onDone) await callbacks.onDone(j, streamText.value)
+              _sessionStreamData.value[sKey].streaming = false
+              if (callbacks?.onDone) await callbacks.onDone(j, localStreamText)
               _persist()
             } else if (j.type === 'error') {
               streaming.value = false
+              if (_sessionStreamData.value[sKey]) _sessionStreamData.value[sKey].streaming = false
               if (callbacks?.onError) await callbacks.onError(j.content)
             }
           } catch (e) { console.error('Error al parsear SSE JSON en opencode:', e) }
         }
       }
 
-      if (streaming.value) {
+      if (!doneReceived) {
         streaming.value = false
+        if (_sessionStreamData.value[sKey]) _sessionStreamData.value[sKey].streaming = false
         if (callbacks?.onDone) {
-          const fullResponse = streamText.value
-          const fullThinking = streamThinking.value
-          const sKey = String(sessionId)
-          if (sessionsMap.value[sKey]) {
-            sessionsMap.value[sKey].ocSessionId = ocSessionId.value
+          const sKey2 = String(sessionId)
+          if (sessionsMap.value[sKey2]) {
+            sessionsMap.value[sKey2].ocSessionId = ocSessionId.value
           }
           await callbacks.onDone(
-            { type: 'done', ocSessionId: ocSessionId.value, fullResponse, thinking: fullThinking },
-            fullResponse
+            { type: 'done', ocSessionId: ocSessionId.value, fullResponse: localStreamText, thinking: localStreamThinking },
+            localStreamText
           )
           _persist()
         }
@@ -265,12 +316,14 @@ export const useOpencodeStore = defineStore('opencode', () => {
     } catch (err) {
       console.error('Error en streamPrompt:', err)
       streaming.value = false
+      if (_sessionStreamData.value[sKey]) _sessionStreamData.value[sKey].streaming = false
       if (callbacks?.onError) await callbacks.onError(err.message)
     }
   }
 
   function clearAllSessions() {
     sessionsMap.value = {}
+    _sessionStreamData.value = {}
     currentActiveChatSession.value = null
     step.value = 'idle'
     ocSessionId.value = null
@@ -289,26 +342,15 @@ export const useOpencodeStore = defineStore('opencode', () => {
   }
 
   function finish() {
-    step.value = 'idle'
-    ocSessionId.value = null
-    chatSessionId.value = null
-    streaming.value = false
-    streamText.value = ''
-    streamThinking.value = ''
-    selectedProvider.value = ''
-    selectedModel.value = ''
-    selectedThinking.value = ''
-    selectedMode.value = ''
-    selectedTemperature.value = ''
-    messageQueue.value = []
-    processing.value = false
+    _resetValues()
     const key = currentActiveChatSession.value ? String(currentActiveChatSession.value) : null
     if (key && sessionsMap.value[key]) {
       delete sessionsMap.value[key]
-      _persist()
-    } else {
-      sessionStorage.removeItem(SESSION_KEY)
     }
+    if (key && _sessionStreamData.value[key]) {
+      delete _sessionStreamData.value[key]
+    }
+    _persist()
   }
 
   function restoreFromState(savedState) {

@@ -197,6 +197,11 @@ router.post('/proyectos/import-all', async (req, res) => {
             redmine_parent_name: p.parent?.name || null,
             workspace_id: wsId,
           });
+          if (existing.workspace_id !== wsId) {
+            await db('chat_sessions')
+              .where({ proyecto_id: existing.id })
+              .update({ workspace_id: wsId, updated_at: db.fn.now() });
+          }
           yaExistentes.push({ id: p.id, name: p.name, identifier: p.identifier });
           continue;
         }
@@ -403,6 +408,11 @@ async function importarIssuesDeRedmine(proyecto, token, url, workspaceId) {
       const existing = await db('tickets').where({ redmine_id: issue.id }).first();
       if (existing) {
         await db('tickets').where({ redmine_id: issue.id }).update(ticketData);
+        if (existing.workspace_id !== ticketData.workspace_id) {
+          await db('chat_sessions')
+            .where({ id_ticket_redmine: issue.id })
+            .update({ workspace_id: ticketData.workspace_id, updated_at: db.fn.now() });
+        }
         actualizados++;
       } else {
         await db('tickets').insert(ticketData);

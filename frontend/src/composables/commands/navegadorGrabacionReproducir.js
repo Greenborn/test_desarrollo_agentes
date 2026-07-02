@@ -148,7 +148,8 @@ register({
         : { role: 'result', content: `❌ [${step}/${total}] ${label} — Error: ${errorMsg}` }
 
       chatStore.pushMessage(stepMsg, targetSessionId)
-      if (targetSessionId) {
+      const currentActiveId = chatStore.activeSessionId?.value ?? chatStore.activeSessionId
+      if (Number(targetSessionId) === Number(currentActiveId)) {
         chatStore._saveMessageToDb(targetSessionId, stepMsg)
       }
 

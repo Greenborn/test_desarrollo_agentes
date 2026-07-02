@@ -871,6 +871,19 @@ export default {
       replayCancelled.value = false
       replayProgress.value = { current: 0, total: 0 }
 
+      let targetSessionId = Number(activeSessionId.value)
+      try {
+        const statusRes = await fetch('/api/navegador/status', { credentials: 'include' })
+        if (statusRes.ok) {
+          const statusData = await statusRes.json()
+          if (statusData.hasActiveSession && statusData.originalSessionId) {
+            targetSessionId = Number(statusData.originalSessionId)
+          }
+        }
+      } catch (e) {
+        console.error('Error al verificar sesión del navegador:', e.message)
+      }
+
       try {
         const res = await fetch(`/api/playwright-logs/events?recording_id=${selectedRecordingId.value}&order=asc`, {
           credentials: 'include',
@@ -886,19 +899,19 @@ export default {
         const actionEntries = events.map(e => ({ action: eventToAction(e), event: e })).filter(a => a.action !== null)
         replayProgress.value.total = actionEntries.length
 
-        try {
-          await fetch(`/api/chat/sessions/${activeSessionId.value}/save-messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              messages: [{ role: 'command', content: `▶ Reproduciendo grabación: "${recordingName}" (${actionEntries.length} acciones)` }],
-            }),
-          })
-          chatStore.pushMessage({ role: 'command', content: `▶ Reproduciendo grabación: "${recordingName}" (${actionEntries.length} acciones)` }, activeSessionId.value)
-        } catch (e) {
-          console.error('Error al enviar inicio al chat:', e.message)
-        }
+        ;(async () => {
+          const isActive = Number(targetSessionId) === Number(activeSessionId.value)
+          const msg = { role: 'command', content: `▶ Reproduciendo grabación: "${recordingName}" (${actionEntries.length} acciones)` }
+          if (isActive) {
+            await fetch(`/api/chat/sessions/${targetSessionId}/save-messages`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ messages: [msg] }),
+            })
+          }
+          chatStore.pushMessage(msg, targetSessionId)
+        })().catch(e => console.error('Error al enviar inicio al chat:', e.message))
 
         for (let i = 0; i < actionEntries.length; i++) {
           if (replayCancelled.value) break
@@ -934,34 +947,34 @@ export default {
               desc = describeAction(evt)
             }
 
-            try {
-              await fetch(`/api/chat/sessions/${activeSessionId.value}/save-messages`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                  messages: [{ role: 'result', content: `Paso ${i + 1}/${actionEntries.length}: ${desc}` }],
-                }),
-              })
-              chatStore.pushMessage({ role: 'result', content: `Paso ${i + 1}/${actionEntries.length}: ${desc}` }, activeSessionId.value)
-            } catch (e) {
-              console.error('Error al enviar paso al chat:', e.message)
-            }
+            ;(async () => {
+              const isActive = Number(targetSessionId) === Number(activeSessionId.value)
+              const msg = { role: 'result', content: `Paso ${i + 1}/${actionEntries.length}: ${desc}` }
+              if (isActive) {
+                await fetch(`/api/chat/sessions/${targetSessionId}/save-messages`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ messages: [msg] }),
+                })
+              }
+              chatStore.pushMessage(msg, targetSessionId)
+            })().catch(e => console.error('Error al enviar paso al chat:', e.message))
           } catch (err) {
             console.error(`Error ejecutando paso ${i + 1}:`, err.message)
-            try {
-              await fetch(`/api/chat/sessions/${activeSessionId.value}/save-messages`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                  messages: [{ role: 'result', content: `❌ Paso ${i + 1}/${actionEntries.length}: Error - ${err.message}` }],
-                }),
-              })
-              chatStore.pushMessage({ role: 'result', content: `❌ Paso ${i + 1}/${actionEntries.length}: Error - ${err.message}` }, activeSessionId.value)
-            } catch (e) {
-              console.error('Error al reportar fallo al chat:', e.message)
-            }
+            ;(async () => {
+              const isActive = Number(targetSessionId) === Number(activeSessionId.value)
+              const msg = { role: 'result', content: `❌ Paso ${i + 1}/${actionEntries.length}: Error - ${err.message}` }
+              if (isActive) {
+                await fetch(`/api/chat/sessions/${targetSessionId}/save-messages`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ messages: [msg] }),
+                })
+              }
+              chatStore.pushMessage(msg, targetSessionId)
+            })().catch(e => console.error('Error al reportar fallo al chat:', e.message))
           }
 
           if (i < actionEntries.length - 1 && !replayCancelled.value) {
@@ -973,19 +986,19 @@ export default {
         const summary = completed
           ? `✅ Reproducción completada: ${replayProgress.value.current}/${replayProgress.value.total} acciones ejecutadas.`
           : `⏹ Reproducción cancelada: ${replayProgress.value.current}/${replayProgress.value.total} acciones ejecutadas.`
-        try {
-          await fetch(`/api/chat/sessions/${activeSessionId.value}/save-messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              messages: [{ role: 'result', content: summary }],
-            }),
-          })
-          chatStore.pushMessage({ role: 'result', content: summary }, activeSessionId.value)
-        } catch (e) {
-          console.error('Error al enviar resumen al chat:', e.message)
-        }
+        ;(async () => {
+          const isActive = Number(targetSessionId) === Number(activeSessionId.value)
+          const msg = { role: 'result', content: summary }
+          if (isActive) {
+            await fetch(`/api/chat/sessions/${targetSessionId}/save-messages`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ messages: [msg] }),
+            })
+          }
+          chatStore.pushMessage(msg, targetSessionId)
+        })().catch(e => console.error('Error al enviar resumen al chat:', e.message))
       } catch (err) {
         console.error('Error en reproducción:', err.message)
       } finally {

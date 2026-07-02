@@ -8,6 +8,7 @@
     <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
       <button class="tab-btn" :class="{ active: tab === 'chats' }" @click="selectChatTab('chats')">Chats</button>
       <button class="tab-btn ms-3" :class="{ active: tab === 'servicios' }" @click="selectChatTab('servicios')">Servicios</button>
+      <button class="tab-btn ms-3" :class="{ active: tab === 'archived' }" @click="selectChatTab('archived')">Archivados</button>
     </div>
     <div v-if="tab === 'chats'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
     <button class="btn btn-sm mb-2 flex-shrink-0 btn-argentina" @click="createSession" :disabled="creating">
@@ -36,13 +37,20 @@
             <span class="text-truncate">{{ s.title }}</span>
             <span class="text-muted" style="font-size: 0.6rem; line-height: 1.2;">{{ formatDate(s.updated_at) }}</span>
           </div>
-          <span v-if="showWorkspaceBadges && workspaceMap[s.workspace_id]"
-                class="workspace-badge"
-                :style="workspaceBadgeStyle(workspaceMap[s.workspace_id])"
-                title="Espacio de trabajo">{{ workspaceMap[s.workspace_id].name }}</span>
-          <span v-if="s.proyecto_id"
-                class="project-badge"
-                title="Proyecto">{{ s.proyecto_id }}</span>
+          <div class="d-flex flex-column gap-1">
+            <span v-if="showWorkspaceBadges && workspaceMap[s.workspace_id]"
+                  class="workspace-badge"
+                  :style="workspaceBadgeStyle(workspaceMap[s.workspace_id])"
+                  title="Espacio de trabajo">{{ workspaceMap[s.workspace_id].name }}</span>
+            <span v-if="s.proyecto_id"
+                  class="project-badge"
+                  title="Proyecto">{{ s.proyecto_id }}</span>
+          </div>
+          <span
+            class="archive-btn"
+            @click.stop="archiveSession(s.id)"
+            title="Archivar"
+          >&#128451;</span>
           <span
             class="delete-btn"
             @click.stop="chat.deleteSession(s.id)"
@@ -51,6 +59,52 @@
         </button>
       </div>
     </div>
+    </div>
+    <div v-if="tab === 'archived'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
+      <div class="overflow-y-auto flex-grow-1" style="min-height: 0;">
+        <div class="list-group list-group-flush" style="min-height: 0;">
+          <button
+            v-for="s in filteredArchivedSessions"
+            :key="s.id"
+            class="list-group-item list-group-item-action py-2 px-2 small d-flex justify-content-between align-items-center"
+            :class="[{ active: s.id === activeSessionId }, ticketPriorityClass(s.priority_id)]"
+            :title="sessionTooltip(s)"
+            @click="selectSession(s.id)"
+          >
+            <span class="status-led archived"></span>
+            <a v-if="s.id_ticket_redmine"
+               class="ticket-badge"
+               :href="`${s.session_redmine_url || redmineUrl}/issues/${s.id_ticket_redmine}`"
+               target="_blank" rel="noopener noreferrer"
+               @click.stop
+               :style="ticketBadgeStyle(s)"
+               title="Abrir ticket en Redmine">#{{ s.id_ticket_redmine }}</a>
+            <div class="d-flex flex-column flex-grow-1 min-width-0">
+              <span class="text-truncate">{{ s.title }}</span>
+              <span class="text-muted" style="font-size: 0.6rem; line-height: 1.2;">{{ formatDate(s.updated_at) }}</span>
+            </div>
+            <div class="d-flex flex-column gap-1">
+              <span v-if="showWorkspaceBadges && workspaceMap[s.workspace_id]"
+                    class="workspace-badge"
+                    :style="workspaceBadgeStyle(workspaceMap[s.workspace_id])"
+                    title="Espacio de trabajo">{{ workspaceMap[s.workspace_id].name }}</span>
+              <span v-if="s.proyecto_id"
+                    class="project-badge"
+                    title="Proyecto">{{ s.proyecto_id }}</span>
+            </div>
+            <span
+              class="unarchive-btn"
+              @click.stop="unarchiveSession(s.id)"
+              title="Desarchivar"
+            >&#128194;</span>
+            <span
+              class="delete-btn"
+              @click.stop="chat.deleteSession(s.id)"
+              title="Eliminar conversación"
+            >&times;</span>
+          </button>
+        </div>
+      </div>
     </div>
     <ServiciosPanel v-if="tab === 'servicios'" class="flex-grow-1" style="min-height: 0;" />
     <div class="sidebar-resize-handle" @mousedown.prevent="onResizeStart">
@@ -78,7 +132,7 @@ export default {
     const ui = useUiStore()
     const settings = useSettingsStore()
     const ws = useWorkspaceStore()
-    const { sessions, activeSessionId, creating, sessionStatus, pendingNotifications } = storeToRefs(chat)
+    const { sessions, archivedSessions, activeSessionId, creating, sessionStatus, pendingNotifications } = storeToRefs(chat)
     const { sidebarCollapsed, sidebarWidth, centralPanelCollapsed, sidebarWidthPct, rightPanelCollapsed, omnifilter, sidebarChatTab } = storeToRefs(ui)
     const tab = ref('chats')
     const stopTabSync = watch(sidebarChatTab, (v) => { tab.value = v; stopTabSync() })
@@ -128,6 +182,15 @@ export default {
       })
     })
 
+    const filteredArchivedSessions = computed(() => {
+      const filter = omnifilter.value.toLowerCase()
+      if (!filter) return archivedSessions.value
+      return archivedSessions.value.filter((s) => {
+        const fields = [s.title, s.proyecto_descripcion, s.proyecto_id, s.cwd]
+        return fields.some((f) => f && f.toLowerCase().includes(filter))
+      })
+    })
+
     function formatDate(dateStr) {
       if (!dateStr) return ''
       const d = new Date(dateStr)
@@ -155,7 +218,7 @@ export default {
     }
 
     function selectSession(id) {
-      const s = chat.sessions.find((s) => s.id === id)
+      const s = chat.sessions.find((s) => s.id === id) || chat.archivedSessions.find((s) => s.id === id)
       if (s && s.cwd) cmd.currentDir = s.cwd
       chat.loadMessages(id)
     }
@@ -164,6 +227,9 @@ export default {
       tab.value = val
       sidebarChatTab.value = val
       ui.saveLayoutPrefs()
+      if (val === 'archived') {
+        chat.loadArchivedSessions()
+      }
     }
 
     function ticketPriorityClass(priorityId) {
@@ -220,11 +286,20 @@ export default {
       }, 300)
     })
 
+    function archiveSession(id) {
+      chat.archiveSession(id)
+    }
+
+    function unarchiveSession(id) {
+      chat.unarchiveSession(id)
+    }
+
     return {
       tab,
       selectChatTab,
       chat,
       filteredSessions,
+      filteredArchivedSessions,
       activeSessionId,
       creating,
       pendingNotifications,
@@ -244,6 +319,8 @@ export default {
       onResizeStart,
       workspaceBadgeStyle,
       ticketBadgeStyle,
+      archiveSession,
+      unarchiveSession,
     }
   },
 }
@@ -345,6 +422,30 @@ export default {
 .list-group-item:hover .delete-btn {
   display: inline;
 }
+.archive-btn {
+  display: none;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: #75AADB;
+  padding: 0 4px;
+  margin-left: 4px;
+}
+.list-group-item:hover .archive-btn {
+  display: inline;
+}
+.unarchive-btn {
+  display: none;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: #22c55e;
+  padding: 0 4px;
+  margin-left: 4px;
+}
+.list-group-item:hover .unarchive-btn {
+  display: inline;
+}
 .btn-argentina {
   background-color: #75AADB;
   color: #fff;
@@ -380,6 +481,10 @@ export default {
 .status-led.flash {
   background-color: #3b82f6;
   box-shadow: 0 0 6px #3b82f6;
+}
+.status-led.archived {
+  background-color: #6b7280;
+  opacity: 0.4;
 }
 .notification-dot {
   display: inline-block;

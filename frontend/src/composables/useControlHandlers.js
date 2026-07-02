@@ -548,12 +548,14 @@ export function useControlHandlers(api) {
             descripcion: value.descripcion || '',
             id_proyecto: proyectoId,
             comando: value.comando,
+            ocultar_ejecucion: value.ocultarEjecucion || false,
           })
         } else if (mode === 'update' && id) {
           await store.updateCommand(id, {
             label: value.label,
             descripcion: value.descripcion || '',
             comando: value.comando,
+            ocultar_ejecucion: value.ocultarEjecucion || false,
           })
         }
         const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)

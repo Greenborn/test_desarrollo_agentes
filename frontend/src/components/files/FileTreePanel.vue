@@ -110,7 +110,7 @@ export default {
     function openFile(path) {
       const name = path.split('/').pop() || path
       selectedFile.value = path
-      modal.open(FileEditorModal, { filePath: path }, { title: `Editar: ${name}`, wide: true })
+      modal.open(FileEditorModal, { filePath: path, sessionId: props.sessionId }, { title: `Editar: ${name}`, wide: true })
     }
 
     function getFileIcon(node) {

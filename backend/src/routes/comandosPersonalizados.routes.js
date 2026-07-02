@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import db from '../config/db.js';
+import memoriaClient from '../services/memoriaClient.js';
 
 const router = Router();
 const runningProcesses = new Set();
@@ -61,7 +62,7 @@ router.get('/:proyectoId', async (req, res) => {
 
 router.post('/', async (req, res) => {
   if (!authGuard(req, res)) return;
-  const { label, descripcion, id_proyecto, comando } = req.body;
+  const { label, descripcion, id_proyecto, comando, ocultar_ejecucion } = req.body;
   if (!label) {
     return res.status(400).json({ error: 'label es requerido' });
   }
@@ -89,6 +90,7 @@ router.post('/', async (req, res) => {
       descripcion: descripcion || null,
       id_proyecto,
       comando,
+      ocultar_ejecucion: ocultar_ejecucion ? 1 : 0,
     });
     const created = await db('comandos_personalizados_proyectos').where({ id }).first();
     res.status(201).json({ comando: created });
@@ -100,7 +102,7 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
-  const { label, descripcion, comando } = req.body;
+  const { label, descripcion, comando, ocultar_ejecucion } = req.body;
   if (!label) {
     return res.status(400).json({ error: 'label es requerido' });
   }
@@ -128,7 +130,13 @@ router.put('/:id', async (req, res) => {
     }
     await db('comandos_personalizados_proyectos')
       .where({ id: req.params.id })
-      .update({ label, descripcion: descripcion || null, comando, updated_at: db.fn.now() });
+      .update({
+        label,
+        descripcion: descripcion || null,
+        comando,
+        ocultar_ejecucion: ocultar_ejecucion !== undefined ? (ocultar_ejecucion ? 1 : 0) : undefined,
+        updated_at: db.fn.now(),
+      });
     const updated = await db('comandos_personalizados_proyectos').where({ id: req.params.id }).first();
     res.json({ comando: updated });
   } catch (err) {
@@ -180,13 +188,44 @@ router.post('/:id/execute', async (req, res) => {
       if (session && session.cwd) cwd = session.cwd;
     }
 
+    let shellCommand = comando.comando;
+    if (comando.id_proyecto && shellCommand.includes('{{')) {
+      try {
+        const dbVariables = await db('project_variables')
+          .select('key', 'value', 'type')
+          .where({ proyecto_id: comando.id_proyecto });
+
+        const variableMap = {};
+        const memoryNamespace = `proyecto:${comando.id_proyecto}`;
+
+        for (const v of dbVariables) {
+          if (v.type === 'memory') {
+            try {
+              const memResult = await memoriaClient.get(memoryNamespace, v.key);
+              variableMap[v.key] = memResult.value;
+            } catch {
+              variableMap[v.key] = '';
+            }
+          } else {
+            variableMap[v.key] = v.value;
+          }
+        }
+
+        shellCommand = shellCommand.replace(/\{\{(.+?)\}\}/g, (match, key) => {
+          return key in variableMap ? variableMap[key] : match;
+        });
+      } catch (err) {
+        console.log('Error al resolver variables para comando personalizado:', err.message);
+      }
+    }
+
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
     });
 
-    const proc = spawn('/bin/sh', ['-c', comando.comando], {
+    const proc = spawn('/bin/sh', ['-c', shellCommand], {
       cwd,
       env: { ...process.env },
       stdio: ['ignore', 'pipe', 'pipe'],

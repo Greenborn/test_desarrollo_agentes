@@ -106,6 +106,7 @@
           >
             <span class="status-dot" :class="p.status"></span>
             <span class="small fw-semibold" :class="p.status === 'running' ? 'text-light' : 'text-muted'">{{ p.name }}</span>
+            <span v-if="p.detectedPort" class="small text-info ms-1" style="font-size: 0.65rem;">:{{ p.detectedPort }}</span>
             <span v-if="p.sessionId && filterBySession" class="badge bg-info-subtle text-info ms-1" style="font-size: 0.55rem;">{{ String(p.sessionId).slice(0, 6) }}…</span>
             <span class="badge ms-auto" :class="p.status === 'running' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'" style="font-size: 0.6rem;">{{ typeLabel(p.type) }}</span>
           </button>

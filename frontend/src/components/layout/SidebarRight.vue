@@ -72,6 +72,7 @@
           <span class="variable-sep mx-1 text-muted">=</span>
           <span class="variable-value small">{{ truncateValue(v.value) }}</span>
           <span v-if="v.type === 'memory'" class="badge bg-info ms-1" style="font-size: 0.55rem; line-height: 1.2; align-self: center;">mem</span>
+          <button class="variable-copy-btn" title="Copiar {{key}}" @click.stop="copiarKey(v.key)">📋</button>
         </div>
       </div>
     </template>
@@ -662,6 +663,12 @@ export default {
       modal.open(VariableDetailModal, { variable }, { title: variable.key })
     }
 
+    function copiarKey(key) {
+      navigator.clipboard.writeText('{{' + key + '}}').catch(err => {
+        console.error('Error al copiar key:', err)
+      })
+    }
+
     function agregarVariable() {
       modal.open(CreateVariableModal, {}, { title: 'Nueva Variable' })
     }
@@ -745,16 +752,15 @@ export default {
       const sid = activeSessionId.value
       if (!sid || executingCommands.value.has(c.id)) return
 
+      const esOculto = c.ocultar_ejecucion ? true : false
+
       const abortController = new AbortController()
       executingCommands.value.set(c.id, abortController)
 
-      const cmdKey = 'cmd-sb-' + Date.now()
       const streamKey = 'stream-sb-' + Date.now()
       const isActive = () => Number(chat.activeSessionId) === Number(sid)
 
       if (isActive()) {
-        chat.messages.push({ role: 'command', content: `$ ${c.label}`, _key: cmdKey })
-        chat.flashLed(sid)
         chat.messages.push({ role: 'result', content: '⏳ Ejecutando...', _key: streamKey })
         chat.flashLed(sid)
       }
@@ -807,21 +813,7 @@ export default {
         }
 
         const finalContent = fullOutput || '(sin salida)'
-        await fetch(`/api/chat/sessions/${sid}/save-messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            messages: [
-              { role: 'command', content: `$ ${c.label}` },
-              { role: 'result', content: finalContent },
-            ],
-          }),
-        })
-        if (isActive()) _updateStreamMsg(streamKey, finalContent)
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          const finalContent = '(ejecución detenida)'
+        if (!esOculto) {
           await fetch(`/api/chat/sessions/${sid}/save-messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -833,6 +825,24 @@ export default {
               ],
             }),
           })
+        }
+        if (isActive()) _updateStreamMsg(streamKey, finalContent)
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          const finalContent = '(ejecución detenida)'
+          if (!esOculto) {
+            await fetch(`/api/chat/sessions/${sid}/save-messages`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                messages: [
+                  { role: 'command', content: `$ ${c.label}` },
+                  { role: 'result', content: finalContent },
+                ],
+              }),
+            })
+          }
           if (isActive()) _updateStreamMsg(streamKey, finalContent)
         } else {
           console.error('Error ejecutando comando:', err)
@@ -886,6 +896,7 @@ export default {
           label: c.label,
           descripcion: c.descripcion || '',
           comando: c.comando,
+          ocultar_ejecucion: c.ocultar_ejecucion ? true : false,
         }),
         controlData: {
           controlId: 'comando-edit-update-' + Date.now(),
@@ -896,6 +907,7 @@ export default {
           label: c.label,
           descripcion: c.descripcion || '',
           comando: c.comando,
+          ocultar_ejecucion: c.ocultar_ejecucion ? true : false,
         },
         _key: 'ctrl-comando-' + Date.now(),
       })
@@ -987,6 +999,7 @@ export default {
       deleteSentComments,
       truncateValue,
       openVariableDetail,
+      copiarKey,
       agregarVariable,
       ejecutarComando,
       detenerComando,
@@ -1129,6 +1142,34 @@ export default {
 }
 .variable-item:hover {
   background: #1e3050;
+}
+.variable-copy-btn {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 0.6rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  line-height: 1.2;
+  color: #6b7280;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+  z-index: 2;
+}
+.variable-item {
+  position: relative;
+}
+.variable-item:hover .variable-copy-btn {
+  opacity: 1;
+}
+.variable-copy-btn:hover {
+  color: #75AADB;
+  background: rgba(117, 170, 219, 0.12);
 }
 .variable-key {
   color: #75AADB;

@@ -22,13 +22,14 @@ Motor: **MariaDB** vía **Knex** (query builder).
 |---|---|---|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
 | `user_id` | INTEGER UNSIGNED | NOT NULL, FK → `users(id)` ON DELETE CASCADE |
-| `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` — FK lógica → `workspaces(id)` |
+| `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` — FK → `workspaces(id)` |
 | `title` | VARCHAR(255) | nullable |
 | `cwd` | VARCHAR(500) | nullable — directorio de trabajo de la sesión |
 | `proyecto_id` | VARCHAR(255) | nullable — FK lógica → `proyectos(id)` |
 | `id_ticket_redmine` | INTEGER | nullable — ID del issue en Redmine (FK lógica → `tickets(redmine_id)`) |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
+| `archived` | BOOLEAN | NOT NULL, DEFAULT `false` — indica si la sesión está archivada |
 
 ---
 

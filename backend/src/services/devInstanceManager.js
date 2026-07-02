@@ -1,12 +1,23 @@
 import { spawn, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { waitForPortsByPID } from './portDetector.js';
 
-const instances = new Map();
-const browserSessions = [];
-let lastFrontendPorts = [];
-let lastResolution = null;
+const sessions = new Map(); // sessionId → { instances: Map<cwd,entry>, browserSessions: [], frontendPorts: [], resolution }
 const PW_URL = `http://localhost:${process.env.SERVICIO_PLAYWRIGHT_PORT || 4098}`;
+
+function getOrCreateSession(sessionId) {
+  sessionId = Number(sessionId);
+  if (!sessions.has(sessionId)) {
+    sessions.set(sessionId, {
+      instances: new Map(),
+      browserSessions: [],
+      frontendPorts: [],
+      resolution: null,
+    });
+  }
+  return sessions.get(sessionId);
+}
 
 function getSubprojects(deployConfig) {
   const installEntries = deployConfig.install || [];
@@ -57,9 +68,22 @@ function runNpmCi(dir) {
   });
 }
 
-export async function startDevInstance(projectRoot, deployConfig, sessionId = null) {
-  await stopAll();
+async function detectInstancePort(entry) {
+  const pid = entry.process && entry.process.pid;
+  if (!pid) return;
+  const port = await waitForPortsByPID(pid, 15000, 500);
+  if (port && !entry.detectedPort) {
+    entry.detectedPort = port;
+    entry.detectedUrl = `http://localhost:${port}`;
+  }
+}
 
+export async function startDevInstance(projectRoot, deployConfig, sessionId = null) {
+  if (!sessionId) {
+    throw new Error('Se requiere sessionId para iniciar una instancia de desarrollo.');
+  }
+
+  const session = getOrCreateSession(sessionId);
   const subprojects = getSubprojects(deployConfig);
   if (subprojects.length === 0) {
     return [];
@@ -162,19 +186,26 @@ export async function startDevInstance(projectRoot, deployConfig, sessionId = nu
       entry.process = null;
     });
 
-    instances.set(sub.cwd, entry);
+    session.instances.set(sub.cwd, entry);
     results.push({ name: sub.cwd, type: sub.type, status: 'running' });
+
+    if (proc && proc.pid) {
+      detectInstancePort(entry);
+    }
   }
 
   return results;
 }
 
-export function registerBrowserSession({ name, url, idSession }) {
-  browserSessions.push({ name, url, idSession });
+export function registerBrowserSession(sessionId, { name, url, idSession }) {
+  const session = sessions.get(sessionId);
+  if (session) {
+    session.browserSessions.push({ name, url, idSession });
+  }
 }
 
-async function closeAllBrowserSessions() {
-  for (const bs of browserSessions) {
+async function closeSessionBrowserSessions(session) {
+  for (const bs of session.browserSessions) {
     try {
       await fetch(`${PW_URL}/api/command`, {
         method: 'POST',
@@ -186,12 +217,16 @@ async function closeAllBrowserSessions() {
       console.log(`[dev] Error al cerrar navegador para ${bs.name}:`, err.message);
     }
   }
-  browserSessions.length = 0;
+  session.browserSessions.length = 0;
 }
 
-export async function stopAll() {
-  await closeAllBrowserSessions();
-  for (const [key, entry] of instances) {
+export async function stopBySession(sessionId) {
+  const session = sessions.get(sessionId);
+  if (!session) return;
+
+  await closeSessionBrowserSessions(session);
+
+  for (const [key, entry] of session.instances) {
     if (entry.process) {
       try {
         process.kill(-entry.process.pid, 'SIGTERM');
@@ -204,34 +239,87 @@ export async function stopAll() {
     }
     entry.status = 'stopped';
   }
-  instances.clear();
-  lastFrontendPorts = [];
-  lastResolution = null;
+
+  sessions.delete(sessionId);
 }
 
-export function setFrontendPorts(ports) {
-  lastFrontendPorts = ports;
-}
-
-export function setResolution(res) {
-  lastResolution = res;
-}
-
-export function getStatus() {
-  const processes = [];
-  for (const [key, entry] of instances) {
-    processes.push({ name: entry.name, type: entry.type, status: entry.status, sessionId: entry.sessionId });
+export async function stopAll() {
+  for (const sessionId of sessions.keys()) {
+    await stopBySession(sessionId);
   }
+}
+
+export function setFrontendPorts(ports, sessionId) {
+  const session = sessions.get(sessionId);
+  if (session) {
+    session.frontendPorts = ports;
+  }
+}
+
+export function setResolution(res, sessionId) {
+  const session = sessions.get(sessionId);
+  if (session) {
+    session.resolution = res;
+  }
+}
+
+export function getStatus(sessionId = null) {
+  const allProcesses = [];
+  let allFrontendPorts = [];
+  let allBrowserSessions = [];
+  let anyResolution = null;
+
+  if (sessionId != null) {
+    sessionId = Number(sessionId);
+    const session = sessions.get(sessionId);
+    if (session) {
+      for (const [key, entry] of session.instances) {
+        allProcesses.push({
+          name: entry.name,
+          type: entry.type,
+          status: entry.status,
+          sessionId: entry.sessionId,
+          detectedPort: entry.detectedPort,
+          detectedUrl: entry.detectedUrl,
+        });
+      }
+      allFrontendPorts = session.frontendPorts;
+      allBrowserSessions = session.browserSessions.map(bs => ({ name: bs.name, url: bs.url, idSession: bs.idSession }));
+      anyResolution = session.resolution;
+    }
+  } else {
+    for (const [sid, session] of sessions) {
+      for (const [key, entry] of session.instances) {
+        allProcesses.push({
+          name: entry.name,
+          type: entry.type,
+          status: entry.status,
+          sessionId: entry.sessionId,
+          detectedPort: entry.detectedPort,
+          detectedUrl: entry.detectedUrl,
+        });
+      }
+      allFrontendPorts = allFrontendPorts.concat(session.frontendPorts);
+      allBrowserSessions = allBrowserSessions.concat(
+        session.browserSessions.map(bs => ({ name: bs.name, url: bs.url, idSession: bs.idSession }))
+      );
+      if (session.resolution) anyResolution = session.resolution;
+    }
+  }
+
   return {
-    processes,
-    frontendPorts: lastFrontendPorts,
-    browserSessions: browserSessions.map(bs => ({ name: bs.name, url: bs.url, idSession: bs.idSession })),
-    resolution: lastResolution,
+    processes: allProcesses,
+    frontendPorts: allFrontendPorts,
+    browserSessions: allBrowserSessions,
+    resolution: anyResolution,
   };
 }
 
-export function getLogs(name) {
-  const entry = instances.get(name);
+export function getLogs(sessionId, name) {
+  if (sessionId != null) sessionId = Number(sessionId);
+  const session = sessions.get(sessionId);
+  if (!session) return [];
+  const entry = session.instances.get(name);
   return entry ? entry.logs.slice() : [];
 }
 
@@ -251,12 +339,15 @@ export function killPorts(ports) {
       const output = execSync(`fuser -k ${portNum}/tcp 2>&1`, { timeout: 10000 });
       const stdout = output.toString().trim();
 
-      for (const [key, entry] of instances) {
-        if (entry.detectedPort === portNum) {
-          entry.process = null;
-          entry.status = 'stopped';
-          instances.delete(key);
+      for (const [sid, session] of sessions) {
+        for (const [key, entry] of session.instances) {
+          if (entry.detectedPort === portNum) {
+            entry.process = null;
+            entry.status = 'stopped';
+            session.instances.delete(key);
+          }
         }
+        session.frontendPorts = session.frontendPorts.filter(fp => fp.port !== portNum);
       }
 
       results.push({ port: portNum, status: 'ok', message: stdout || `Puerto ${portNum} liberado` });
@@ -266,23 +357,23 @@ export function killPorts(ports) {
     }
   }
 
-  lastFrontendPorts = lastFrontendPorts.filter(fp => !ports.includes(fp.port));
-
   return results;
 }
 
-export async function waitForFrontendPorts(timeout = 20000) {
+export async function waitForAllPorts(sessionId, timeout = 20000) {
+  const session = sessions.get(sessionId);
+  if (!session) return [];
+
   const start = Date.now();
 
   while (Date.now() - start < timeout) {
-    const allDetected = Array.from(instances.values())
-      .filter(e => e.type === 'frontend')
-      .every(e => e.detectedPort);
-    if (allDetected) break;
+    const active = Array.from(session.instances.values()).filter(e => e.status === 'running');
+    const allDetected = active.every(e => e.detectedPort);
+    if (allDetected || active.length === 0) break;
     await new Promise(r => setTimeout(r, 300));
   }
 
-  return Array.from(instances.values())
-    .filter(e => e.type === 'frontend' && e.detectedPort)
-    .map(e => ({ name: e.name, port: e.detectedPort, url: e.detectedUrl }));
+  return Array.from(session.instances.values())
+    .filter(e => e.detectedPort)
+    .map(e => ({ name: e.name, type: e.type, port: e.detectedPort, url: e.detectedUrl }));
 }

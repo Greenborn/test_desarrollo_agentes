@@ -30,6 +30,8 @@ async function _ejecutarComandoSimple(comandoId, sessionId) {
     throw new Error(`Comando con id ${comandoId} no encontrado.`)
   }
 
+  const ocultarEjecucion = comandoData.ocultar_ejecucion ? true : false
+
   let fullOutput = ''
 
   const res = await fetch(`/api/comandos-personalizados/${comandoId}/execute`, {
@@ -70,7 +72,7 @@ async function _ejecutarComandoSimple(comandoId, sessionId) {
     }
   }
 
-  return fullOutput || '(sin salida)'
+  return { output: fullOutput || '(sin salida)', ocultarEjecucion }
 }
 
 register({
@@ -161,30 +163,32 @@ register({
     const cmd = allCommands.find(c => Number(c.id) === Number(params.id))
     if (!cmd) throw new Error(`Comando con id ${params.id} no encontrado.`)
 
-    chatStore.pushMessage({
-      role: 'opencode_control',
-      content: JSON.stringify({
-        controlId: 'comando-edit-update-' + Date.now(),
-        controlType: 'comando_edit',
-        mode: 'update',
-        id: cmd.id,
-        proyectoId: cmd.id_proyecto,
-        label: cmd.label,
-        descripcion: cmd.descripcion || '',
-        comando: cmd.comando,
-      }),
-      controlData: {
-        controlId: 'comando-edit-update-' + Date.now(),
-        controlType: 'comando_edit',
-        mode: 'update',
-        id: cmd.id,
-        proyectoId: cmd.id_proyecto,
-        label: cmd.label,
-        descripcion: cmd.descripcion || '',
-        comando: cmd.comando,
-      },
-      _key: 'ctrl-comando-' + Date.now(),
-    })
+      chatStore.pushMessage({
+        role: 'opencode_control',
+        content: JSON.stringify({
+          controlId: 'comando-edit-update-' + Date.now(),
+          controlType: 'comando_edit',
+          mode: 'update',
+          id: cmd.id,
+          proyectoId: cmd.id_proyecto,
+          label: cmd.label,
+          descripcion: cmd.descripcion || '',
+          comando: cmd.comando,
+          ocultar_ejecucion: cmd.ocultar_ejecucion ? true : false,
+        }),
+        controlData: {
+          controlId: 'comando-edit-update-' + Date.now(),
+          controlType: 'comando_edit',
+          mode: 'update',
+          id: cmd.id,
+          proyectoId: cmd.id_proyecto,
+          label: cmd.label,
+          descripcion: cmd.descripcion || '',
+          comando: cmd.comando,
+          ocultar_ejecucion: cmd.ocultar_ejecucion ? true : false,
+        },
+        _key: 'ctrl-comando-' + Date.now(),
+      })
   },
 })
 
@@ -234,6 +238,10 @@ register({
     const { params, errors } = parseCommandArgs(args, { id: { required: true } })
     if (errors.length > 0) throw new Error(errors.join('. '))
 
-    return await _ejecutarComandoSimple(params.id, sessionId)
+    const result = await _ejecutarComandoSimple(params.id, sessionId)
+    if (result.ocultarEjecucion) {
+      return { __silent: true, output: result.output }
+    }
+    return result.output
   },
 })

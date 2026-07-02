@@ -209,7 +209,17 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
 
     const results = await devInstanceManager.startDevInstance(projectRoot, deployConfig, sessionId);
 
-    const frontendPorts = await devInstanceManager.waitForFrontendPorts(20000);
+    const allPorts = await devInstanceManager.waitForAllPorts(sessionId, 20000);
+
+    for (const r of results) {
+      const info = allPorts.find(p => p.name === r.name);
+      if (info) {
+        r.port = info.port;
+        r.url = info.url;
+      }
+    }
+
+    const frontendPorts = allPorts.filter(p => p.type === 'frontend');
 
     const browserSessions = [];
     let resolution = null;
@@ -258,7 +268,7 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
             const pwData = await pwRes.json();
             if (pwData.id_session) {
               browserSessions.push({ name: fe.name, url: fe.url, idSession: pwData.id_session });
-              devInstanceManager.registerBrowserSession({ name: fe.name, url: fe.url, idSession: pwData.id_session });
+              devInstanceManager.registerBrowserSession(sessionId, { name: fe.name, url: fe.url, idSession: pwData.id_session });
             } else if (pwData.error) {
               console.log(`[despliegue] Error al abrir navegador para ${fe.name}: ${pwData.error}`);
             }
@@ -271,8 +281,8 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
       }
     }
 
-    devInstanceManager.setFrontendPorts(frontendPorts);
-    devInstanceManager.setResolution(resolution);
+    devInstanceManager.setFrontendPorts(frontendPorts, sessionId);
+    devInstanceManager.setResolution(resolution, sessionId);
 
     res.json({ success: true, results, frontendPorts, browserSessions });
   } catch (err) {
@@ -283,7 +293,12 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
 
 router.post('/detener-instancia-dev', async (req, res) => {
   try {
-    await devInstanceManager.stopAll();
+    const { sessionId } = req.body;
+    if (sessionId) {
+      await devInstanceManager.stopBySession(sessionId);
+    } else {
+      await devInstanceManager.stopAll();
+    }
     res.json({ success: true });
   } catch (err) {
     console.log('Error en POST /api/despliegue/detener-instancia-dev:', err);
@@ -309,7 +324,8 @@ router.post('/cerrar-puertos', async (req, res) => {
 
 router.get('/estado-instancia-dev', async (req, res) => {
   try {
-    const status = devInstanceManager.getStatus();
+    const { sessionId } = req.query;
+    const status = devInstanceManager.getStatus(sessionId || null);
     res.json({ success: true, ...status });
   } catch (err) {
     console.log('Error en GET /api/despliegue/estado-instancia-dev:', err);
@@ -319,11 +335,14 @@ router.get('/estado-instancia-dev', async (req, res) => {
 
 router.get('/logs', async (req, res) => {
   try {
-    const { name } = req.query;
+    const { sessionId, name } = req.query;
     if (!name) {
       return res.status(400).json({ success: false, error: 'Se requiere el parámetro name.' });
     }
-    const logs = devInstanceManager.getLogs(name);
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'Se requiere el parámetro sessionId.' });
+    }
+    const logs = devInstanceManager.getLogs(sessionId, name);
     res.json({ success: true, name, logs });
   } catch (err) {
     console.log('Error en GET /api/despliegue/logs:', err);

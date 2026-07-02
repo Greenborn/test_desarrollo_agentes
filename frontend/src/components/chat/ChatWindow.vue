@@ -366,6 +366,7 @@ export default {
         })
       } finally {
         await fetchGitBranch()
+        await devInstanceStore.fetchStatus()
       }
     }
 
@@ -394,8 +395,7 @@ export default {
         ocStore.activateSession(newId)
         ocStreaming.value = chat.getIsOcStreaming(newId)
         streamingConsole.value = false
-        ocChunk.value = ''
-        ocThinking.value = ''
+        streamingApi._syncStreamData(newId)
       }
       loadTicketInfo()
       fetchGitBranch()
