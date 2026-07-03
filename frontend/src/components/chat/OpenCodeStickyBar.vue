@@ -73,6 +73,7 @@
         <button class="btn btn-sm btn-success" :disabled="ocStreaming || !ocInput.trim()" @click="send">Enviar</button>
         <button class="btn btn-sm btn-outline-danger" @click="$emit('finish')">⏹ Finalizar</button>
         <button class="btn btn-sm btn-outline-info" @click="$emit('toggle-terminal')">📟 Terminal</button>
+        <button class="btn btn-sm" :class="maximized ? 'btn-warning' : 'btn-outline-secondary'" @click="$emit('toggle-maximize')" :title="maximized ? 'Restaurar' : 'Pantalla completa'">⛶</button>
       </div>
     </div>
   </div>
@@ -92,8 +93,9 @@ export default {
     activeSessionId: { type: [Number, String], default: null },
     ocStreaming: { type: Boolean, default: false },
     ocInput: { type: String, default: '' },
+    maximized: { type: Boolean, default: false },
   },
-  emits: ['update:ocInput', 'send', 'finish'],
+  emits: ['update:ocInput', 'send', 'finish', 'toggle-maximize'],
   setup(props, { emit }) {
     const ocStore = useOpencodeStore()
     const chat = useChatStore()
