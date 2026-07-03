@@ -43,6 +43,7 @@ router.get('/sessions', async (req, res) => {
         'chat_sessions.workspace_id',
         'ws_redmine.setting_value as session_redmine_url',
         'proyectos.descripcion as proyecto_descripcion',
+        'proyectos.color as proyecto_color',
         'tickets.priority_id',
         'tickets.priority_name'
       );
@@ -622,6 +623,7 @@ router.get('/sessions/archived', async (req, res) => {
         'chat_sessions.workspace_id',
         'ws_redmine.setting_value as session_redmine_url',
         'proyectos.descripcion as proyecto_descripcion',
+        'proyectos.color as proyecto_color',
         'tickets.priority_id',
         'tickets.priority_name'
       );

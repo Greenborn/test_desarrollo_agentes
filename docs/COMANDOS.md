@@ -89,12 +89,21 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/proyecto_var_crear` | Crea una nueva variable en un proyecto. Sin `--id` usa el proyecto de la sesión actual. Usar `--type=memory` para no persistente (db por defecto) | `/proyecto_var_crear --key=nombre --value=valor [--id=proyecto] [--type=db\|memory]` |
 | `/proyecto_var_actualizar` | Actualiza el valor de una variable existente en un proyecto. Sin `--id` usa el proyecto de la sesión actual. Usar `--type=memory\|db` para cambiar persistencia | `/proyecto_var_actualizar --key=nombre --value=valor [--id=proyecto] [--type=db\|memory]` |
 | `/proyecto_var_eliminar` | Elimina una variable de un proyecto. Sin `--id` usa el proyecto de la sesión actual | `/proyecto_var_eliminar --key=nombre [--id=proyecto]` |
+| `/proyecto_color_set` | Establece el color identificativo de un proyecto (formato hexadecimal). Sin `--id` usa el proyecto de la sesión actual | `/proyecto_color_set --color=#ff6b6b [--id=proyecto]` |
 | `/archivos_listar` | Lista los archivos del proyecto vinculado a la sesión actual o del especificado | `/archivos_listar [--id=proyecto]` |
 | `/archivos_eliminar` | Elimina un archivo del proyecto por su ID | `/archivos_eliminar --id=<id_archivo>` |
 
 ### Interpolación de variables
 
 Las variables de proyecto pueden usarse en cualquier campo de texto del chat (mensajes, prompts de OpenCode, etc.) mediante la sintaxis `{{nombre_variable}}`. Al enviar el texto, el sistema resuelve automáticamente las variables reemplazando `{{nombre}}` por su valor, siempre que la sesión tenga un proyecto asignado.
+
+---
+
+## Base de datos
+
+| Comando | Descripción | Uso |
+|---|---|---|
+| `/db_export` | Exporta la base de datos completa mediante mysqldump a un archivo .sql. Con `--output=<ruta>` se guarda donde se indique; sin él se guarda en `backend/exports/` con timestamp | `/db_export [--output=<ruta>]` |
 
 ---
 

@@ -43,6 +43,14 @@
               <template v-else>(sin datos)</template>
             </div>
           </div>
+          <div class="col-12 mb-2">
+            <label class="form-label small text-secondary mb-1">Color identificativo</label>
+            <div class="d-flex align-items-center gap-2">
+              <input type="color" :value="project.color || '#6b7280'" @input="updateColor" class="form-control form-control-color p-0" style="width: 40px; height: 32px; border: none; cursor: pointer;" />
+              <span class="text-light small font-monospace">{{ project.color || '#6b7280' }}</span>
+              <span v-if="savingColor" class="spinner-border spinner-border-sm text-secondary ms-1" role="status"></span>
+            </div>
+          </div>
           <div v-if="project.url_github" class="col-12 mb-2">
             <label class="form-label small text-secondary mb-1">Repositorio GitHub</label>
             <div class="text-light">
@@ -71,7 +79,7 @@
 </template>
 
 <script>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useProjectStore } from '../../stores/project.js'
 import JsonTreeView from '../utils/JsonTreeView.vue'
@@ -81,6 +89,7 @@ export default {
   setup() {
     const projectStore = useProjectStore()
     const { selectedProject } = storeToRefs(projectStore)
+    const savingColor = ref(false)
 
     const deployConfig = computed(() => {
       const raw = selectedProject.value?.despliegue_config
@@ -91,6 +100,27 @@ export default {
         return null
       }
     })
+
+    async function updateColor(e) {
+      const color = e.target.value
+      if (!color || !selectedProject.value?.id) return
+      savingColor.value = true
+      try {
+        const res = await fetch(`/api/proyecto/${selectedProject.value.id}/color`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ color }),
+        })
+        if (!res.ok) throw new Error('Error al actualizar color')
+        selectedProject.value.color = color
+        projectStore.updateProjectColor(selectedProject.value.id, color)
+      } catch (err) {
+        console.error('Error al actualizar color del proyecto:', err)
+      } finally {
+        savingColor.value = false
+      }
+    }
 
     function goBack() {
       projectStore.clearSelection()
@@ -127,6 +157,8 @@ export default {
       goBack,
       formatDate,
       statusLabel,
+      updateColor,
+      savingColor,
     }
   },
 }

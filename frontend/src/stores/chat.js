@@ -29,6 +29,7 @@ export const useChatStore = defineStore('chat', () => {
   const _ocSessionStreamCache = ref({})
   const ledFlash = ref({})
   const ledFlashTimers = {}
+  const showTerminal = ref(false)
 
   const streaming = computed(() => {
     const sid = activeSessionId.value
@@ -786,7 +787,7 @@ export const useChatStore = defineStore('chat', () => {
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
     setOcStreaming, getIsOcStreaming, updateOcStreamCache, clearOcStreamCache,
     sessionTickets, activeSessionTicket, setSessionTicket, clearSessionTicket,
-    _saveMessageToDb, clearPendingNotification, ledFlash, flashLed,
+    _saveMessageToDb, clearPendingNotification, ledFlash, flashLed, showTerminal,
     saveUiState,
   }
 })

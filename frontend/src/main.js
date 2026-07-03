@@ -45,6 +45,7 @@ import './composables/commands/proyectoVarListar.js'
 import './composables/commands/proyectoVarCrear.js'
 import './composables/commands/proyectoVarActualizar.js'
 import './composables/commands/proyectoVarEliminar.js'
+import './composables/commands/proyectoColorSet.js'
 import './composables/commands/ambientesListar.js'
 import './composables/commands/ambientesMerge.js'
 import './composables/commands/ambientesDiff.js'
@@ -63,6 +64,7 @@ import './composables/commands/capturasListar.js'
 import './composables/commands/navegadorEvaluarSelector.js'
 import './composables/commands/navegadorSimularEvento.js'
 import './composables/commands/terminalToggle.js'
+import './composables/commands/dbExport.js'
 
 const app = createApp(App)
 const pinia = createPinia()
