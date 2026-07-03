@@ -1,8 +1,10 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import wsClient from '../../services/wsClient.js';
 import { useAuthStore } from '../../stores/auth.js';
+import { getUsedFlags } from '../parseCommandArgs.js';
 
 const { register } = useCommandRegistry();
+const ALL_FLAGS = ['--id=']
 
 register({
   name: '/proyecto_var_listar',
@@ -10,12 +12,16 @@ register({
   description: 'Lista las variables de un proyecto.',
   usage: '/proyecto_var_listar [--id=proyecto]',
   autocomplete(args, cmdStore) {
-    const used = args.filter(a => a.startsWith('--id='))
-    if (used.length > 0) {
+    const usedFlags = getUsedFlags(args)
+    const suggestions = ALL_FLAGS.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
+    } else {
       cmdStore.hideAutocomplete()
-      return
     }
-    cmdStore.showAutocomplete(['--id='])
   },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {

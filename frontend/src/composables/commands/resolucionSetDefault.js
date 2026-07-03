@@ -1,5 +1,6 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
 import { settingSet } from '../../services/settingService.js'
+import { getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
@@ -20,8 +21,9 @@ register({
   description: 'Establece la resolución de pantalla por defecto.',
   usage: '/resolucion_set_default --resolucion=<ID>',
   async autocomplete(args, cmdStore) {
-    const resolucionArg = args.find(a => a.startsWith('--resolucion='))
-    if (resolucionArg) {
+    const usedFlags = getUsedFlags(args)
+    if (usedFlags.includes('--resolucion=')) {
+      const resolucionArg = args.find(a => a.startsWith('--resolucion='))
       const resolutions = await fetchResolutions()
       if (!resolutions.length) {
         cmdStore.hideAutocomplete()

@@ -1,8 +1,9 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
-import { parseCommandArgs } from '../parseCommandArgs.js';
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
 import { useComandosPersonalizadosStore } from '../../stores/comandosPersonalizados.js';
 
 const { register } = useCommandRegistry();
+const ALL_FLAGS = ['--id=']
 
 function _getProyectoId(sessions, activeSessionId) {
   const session = sessions.find(s => Number(s.id) === Number(activeSessionId))
@@ -81,8 +82,13 @@ register({
   description: 'Lista los comandos personalizados del proyecto de la sesión o del especificado.',
   usage: '/comando_listar [--id=proyecto]',
   autocomplete(args, cmdStore) {
-    if (!args.some(a => a.startsWith('--id='))) {
-      cmdStore.showAutocomplete(['--id='])
+    const usedFlags = getUsedFlags(args)
+    const suggestions = ALL_FLAGS.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
     } else {
       cmdStore.hideAutocomplete()
     }
@@ -142,8 +148,13 @@ register({
   description: 'Abre un formulario inline para editar un comando personalizado existente.',
   usage: '/comando_editar --id=ID',
   autocomplete(args, cmdStore) {
-    if (!args.some(a => a.startsWith('--id='))) {
-      cmdStore.showAutocomplete(['--id='])
+    const usedFlags = getUsedFlags(args)
+    const suggestions = ALL_FLAGS.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
     } else {
       cmdStore.hideAutocomplete()
     }
@@ -198,8 +209,13 @@ register({
   description: 'Elimina un comando personalizado.',
   usage: '/comando_eliminar --id=ID',
   autocomplete(args, cmdStore) {
-    if (!args.some(a => a.startsWith('--id='))) {
-      cmdStore.showAutocomplete(['--id='])
+    const usedFlags = getUsedFlags(args)
+    const suggestions = ALL_FLAGS.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
     } else {
       cmdStore.hideAutocomplete()
     }
@@ -227,8 +243,13 @@ register({
   description: 'Ejecuta un comando personalizado por su ID. Los resultados parciales se muestran en vivo.',
   usage: '/comando_ejecutar --id=ID',
   autocomplete(args, cmdStore) {
-    if (!args.some(a => a.startsWith('--id='))) {
-      cmdStore.showAutocomplete(['--id='])
+    const usedFlags = getUsedFlags(args)
+    const suggestions = ALL_FLAGS.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
     } else {
       cmdStore.hideAutocomplete()
     }

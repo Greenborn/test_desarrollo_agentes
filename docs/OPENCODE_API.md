@@ -104,10 +104,12 @@ Inicializa (o recupera) un servidor OpenCode y devuelve los proveedores/modelos 
 **Comportamiento:**
 - Si `sessionId` está presente, busca el `cwd` en `chat_sessions` y lo usa como directorio de trabajo.
 - Usa `workspaceIds[0]` de la sesión (o `1` por defecto) para obtener el locale desde `settings`.
-- Los campos `saved*` se leen de `user_settings` para la key `opencode_last_*`.
+- Los campos `saved*` se leen primero de `user_settings` para la key `opencode_last_*`.
+- Si `sessionId` tiene un proyecto asociado (`chat_sessions.proyecto_id`), los valores guardados en `project_variables` (keys `opencode_*`) sobreescriben los de `user_settings`.
+- El frontend aplica estos `saved*` como valores por defecto de los `selected*` en el store.
 - El servidor OpenCode se inicia (si no existe) y se consulta `GET /config/providers`.
 
-**Código fuente:** `backend/src/routes/opencode.routes.js:60-93`
+**Código fuente:** `backend/src/routes/opencode.routes.js:60-110`
 
 ---
 
@@ -119,7 +121,8 @@ Guarda una preferencia del usuario sobre la configuración de OpenCode.
 ```json
 {
   "key": "provider",
-  "value": "anthropic"
+  "value": "anthropic",
+  "sessionId": 123
 }
 ```
 
@@ -127,9 +130,10 @@ Guarda una preferencia del usuario sobre la configuración de OpenCode.
 
 **Comportamiento:**
 - Guarda en `user_settings` la key `opencode_last_<key>` para el usuario autenticado.
+- Si `sessionId` está presente y tiene un proyecto asociado (`chat_sessions.proyecto_id`), también guarda en `project_variables` la key `opencode_<key>` con type `'db'` (upsert).
 - Keys válidas: `provider`, `model`, `thinking`, `mode`, `temperature`.
 
-**Código fuente:** `backend/src/routes/opencode.routes.js:95-107`
+**Código fuente:** `backend/src/routes/opencode.routes.js:112-135`
 
 ---
 
@@ -474,13 +478,15 @@ const temperatureOptions = [
 
 | Método | Descripción |
 |---|---|
-| `start(chatSessionId?)` | `GET /api/opencode/start`. Inicializa el store con proveedores y preferencias guardadas. |
-| `select(key, value)` | `POST /api/opencode/select`. Guarda preferencia en backend. |
+| `start(chatSessionId?)` | `GET /api/opencode/start`. Inicializa el store con proveedores y preferencias guardadas. Además, aplica los `saved*` a los `selected*` si están vacíos (para sesiones nuevas). |
+| `select(key, value)` | `POST /api/opencode/select`. Guarda preferencia en backend. Si `chatSessionId` está disponible, lo envía como `sessionId` para persistir también en `project_variables`. |
 | `streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, callbacks)` | Envía un prompt a OpenCode con callbacks: `onChunk`, `onThinking`, `onControl`, `onDone`, `onError`. |
 | `finish()` | Limpia el estado local (no llama al backend). |
 | `clearAllSessions()` | Limpia todas las sesiones del store. |
 | `activateSession(chatSid)` | Cambia a otra sesión guardada en `sessionsMap`. |
-| `saveCurrentToMap(chatSid)` | Guarda estado actual en el mapa de sesiones. |
+| `saveCurrentToMap(chatSid, extraFields?)` | Guarda estado actual en el mapa de sesiones. Acepta `extraFields` opcional (ej: `{ ocInput }`). |
+| `setSessionOcInput(chatSid, text)` | Guarda el texto del StickyBar (`ocInput`) para una sesión en el mapa. |
+| `getSessionOcInput(chatSid)` | Recupera el texto del StickyBar guardado para una sesión. |
 | `saveUiState()` | Persiste el estado actual en `sessionStorage`. |
 | `restoreFromSession()` | Restaura estado desde `sessionStorage`. |
 | `restoreFromState(savedState)` | Restaura estado desde un objeto. |
@@ -585,18 +591,22 @@ Los mensajes relacionados con OpenCode usan roles especiales en `chat_messages`:
 
 ### Inicio
 
-1. Usuario selecciona una sesión de chat.
-2. El frontend llama a `opencodeStore.start(sessionId)` → `GET /api/opencode/start?sessionId=X`.
+1. Usuario ejecuta `/dev_opencode_iniciar` o hace clic en "Iniciar OpenCode" en la barra de ticket.
+2. El comando llama a `opencodeStore.start(sessionId)` → `GET /api/opencode/start?sessionId=X`.
 3. El backend inicia (o reusa) un servidor `opencode serve` en el `cwd` de la sesión.
 4. El backend consulta `GET /config/providers` y devuelve los proveedores disponibles.
-5. El frontend carga las preferencias guardadas del usuario.
+5. El backend lee `user_settings` + `project_variables` y devuelve las preferencias guardadas.
+6. El frontend aplica `saved*` a `selected*` y vincula el `chatSessionId`.
+7. Aparece `OpenCodeStickyBar` en la parte inferior con los campos precargados.
+8. Si no hay proveedor guardado, se muestra el selector de proveedor dentro del StickyBar.
 
 ### Envío de prompt
 
-1. Usuario escribe un mensaje en `OpenCodeStickyBar` o en un formulario (`ChatOpencodeForm`).
-2. El frontend llama a `useOpencodeStreaming().opencodeStreamPrompt()` (o variante).
-3. Se crea un mensaje temporal `opencode_stream` en el chat.
-4. Se llama a `opencodeStore.streamPrompt()` → `POST /api/opencode/send`.
+1. Usuario escribe un mensaje en el `OpenCodeStickyBar` (textarea de 5 filas con auto-resize).
+2. Opcional: activa el switch "Usar descripción del ticket" para precargar la descripción.
+3. El frontend llama a `useOpencodeStreaming().opencodeStreamPrompt()` (o variante).
+4. Se crea un mensaje temporal `opencode_stream` en el chat.
+5. Se llama a `opencodeStore.streamPrompt()` → `POST /api/opencode/send`.
 5. El backend:
    - Obtiene/crea el servidor OpenCode.
    - Crea una sesión OpenCode (`POST /session`) con agente `plan` o `build`.
@@ -661,7 +671,7 @@ sessionStorage.setItem('oc_opencode_state', JSON.stringify({
 
 | Componente | Archivo | Propósito |
 |---|---|---|
-| `OpenCodeStickyBar` | `frontend/src/components/chat/OpenCodeStickyBar.vue` | Barra inferior con selector de modelo/temperatura/modo y textarea para enviar prompts. Incluye autocompletado de variables `{{...}}`. |
+| `OpenCodeStickyBar` | `frontend/src/components/chat/OpenCodeStickyBar.vue` | Barra inferior con selector de proveedor (si no hay), modelo/pensamiento/temperatura/modo, switch "Usar descripción del ticket" y textarea (5 filas, auto-resize). Incluye autocompletado de variables `{{...}}`. Se activa al ejecutar `/dev_opencode_iniciar`. |
 | `OpenCodeStreamDisplay` | `frontend/src/components/chat/OpenCodeStreamDisplay.vue` | Visualización del streaming en vivo (thinking colapsable + respuesta). |
-| `ChatOpencodeForm` | `frontend/src/components/chat-controls/ChatOpencodeForm.vue` | Formulario completo con selector de modelo, thinking, temperatura, modo y opción de usar descripción del ticket. Usado en comandos `/dev_opencode_iniciar`. |
+| `ChatOpencodeForm` | `frontend/src/components/chat-controls/ChatOpencodeForm.vue` | Formulario completo con selector de modelo, thinking, temperatura, modo y opción de usar descripción del ticket. Usado en comandos `/dev_opencode_generar_commit` y otros flujos que requieren wizard paso a paso. |
 | `VariableAutocomplete` | `frontend/src/components/chat/VariableAutocomplete.vue` | Autocompletado de variables `{{...}}` usando datos reales del proyecto. |

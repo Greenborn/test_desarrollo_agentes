@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
-import { parseCommandArgs } from '../parseCommandArgs.js'
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
@@ -9,8 +9,9 @@ register({
   description: 'Obtiene la lista de tickets de Redmine para un proyecto importado.',
   usage: '/redmine_listar_tickets --id=&lt;id_proyecto&gt;',
   async autocomplete(args, cmdStore) {
-    const idArg = args.find(a => a.startsWith('--id='))
-    if (idArg) {
+    const usedFlags = getUsedFlags(args)
+    if (usedFlags.includes('--id=')) {
+      const idArg = args.find(a => a.startsWith('--id='))
       const val = idArg.slice('--id='.length)
       try {
         const res = await fetch('/api/proyecto', { credentials: 'include' })

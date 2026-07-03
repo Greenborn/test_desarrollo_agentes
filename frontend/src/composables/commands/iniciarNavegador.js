@@ -1,4 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
+import { getUsedFlags } from '../parseCommandArgs.js';
 import { settingGet } from '../../services/settingService.js';
 
 const { register } = useCommandRegistry();
@@ -54,9 +55,6 @@ register({
   description: 'Inicia una sesión de navegador web (chrome o firefox). Usa --resolution=ID o la resolución por defecto del usuario.',
   usage: '/navegador_iniciar [--navegador=chrome|firefox] [--resolution=ID] [--url=URL]',
   async autocomplete(args, cmdStore) {
-    const hasResolution = args.find(a => a.startsWith('--resolution='))
-    const hasUrl = args.find(a => a.startsWith('--url='))
-
     const navegadorArg = args.find(a => a.startsWith('--navegador='))
     if (navegadorArg) {
       const val = navegadorArg.slice('--navegador='.length)
@@ -109,10 +107,12 @@ register({
       }
     }
 
-    const suggestions = []
-    if (!args.find(a => a.startsWith('--navegador='))) suggestions.push('--navegador=')
-    if (!hasResolution) suggestions.push('--resolution=')
-    if (!hasUrl) suggestions.push('--url=')
+    const usedFlags = getUsedFlags(args)
+    const allFlags = ['--navegador=', '--resolution=', '--url=']
+    const suggestions = allFlags.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
     cmdStore.showAutocomplete(suggestions)
   },
   async execute(args, { chatStore, loadingIdx, sessionId }) {

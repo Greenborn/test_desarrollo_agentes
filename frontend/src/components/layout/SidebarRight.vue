@@ -12,6 +12,7 @@
       <button class="tab-btn" :class="{ active: tab === 'capturas' }" @click="selectTab('capturas')">Capturas</button>
       <button class="tab-btn" :class="{ active: tab === 'casos_prueba' }" @click="selectTab('casos_prueba')">Casos de Prueba</button>
       <button class="tab-btn" :class="{ active: tab === 'documentacion' }" @click="selectTab('documentacion')">Documentación</button>
+      <button class="tab-btn" :class="{ active: tab === 'skills' }" @click="selectTab('skills')">Skills</button>
     </div>
 
     <template v-if="tab === 'comentarios'">
@@ -101,6 +102,7 @@
             <button v-if="!executingCommands.has(c.id)" class="btn btn-sm btn-outline-success py-0 px-2" style="font-size: 0.65rem;" @click.stop="ejecutarComando(c)">▶ Ejecutar</button>
             <button v-else class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size: 0.65rem;" @click.stop="detenerComando(c)">⏹ Detener</button>
             <button class="btn btn-sm btn-outline-info py-0 px-2" style="font-size: 0.65rem;" @click.stop="editarComando(c)">✏</button>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.65rem;" @click.stop="copiarComando(c)">📋</button>
             <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.65rem;" @click.stop="eliminarComando(c)">🗑</button>
           </div>
         </div>
@@ -189,6 +191,9 @@
     <template v-else-if="tab === 'documentacion'">
       <DocumentacionPanel :proyecto-id="proyectoId" :ticket-id="activeTicketId" />
     </template>
+    <template v-else-if="tab === 'skills'">
+      <SkillsTab />
+    </template>
     <div class="sidebar-right-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-right-resize-handle-bar"></div>
     </div>
@@ -213,9 +218,10 @@ import CapturaDetailModal from '../modals/CapturaDetailModal.vue'
 import FileTreePanel from '../files/FileTreePanel.vue'
 import FilePreviewPanel from '../files/FilePreviewPanel.vue'
 import DocumentacionPanel from '../documentation/DocumentacionPanel.vue'
+import SkillsTab from '../skills/SkillsTab.vue'
 
 export default {
-  components: { FileTreePanel, FilePreviewPanel, DocumentacionPanel, CreateVariableModal },
+  components: { FileTreePanel, FilePreviewPanel, DocumentacionPanel, CreateVariableModal, SkillsTab },
   setup() {
     const ui = useUiStore()
     const chat = useChatStore()
@@ -913,6 +919,24 @@ export default {
       })
     }
 
+    async function copiarComando(c) {
+      try {
+        const nuevoLabel = 'copia_' + c.label
+        await comandosStore.createCommand({
+          label: nuevoLabel,
+          descripcion: c.descripcion || '',
+          id_proyecto: c.id_proyecto,
+          comando: c.comando,
+          ocultar_ejecucion: c.ocultar_ejecucion ? true : false,
+        })
+        if (Number(chat.activeSessionId) === Number(activeSessionId.value) && activeSessionId.value) {
+          chat.pushMessage({ role: 'result', content: `✓ Comando "${c.label}" copiado como "${nuevoLabel}".`, _key: 'cpy-' + Date.now() })
+        }
+      } catch (err) {
+        console.error('Error al copiar comando:', err)
+      }
+    }
+
     async function eliminarComando(c) {
       if (!confirm(`¿Eliminar el comando "${c.label}"?`)) return
       try {
@@ -1005,6 +1029,7 @@ export default {
       detenerComando,
       crearComando,
       editarComando,
+      copiarComando,
       eliminarComando,
       executingCommands,
       onResizeStart,
@@ -1034,6 +1059,8 @@ export default {
 <style scoped>
 .tab-bar {
   border-bottom: 1px solid #374151;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .tab-btn {
   background: none;

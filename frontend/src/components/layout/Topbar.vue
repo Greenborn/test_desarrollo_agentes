@@ -32,7 +32,7 @@ import { useModalStore } from '../../stores/modal.js'
 import { useOpencodeStore } from '../../stores/opencode.js'
 import { useBrowserStore } from '../../stores/browser.js'
 import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
-import { parseCommandArgs } from '../../composables/parseCommandArgs.js'
+import { parseCommandArgs, getUsedFlags } from '../../composables/parseCommandArgs.js'
 import { useChatStore } from '../../stores/chat.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { contrastTextColor } from '../../utils/color.js'
@@ -149,41 +149,13 @@ export default {
     register({
       name: '/dev_opencode_iniciar',
       category: 'Desarrollo',
-      description: 'Inicia una sesión con OpenCode: seleccionar proveedor, modelo, modo y enviar prompt. Si ya hay una sesión activa, la cierra y abre una nueva. Con --ticket-desc precarga el textarea con la descripción del ticket de la sesión.',
-      usage: '/dev_opencode_iniciar [--ticket-desc]',
-      async autocomplete(args, cmdStore) {
-        const usedFlags = args.filter(a => a.startsWith('--')).map(a => a.split('=')[0])
-        if (usedFlags.includes('--ticket-desc')) {
-          cmdStore.hideAutocomplete()
-        } else {
-          cmdStore.showAutocomplete(['--ticket-desc'])
-        }
-      },
+      description: 'Inicia una sesión con OpenCode: seleccionar proveedor, modelo, modo y enviar prompt. Si ya hay una sesión activa, la cierra y abre una nueva.',
+      usage: '/dev_opencode_iniciar',
+      autocomplete: null,
       async execute(args, { cmdStore, chatStore, sessionId }) {
         if (!sessionId) {
           console.error('Error en /dev_opencode_iniciar: no hay sesión de chat activa')
           return
-        }
-
-        const { params } = parseCommandArgs(args, { 'ticket-desc': { required: false } })
-        const useTicketDesc = params['ticket-desc'] === 'true'
-
-        let prefill = ''
-        if (useTicketDesc) {
-          try {
-            const res = await fetch(`/api/tickets/session/${sessionId}`, { credentials: 'include' })
-            const data = await res.json()
-            if (data.ticket && data.ticket.description) {
-              prefill = data.ticket.description
-            } else if (data.idTicketRedmine) {
-              prefill = '*(El ticket asignado no tiene descripción)*'
-            } else {
-              prefill = '*(No hay ticket asignado a esta sesión)*'
-            }
-          } catch (err) {
-            console.error('Error al obtener ticket para --ticket-desc:', err.message)
-            prefill = '*(Error al obtener la descripción del ticket)*'
-          }
         }
 
         if (ocStore.ocSessionId) {
@@ -208,13 +180,14 @@ export default {
         const data = await ocStore.start(sessionId)
         if (!data) return
 
+        ocStore.chatSessionId = sessionId
+        ocStore.saveCurrentToMap(sessionId)
+
         const providerList = ocStore.getAvailableProviders()
         if (providerList.length === 0) {
           console.error('Error en /dev_opencode_iniciar: no se encontraron proveedores')
           return
         }
-
-        const preselectProvider = ocStore.savedProvider || providerList[0].value
 
         ;(async () => {
           try {
@@ -254,20 +227,7 @@ export default {
           }
         })()
 
-        chatStore.messages.push({
-          role: 'opencode_control',
-          controlData: {
-            controlId: 'provider-' + Date.now(),
-            controlType: 'select',
-            stepType: 'opencode_setup',
-            subStepType: 'provider',
-            options: providerList,
-            placeholder: 'Selecciona proveedor...',
-            preselect: preselectProvider,
-            prefill: prefill,
-          },
-          _key: 'control-' + Date.now(),
-        })
+        // El StickyBar se encarga de la selección de proveedor/modelo desde el primer momento
       },
     })
 
@@ -286,15 +246,12 @@ export default {
       description: 'Navega a una URL en la sesión de navegador activa.',
       usage: '/navegador_ir_url --url=&lt;url&gt;',
       async autocomplete(args, cmdStore) {
-        const urlArg = args.find(a => a.startsWith('--url='))
-        if (urlArg) {
-          if (urlArg.slice('--url='.length)) {
-            cmdStore.hideAutocomplete()
-          } else {
-            cmdStore.hideAutocomplete()
-          }
+        const usedFlags = getUsedFlags(args)
+        const suggestions = ['--url='].filter(f => !usedFlags.includes(f))
+        if (suggestions.length > 0) {
+          cmdStore.showAutocomplete(suggestions)
         } else {
-          cmdStore.showAutocomplete(['--url='])
+          cmdStore.hideAutocomplete()
         }
       },
       async execute(args, { cmdStore, chatStore, sessionId }) {
@@ -325,14 +282,20 @@ export default {
       description: 'Cambia el modo headless del navegador (0 = visible, 1 = headless). Si hay sesión activa, la reinicia.',
       usage: '/navegador_configurar_headless --mode=&lt;0|1&gt;',
       autocomplete(args, cmdStore) {
-        const modeArg = args.find(a => a.startsWith('--mode='))
-        if (modeArg) {
-          const val = modeArg.slice('--mode='.length)
+        const usedFlags = getUsedFlags(args)
+        const modeInUse = usedFlags.includes('--mode=') || usedFlags.includes('--mode')
+        if (modeInUse) {
+          const modeArg = args.find(a => a.startsWith('--mode='))
+          const val = modeArg ? modeArg.slice('--mode='.length) : ''
           if (val === '0' || val === '1') {
             cmdStore.hideAutocomplete()
           } else {
             const filtered = ['0', '1'].filter(v => v.startsWith(val))
-            cmdStore.showAutocomplete(filtered.map(v => ({ display: v === '0' ? '0 (visible)' : '1 (headless)', value: `--mode=${v}` })))
+            if (filtered.length > 0) {
+              cmdStore.showAutocomplete(filtered.map(v => ({ display: v === '0' ? '0 (visible)' : '1 (headless)', value: `--mode=${v}` })))
+            } else {
+              cmdStore.hideAutocomplete()
+            }
           }
         } else {
           cmdStore.showAutocomplete(['--mode='])
@@ -445,9 +408,11 @@ export default {
       description: 'Asigna un proyecto a la sesión actual, o crea uno nuevo si se invoca sin parámetros.',
       usage: '/chat_set_proyecto [--id=&lt;id_proyecto&gt;]',
       async autocomplete(args, cmdStore) {
-        const idArg = args.find(a => a.startsWith('--id='))
-        if (idArg) {
-          const val = idArg.slice('--id='.length)
+        const usedFlags = getUsedFlags(args)
+        const idInUse = usedFlags.includes('--id=') || usedFlags.includes('--id')
+        if (idInUse) {
+          const idArg = args.find(a => a.startsWith('--id='))
+          const val = idArg ? idArg.slice('--id='.length) : ''
           try {
             const res = await fetch('/api/proyecto', { credentials: 'include' })
             const data = await res.json()
@@ -527,8 +492,12 @@ export default {
       description: 'Asigna una URL de repositorio GitHub al proyecto actual de la sesión.',
       usage: '/chat_set_repositorio --url=<url>',
       async autocomplete(args, cmdStore) {
-        if (!args.find(a => a.startsWith('--url='))) {
-          cmdStore.showAutocomplete(['--url='])
+        const usedFlags = getUsedFlags(args)
+        const suggestions = ['--url='].filter(f => !usedFlags.includes(f))
+        if (suggestions.length > 0) {
+          cmdStore.showAutocomplete(suggestions)
+        } else {
+          cmdStore.hideAutocomplete()
         }
       },
       async execute(args, { cmdStore, chatStore, sessionId }) {

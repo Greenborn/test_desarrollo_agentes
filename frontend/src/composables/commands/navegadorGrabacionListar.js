@@ -1,7 +1,8 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
-import { parseCommandArgs } from '../parseCommandArgs.js'
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
+const ALL_FLAGS = ['--project_id=']
 
 register({
   name: '/navegador_grabacion_listar',
@@ -9,9 +10,13 @@ register({
   description: 'Lista todas las grabaciones de eventos. Opcionalmente filtrar por proyecto. Si no se especifica proyecto, usa el asignado a la sesión de chat actual.',
   usage: '/navegador_grabacion_listar [--project_id=<id>]',
   async autocomplete(args, cmdStore) {
-    const projArg = args.find(a => a.startsWith('--project_id='))
-    if (!projArg) {
-      cmdStore.showAutocomplete(['--project_id='])
+    const usedFlags = getUsedFlags(args)
+    const suggestions = ALL_FLAGS.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
     } else {
       cmdStore.hideAutocomplete()
     }

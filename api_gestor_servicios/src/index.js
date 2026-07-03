@@ -17,6 +17,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const processes = {};
 
 const serviceConfig = {
+  memoria: {
+    script: '../../api_memoria/src/index.js',
+    cwd: path.resolve(__dirname, '../../api_memoria'),
+    port: process.env.SERVICIO_MEMORIA_PORT,
+  },
   backend: {
     script: '../../backend/src/index.js',
     cwd: path.resolve(__dirname, '../../backend'),
@@ -42,11 +47,6 @@ const serviceConfig = {
     script: '../../api_gastos/src/index.js',
     cwd: path.resolve(__dirname, '../../api_gastos'),
     port: process.env.SERVICIO_GASTOS_PORT,
-  },
-  memoria: {
-    script: '../../api_memoria/src/index.js',
-    cwd: path.resolve(__dirname, '../../api_memoria'),
-    port: process.env.SERVICIO_MEMORIA_PORT,
   },
 };
 

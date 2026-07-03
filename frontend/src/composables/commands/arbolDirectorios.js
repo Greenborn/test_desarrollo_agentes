@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
-import { parseCommandArgs } from '../parseCommandArgs.js';
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
 
 const { register } = useCommandRegistry();
 
@@ -9,17 +9,18 @@ register({
   description: 'Muestra el árbol de directorios en formato JSON. Si no se especifica ruta, usa el directorio base de la sesión.',
   usage: '/arbol_directorios [--dir=&lt;ruta&gt;] [--gitignore=&lt;bool&gt;] [--filter-extension=&lt;ext1,ext2&gt;]',
   autocomplete(args, cmdStore) {
-    const dirArg = args.find(a => a.startsWith('--dir='))
-    if (dirArg) {
-      const prefix = dirArg.slice('--dir='.length) || '/'
+    const usedFlags = getUsedFlags(args)
+    const dirInUse = usedFlags.includes('--dir=') || usedFlags.includes('--dir')
+    if (dirInUse) {
+      const dirArg = args.find(a => a.startsWith('--dir='))
+      const prefix = dirArg ? dirArg.slice('--dir='.length) || '/' : '/'
       cmdStore.fetchAutocomplete(prefix, cmdStore.currentDir)
     } else {
-      const hasGitignore = args.find(a => a.startsWith('--gitignore'))
-      const hasFilter = args.find(a => a.startsWith('--filter-extension'))
-      const suggestions = []
-      if (!dirArg) suggestions.push('--dir=')
-      if (!hasGitignore) suggestions.push('--gitignore=')
-      if (!hasFilter) suggestions.push('--filter-extension=')
+      const allFlags = ['--dir=', '--gitignore=', '--filter-extension=']
+      const suggestions = allFlags.filter(f => {
+        const base = f.split('=')[0]
+        return !usedFlags.includes(f) && !usedFlags.includes(base)
+      })
       cmdStore.showAutocomplete(suggestions)
     }
   },

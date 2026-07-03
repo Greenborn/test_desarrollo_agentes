@@ -1,6 +1,6 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { useOpencodeStore } from '../../stores/opencode.js';
-import { parseCommandArgs } from '../parseCommandArgs.js';
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
 
 const { register } = useCommandRegistry();
 const DOC_TYPES = ['base_datos', 'subproyectos', 'endpoints', 'web_sockets', 'funcionalidades', 'all'];
@@ -11,8 +11,9 @@ register({
   description: 'Actualiza la documentación del proyecto usando OpenCode para el tipo indicado.',
   usage: '/dev_documento_actualizar --tipo=&lt;tipo&gt;',
   async autocomplete(args, cmdStore) {
-    const tipoArg = args.find(a => a.startsWith('--tipo='))
-    if (tipoArg) {
+    const usedFlags = getUsedFlags(args)
+    if (usedFlags.includes('--tipo=')) {
+      const tipoArg = args.find(a => a.startsWith('--tipo='))
       const val = tipoArg.slice('--tipo='.length)
       if (val && DOC_TYPES.includes(val)) {
         cmdStore.hideAutocomplete()

@@ -1,7 +1,8 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
-import { parseCommandArgs } from '../parseCommandArgs.js'
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
+const ALL_FLAGS = ['--mode=']
 
 register({
   name: '/chat_edit_ticket',
@@ -9,17 +10,15 @@ register({
   description: 'Abre un editor inline para modificar los datos del ticket de Redmine asignado a la sesión actual. Con --mode=descripcion abre un textarea directo para editar la descripción.',
   usage: '/chat_edit_ticket [--mode=descripcion]',
   async autocomplete(args, cmdStore) {
-    const modeArg = args.find(a => a.startsWith('--mode='))
-    if (modeArg) {
-      const val = modeArg.slice('--mode='.length)
-      if (val === 'descripcion') {
-        cmdStore.hideAutocomplete()
-      } else {
-        const filtered = ['descripcion'].filter(t => t.startsWith(val))
-        cmdStore.showAutocomplete(filtered.map(v => ({ display: v, value: `--mode=${v}` })))
-      }
+    const usedFlags = getUsedFlags(args)
+    const suggestions = ALL_FLAGS.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
     } else {
-      cmdStore.showAutocomplete(['--mode='])
+      cmdStore.hideAutocomplete()
     }
   },
   async execute(args, { chatStore, sessionId }) {

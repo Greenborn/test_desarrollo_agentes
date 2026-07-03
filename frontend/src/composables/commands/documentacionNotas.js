@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
-import { parseCommandArgs } from '../parseCommandArgs.js';
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
 
 const { register } = useCommandRegistry();
 
@@ -38,6 +38,15 @@ register({
   category: 'Documentación',
   description: 'Lista todas las notas de documentación del proyecto.',
   usage: '/doc_nota_listar [--proyecto-id=<id>]',
+  autocomplete(args, cmdStore) {
+    const usedFlags = getUsedFlags(args)
+    const idInUse = usedFlags.some(f => f === '--proyecto-id=' || f === '--proyecto-id')
+    if (!idInUse) {
+      cmdStore.showAutocomplete(['--proyecto-id='])
+    } else {
+      cmdStore.hideAutocomplete()
+    }
+  },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) throw new Error('Primero debe iniciar una sesión de chat.');
 
@@ -66,23 +75,33 @@ register({
   description: 'Crea una nota de documentación. Si hay ticket vinculado a la sesión se asocia automáticamente; si no, se crea como documentación general.',
   usage: '/doc_nota_crear --clave=<key> --valor=<text> [--proyecto-id=<id>]',
   async autocomplete(args, cmdStore) {
-    const last = args[args.length - 1] || '';
-    if (!last.startsWith('--')) {
-      cmdStore.showAutocomplete(['--clave=', '--valor=', '--proyecto-id=']);
-    } else if (last.startsWith('--proyecto-id=')) {
-      const val = last.slice('--proyecto-id='.length);
+    const usedFlags = getUsedFlags(args)
+    const last = args[args.length - 1] || ''
+    if (last.startsWith('--proyecto-id=')) {
+      const val = last.slice('--proyecto-id='.length)
       try {
-        const res = await fetch('/api/proyecto', { credentials: 'include' });
-        const data = await res.json();
+        const res = await fetch('/api/proyecto', { credentials: 'include' })
+        const data = await res.json()
         if (data.proyectos) {
-          const filtered = data.proyectos.filter(p => p.id.toLowerCase().includes(val.toLowerCase()));
+          const filtered = data.proyectos.filter(p => p.id.toLowerCase().includes(val.toLowerCase()))
           if (val && filtered.length === 1 && filtered[0].id === val) {
-            cmdStore.hideAutocomplete();
+            cmdStore.hideAutocomplete()
           } else {
-            cmdStore.showAutocomplete(filtered.map(p => ({ display: p.id, value: `--proyecto-id=${p.id}` })));
+            cmdStore.showAutocomplete(filtered.map(p => ({ display: p.id, value: `--proyecto-id=${p.id}` })))
           }
         }
-      } catch (err) { console.error('Error en autocomplete de /doc_nota_crear:', err); cmdStore.hideAutocomplete(); }
+      } catch (err) { console.error('Error en autocomplete de /doc_nota_crear:', err); cmdStore.hideAutocomplete() }
+    } else {
+      const allFlags = ['--clave=', '--valor=', '--proyecto-id=']
+      const suggestions = allFlags.filter(f => {
+        const base = f.split('=')[0]
+        return !usedFlags.includes(f) && !usedFlags.includes(base)
+      })
+      if (suggestions.length > 0) {
+        cmdStore.showAutocomplete(suggestions)
+      } else {
+        cmdStore.hideAutocomplete()
+      }
     }
   },
   async execute(args, { chatStore, sessionId }) {
@@ -138,6 +157,19 @@ register({
   category: 'Documentación',
   description: 'Muestra el contenido completo de una nota de documentación.',
   usage: '/doc_nota_ver --clave=<key> [--proyecto-id=<id>]',
+  autocomplete(args, cmdStore) {
+    const usedFlags = getUsedFlags(args)
+    const allFlags = ['--clave=', '--proyecto-id=']
+    const suggestions = allFlags.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
+    } else {
+      cmdStore.hideAutocomplete()
+    }
+  },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) throw new Error('Primero debe iniciar una sesión de chat.');
 
@@ -167,6 +199,19 @@ register({
   category: 'Documentación',
   description: 'Actualiza el contenido de una nota de documentación.',
   usage: '/doc_nota_editar --clave=<key> [--valor=<text>] [--proyecto-id=<id>]',
+  autocomplete(args, cmdStore) {
+    const usedFlags = getUsedFlags(args)
+    const allFlags = ['--clave=', '--valor=', '--proyecto-id=']
+    const suggestions = allFlags.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
+    } else {
+      cmdStore.hideAutocomplete()
+    }
+  },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) throw new Error('Primero debe iniciar una sesión de chat.');
 
@@ -213,6 +258,19 @@ register({
   category: 'Documentación',
   description: 'Elimina una nota de documentación.',
   usage: '/doc_nota_eliminar --clave=<key> [--proyecto-id=<id>]',
+  autocomplete(args, cmdStore) {
+    const usedFlags = getUsedFlags(args)
+    const allFlags = ['--clave=', '--proyecto-id=']
+    const suggestions = allFlags.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
+    } else {
+      cmdStore.hideAutocomplete()
+    }
+  },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) throw new Error('Primero debe iniciar una sesión de chat.');
 

@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
-import { parseCommandArgs } from '../parseCommandArgs.js';
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
 import { useModalStore } from '../../stores/modal.js';
 import { useTemplatesStore } from '../../stores/templates.js';
 import TemplateEditorModal from '../../components/modals/TemplateEditorModal.vue';
@@ -65,8 +65,9 @@ register({
   description: 'Abre el editor para modificar una plantilla existente.',
   usage: '/plantilla_editar --slug=&lt;slug&gt;',
   async autocomplete(args, cmdStore) {
-    const slugArg = args.find(a => a.startsWith('--slug='));
-    if (slugArg) {
+    const usedFlags = getUsedFlags(args)
+    if (usedFlags.includes('--slug=')) {
+      const slugArg = args.find(a => a.startsWith('--slug='));
       const val = slugArg.slice('--slug='.length);
       try {
         const res = await fetch('/api/templates', { credentials: 'include' });
@@ -102,8 +103,9 @@ register({
   description: 'Elimina una plantilla por slug.',
   usage: '/plantilla_eliminar --slug=&lt;slug&gt;',
   async autocomplete(args, cmdStore) {
-    const slugArg = args.find(a => a.startsWith('--slug='));
-    if (slugArg) {
+    const usedFlags = getUsedFlags(args)
+    if (usedFlags.includes('--slug=')) {
+      const slugArg = args.find(a => a.startsWith('--slug='));
       const val = slugArg.slice('--slug='.length);
       try {
         const res = await fetch('/api/templates', { credentials: 'include' });

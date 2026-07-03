@@ -23,6 +23,7 @@ export function useOpencodeStreaming() {
   const ocThinking = ref('')
   const streamSessionId = ref(null)
   const streamingConsole = ref(false)
+  const terminalContent = ref('')
   const _ocStreamData = ref({})
 
   function _syncStreamData(sessionId) {
@@ -31,11 +32,58 @@ export function useOpencodeStreaming() {
       ocChunk.value = _ocStreamData.value[sKey].text || ''
       ocThinking.value = _ocStreamData.value[sKey].thinking || ''
       ocStreaming.value = _ocStreamData.value[sKey].streaming || false
+      terminalContent.value = _ocStreamData.value[sKey].terminalContent || ''
       streamSessionId.value = sessionId
     } else {
       ocChunk.value = ''
       ocThinking.value = ''
       ocStreaming.value = false
+      terminalContent.value = ''
+    }
+  }
+
+  function _ensureStreamData(sid) {
+    const sKey = String(sid)
+    if (!_ocStreamData.value[sKey]) {
+      _ocStreamData.value[sKey] = { text: '', thinking: '', streaming: false, terminalContent: '' }
+    }
+    return _ocStreamData.value[sKey]
+  }
+
+  function makeStreamCallbacks(sd, sessionId, streamKey) {
+    const sKey = String(sessionId)
+    function updateText() {
+      _ocStreamData.value[sKey] = sd
+      if (isActiveSession(sessionId)) ocChunk.value = sd.text
+      chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamKey)
+    }
+    function updateThinking() {
+      _ocStreamData.value[sKey] = sd
+      if (isActiveSession(sessionId)) ocThinking.value = sd.thinking
+      chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamKey)
+    }
+    function formatToolCall(content) {
+      let name = content
+      let args = ''
+      try { const p = JSON.parse(content); if (p.name) name = p.name; if (p.arguments) args = typeof p.arguments === 'object' ? JSON.stringify(p.arguments, null, 2) : String(p.arguments) } catch {}
+      let block = `\n\n┌─ 🔧 ${name}`
+      if (args) block += `\n│ ${args.split('\n').join('\n│ ')}`
+      block += '\n└──────────────\n'
+      return block
+    }
+    return {
+      onChunk(content) { sd.text += content; updateText() },
+      onThinking(content) { sd.thinking += content; updateThinking() },
+      onToolCall(content) { sd.text += formatToolCall(content); updateText() },
+      onToolResult(content) { sd.text += `\`\`\`\n${content}\n\`\`\`\n`; updateText() },
+      onToolData(content, partType) { sd.text += `\n> ${partType || 'data'}: ${content}\n`; updateText() },
+      onTerminalLine(line, partType) {
+        terminalContent.value += line + '\n'
+        if (!_ocStreamData.value[sKey]) {
+          _ocStreamData.value[sKey] = { text: '', thinking: '', streaming: false, terminalContent: '' }
+        }
+        _ocStreamData.value[sKey].terminalContent = terminalContent.value
+      },
     }
   }
 
@@ -93,6 +141,7 @@ export function useOpencodeStreaming() {
     sd.streaming = true
     ocStreaming.value = true
     streamSessionId.value = sessionId
+    terminalContent.value = ''
     if (isActiveSession(sessionId)) {
       ocChunk.value = ''
       ocThinking.value = ''
@@ -223,27 +272,10 @@ export function useOpencodeStreaming() {
     const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
     streamMsg._key = 'stream-' + Date.now()
 
+    const callbacks = makeStreamCallbacks(sd, sessionId, streamMsg._key)
+
     await ocStore.streamPrompt(sessionId, userPrompt, descripcionData.provider, ocStore.selectedModel || descripcionData.model, ocStore.selectedThinking || descripcionData.thinking, ocStore.selectedMode || descripcionData.mode, temperature, {
-      onChunk(content) {
-        sd.text += content
-        _ocStreamData.value[String(sessionId)] = sd
-        if (isActiveSession(sessionId)) ocChunk.value = sd.text
-        chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamMsg._key)
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) chat.messages[idx].content = sd.text
-        }
-      },
-      onThinking(content) {
-        sd.thinking += content
-        _ocStreamData.value[String(sessionId)] = sd
-        if (isActiveSession(sessionId)) ocThinking.value = sd.thinking
-        chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamMsg._key)
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) chat.messages[idx].thinking = sd.thinking
-        }
-      },
+      ...callbacks,
       onControl(control) {
         const controlMsg = {
           role: 'opencode_control',
@@ -326,6 +358,7 @@ export function useOpencodeStreaming() {
     sd.streaming = true
     ocStreaming.value = true
     streamSessionId.value = sessionId
+    terminalContent.value = ''
     if (isActiveSession(sessionId)) {
       ocChunk.value = ''
       ocThinking.value = ''
@@ -340,27 +373,10 @@ export function useOpencodeStreaming() {
       streamingConsole.value = true
     }
 
+    const callbacks = makeStreamCallbacks(sd, sessionId, streamMsg._key)
+
     await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
-      onChunk(content) {
-        sd.text += content
-        _ocStreamData.value[String(sessionId)] = sd
-        if (isActiveSession(sessionId)) ocChunk.value = sd.text
-        chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamMsg._key)
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) chat.messages[idx].content = sd.text
-        }
-      },
-      onThinking(content) {
-        sd.thinking += content
-        _ocStreamData.value[String(sessionId)] = sd
-        if (isActiveSession(sessionId)) ocThinking.value = sd.thinking
-        chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamMsg._key)
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) chat.messages[idx].thinking = sd.thinking
-        }
-      },
+      ...callbacks,
       onControl(control) {
         const controlMsg = {
           role: 'opencode_control',
@@ -382,7 +398,15 @@ export function useOpencodeStreaming() {
         chat.setOcStreaming(sessionId, false)
         chat.clearOcStreamCache(sessionId)
         if (sessionId) chat.setSessionStatus(sessionId, 'idle')
-        const content = json.fullResponse || fullText || '(sin respuesta)'
+        let content = sd.text || json.fullResponse || fullText || '(sin respuesta)'
+
+        if (json.diff && json.diff.length > 0) {
+          content += '\n\n---\n### 📁 Archivos modificados\n'
+          for (const d of json.diff) {
+            content += `\n**\`${d.path}\`** (${d.type || 'modificado'}):\n\`\`\`diff\n${d.content}\n\`\`\`\n`
+          }
+        }
+
         const thinking = json.thinking || sd.thinking || null
         await chat._saveMessageToDb(sessionId, { role: 'opencode_result', content, thinking })
         if (!isActiveSession(sessionId)) {
@@ -432,6 +456,7 @@ export function useOpencodeStreaming() {
     sd.streaming = true
     ocStreaming.value = true
     streamSessionId.value = sessionId
+    terminalContent.value = ''
     if (isActiveSession(sessionId)) {
       ocChunk.value = ''
       ocThinking.value = ''
@@ -442,27 +467,10 @@ export function useOpencodeStreaming() {
     const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
     streamMsg._key = 'stream-' + Date.now()
 
+    const callbacks = makeStreamCallbacks(sd, sessionId, streamMsg._key)
+
     await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
-      onChunk(content) {
-        sd.text += content
-        _ocStreamData.value[String(sessionId)] = sd
-        if (isActiveSession(sessionId)) ocChunk.value = sd.text
-        chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamMsg._key)
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) chat.messages[idx].content = sd.text
-        }
-      },
-      onThinking(content) {
-        sd.thinking += content
-        _ocStreamData.value[String(sessionId)] = sd
-        if (isActiveSession(sessionId)) ocThinking.value = sd.thinking
-        chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamMsg._key)
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) chat.messages[idx].thinking = sd.thinking
-        }
-      },
+      ...callbacks,
       onControl(control) {
         const controlMsg = {
           role: 'opencode_control',
@@ -650,27 +658,10 @@ export function useOpencodeStreaming() {
     }
     chat.pushMessage(streamMsg)
 
+    const callbacks = makeStreamCallbacks(sd, sessionId, streamMsg._key)
+
     await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
-      onChunk(text) {
-        sd.text += text
-        _ocStreamData.value[String(sessionId)] = sd
-        ocChunk.value = sd.text
-        chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamMsg._key)
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) chat.messages[idx].content = sd.text
-        }
-      },
-      onThinking(text) {
-        sd.thinking += text
-        _ocStreamData.value[String(sessionId)] = sd
-        ocThinking.value = sd.thinking
-        chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamMsg._key)
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) chat.messages[idx].thinking = sd.thinking
-        }
-      },
+      ...callbacks,
       onControl(control) {
         if (!isActiveSession(sessionId)) return
         console.log('[testing-notes] control:', control)
@@ -739,6 +730,7 @@ export function useOpencodeStreaming() {
     sd.streaming = true
     ocStreaming.value = true
     streamSessionId.value = sessionId
+    terminalContent.value = ''
     if (isActiveSession(sessionId)) {
       ocChunk.value = ''
       ocThinking.value = ''
@@ -749,27 +741,10 @@ export function useOpencodeStreaming() {
     const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
     streamMsg._key = 'stream-' + Date.now()
 
+    const callbacks = makeStreamCallbacks(sd, sessionId, streamMsg._key)
+
     await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
-      onChunk(content) {
-        sd.text += content
-        _ocStreamData.value[String(sessionId)] = sd
-        if (isActiveSession(sessionId)) ocChunk.value = sd.text
-        chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamMsg._key)
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) chat.messages[idx].content = sd.text
-        }
-      },
-      onThinking(content) {
-        sd.thinking += content
-        _ocStreamData.value[String(sessionId)] = sd
-        if (isActiveSession(sessionId)) ocThinking.value = sd.thinking
-        chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamMsg._key)
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) chat.messages[idx].thinking = sd.thinking
-        }
-      },
+      ...callbacks,
       onControl(control) {
         const controlMsg = {
           role: 'opencode_control',
@@ -854,7 +829,7 @@ export function useOpencodeStreaming() {
   }
 
   return {
-    ocStreaming, ocChunk, ocThinking, streamSessionId, streamingConsole,
+    ocStreaming, ocChunk, ocThinking, streamSessionId, streamingConsole, terminalContent,
     isActiveSession, _getProyectoId, resolveInput, fetchGitBranch, addMessage,
     _syncStreamData,
     opencodeStreamPrompt, opencodeStreamPromptCommit, opencodeStreamPromptTestingNotes,

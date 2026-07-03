@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useAuthStore } from './auth.js'
+import { useWorkspaceStore } from './workspace.js'
 import wsClient from '../services/wsClient.js'
 
 const API = '/api'
@@ -85,6 +86,7 @@ export const useChatStore = defineStore('chat', () => {
       sessions.value.unshift(data.session)
       activeSessionId.value = data.session.id
       messages.value = []
+      _pushNewSessionSetup(data.session)
     } catch (err) {
       console.error('Error al crear chat:', err)
     } finally {
@@ -97,6 +99,29 @@ export const useChatStore = defineStore('chat', () => {
       await createSession(cwd)
     }
     return activeSessionId.value
+  }
+
+  function _pushNewSessionSetup(session) {
+    const workspaceStore = useWorkspaceStore()
+    const wsOptions = (workspaceStore.workspaces || []).map(w => ({
+      label: w.name,
+      value: String(w.id),
+    }))
+    if (wsOptions.length > 0) {
+      pushMessage({
+        role: 'opencode_control',
+        controlData: {
+          controlId: 'setup-ws-' + Date.now(),
+          controlType: 'select',
+          stepType: 'new_session_workspace',
+          question: '1. Selecciona espacio de trabajo:',
+          options: wsOptions,
+          placeholder: 'Selecciona espacio de trabajo...',
+          preselect: String(session.workspace_id || wsOptions[0]?.value || ''),
+        },
+        _key: 'ctrl-setup-ws-' + Date.now(),
+      })
+    }
   }
 
   function _decSessionCount(sid) {

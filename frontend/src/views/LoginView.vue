@@ -41,6 +41,7 @@ export default {
     })
 
     function handleLogin() {
+      console.log('[LoginView] handleLogin llamada', username.value)
       auth.login(username.value, password.value)
     }
 

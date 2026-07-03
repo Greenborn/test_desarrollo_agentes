@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { EventEmitter } from 'events';
+import zlib from 'zlib';
 import db from '../config/db.js';
 import opencode from '../services/opencode.js';
 
@@ -71,11 +72,28 @@ router.get('/start', async (req, res) => {
     const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
     const providerData = await opencode.getModels(cwd, sessionId || null, locale);
-    const savedProvider = await getUserSetting(req.session.userId, 'opencode_last_provider');
-    const savedModel = await getUserSetting(req.session.userId, 'opencode_last_model');
-    const savedThinking = await getUserSetting(req.session.userId, 'opencode_last_thinking');
-    const savedMode = await getUserSetting(req.session.userId, 'opencode_last_mode');
-    const savedTemperature = await getUserSetting(req.session.userId, 'opencode_last_temperature');
+    let savedProvider = await getUserSetting(req.session.userId, 'opencode_last_provider');
+    let savedModel = await getUserSetting(req.session.userId, 'opencode_last_model');
+    let savedThinking = await getUserSetting(req.session.userId, 'opencode_last_thinking');
+    let savedMode = await getUserSetting(req.session.userId, 'opencode_last_mode');
+    let savedTemperature = await getUserSetting(req.session.userId, 'opencode_last_temperature');
+
+    if (sessionId) {
+      const chatSession = await db('chat_sessions').where({ id: sessionId }).select('proyecto_id').first();
+      if (chatSession && chatSession.proyecto_id) {
+        const projectVars = await db('project_variables')
+          .where({ proyecto_id: chatSession.proyecto_id })
+          .whereIn('key', ['opencode_provider', 'opencode_model', 'opencode_thinking', 'opencode_mode', 'opencode_temperature'])
+          .select('key', 'value');
+        const varMap = {};
+        for (const v of projectVars) varMap[v.key] = v.value;
+        if (varMap['opencode_provider']) savedProvider = varMap['opencode_provider'];
+        if (varMap['opencode_model']) savedModel = varMap['opencode_model'];
+        if (varMap['opencode_thinking']) savedThinking = varMap['opencode_thinking'];
+        if (varMap['opencode_mode']) savedMode = varMap['opencode_mode'];
+        if (varMap['opencode_temperature']) savedTemperature = varMap['opencode_temperature'];
+      }
+    }
 
     res.json({
       providers: providerData.providers || [],
@@ -95,11 +113,22 @@ router.get('/start', async (req, res) => {
 router.post('/select', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { key, value } = req.body;
+    const { key, value, sessionId } = req.body;
     if (!key || value === undefined) {
       return res.status(400).json({ error: 'key y value requeridos' });
     }
     await saveUserSetting(req.session.userId, `opencode_last_${key}`, value);
+
+    if (sessionId) {
+      const chatSession = await db('chat_sessions').where({ id: sessionId }).select('proyecto_id').first();
+      if (chatSession && chatSession.proyecto_id) {
+        await db('project_variables')
+          .insert({ proyecto_id: chatSession.proyecto_id, key: `opencode_${key}`, value: String(value), type: 'db' })
+          .onConflict(['proyecto_id', 'key'])
+          .merge();
+      }
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -248,7 +277,7 @@ router.post('/send', async (req, res) => {
     parts.push({ type: 'text', text: prompt });
 
     const msgOptions = {};
-    if (Object.keys(modelConfig).length > 0) {
+    if (modelConfig.providerID && modelConfig.modelID) {
       msgOptions.model = modelConfig;
     }
 
@@ -281,17 +310,33 @@ router.post('/send', async (req, res) => {
           if (partId) partTypes[partId] = event.properties.part.type;
         }
 
-        if (event.type === 'message.part.delta' && event.properties?.field === 'text') {
+        if (event.type === 'message.part.delta' && event.properties?.delta) {
           const partId = event.properties.partID;
           const partType = partTypes[partId] || '';
           const delta = event.properties.delta || '';
+          const field = event.properties.field || '';
+          let terminalLine = '';
 
           if (partType === 'reasoning') {
             fullThinking += delta;
             res.write(`data: ${JSON.stringify({ type: 'thinking', content: delta, sessionId })}\n\n`);
-          } else {
+          } else if (partType === 'tool_call') {
+            let toolName = delta;
+            try { const p = JSON.parse(delta); if (p.name) toolName = p.name; if (p.arguments) toolName += ' ' + JSON.stringify(p.arguments); } catch {}
+            terminalLine = `\x1b[38;5;214m$ ${toolName}\x1b[0m`;
+            res.write(`data: ${JSON.stringify({ type: 'tool_call', content: delta, field, sessionId })}\n\n`);
+          } else if (partType === 'tool_result') {
+            terminalLine = `\x1b[38;5;246m${delta}\x1b[0m`;
+            res.write(`data: ${JSON.stringify({ type: 'tool_result', content: delta, field, sessionId })}\n\n`);
+          } else if (field === 'text') {
             fullResponse += delta;
+            terminalLine = delta;
             res.write(`data: ${JSON.stringify({ type: 'response', content: delta, sessionId })}\n\n`);
+          } else {
+            res.write(`data: ${JSON.stringify({ type: 'tool_data', content: delta, partType, field, sessionId })}\n\n`);
+          }
+          if (terminalLine) {
+            res.write(`data: ${JSON.stringify({ type: 'terminal', line: terminalLine, partType, sessionId })}\n\n`);
           }
         }
 
@@ -301,6 +346,14 @@ router.post('/send', async (req, res) => {
       }
 
       const diff = await server.getSessionDiff(ocSessionId);
+
+      res.write(`data: ${JSON.stringify({ type: 'terminal', line: '', partType: 'separator', sessionId })}\n\n`);
+      if (diff && diff.length > 0) {
+        for (const d of diff) {
+          res.write(`data: ${JSON.stringify({ type: 'terminal', line: `\x1b[38;5;39m📁 ${d.path} (\x1b[38;5;214m${d.type || 'modificado'}\x1b[38;5;39m)\x1b[0m`, partType: 'diff', sessionId })}\n\n`);
+        }
+      }
+      res.write(`data: ${JSON.stringify({ type: 'terminal', line: '\x1b[38;5;40m✅ Hecho.\x1b[0m', partType: 'done', sessionId })}\n\n`);
 
       if (!fullResponse || fullResponse.trim().length === 0) {
         try {
@@ -521,7 +574,7 @@ router.post('/editor-send', async (req, res) => {
     parts.push({ type: 'text', text: prompt });
 
     const msgOptions = {};
-    if (Object.keys(modelConfig).length > 0) {
+    if (modelConfig.providerID && modelConfig.modelID) {
       msgOptions.model = modelConfig;
     }
 
@@ -653,6 +706,82 @@ router.post('/editor-finish', async (req, res) => {
   } catch (err) {
     console.log('Error en opencode/editor-finish:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+function crc32(buf) {
+  let c = 0xffffffff;
+  const table = new Int32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let v = n;
+    for (let k = 0; k < 8; k++) v = (v & 1) ? (0xedb88320 ^ (v >>> 1)) : (v >>> 1);
+    table[n] = v;
+  }
+  for (let i = 0; i < buf.length; i++) c = table[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length);
+  const t = Buffer.from(type, 'ascii');
+  const crcData = Buffer.concat([t, data]);
+  const c = Buffer.alloc(4);
+  c.writeUInt32BE(crc32(crcData));
+  return Buffer.concat([len, t, data, c]);
+}
+
+function generateTestPNG(width, height) {
+  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; ihdr[9] = 2; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+
+  const raw = [];
+  for (let y = 0; y < height; y++) {
+    raw.push(0);
+    for (let x = 0; x < width; x++) {
+      raw.push(Math.floor(255 * x / width), Math.floor(255 * y / height), 128);
+    }
+  }
+  const compressed = zlib.deflateSync(Buffer.from(raw));
+
+  return Buffer.concat([sig, pngChunk('IHDR', ihdr), pngChunk('IDAT', compressed), pngChunk('IEND', Buffer.alloc(0))]);
+}
+
+function makeIIP(pngBuffer) {
+  const b64 = pngBuffer.toString('base64');
+  return `\x1b]1337;File=inline=1;size=${pngBuffer.length}:${b64}\x07`;
+}
+
+router.get('/test-image', async (req, res) => {
+  try {
+    const png = generateTestPNG(200, 100);
+    const iip = makeIIP(png);
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+
+    const lines = [
+      `\x1b[38;5;39m📸 Test de imagen inline (200x100)\x1b[0m`,
+      iip,
+      `\x1b[38;5;245m✅ Imagen enviada — Sixel/IIP habilitado\x1b[0m`,
+    ];
+
+    for (const line of lines) {
+      res.write(`data: ${JSON.stringify({ type: 'terminal', line, partType: 'test' })}\n\n`);
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'done', ocSessionId: null, fullResponse: '', diff: [] })}\n\n`);
+    res.end();
+  } catch (err) {
+    console.log('Error en opencode/test-image:', err.message);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+    else res.end();
   }
 });
 

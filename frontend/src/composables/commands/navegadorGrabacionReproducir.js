@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
-import { parseCommandArgs } from '../parseCommandArgs.js'
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
@@ -29,9 +29,8 @@ register({
   description: 'Reproduce una grabación de eventos en la instancia de navegador activa. Requiere sesión de navegador Playwright activa. Cada acción se ejecuta con un intervalo configurable.',
   usage: '/navegador_grabacion_reproducir --id=<id> [--intervalo=<ms>]',
   async autocomplete(args, cmdStore) {
-    const idArg = args.find(a => a.startsWith('--id='))
-    const intervalArg = args.find(a => a.startsWith('--intervalo='))
-    if (!idArg) {
+    const usedFlags = getUsedFlags(args)
+    if (!usedFlags.includes('--id=')) {
       try {
         const res = await fetch('/api/playwright-logs/event-recordings', { credentials: 'include' })
         const data = await res.json()
@@ -40,7 +39,7 @@ register({
       } catch {
         cmdStore.showAutocomplete(['--id='])
       }
-    } else if (!intervalArg) {
+    } else if (!usedFlags.includes('--intervalo=')) {
       cmdStore.showAutocomplete(['--intervalo='])
     } else {
       cmdStore.hideAutocomplete()

@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
-import { parseCommandArgs } from '../parseCommandArgs.js';
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
 import { useProjectVariablesStore } from '../../stores/projectVariables.js';
 import wsClient from '../../services/wsClient.js';
 import { useAuthStore } from '../../stores/auth.js';
@@ -12,16 +12,16 @@ register({
   description: 'Crea una nueva variable en un proyecto. Usar --type=memory para no persistente (db por defecto).',
   usage: '/proyecto_var_crear --key=nombre --value=valor [--id=proyecto] [--type=db|memory]',
   autocomplete(args, cmdStore) {
-    const usedFlags = args.filter(a => a.startsWith('--'))
-    const hasKey = usedFlags.some(a => a.startsWith('--key='))
-    const hasValue = usedFlags.some(a => a.startsWith('--value='))
-    const hasId = usedFlags.some(a => a.startsWith('--id='))
-    const hasType = usedFlags.some(a => a.startsWith('--type='))
+    const usedFlags = getUsedFlags(args)
+    const keyInUse = usedFlags.some(f => f === '--key=' || f === '--key')
+    const valueInUse = usedFlags.some(f => f === '--value=' || f === '--value')
+    const idInUse = usedFlags.some(f => f === '--id=' || f === '--id')
+    const typeInUse = usedFlags.some(f => f === '--type=' || f === '--type')
     const suggestions = []
-    if (!hasKey) suggestions.push('--key=')
-    if (!hasValue) suggestions.push('--value=')
-    if (!hasId) suggestions.push('--id=')
-    if (!hasType) suggestions.push('--type=db', '--type=memory')
+    if (!keyInUse) suggestions.push('--key=')
+    if (!valueInUse) suggestions.push('--value=')
+    if (!idInUse) suggestions.push('--id=')
+    if (!typeInUse) suggestions.push('--type=db', '--type=memory')
     cmdStore.showAutocomplete(suggestions)
   },
   async execute(args, { chatStore, sessionId }) {

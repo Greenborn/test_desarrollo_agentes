@@ -24,10 +24,12 @@ import gestorRoutes from './routes/gestor.routes.js';
 import comandosPersonalizadosRoutes, { stopAll as stopComandosPersonalizados } from './routes/comandosPersonalizados.routes.js';
 import proxyRoutes from './routes/proxy.routes.js';
 import archivosRoutes, { ensureStorageDir } from './routes/archivos.routes.js';
+import skillsRoutes from './routes/skills.routes.js';
 import opencode from './services/opencode.js';
 import * as devInstanceManager from './services/devInstanceManager.js';
 import memoriaClient from './services/memoriaClient.js';
 import { setupFrontendWebSocket } from './services/frontendWsServer.js';
+import { setupTerminalServer } from './services/terminalServer.js';
 import db from './config/db.js';
 
 const PORT = process.env.PORT;
@@ -62,6 +64,7 @@ app.use('/api/gestor', gestorRoutes);
 app.use('/api/comandos-personalizados', comandosPersonalizadosRoutes);
 app.use('/api/proxy', proxyRoutes);
 app.use('/api/archivos', archivosRoutes);
+app.use('/api/skills', skillsRoutes);
 
 async function start() {
   ensureStorageDir();
@@ -76,6 +79,7 @@ async function start() {
 
   const server = http.createServer(app);
   setupFrontendWebSocket(server);
+  setupTerminalServer();
   server.listen(PORT, (err) => {
     if (err) {
       console.log('Error al iniciar servidor:', err.message);

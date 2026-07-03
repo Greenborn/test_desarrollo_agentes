@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
-import { parseCommandArgs } from '../parseCommandArgs.js'
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
@@ -9,8 +9,9 @@ register({
   description: 'Lista las funcionalidades del proyecto vinculado a la sesión o del especificado.',
   usage: '/dev_funcionalidad_listar [--id=&lt;id_proyecto&gt;]',
   async autocomplete(args, cmdStore) {
-    const idArg = args.find(a => a.startsWith('--id='))
-    if (idArg) {
+    const usedFlags = getUsedFlags(args)
+    if (usedFlags.includes('--id=')) {
+      const idArg = args.find(a => a.startsWith('--id='))
       const val = idArg.slice('--id='.length)
       try {
         const res = await fetch('/api/proyecto', { credentials: 'include' })

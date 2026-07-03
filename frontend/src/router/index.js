@@ -16,14 +16,30 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
+
   if (auth.loading) {
-    try {
-      await wsClient.connect()
-    } catch (err) {
-      console.error('Error al conectar WebSocket:', err)
+    if (to.meta.requiresAuth) {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' })
+        const userData = await res.json()
+        if (userData && userData.id) {
+          auth.user = userData
+          auth.loading = false
+          wsClient.connect().catch(() => {})
+        } else {
+          auth.loading = false
+          return next('/')
+        }
+      } catch (err) {
+        console.error('Error al verificar sesión:', err)
+        auth.loading = false
+        return next('/')
+      }
+    } else {
+      auth.loading = false
     }
-    await auth.checkSession()
   }
+
   if (to.meta.requiresAuth && !auth.user) {
     return next('/')
   }

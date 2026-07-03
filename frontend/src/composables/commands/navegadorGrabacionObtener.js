@@ -1,7 +1,8 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
-import { parseCommandArgs } from '../parseCommandArgs.js'
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
+const ALL_FLAGS = ['--id=']
 
 register({
   name: '/navegador_grabacion_obtener',
@@ -9,9 +10,13 @@ register({
   description: 'Obtiene información de una grabación de eventos por su ID.',
   usage: '/navegador_grabacion_obtener --id=<id>',
   async autocomplete(args, cmdStore) {
-    const idArg = args.find(a => a.startsWith('--id='))
-    if (!idArg) {
-      cmdStore.showAutocomplete(['--id='])
+    const usedFlags = getUsedFlags(args)
+    const suggestions = ALL_FLAGS.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
     } else {
       cmdStore.hideAutocomplete()
     }

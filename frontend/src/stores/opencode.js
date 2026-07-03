@@ -47,10 +47,11 @@ export const useOpencodeStore = defineStore('opencode', () => {
     return Object.values(sessionsMap.value).filter((s) => s.ocSessionId).length
   }
 
-  function saveCurrentToMap(chatSid) {
+  function saveCurrentToMap(chatSid, extraFields = {}) {
     if (!chatSid) return
     const key = String(chatSid)
     sessionsMap.value[key] = {
+      ...sessionsMap.value[key],
       step: step.value,
       ocSessionId: ocSessionId.value,
       chatSessionId: chatSessionId.value,
@@ -60,7 +61,20 @@ export const useOpencodeStore = defineStore('opencode', () => {
       selectedMode: selectedMode.value,
       selectedTemperature: selectedTemperature.value,
       messageQueue: [...messageQueue.value],
+      ...extraFields,
     }
+  }
+
+  function setSessionOcInput(chatSid, text) {
+    const key = String(chatSid)
+    if (!sessionsMap.value[key]) return
+    sessionsMap.value[key].ocInput = text
+    _persist()
+  }
+
+  function getSessionOcInput(chatSid) {
+    const key = String(chatSid)
+    return sessionsMap.value[key]?.ocInput || ''
   }
 
   function loadFromMap(chatSid) {
@@ -184,6 +198,13 @@ export const useOpencodeStore = defineStore('opencode', () => {
       savedThinking.value = data.savedThinking || ''
       savedMode.value = data.savedMode || ''
       savedTemperature.value = data.savedTemperature || ''
+
+      if (!selectedProvider.value && data.savedProvider) selectedProvider.value = data.savedProvider
+      if (!selectedModel.value && data.savedModel) selectedModel.value = data.savedModel
+      if (!selectedThinking.value && data.savedThinking) selectedThinking.value = data.savedThinking
+      if (!selectedMode.value && data.savedMode) selectedMode.value = data.savedMode
+      if (!selectedTemperature.value && data.savedTemperature) selectedTemperature.value = data.savedTemperature
+
       return data
     } catch (err) {
       console.error('Error en opencode start:', err)
@@ -193,11 +214,15 @@ export const useOpencodeStore = defineStore('opencode', () => {
 
   async function select(key, value) {
     try {
+      const payload = { key, value }
+      if (chatSessionId.value) {
+        payload.sessionId = chatSessionId.value
+      }
       await fetch(`${API}/opencode/select`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ key, value }),
+        body: JSON.stringify(payload),
       })
     } catch (err) {
       console.error('Error en opencode select:', err)
@@ -274,6 +299,14 @@ export const useOpencodeStore = defineStore('opencode', () => {
               _sessionStreamData.value[sKey].thinking = localStreamThinking
               if (isActiveSession()) streamThinking.value = localStreamThinking
               if (callbacks?.onThinking) callbacks.onThinking(j.content, localStreamThinking)
+            } else if (j.type === 'tool_call') {
+              if (callbacks?.onToolCall) callbacks.onToolCall(j.content, j.field, localStreamText)
+            } else if (j.type === 'tool_result') {
+              if (callbacks?.onToolResult) callbacks.onToolResult(j.content, j.field, localStreamText)
+            } else if (j.type === 'tool_data') {
+              if (callbacks?.onToolData) callbacks.onToolData(j.content, j.partType, j.field, localStreamText)
+            } else if (j.type === 'terminal') {
+              if (callbacks?.onTerminalLine) callbacks.onTerminalLine(j.line, j.partType)
             } else if (j.type === 'control_request') {
               if (callbacks?.onControl) callbacks.onControl(j.control)
             } else if (j.type === 'done') {
@@ -406,6 +439,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
     messageQueue, processing,
     sessionsMap, currentActiveChatSession,
     saveCurrentToMap, activateSession, getActiveSessionsCount, clearAllSessions,
+    setSessionOcInput, getSessionOcInput,
     getAvailableProviders, getModelsForProvider, modelSupportsReasoning,
     start, select, streamPrompt, finish, restoreFromState, restoreFromSession, saveUiState,
   }

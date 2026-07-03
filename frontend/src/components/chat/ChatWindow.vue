@@ -14,12 +14,12 @@
           — Todos los mensajes cargados —
         </div>
         <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
-        <OpenCodeStreamDisplay :current-thinking="currentThinking" :current-chunk="currentChunk" :streaming="streaming" />
+        <XtermTerminal label="bash" @close="onTerminalClose" v-if="showTerminal" />
       </div>
     </div>
     <DeteccionStateBar :deteccion-state="deteccionState" @abort="abortDeteccion" />
-    <OpenCodeStickyBar :active-session-id="activeSessionId" v-model:oc-input="ocInput" :oc-streaming="ocStreaming" @send="sendToOpencodeFromSticky" @finish="finishOpencode" />
-    <DeepSeekChatFab v-if="activeSessionId && (!ocStore.ocSessionId || (ocStore.chatSessionId && Number(activeSessionId) !== Number(ocStore.chatSessionId)))" :active-session-id="activeSessionId" @send="handleFabSend" />
+    <OpenCodeStickyBar :active-session-id="activeSessionId" v-model:oc-input="ocInput" :oc-streaming="ocStreaming" @send="sendToOpencodeFromSticky" @finish="finishOpencode" @toggle-terminal="showTerminal = !showTerminal" />
+    <DeepSeekChatFab v-if="activeSessionId && !(ocStore.chatSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId))" :active-session-id="activeSessionId" @send="handleFabSend" />
     <ContextMenuChat :ctx-menu="ctxMenu" :raw-msg-keys="rawMsgKeys" :msg-key="msgKey" @toggle-raw="toggleRawView" @copy-plain="copyPlainText" @delete="deleteMessage" @close="closeCtxMenu" />
   </div>
 </template>
@@ -44,14 +44,14 @@ import { useControlHandlers } from '../../composables/useControlHandlers.js'
 import TicketInfoBar from './TicketInfoBar.vue'
 import ChatMessage from './ChatMessage.vue'
 import DeepSeekChatFab from './DeepSeekChatFab.vue'
-import OpenCodeStreamDisplay from './OpenCodeStreamDisplay.vue'
+import XtermTerminal from './XtermTerminal.vue'
 import DeteccionStateBar from './DeteccionStateBar.vue'
 import OpenCodeStickyBar from './OpenCodeStickyBar.vue'
 import ContextMenuChat from './ContextMenuChat.vue'
 import HelpContent from '../help/HelpModal.vue'
 
 export default {
-  components: { TicketInfoBar, ChatMessage, DeepSeekChatFab, OpenCodeStreamDisplay, DeteccionStateBar, OpenCodeStickyBar, ContextMenuChat },
+  components: { TicketInfoBar, ChatMessage, DeepSeekChatFab, XtermTerminal, DeteccionStateBar, OpenCodeStickyBar, ContextMenuChat },
   setup() {
     const chat = useChatStore()
     const cmdStore = useCommandStore()
@@ -67,13 +67,18 @@ export default {
 
     const streamingApi = useOpencodeStreaming()
     const {
-      ocStreaming, ocChunk, ocThinking, streamSessionId, streamingConsole,
+      ocStreaming, ocChunk, ocThinking, streamSessionId, streamingConsole, terminalContent,
       fetchGitBranch, _getProyectoId, resolveInput, addMessage, isActiveSession,
       opencodeStreamPrompt, opencodeStreamPromptCommit, opencodeStreamPromptTestingNotes,
       opencodeStreamPromptDocUpdate, opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
     } = streamingApi
 
     const ticketInfo = ref(null)
+
+    const sessionCwd = computed(() => {
+      const s = sessions.value.find(s => Number(s.id) === Number(activeSessionId.value))
+      return s?.cwd || '~'
+    })
 
     async function loadTicketInfo() {
       ticketInfo.value = null
@@ -111,6 +116,7 @@ export default {
       ticketInfo, loadTicketInfo,
     })
 
+    const showTerminal = ref(false)
     const input = ref('')
     const ocInput = ref('')
     const ctxMenu = reactive({ show: false, x: 0, y: 0, msg: null })
@@ -341,6 +347,10 @@ export default {
       }
     }
 
+    function onTerminalClose() {
+      showTerminal.value = false
+    }
+
     async function executeCommand(raw) {
       const parts = raw.split(/\s+/)
       const cmdName = parts[0].toLowerCase()
@@ -390,12 +400,17 @@ export default {
     watch(messages, () => scrollToBottom(false), { deep: true })
     watch([currentChunk, ocChunk], () => scrollToBottom(false))
 
-    watch(activeSessionId, (newId) => {
+    watch(activeSessionId, (newId, oldId) => {
+      if (oldId) {
+        ocStore.saveCurrentToMap(oldId, { ocInput: ocInput.value })
+        ocInput.value = ''
+      }
       if (newId) {
         ocStore.activateSession(newId)
         ocStreaming.value = chat.getIsOcStreaming(newId)
         streamingConsole.value = false
         streamingApi._syncStreamData(newId)
+        ocInput.value = ocStore.getSessionOcInput(newId)
       }
       loadTicketInfo()
       fetchGitBranch()
@@ -438,7 +453,7 @@ export default {
     return {
       activeSessionId, messages, streaming, currentChunk, currentThinking,
       sessions, loadingMore, hasMoreMessages, input, gitStore, ocStore,
-      ocInput, ocStreaming,
+      ocInput, ocStreaming, terminalContent, sessionCwd, showTerminal, onTerminalClose,
       ticketInfo, devInstanceRunning,
       deteccionState, abortDeteccion,
       ctxMenu, rawMsgKeys, msgKey,

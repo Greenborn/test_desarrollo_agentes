@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
-import { parseCommandArgs } from '../parseCommandArgs.js'
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
@@ -9,11 +9,11 @@ register({
   description: 'Importa proyectos de Redmine a la base de datos local. Usa --all para importar todos, --id para importar por ID de Redmine o --slug para importar por slug.',
   usage: '/redmine_importar_proyectos --all | --id=<redmine_id> | --slug=<slug>',
   autocomplete(args, cmdStore) {
-    const hasAll = args.find(a => a === '--all')
-    const hasId = args.find(a => a.startsWith('--id='))
-    const hasSlug = args.find(a => a.startsWith('--slug='))
-    if (!hasAll && !hasId && !hasSlug) {
-      cmdStore.showAutocomplete(['--all', '--id=', '--slug='])
+    const usedFlags = getUsedFlags(args)
+    const allFlags = ['--all', '--id=', '--slug=']
+    const suggestions = allFlags.filter(f => !usedFlags.includes(f))
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
     } else {
       cmdStore.hideAutocomplete()
     }

@@ -62,6 +62,7 @@ import './composables/commands/navegadorCapturarPantalla.js'
 import './composables/commands/capturasListar.js'
 import './composables/commands/navegadorEvaluarSelector.js'
 import './composables/commands/navegadorSimularEvento.js'
+import './composables/commands/terminalToggle.js'
 
 const app = createApp(App)
 const pinia = createPinia()

@@ -253,6 +253,15 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 
 Las variables `type='memory'` almacenan su valor real en el servicio `api_memoria` (caché en RAM). La columna `value` se guarda vacía y solo el registro metadata persiste en la DB. Se usan para datos volátiles como logs de consola del navegador.
 
+**Keys usadas por OpenCode (`type='db'`):**
+- `opencode_provider` — Último proveedor seleccionado (ej: `'anthropic'`)
+- `opencode_model` — Último modelo seleccionado (ej: `'claude-sonnet-4-20250514'`)
+- `opencode_thinking` — Último nivel de pensamiento (ej: `'medium'`)
+- `opencode_mode` — Último modo (ej: `'Build'`)
+- `opencode_temperature` — Última temperatura (ej: `'0.7'`)
+
+Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar` mediante `POST /api/opencode/select` con `sessionId`. Al iniciar una nueva sesión, se cargan como defaults del proyecto sobreescribiendo los valores globales de `user_settings`.
+
 ---
 
 ## 13. `tickets`

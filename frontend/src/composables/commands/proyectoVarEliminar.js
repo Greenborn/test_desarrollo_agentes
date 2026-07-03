@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
-import { parseCommandArgs } from '../parseCommandArgs.js';
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
 import { useProjectVariablesStore } from '../../stores/projectVariables.js';
 import wsClient from '../../services/wsClient.js';
 import { useAuthStore } from '../../stores/auth.js';
@@ -12,11 +12,11 @@ register({
   description: 'Elimina una variable de un proyecto.',
   usage: '/proyecto_var_eliminar --key=nombre [--id=proyecto]',
   async autocomplete(args, cmdStore) {
-    const usedFlags = args.filter(a => a.startsWith('--'))
-    const hasKey = usedFlags.some(a => a.startsWith('--key='))
-    const hasId = usedFlags.some(a => a.startsWith('--id='))
+    const usedFlags = getUsedFlags(args)
+    const keyInUse = usedFlags.some(f => f === '--key=' || f === '--key')
+    const idInUse = usedFlags.some(f => f === '--id=' || f === '--id')
 
-    if (!hasKey) {
+    if (!keyInUse) {
       const idFlag = args.find(a => a.startsWith('--id='))
       let proyectoId = idFlag ? idFlag.slice(5) : null
       if (!proyectoId) {
@@ -48,7 +48,7 @@ register({
     }
 
     const suggestions = []
-    if (!hasId) suggestions.push('--id=')
+    if (!idInUse) suggestions.push('--id=')
     cmdStore.showAutocomplete(suggestions)
   },
   async execute(args, { chatStore, sessionId }) {

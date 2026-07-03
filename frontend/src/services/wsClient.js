@@ -5,9 +5,7 @@ const WS_URL = `ws://localhost:4000/ws`
 let ws = null
 let msgIdCounter = 0
 const pending = new Map()
-let reconnectTimer = null
 let connectPromise = null
-let shouldReconnect = true
 
 export const connected = ref(false)
 
@@ -23,6 +21,8 @@ function cleanupPending(errorMsg) {
   }
 }
 
+const CONNECT_TIMEOUT = 5000
+
 function connect() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     return Promise.resolve()
@@ -33,7 +33,7 @@ function connect() {
   }
 
   if (ws) {
-    try { ws.close() } catch (e) {}
+    try { ws.close() } catch {}
     ws = null
   }
 
@@ -41,10 +41,22 @@ function connect() {
     return connectPromise
   }
 
+  let rejectConnect = null
   connectPromise = new Promise((resolve, reject) => {
+    rejectConnect = reject
+    const timeout = setTimeout(() => {
+      if (ws) {
+        try { ws.close() } catch {}
+        ws = null
+      }
+      connectPromise = null
+      reject(new Error('Timeout al conectar WebSocket'))
+    }, CONNECT_TIMEOUT)
+
     try {
       ws = new WebSocket(WS_URL)
     } catch (err) {
+      clearTimeout(timeout)
       connected.value = false
       connectPromise = null
       reject(err)
@@ -52,6 +64,8 @@ function connect() {
     }
 
     ws.onopen = () => {
+      clearTimeout(timeout)
+      rejectConnect = null
       connected.value = true
       connectPromise = null
       resolve()
@@ -78,26 +92,22 @@ function connect() {
     }
 
     ws.onclose = () => {
+      clearTimeout(timeout)
       connected.value = false
       ws = null
       connectPromise = null
       cleanupPending('Conexión WebSocket cerrada')
-
-      if (shouldReconnect) {
-        if (reconnectTimer) clearTimeout(reconnectTimer)
-        reconnectTimer = setTimeout(() => connect(), 1000)
-      }
     }
 
-    ws.onerror = (err) => {
+    ws.onerror = () => {
+      clearTimeout(timeout)
       connected.value = false
-      connectPromise = null
-      reject(err)
       ws = null
-
-      if (shouldReconnect) {
-        if (reconnectTimer) clearTimeout(reconnectTimer)
-        reconnectTimer = setTimeout(() => connect(), 1000)
+      if (rejectConnect) {
+        const r = rejectConnect
+        rejectConnect = null
+        connectPromise = null
+        r(new Error('Error en conexión WebSocket'))
       }
     }
   })
@@ -106,8 +116,6 @@ function connect() {
 }
 
 function disconnect() {
-  shouldReconnect = false
-  if (reconnectTimer) clearTimeout(reconnectTimer)
   if (ws) {
     ws.close()
     ws = null
@@ -118,9 +126,12 @@ function disconnect() {
 
 async function send(type, payload = {}) {
   for (let attempt = 0; attempt < 3; attempt++) {
-    await connect()
-    if (ws && ws.readyState === WebSocket.OPEN) break
-    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 200))
+    try {
+      await connect()
+      if (ws && ws.readyState === WebSocket.OPEN) break
+    } catch {
+      if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 200))
+    }
   }
 
   if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -141,7 +152,5 @@ async function send(type, payload = {}) {
     }
   })
 }
-
-connect().catch(() => {})
 
 export default { connect, disconnect, send, connected }

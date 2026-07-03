@@ -2,7 +2,7 @@ import { useCommandRegistry } from '../useCommandRegistry.js'
 import { useChatStore } from '../../stores/chat.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useAuthStore } from '../../stores/auth.js'
-import { parseCommandArgs } from '../parseCommandArgs.js'
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
@@ -12,8 +12,9 @@ register({
   description: 'Asigna un espacio de trabajo a la sesión actual.',
   usage: '/chat_set_workspace --id=<workspace_id>',
   async autocomplete(args, cmdStore) {
-    const idArg = args.find(a => a.startsWith('--id='))
-    if (idArg) {
+    const usedFlags = getUsedFlags(args)
+    if (usedFlags.includes('--id=')) {
+      const idArg = args.find(a => a.startsWith('--id='))
       const val = idArg.slice('--id='.length)
       const workspaceStore = useWorkspaceStore()
       const workspaces = workspaceStore.workspaces || []

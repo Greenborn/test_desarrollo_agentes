@@ -25,7 +25,8 @@
           }"
           :style="{ paddingLeft: (item.depth * 20) + 'px' }"
           :title="item.node.path"
-           @click="item.node.type === 'directory' ? handleToggleDirectory(item.node.path) : handleFileClick(item.node.path, item.node.name)"
+          @click="item.node.type === 'directory' ? handleToggleDirectory(item.node.path) : handleFileClick(item.node.path, item.node.name)"
+          @contextmenu.prevent="onContextMenu($event, item)"
         >
           <span v-if="item.node.type === 'directory'" class="tree-toggle flex-shrink-0">
             {{ handleIsExpanded(item.node.path) ? '▾' : '▸' }}
@@ -35,6 +36,12 @@
           <span class="tree-name text-truncate small">{{ item.node.name }}</span>
         </div>
       </div>
+    </div>
+
+    <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu"></div>
+    <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
+      <div class="context-menu-item" @click="copyRelativePath">📋 Copiar ruta relativa</div>
+      <div class="context-menu-item" @click="copyFullPath">📋 Copiar ruta completa</div>
     </div>
   </div>
 </template>
@@ -82,6 +89,7 @@ export default {
     const fileTreeStore = useFileTreeStore()
 
     const selectedFile = ref(null)
+    const ctxMenu = ref({ show: false, x: 0, y: 0, path: '', fullPath: '' })
     let clickTimer = null
 
     const tree = computed(() => props.sessionId ? fileTreeStore.getTree(props.sessionId) : null)
@@ -131,6 +139,38 @@ export default {
       return props.sessionId ? fileTreeStore.isExpanded(props.sessionId, path) : false
     }
 
+    function onContextMenu(event, item) {
+      ctxMenu.value = {
+        show: true,
+        x: event.clientX,
+        y: event.clientY,
+        path: item.node.path,
+        fullPath: item.node.path,
+      }
+    }
+
+    function closeCtxMenu() {
+      ctxMenu.value.show = false
+    }
+
+    function copyRelativePath() {
+      const rootPath = tree.value ? tree.value.path || '' : ''
+      const relativePath = ctxMenu.value.path.startsWith(rootPath + '/')
+        ? ctxMenu.value.path.slice(rootPath.length + 1)
+        : ctxMenu.value.path
+      navigator.clipboard.writeText(relativePath).catch(err => {
+        console.error('Error al copiar ruta relativa:', err)
+      })
+      closeCtxMenu()
+    }
+
+    function copyFullPath() {
+      navigator.clipboard.writeText(ctxMenu.value.fullPath).catch(err => {
+        console.error('Error al copiar ruta completa:', err)
+      })
+      closeCtxMenu()
+    }
+
     onBeforeUnmount(() => {
       if (clickTimer) clearTimeout(clickTimer)
     })
@@ -140,9 +180,10 @@ export default {
     }, { immediate: true })
 
     return {
-      tree, loading, error, flatTree, selectedFile,
+      tree, loading, error, flatTree, selectedFile, ctxMenu,
       getFileIcon, reloadTree, handleToggleDirectory, handleIsExpanded,
       handleSelectFile, handleFileClick, openFile,
+      onContextMenu, closeCtxMenu, copyRelativePath, copyFullPath,
     }
   },
 }
@@ -191,5 +232,29 @@ export default {
 }
 .tree-name {
   color: #d1d5db;
+}
+.context-menu-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1040;
+}
+.context-menu {
+  position: fixed;
+  z-index: 1050;
+  background: #1a2744;
+  border: 1px solid #75AADB;
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.context-menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #e0e0e0;
+}
+.context-menu-item:hover {
+  background: #1a2a4e;
 }
 </style>

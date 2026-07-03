@@ -329,6 +329,8 @@ export default {
 <style scoped>
 .tab-bar {
   border-bottom: 1px solid #374151;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .tab-btn {
   background: none;

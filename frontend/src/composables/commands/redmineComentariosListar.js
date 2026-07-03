@@ -10,39 +10,31 @@ register({
   usage: '/dev_redmine_comentarios_listar [--ticket_id=<id>]',
   async autocomplete(args, cmdStore) {
     const usedFlags = getUsedFlags(args)
-    if (usedFlags.includes('--ticket_id')) {
+    const ticketInUse = usedFlags.includes('--ticket_id=') || usedFlags.includes('--ticket_id')
+    if (ticketInUse) {
+      const idArg = args.find(a => a.startsWith('--ticket_id='))
+      const val = idArg ? idArg.slice('--ticket_id='.length) : ''
+      if (!val) {
+        cmdStore.hideAutocomplete()
+        return
+      }
+      try {
+        const ticketRes = await fetch('/api/tickets', { credentials: 'include' })
+        const ticketData = await ticketRes.json()
+        if (ticketData.tickets) {
+          const filtered = ticketData.tickets.filter(t => String(t.redmine_id).includes(val))
+          if (filtered.length > 0 && !(filtered.length === 1 && String(filtered[0].redmine_id) === val)) {
+            cmdStore.showAutocomplete(filtered.map(t => ({ display: `#${t.redmine_id} — ${t.subject}`, value: `--ticket_id=${t.redmine_id}` })))
+            return
+          }
+        }
+      } catch (err) {
+        console.error('Error en autocomplete de redmineComentariosListar:', err.message)
+      }
       cmdStore.hideAutocomplete()
       return
     }
-    if (args.find(a => a.startsWith('--ticket_id='))) {
-      cmdStore.hideAutocomplete()
-      return
-    }
-    try {
-      const { useChatStore } = await import('../../stores/chat.js')
-      const chatStore = useChatStore()
-      const sessionId = chatStore.activeSessionId
-      if (!sessionId) {
-        cmdStore.showAutocomplete(['--ticket_id='])
-        return
-      }
-      const sessionRes = await fetch(`/api/tickets/session/${sessionId}`, { credentials: 'include' })
-      const sessionData = await sessionRes.json()
-      if (!sessionData.ticket?.proyecto_id) {
-        cmdStore.showAutocomplete(['--ticket_id='])
-        return
-      }
-      const ticketRes = await fetch('/api/tickets?proyecto_id=' + encodeURIComponent(sessionData.ticket.proyecto_id), { credentials: 'include' })
-      const ticketData = await ticketRes.json()
-      if (ticketData.tickets) {
-        const prefix = (args.find(a => a.startsWith('--ticket_id=')) || '').split('=')[1] || ''
-        const filtered = ticketData.tickets.filter(t => String(t.redmine_id).includes(prefix))
-        cmdStore.showAutocomplete(filtered.map(t => ({ display: `#${t.redmine_id} — ${t.subject}`, value: `--ticket_id=${t.redmine_id}` })))
-      }
-    } catch (err) {
-      console.error('Error en autocomplete de redmineComentariosListar:', err.message)
-      cmdStore.showAutocomplete(['--ticket_id='])
-    }
+    cmdStore.showAutocomplete(['--ticket_id='])
   },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {

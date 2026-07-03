@@ -12,9 +12,11 @@ register({
   description: 'Asigna un ticket de Redmine a la sesión actual. El autocomplete se filtra por el proyecto asignado a la sesión.',
   usage: '/chat_set_ticket --id=&lt;id_ticket_redmine&gt;',
   async autocomplete(args, cmdStore) {
-    const idArg = args.find(a => a.startsWith('--id='))
-    if (idArg) {
-      const val = idArg.slice('--id='.length)
+    const usedFlags = getUsedFlags(args)
+    const idInUse = usedFlags.includes('--id=') || usedFlags.includes('--id')
+    if (idInUse) {
+      const idArg = args.find(a => a.startsWith('--id='))
+      const val = idArg ? idArg.slice('--id='.length) : ''
       try {
         const chatStore = useChatStore()
         const activeSessionId = chatStore.activeSessionId

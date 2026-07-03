@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
-import { parseCommandArgs } from '../parseCommandArgs.js'
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
@@ -9,6 +9,7 @@ register({
   description: 'Importa todos los tickets de Redmine de un proyecto o de todos los proyectos a la base de datos local.',
   usage: '/redmine_importar_tickets [--id=&lt;id_proyecto&gt;|--all]',
   async autocomplete(args, cmdStore) {
+    const usedFlags = getUsedFlags(args)
     const idArg = args.find(a => a.startsWith('--id='))
     const allArg = args.find(a => a.startsWith('--all'))
     if (idArg) {
@@ -29,7 +30,9 @@ register({
         console.error('Error en autocomplete de /redmine_importar_tickets:', err)
       }
     } else {
-      cmdStore.showAutocomplete(allArg ? ['--id='] : ['--all', '--id='])
+      const allFlags = ['--all', '--id=']
+      const suggestions = allFlags.filter(f => !usedFlags.includes(f))
+      cmdStore.showAutocomplete(suggestions)
     }
   },
   async execute(args, { chatStore, sessionId }) {

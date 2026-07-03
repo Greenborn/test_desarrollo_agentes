@@ -346,12 +346,18 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 ### `GET /api/opencode/start`
 - **Auth:** Requerida
 - **Query:** `?sessionId=<chatSessionId>` (opcional — asigna el servidor OpenCode a una sesión de chat específica)
-- **Respuesta:** `{ providers, defaultModels, savedProvider, savedModel, savedThinking, savedMode }`
+- **Respuesta:** `{ providers, defaultModels, savedProvider, savedModel, savedThinking, savedMode, savedTemperature }`
+- **Comportamiento:**
+  - Los campos `saved*` se leen primero de `user_settings` (key `opencode_last_*`).
+  - Si `sessionId` tiene un proyecto asociado, los valores guardados en `project_variables` (keys `opencode_*`) sobreescriben los de `user_settings`.
+  - El frontend aplica estos `saved*` como valores por defecto de los `selected*` en el store.
 
 ### `POST /api/opencode/select`
 - **Auth:** Requerida
-- **Body:** `{ key: string, value: string }`
-- Guarda en `user_settings` como `opencode_last_<key>`
+- **Body:** `{ key: string, value: string, sessionId?: number }`
+- Guarda en `user_settings` como `opencode_last_<key>`.
+- Si `sessionId` está presente y tiene un proyecto asociado, también guarda en `project_variables` como `opencode_<key>` (type `'db'`).
+- Keys válidas: `provider`, `model`, `thinking`, `mode`, `temperature`.
 - **Respuesta:** `{ success: true }`
 
 ### `POST /api/opencode/send`
@@ -1206,9 +1212,34 @@ Endpoint base: `http://localhost:4099/api/documentacion`
 
 ---
 
+## Skills (`/api/skills`)
+
+Endpoints para gestionar skills del proyecto (archivos `.agents/skills/[name]/SKILL.md`).
+
+### `GET /api/skills/list?cwd=...`
+- **Auth:** Requerida
+- **Descripción:** Lista todos los skills en el directorio `.agents/skills/` relativo a `cwd`. Cada skill es un subdirectorio que contiene un archivo `SKILL.md`.
+- **Respuesta 200:**
+```json
+{
+  "skills": [
+    { "name": "mi-skill", "path": "/absoluto/a/.agents/skills/mi-skill/SKILL.md" }
+  ]
+}
+```
+
+### `POST /api/skills/create`
+- **Auth:** Requerida
+- **Body:** `{ name: "nombre-skill", cwd: "/ruta/del/proyecto" }`
+- **Descripción:** Crea un nuevo skill: crea el directorio `.agents/skills/[name]/` y escribe un `SKILL.md` con contenido por defecto.
+- **Respuesta 200:** `{ success: true, name: "nombre-skill", path: "/ruta/.../SKILL.md" }`
+- **Respuesta 400:** `{ error: "El skill '...' ya existe" }`
+
+---
+
 ## Notas
 
 - Todas las rutas protegidas devuelven `401 { error: "Sesión no válida" }` si no hay sesión
-- Los endpoints con `sessionId` opcional solo persisten en `chat_messages` cuando se provee
+- Los endpoints con `sessionId` opcional solo persisten en `chat_messages` cuando se proveen
 - El streaming SSE se usa para respuestas de DeepSeek (chat) y OpenCode
 - Los espacios de trabajo (workspaces) agrupan configuraciones, sesiones de chat, proyectos y tickets. El workspace_id se almacena en la sesión del usuario y se usa para filtrar datos en todos los endpoints relevantes.

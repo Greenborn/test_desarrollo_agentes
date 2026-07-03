@@ -17,6 +17,9 @@
       </select>
     </div>
     <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-argentina-outline" @click="abrirModal" :disabled="!commentText.trim()">
+        🤖 Mejorar con IA
+      </button>
       <button class="btn btn-sm btn-success" @click="confirmar" :disabled="!commentText.trim()">
         Confirmar
       </button>
@@ -29,10 +32,13 @@
 
 <script>
 import { ref } from 'vue'
+import { useModalStore } from '../../stores/modal.js'
+import DescripcionMejorarModal from '../chat-controls/DescripcionMejorarModal.vue'
 
 export default {
   props: {
     ticketId: { type: [Number, String], required: true },
+    sessionId: { type: [String, Number], default: '' },
     modoEnvioInicial: { type: String, default: 'encolar' },
   },
   emits: ['confirm'],
@@ -49,7 +55,18 @@ export default {
       emit('confirm', null)
     }
 
-    return { commentText, modoEnvio, confirmar, cancelar }
+    function abrirModal() {
+      const modal = useModalStore()
+      modal.open(DescripcionMejorarModal, {
+        sessionId: props.sessionId,
+        ticketId: props.ticketId,
+        onApply: (improved) => {
+          commentText.value = improved
+        },
+      }, { title: 'Mejorar comentario con IA', wide: true })
+    }
+
+    return { commentText, modoEnvio, confirmar, cancelar, abrirModal }
   },
 }
 </script>
@@ -66,6 +83,15 @@ export default {
 }
 .btn-success:disabled {
   opacity: 0.5;
+}
+.btn-argentina-outline {
+  background-color: transparent;
+  color: #75AADB;
+  border: 1px solid #75AADB;
+}
+.btn-argentina-outline:hover {
+  background-color: #1a2744;
+  color: #75AADB;
 }
 .btn-outline-argentina {
   background-color: transparent;

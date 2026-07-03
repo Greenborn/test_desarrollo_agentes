@@ -1,12 +1,26 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
+import { getUsedFlags } from '../parseCommandArgs.js';
 
 const { register } = useCommandRegistry();
+const ALL_FLAGS = ['--proyecto_id=']
 
 register({
   name: '/capturas_listar',
   category: 'Capturas',
   description: 'Lista las capturas de pantalla del proyecto vinculado a la sesión o de un proyecto específico.',
   usage: '/capturas_listar [proyecto_id]',
+  async autocomplete(args, cmdStore) {
+    const usedFlags = getUsedFlags(args)
+    const suggestions = ALL_FLAGS.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
+    } else {
+      cmdStore.hideAutocomplete()
+    }
+  },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')

@@ -1,56 +1,8 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
-import { parseCommandArgs } from '../parseCommandArgs.js'
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
-
-function eventToAction(evt) {
-  switch (evt.event_type) {
-    case 'click':
-    case 'dblclick':
-      return {
-        type: 'click',
-        selector: evt.selector || null,
-        text: evt.text_content || null,
-        url: evt.url || null,
-        x: evt.x ?? null,
-        y: evt.y ?? null,
-      }
-    case 'input':
-      return {
-        type: 'fill',
-        selector: evt.selector || null,
-        value: evt.value || null,
-        text: evt.text_content || null,
-      }
-    case 'change':
-      return {
-        type: 'select',
-        selector: evt.selector || null,
-        value: evt.value || null,
-        text: evt.text_content || null,
-      }
-    case 'submit':
-      return {
-        type: 'submit',
-        selector: evt.selector || null,
-        text: evt.text_content || null,
-      }
-    case 'keydown':
-      return {
-        type: 'press',
-        key: evt.key || null,
-        selector: evt.selector || null,
-      }
-    case 'scroll':
-      return {
-        type: 'scroll',
-        x: evt.scroll_x ?? null,
-        y: evt.scroll_y ?? null,
-      }
-    default:
-      return null
-  }
-}
+const ALL_FLAGS = ['--id=']
 
 register({
   name: '/navegador_grabacion_acciones',
@@ -58,9 +10,13 @@ register({
   description: 'Genera un arreglo JSON de acciones a partir de los eventos de una grabación, ordenado del más antiguo al más reciente.',
   usage: '/navegador_grabacion_acciones --id=<id>',
   async autocomplete(args, cmdStore) {
-    const idArg = args.find(a => a.startsWith('--id='))
-    if (!idArg) {
-      cmdStore.showAutocomplete(['--id='])
+    const usedFlags = getUsedFlags(args)
+    const suggestions = ALL_FLAGS.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
     } else {
       cmdStore.hideAutocomplete()
     }

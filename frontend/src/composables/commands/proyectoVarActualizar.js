@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
-import { parseCommandArgs } from '../parseCommandArgs.js';
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
 import { useProjectVariablesStore } from '../../stores/projectVariables.js';
 import wsClient from '../../services/wsClient.js';
 import { useAuthStore } from '../../stores/auth.js';
@@ -12,12 +12,13 @@ register({
   description: 'Actualiza el valor de una variable existente en un proyecto. Usar --type=memory|db para cambiar persistencia.',
   usage: '/proyecto_var_actualizar --key=nombre --value=valor [--id=proyecto] [--type=db|memory]',
   async autocomplete(args, cmdStore) {
-    const usedFlags = args.filter(a => a.startsWith('--'))
-    const hasKey = usedFlags.some(a => a.startsWith('--key='))
-    const hasValue = usedFlags.some(a => a.startsWith('--value='))
-    const hasId = usedFlags.some(a => a.startsWith('--id='))
+    const usedFlags = getUsedFlags(args)
+    const keyInUse = usedFlags.some(f => f === '--key=' || f === '--key')
+    const valueInUse = usedFlags.some(f => f === '--value=' || f === '--value')
+    const idInUse = usedFlags.some(f => f === '--id=' || f === '--id')
+    const typeInUse = usedFlags.some(f => f === '--type=' || f === '--type')
 
-    if (!hasKey) {
+    if (!keyInUse) {
       const idFlag = args.find(a => a.startsWith('--id='))
       let proyectoId = idFlag ? idFlag.slice(5) : null
       if (!proyectoId) {
@@ -48,11 +49,10 @@ register({
       return
     }
 
-    const hasType = usedFlags.some(a => a.startsWith('--type='))
     const suggestions = []
-    if (!hasValue) suggestions.push('--value=')
-    if (!hasId) suggestions.push('--id=')
-    if (!hasType) suggestions.push('--type=db', '--type=memory')
+    if (!valueInUse) suggestions.push('--value=')
+    if (!idInUse) suggestions.push('--id=')
+    if (!typeInUse) suggestions.push('--type=db', '--type=memory')
     cmdStore.showAutocomplete(suggestions)
   },
   async execute(args, { chatStore, sessionId }) {

@@ -64,7 +64,8 @@ function connect() {
       let msg;
       try {
         msg = JSON.parse(raw);
-      } catch {
+      } catch (parseErr) {
+        console.log('[memoriaClient] mensaje no JSON recibido:', parseErr.message);
         return;
       }
 
@@ -93,21 +94,18 @@ function connect() {
     ws.on('close', () => {
       console.log('[memoriaClient] WebSocket desconectado, reintentando en 1s');
       ws = null;
+      connecting = false;
       flushConnectCallbacks(new Error('Conexión WebSocket cerrada'));
       cleanupPending('Conexión WebSocket cerrada');
 
       if (reconnectTimer) clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(() => connect(), 1000);
+      reconnectTimer = setTimeout(() => { connect(); }, 1000);
     });
 
     ws.on('error', (err) => {
-      console.log('[memoriaClient] Error WebSocket:', err.message);
-      ws = null;
-      flushConnectCallbacks(err);
-      cleanupPending(err.message);
-
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(() => connect(), 1000);
+      if (err.message || err.code) {
+        console.log('[memoriaClient] Error WebSocket:', err.message || err.code);
+      }
     });
   });
 }
@@ -167,12 +165,15 @@ const client = {
     try {
       await connect();
       return !!(ws && ws.readyState === WebSocket.OPEN);
-    } catch {
+    } catch (healthErr) {
+      console.log('[memoriaClient] health check falló:', healthErr.message);
       return false;
     }
   },
 };
 
-connect().catch(() => {});
+connect().catch((bootErr) => {
+  console.log('[memoriaClient] conexión inicial falló:', bootErr.message);
+});
 
 export default client;

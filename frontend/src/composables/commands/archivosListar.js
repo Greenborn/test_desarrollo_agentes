@@ -1,12 +1,26 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
+import { getUsedFlags } from '../parseCommandArgs.js';
 
 const { register } = useCommandRegistry();
+const ALL_FLAGS = ['--id=']
 
 register({
   name: '/archivos_listar',
   category: 'Archivos',
   description: 'Lista los archivos del proyecto vinculado a la sesión actual.',
   usage: '/archivos_listar [--id=proyecto]',
+  async autocomplete(args, cmdStore) {
+    const usedFlags = getUsedFlags(args)
+    const suggestions = ALL_FLAGS.filter(f => {
+      const base = f.split('=')[0]
+      return !usedFlags.includes(f) && !usedFlags.includes(base)
+    })
+    if (suggestions.length > 0) {
+      cmdStore.showAutocomplete(suggestions)
+    } else {
+      cmdStore.hideAutocomplete()
+    }
+  },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')

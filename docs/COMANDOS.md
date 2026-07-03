@@ -10,6 +10,8 @@ Los comandos registrados en frontend tienen prioridad sobre los del backend.
 
 Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtra en vivo (con debounce configurable) las pestañas de chats y los proyectos del sidebar por los campos tooltip e ID respectivamente.
 
+**Autocompletado con Tab:** Todos los comandos con parámetros soportan autocompletado vía Tab. Al presionar Tab se sugieren los `--flag=` disponibles. Si el flag acepta valores conocidos (IDs, nombres, modos), se filtran según lo que el usuario haya escrito.
+
 ---
 
 ## Sistema
@@ -113,7 +115,8 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 | `/dev_funcionalidad_listar` | Lista funcionalidades del proyecto de la sesión o del especificado | `/dev_funcionalidad_listar [--id=<id_proyecto>]` |
 | `/dev_documento_listar` | Obtiene toda la documentación de un proyecto. Si no se especifica, usa el de la sesión actual | `/dev_documento_listar [--id=<id_proyecto>]` |
 | `/dev_documento_actualizar` | Actualiza la documentación del proyecto usando OpenCode para el tipo indicado | `/dev_documento_actualizar --tipo=<tipo>` |
-| `/dev_opencode_iniciar` | Inicia una sesión OpenCode: seleccionar proveedor, modelo, modo y enviar prompt. Después de cada respuesta se puede seguir enviando mensajes. Con `--ticket-desc` precarga el textarea con la descripción del ticket de la sesión actual. Sin `--ticket-desc`, aparece un switch "Usar descripción del ticket" en el formulario para cargarla bajo demanda. | `/dev_opencode_iniciar [--ticket-desc]` |
+| `/chat_set_workspace` | Asigna un espacio de trabajo (workspace) a la sesión actual. Usa Tab para autocompletar con los workspaces disponibles | `/chat_set_workspace --id=<workspace_id>` |
+| `/dev_opencode_iniciar` | Inicia una sesión OpenCode: se habilita la barra inferior (`OpenCodeStickyBar`) con selector de proveedor, modelo, pensamiento, temperatura, modo, switch "Usar descripción del ticket" y textarea para enviar prompts. Los campos se precargan con los últimos valores usados en el proyecto (guardados en `project_variables`). Después de cada respuesta se puede seguir enviando mensajes. | `/dev_opencode_iniciar` |
 | `/dev_opencode_generar_commit` | Genera un mensaje de commit de los cambios realizados usando OpenCode. Seleccioná proveedor, modelo, modo y modalidad de envío (encolar/enviar) para obtener una propuesta de commit. | `/dev_opencode_generar_commit` |
 | `/dev_opencode_finalizar` | Finaliza la sesión OpenCode activa | `/dev_opencode_finalizar` |
 | `/dev_git_crear_rama` | Crea una rama Git a partir del proyecto y ticket de la sesión. Con `--base` se salta la selección de rama base | `/dev_git_crear_rama [--base=<rama_base>]` |

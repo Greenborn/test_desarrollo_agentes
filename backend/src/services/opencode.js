@@ -17,6 +17,7 @@ class OpenCodeServer {
     this.locale = locale || 'es_ES.UTF-8';
     this.process = null;
     this.ready = false;
+    this._abortController = null;
   }
 
   baseUrl() {
@@ -80,7 +81,18 @@ class OpenCodeServer {
     }
   }
 
+  _ensureAbortController() {
+    if (!this._abortController || this._abortController.signal.aborted) {
+      this._abortController = new AbortController();
+    }
+    return this._abortController;
+  }
+
   stop() {
+    if (this._abortController) {
+      this._abortController.abort();
+      this._abortController = null;
+    }
     if (this.process) {
       this.process.kill();
       this.process = null;
@@ -99,9 +111,11 @@ class OpenCodeServer {
 
   async api(path, options = {}) {
     const url = `${this.baseUrl()}${path}`;
+    const ac = this._ensureAbortController();
     const res = await fetch(url, {
-      headers: { 'Content-Type': 'application/json', ...options.headers },
       ...options,
+      headers: { 'Content-Type': 'application/json', ...options.headers },
+      signal: ac.signal,
     });
     if (!res.ok) {
       const text = await res.text();
@@ -124,10 +138,12 @@ class OpenCodeServer {
       parts: Array.isArray(parts) ? parts : [{ type: 'text', text: parts }],
       ...options,
     };
+    const ac = this._ensureAbortController();
     const res = await fetch(`${this.baseUrl()}/session/${sessionId}/prompt_async`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: ac.signal,
     });
     if (!res.ok) {
       const text = await res.text();
@@ -136,7 +152,8 @@ class OpenCodeServer {
   }
 
   async* streamSession(sessionId, parts, options = {}) {
-    const eventRes = await fetch(`${this.baseUrl()}/event`);
+    const ac = this._ensureAbortController();
+    const eventRes = await fetch(`${this.baseUrl()}/event`, { signal: ac.signal });
     if (!eventRes.ok || !eventRes.body) {
       throw new Error('No se pudo conectar al stream de eventos de OpenCode');
     }
@@ -153,7 +170,11 @@ class OpenCodeServer {
       try {
         readerResult = await reader.read();
       } catch (readErr) {
-        console.log(`[opencode ${this.port}] error leyendo evento:`, readErr.message);
+        if (readErr.name === 'AbortError') {
+          console.log(`[opencode ${this.port}] stream abortado por stop()`);
+        } else {
+          console.log(`[opencode ${this.port}] error leyendo evento:`, readErr.message);
+        }
         break;
       }
       const { done: readerDone, value } = readerResult;
@@ -201,14 +222,24 @@ class OpenCodeServer {
   }
 
   async getSessionMessages(sessionId) {
-    const res = await fetch(`${this.baseUrl()}/session/${sessionId}/message`);
-    if (!res.ok) return [];
-    return res.json();
+    const ac = this._ensureAbortController();
+    try {
+      const res = await fetch(`${this.baseUrl()}/session/${sessionId}/message`, { signal: ac.signal });
+      if (!res.ok) return [];
+      return res.json();
+    } catch (msgErr) {
+      if (msgErr.name === 'AbortError') {
+        console.log(`[opencode ${this.port}] getSessionMessages abortado`);
+      } else {
+        console.log(`[opencode ${this.port}] error en getSessionMessages:`, msgErr.message);
+      }
+      return [];
+    }
   }
 }
 
 async function getOrStartServer(directory, chatSessionId, locale, customKey = null) {
-  const key = customKey || chatSessionId;
+  const key = customKey || chatSessionId || `dir_${directory}`;
   if (key && servers[key]) {
     const alive = await servers[key].server.isAlive();
     if (alive) return servers[key].server;

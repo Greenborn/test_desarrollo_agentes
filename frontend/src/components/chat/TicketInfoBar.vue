@@ -6,7 +6,7 @@
       <span class="ticket-sep text-muted">—</span>
       <span class="ticket-subject" :title="ticketInfo.subject">{{ truncatedSubject }}</span>
     </template>
-    <span v-if="currentBranchDisplay && currentBranchDisplay !== 'Sin repo'" class="branch-name ms-2">· rama: {{ currentBranchDisplay }}</span>
+    <span v-if="currentBranchDisplay && currentBranchDisplay !== 'Sin repo'" class="branch-name ms-2" :class="{ 'branch-mismatch': branchMismatch }">· rama: {{ currentBranchDisplay }}</span>
     <div class="ms-auto d-flex align-items-center gap-2">
       <button class="btn btn-sm btn-outline-argentina px-2" @click="$emit('crear-ticket')" title="Crear ticket">🎫</button>
       <button v-if="!devInstanceRunning" class="btn btn-sm btn-outline-argentina px-2" @click="$emit('iniciar-instancia-dev')" title="Iniciar instancia desarrollo">▶️</button>
@@ -26,6 +26,8 @@
 <script>
 import { computed } from 'vue'
 import { useGitStore } from '../../stores/git.js'
+import { useSettingsStore } from '../../stores/settings.js'
+import { useChatStore } from '../../stores/chat.js'
 
 export default {
   props: {
@@ -36,8 +38,27 @@ export default {
   emits: ['clear-chat', 'generar-commit', 'iniciar-instancia-dev', 'detener-instancia-dev', 'iniciar-opencode', 'crear-ticket'],
   setup(props) {
     const gitStore = useGitStore()
+    const settingsStore = useSettingsStore()
+    const chatStore = useChatStore()
 
     const currentBranchDisplay = computed(() => gitStore.getCurrentBranch(props.activeSessionId))
+
+    const idTicketRedmine = computed(() => {
+      if (props.ticketInfo?.redmine_id) return props.ticketInfo.redmine_id
+      const session = chatStore.sessions.find(s => Number(s.id) === Number(props.activeSessionId))
+      return session?.id_ticket_redmine || null
+    })
+
+    const expectedTicketBranch = computed(() => {
+      if (!idTicketRedmine.value) return null
+      const acronimo = settingsStore.repoAcronimo || 'TKT'
+      return acronimo + '-' + idTicketRedmine.value
+    })
+
+    const branchMismatch = computed(() => {
+      if (!expectedTicketBranch.value || !currentBranchDisplay.value) return false
+      return currentBranchDisplay.value !== expectedTicketBranch.value
+    })
 
     const truncatedSubject = computed(() => {
       if (!props.ticketInfo?.subject) return ''
@@ -63,7 +84,7 @@ export default {
       gitStore.zoomOut('chat')
     }
 
-    return { gitStore, currentBranchDisplay, truncatedSubject, priorityClass, zoomIn, zoomOut }
+    return { gitStore, currentBranchDisplay, branchMismatch, truncatedSubject, priorityClass, zoomIn, zoomOut }
   },
 }
 </script>
@@ -104,6 +125,10 @@ export default {
   color: #3fb950;
   font-size: 0.8rem;
   white-space: nowrap;
+}
+.branch-mismatch {
+  color: #eab308 !important;
+  font-weight: 700 !important;
 }
 .ticket-id {
   color: #fbbf24;

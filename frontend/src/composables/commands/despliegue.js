@@ -1,6 +1,7 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { useUiStore } from '../../stores/ui.js';
 import { settingGet } from '../../services/settingService.js';
+import { getUsedFlags } from '../parseCommandArgs.js';
 
 const { register } = useCommandRegistry();
 
@@ -96,8 +97,8 @@ register({
   description: 'Instala dependencias (npm ci) e inicia los procesos de desarrollo (nodemon para backend, npm run dev para frontend) según la configuración de despliegue.',
   usage: '/despliegue_iniciar_instancia [--resolucion=ID]',
   async autocomplete(args, cmdStore) {
-    const resolutionArg = args.find(a => a.startsWith('--resolucion='));
-    if (!resolutionArg) {
+    const usedFlags = getUsedFlags(args)
+    if (!usedFlags.includes('--resolucion=')) {
       cmdStore.showAutocomplete(['--resolucion=']);
       return;
     }
@@ -106,6 +107,7 @@ register({
       cmdStore.hideAutocomplete();
       return;
     }
+    const resolutionArg = args.find(a => a.startsWith('--resolucion='));
     const val = resolutionArg.slice('--resolucion='.length);
     if (val && resolutions.find(r => r.id === val)) {
       cmdStore.hideAutocomplete();
