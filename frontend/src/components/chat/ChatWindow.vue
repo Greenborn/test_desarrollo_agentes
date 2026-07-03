@@ -19,6 +19,7 @@
     </div>
     <DeteccionStateBar :deteccion-state="deteccionState" @abort="abortDeteccion" />
     <OpenCodeStickyBar :active-session-id="activeSessionId" v-model:oc-input="ocInput" :oc-streaming="ocStreaming" @send="sendToOpencodeFromSticky" @finish="finishOpencode" @toggle-terminal="showTerminal = !showTerminal" />
+
     <DeepSeekChatFab v-if="activeSessionId && !(ocStore.chatSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId))" :active-session-id="activeSessionId" @send="handleFabSend" />
     <ContextMenuChat :ctx-menu="ctxMenu" :raw-msg-keys="rawMsgKeys" :msg-key="msgKey" @toggle-raw="toggleRawView" @copy-plain="copyPlainText" @delete="deleteMessage" @close="closeCtxMenu" />
   </div>
@@ -61,7 +62,7 @@ export default {
     const devInstanceStore = useDevInstanceStore()
     const projectVarStore = useProjectVariablesStore()
     const { find } = useCommandRegistry()
-    const { activeSessionId, messages, streaming, currentChunk, currentThinking, sessions, loadingMore, hasMoreMessages } = storeToRefs(chat)
+    const { activeSessionId, messages, streaming, currentChunk, currentThinking, sessions, loadingMore, hasMoreMessages, showTerminal } = storeToRefs(chat)
 
     const { messagesContainer, _isNearBottom, scrollToBottom } = useChatScroll()
 
@@ -116,7 +117,6 @@ export default {
       ticketInfo, loadTicketInfo,
     })
 
-    const showTerminal = ref(false)
     const input = ref('')
     const ocInput = ref('')
     const ctxMenu = reactive({ show: false, x: 0, y: 0, msg: null })

@@ -25,6 +25,7 @@ import comandosPersonalizadosRoutes, { stopAll as stopComandosPersonalizados } f
 import proxyRoutes from './routes/proxy.routes.js';
 import archivosRoutes, { ensureStorageDir } from './routes/archivos.routes.js';
 import skillsRoutes from './routes/skills.routes.js';
+import dbRoutes from './routes/db.routes.js';
 import opencode from './services/opencode.js';
 import * as devInstanceManager from './services/devInstanceManager.js';
 import memoriaClient from './services/memoriaClient.js';
@@ -65,6 +66,7 @@ app.use('/api/comandos-personalizados', comandosPersonalizadosRoutes);
 app.use('/api/proxy', proxyRoutes);
 app.use('/api/archivos', archivosRoutes);
 app.use('/api/skills', skillsRoutes);
+app.use('/api/db', dbRoutes);
 
 async function start() {
   ensureStorageDir();
