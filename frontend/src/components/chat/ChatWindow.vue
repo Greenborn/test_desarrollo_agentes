@@ -14,11 +14,11 @@
           — Todos los mensajes cargados —
         </div>
         <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
-        <XtermTerminal label="bash" @close="onTerminalClose" v-if="showTerminal" />
+        <XtermTerminal v-if="chat.showTerminal" :label="chat.terminalLabel" :cwd="chat.terminalCwd" :initCommand="chat.terminalInitCommand" @close="onTerminalClose" />
       </div>
     </div>
     <DeteccionStateBar :deteccion-state="deteccionState" @abort="abortDeteccion" />
-    <OpenCodeStickyBar :active-session-id="activeSessionId" v-model:oc-input="ocInput" :oc-streaming="ocStreaming" @send="sendToOpencodeFromSticky" @finish="finishOpencode" @toggle-terminal="showTerminal = !showTerminal" />
+    <OpenCodeStickyBar :active-session-id="activeSessionId" v-model:oc-input="ocInput" :oc-streaming="ocStreaming" @send="sendToOpencodeFromSticky" @finish="finishOpencode" @toggle-terminal="chat.showTerminal = !chat.showTerminal" />
 
     <DeepSeekChatFab v-if="activeSessionId && !(ocStore.chatSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId))" :active-session-id="activeSessionId" @send="handleFabSend" />
     <ContextMenuChat :ctx-menu="ctxMenu" :raw-msg-keys="rawMsgKeys" :msg-key="msgKey" @toggle-raw="toggleRawView" @copy-plain="copyPlainText" @delete="deleteMessage" @close="closeCtxMenu" />
@@ -62,7 +62,7 @@ export default {
     const devInstanceStore = useDevInstanceStore()
     const projectVarStore = useProjectVariablesStore()
     const { find } = useCommandRegistry()
-    const { activeSessionId, messages, streaming, currentChunk, currentThinking, sessions, loadingMore, hasMoreMessages, showTerminal } = storeToRefs(chat)
+    const { activeSessionId, messages, streaming, currentChunk, currentThinking, sessions, loadingMore, hasMoreMessages } = storeToRefs(chat)
 
     const { messagesContainer, _isNearBottom, scrollToBottom } = useChatScroll()
 
@@ -348,7 +348,7 @@ export default {
     }
 
     function onTerminalClose() {
-      showTerminal.value = false
+      chat.closeTerminal()
     }
 
     async function executeCommand(raw) {
@@ -451,9 +451,9 @@ export default {
     })
 
     return {
-      activeSessionId, messages, streaming, currentChunk, currentThinking,
+      chat, activeSessionId, messages, streaming, currentChunk, currentThinking,
       sessions, loadingMore, hasMoreMessages, input, gitStore, ocStore,
-      ocInput, ocStreaming, terminalContent, sessionCwd, showTerminal, onTerminalClose,
+      ocInput, ocStreaming, terminalContent, sessionCwd, onTerminalClose,
       ticketInfo, devInstanceRunning,
       deteccionState, abortDeteccion,
       ctxMenu, rawMsgKeys, msgKey,

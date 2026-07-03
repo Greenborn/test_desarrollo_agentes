@@ -30,6 +30,23 @@ export const useChatStore = defineStore('chat', () => {
   const ledFlash = ref({})
   const ledFlashTimers = {}
   const showTerminal = ref(false)
+  const terminalCwd = ref('')
+  const terminalInitCommand = ref('')
+  const terminalLabel = ref('terminal')
+
+  function openTerminal(config = {}) {
+    terminalCwd.value = config.cwd || ''
+    terminalInitCommand.value = config.initCommand || ''
+    terminalLabel.value = config.label || 'terminal'
+    showTerminal.value = true
+  }
+
+  function closeTerminal() {
+    showTerminal.value = false
+    terminalCwd.value = ''
+    terminalInitCommand.value = ''
+    terminalLabel.value = 'terminal'
+  }
 
   const streaming = computed(() => {
     const sid = activeSessionId.value
@@ -788,6 +805,8 @@ export const useChatStore = defineStore('chat', () => {
     setOcStreaming, getIsOcStreaming, updateOcStreamCache, clearOcStreamCache,
     sessionTickets, activeSessionTicket, setSessionTicket, clearSessionTicket,
     _saveMessageToDb, clearPendingNotification, ledFlash, flashLed, showTerminal,
+    terminalCwd, terminalInitCommand, terminalLabel,
+    openTerminal, closeTerminal,
     saveUiState,
   }
 })

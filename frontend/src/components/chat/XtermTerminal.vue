@@ -20,13 +20,15 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 
-const TERMINAL_WS = `ws://localhost:4201`
+const TERMINAL_WS_HOST = 'localhost:4201'
 
 let terminalIdCounter = 0
 
 export default {
   props: {
     label: { type: String, default: 'terminal' },
+    cwd: { type: String, default: '' },
+    initCommand: { type: String, default: '' },
   },
   emits: ['close'],
   setup(props, { emit }) {
@@ -57,7 +59,12 @@ export default {
         ws = null
       }
 
-      ws = new WebSocket(TERMINAL_WS)
+      const params = new URLSearchParams()
+      if (props.cwd) params.set('cwd', props.cwd)
+      if (props.initCommand) params.set('cmd', props.initCommand)
+      const qs = params.toString()
+      const wsUrl = `ws://${TERMINAL_WS_HOST}${qs ? '?' + qs : ''}`
+      ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {
         console.log('[xterm] terminal WebSocket conectado')

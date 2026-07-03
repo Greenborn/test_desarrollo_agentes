@@ -149,85 +149,24 @@ export default {
     register({
       name: '/dev_opencode_iniciar',
       category: 'Desarrollo',
-      description: 'Inicia una sesión con OpenCode: seleccionar proveedor, modelo, modo y enviar prompt. Si ya hay una sesión activa, la cierra y abre una nueva.',
+      description: 'Abre opencode (CLI interactivo) en una terminal dentro del directorio del proyecto asociado a la sesión.',
       usage: '/dev_opencode_iniciar',
       autocomplete: null,
-      async execute(args, { cmdStore, chatStore, sessionId }) {
+      async execute(args, { chatStore, sessionId }) {
         if (!sessionId) {
           console.error('Error en /dev_opencode_iniciar: no hay sesión de chat activa')
           return
         }
 
-        if (ocStore.ocSessionId) {
-          try {
-            await fetch('/api/opencode/abort', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, sessionId }),
-            })
-          } catch (err) {
-            console.error('Error al abortar sesión OpenCode previa:', err)
-          }
-          ocStore.finish()
-          chatStore.pushMessage({
-            role: 'opencode_info',
-            content: JSON.stringify({ type: 'info', message: 'Sesión OpenCode anterior cerrada. Iniciando nueva sesión...' }),
-            _key: 'info-' + Date.now(),
-          }, sessionId)
+        const session = chatStore.sessions.find(s => Number(s.id) === Number(sessionId))
+        const cwd = session?.cwd || ''
+        if (!cwd) {
+          return 'No hay directorio asociado a esta sesión. Usá /cd para establecer un directorio de trabajo.'
         }
 
-        const data = await ocStore.start(sessionId)
-        if (!data) return
+        chatStore.openTerminal({ cwd, initCommand: 'opencode', label: 'OpenCode' })
 
-        ocStore.chatSessionId = sessionId
-        ocStore.saveCurrentToMap(sessionId)
-
-        const providerList = ocStore.getAvailableProviders()
-        if (providerList.length === 0) {
-          console.error('Error en /dev_opencode_iniciar: no se encontraron proveedores')
-          return
-        }
-
-        ;(async () => {
-          try {
-            const projRes = await fetch(`/api/proyecto/session/${sessionId}`, { credentials: 'include' })
-            const projData = await projRes.json()
-            if (projData.proyectoId) {
-              const auth = useAuthStore()
-              const varData = await wsClient.send('proyectoVarListar', {
-                sessionToken: auth.getSessionToken(),
-                proyectoId: projData.proyectoId,
-              })
-              const existingKeys = new Set((varData.variables || []).map(v => v.key))
-              const consoleVars = ['NAVEGADOR_CONSOLE_ERRORS', 'NAVEGADOR_CONSOLE_WARNS', 'NAVEGADOR_CONSOLE_LOGS', 'NAVEGADOR_NETWORK_ERRORS']
-              const created = []
-              for (const varKey of consoleVars) {
-                if (!existingKeys.has(varKey)) {
-                  await wsClient.send('proyectoVarCrear', {
-                    sessionToken: auth.getSessionToken(),
-                    proyectoId: projData.proyectoId,
-                    key: varKey,
-                    value: '{}',
-                    type: 'memory',
-                  })
-                  created.push(varKey)
-                }
-              }
-              if (created.length > 0) {
-                chatStore.pushMessage({
-                  role: 'opencode_info',
-                  content: JSON.stringify({ type: 'info', message: `Variables creadas: ${created.join(', ')} (memoria) para registrar logs de consola del navegador.` }),
-                  _key: 'info-' + Date.now(),
-                }, sessionId)
-              }
-            }
-          } catch (err) {
-            console.error('Error al gestionar variables de consola:', err.message)
-          }
-        })()
-
-        // El StickyBar se encarga de la selección de proveedor/modelo desde el primer momento
+        return `✅ OpenCode iniciado en: ${cwd}`
       },
     })
 

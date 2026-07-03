@@ -8,6 +8,10 @@ register({
   description: 'Abre una terminal interactiva (bash) en el panel de chat. Permite ejecutar comandos del sistema directamente desde el navegador.',
   usage: '/terminal',
   async execute(args, { chatStore }) {
-    chatStore.showTerminal = !chatStore.showTerminal
+    if (chatStore.showTerminal) {
+      chatStore.closeTerminal()
+    } else {
+      chatStore.openTerminal()
+    }
   },
 })

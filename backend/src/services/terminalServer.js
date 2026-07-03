@@ -8,13 +8,18 @@ export function setupTerminalServer() {
   const server = http.createServer();
   const wss = new WebSocketServer({ server });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
     console.log(`[terminal:${PORT}] cliente conectado`);
 
-    const shell = process.env.SHELL || 'bash';
-    const cwd = process.env.CWD || process.cwd();
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const paramCwd = url.searchParams.get('cwd');
+    const paramCmd = url.searchParams.get('cmd');
 
-    const pty = spawn(shell, [], {
+    const shell = process.env.SHELL || 'bash';
+    const cwd = paramCwd || process.env.CWD || process.cwd();
+    const args = paramCmd ? ['-c', paramCmd] : [];
+
+    const pty = spawn(shell, args, {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
@@ -22,7 +27,7 @@ export function setupTerminalServer() {
       env: { ...process.env, TERM: 'xterm-256color' },
     });
 
-    console.log(`[terminal:${PORT}] shell iniciada: ${shell} (pid ${pty.pid})`);
+    console.log(`[terminal:${PORT}] shell iniciada: ${shell} (pid ${pty.pid}) en: ${cwd}`);
 
     pty.onData((data) => {
       if (ws.readyState === ws.OPEN) {
