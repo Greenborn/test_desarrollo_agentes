@@ -17,6 +17,7 @@ export const useUiStore = defineStore('ui', () => {
   const sidebarChatTab = ref('chats')
   const sidebarRightTab = ref('comentarios')
   const devPanelTab = ref('instancias')
+  const ocMaximized = ref(false)
 
   function toggleSidebar() {
     sidebarCollapsed.value = !sidebarCollapsed.value
@@ -52,6 +53,11 @@ export const useUiStore = defineStore('ui', () => {
     panelHeight.value = h
   }
 
+  function toggleOcMaximized() {
+    ocMaximized.value = !ocMaximized.value
+    saveLayoutPrefs()
+  }
+
   function setOmnifilter(text) {
     omnifilter.value = text
   }
@@ -71,6 +77,7 @@ export const useUiStore = defineStore('ui', () => {
         settingSet('sidebar_chat_tab', sidebarChatTab.value),
         settingSet('sidebar_right_tab', sidebarRightTab.value),
         settingSet('dev_panel_tab', devPanelTab.value),
+        settingSet('oc_maximized', String(ocMaximized.value)),
       ])
     } catch (err) {
       console.error('Error saving layout preferences:', err)
@@ -79,7 +86,7 @@ export const useUiStore = defineStore('ui', () => {
 
   async function loadLayoutPrefs() {
     try {
-      const [sidebarData, widthData, panelData, heightData, rightCollapsedData, rightWidthData, recordingListData, centralPanelData, sidebarWidthPctData, sidebarChatTabData, sidebarRightTabData, devPanelTabData] = await Promise.all([
+      const [sidebarData, widthData, panelData, heightData, rightCollapsedData, rightWidthData, recordingListData, centralPanelData, sidebarWidthPctData, sidebarChatTabData, sidebarRightTabData, devPanelTabData, ocMaximizedData] = await Promise.all([
         settingGet('sidebar_collapsed'),
         settingGet('sidebar_width'),
         settingGet('panel_collapsed'),
@@ -92,6 +99,7 @@ export const useUiStore = defineStore('ui', () => {
         settingGet('sidebar_chat_tab'),
         settingGet('sidebar_right_tab'),
         settingGet('dev_panel_tab'),
+        settingGet('oc_maximized'),
       ])
       if (sidebarData.value !== null) {
         sidebarCollapsed.value = sidebarData.value === 'true'
@@ -150,10 +158,13 @@ export const useUiStore = defineStore('ui', () => {
       if (devPanelTabData.value !== null) {
         devPanelTab.value = devPanelTabData.value
       }
+      if (ocMaximizedData.value !== null) {
+        ocMaximized.value = ocMaximizedData.value === 'true'
+      }
     } catch (err) {
       console.error('Error loading layout preferences:', err)
     }
   }
 
-  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, omnifilter, rightPanelCollapsed, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarWidthPct, sidebarChatTab, sidebarRightTab, devPanelTab, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setSidebarWidthPct, setOmnifilter, saveLayoutPrefs, loadLayoutPrefs }
+  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, omnifilter, rightPanelCollapsed, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarWidthPct, sidebarChatTab, sidebarRightTab, devPanelTab, ocMaximized, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setSidebarWidthPct, setOmnifilter, toggleOcMaximized, saveLayoutPrefs, loadLayoutPrefs }
 })

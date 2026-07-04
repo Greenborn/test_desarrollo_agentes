@@ -124,7 +124,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 ### `GET /api/chat/sessions`
 - **Auth:** Requerida
 - **Workspace:** Filtra por `workspace_id` de la sesión
-- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion, id_ticket_redmine, workspace_id, priority_id, priority_name }] }`
+- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion, proyecto_color, id_ticket_redmine, workspace_id, priority_id, priority_name }] }`
 - **Descripción:** Lista las sesiones activas (no archivadas) del usuario.
 
 ### `POST /api/chat/sessions`
@@ -162,7 +162,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 ### `GET /api/chat/sessions/archived`
 - **Auth:** Requerida
 - **Workspace:** Filtra por `workspace_id` de la sesión
-- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion, id_ticket_redmine, workspace_id, priority_id, priority_name }] }`
+- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion, proyecto_color, id_ticket_redmine, workspace_id, priority_id, priority_name }] }`
 - **Descripción:** Lista únicamente las sesiones archivadas del usuario. Misma estructura que `GET /sessions` pero filtrando `archived = true`.
 
 ### `POST /api/chat/sessions/:id/archive`
@@ -425,7 +425,7 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 ### `GET /api/proyecto`
 - **Auth:** Requerida
 - **Descripción:** Lista proyectos. El proyecto pineado (si existe) aparece primero.
-- **Respuesta:** `{ proyectos: [{ id, descripcion }], pinnedProjectId: string|null }`
+- **Respuesta:** `{ proyectos: [{ id, descripcion, color }], pinnedProjectId: string|null }`
 
 ### `POST /api/proyecto`
 - **Auth:** Requerida
@@ -440,6 +440,15 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 - **Auth:** Requerida
 - **Body:** `{ sessionId (req), proyectoId?: string|null }`
 - **Respuesta:** `{ success: true }`
+
+### `PUT /api/proyecto/:id/color`
+- **Auth:** Requerida
+- **Params:** `id` — slug del proyecto
+- **Body:** `{ color: string }` — color hexadecimal (ej: `#ff6b6b`)
+- **Descripción:** Actualiza el color identificativo del proyecto para los iconos de sesión de chat.
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 400:** `{ error: "color es requerido" }`
+- **Respuesta 404:** `{ error: "Proyecto no encontrado" }`
 
 ### `PUT /api/proyecto/repositorio`
 - **Auth:** Requerida

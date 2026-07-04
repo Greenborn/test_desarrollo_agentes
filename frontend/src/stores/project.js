@@ -41,6 +41,14 @@ export const useProjectStore = defineStore('project', () => {
     }
   }
 
+  function updateProjectColor(projectId, color) {
+    const p = projects.value.find(p => p.id === projectId)
+    if (p) p.color = color
+    if (selectedProject.value?.id === projectId) {
+      selectedProject.value.color = color
+    }
+  }
+
   function selectProject(project) {
     selectedProject.value = project
   }
@@ -61,5 +69,5 @@ export const useProjectStore = defineStore('project', () => {
     return list
   }
 
-  return { projects, selectedProject, pinnedProjectId, loadProjects, togglePin, selectProject, clearSelection }
+  return { projects, selectedProject, pinnedProjectId, loadProjects, togglePin, selectProject, clearSelection, updateProjectColor }
 })

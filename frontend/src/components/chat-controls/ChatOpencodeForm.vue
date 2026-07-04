@@ -99,7 +99,7 @@ export default {
       return m ? m.reasoning : false
     })
 
-    let previousText = ''
+    const previousText = ref('')
 
     watch(useTicketDesc, async (enabled) => {
       if (enabled) {
@@ -107,13 +107,13 @@ export default {
           text.value = '*(No hay sesión activa para obtener el ticket)*'
           return
         }
+        previousText.value = text.value
         loadingDesc.value = true
         try {
           const res = await fetch(`/api/tickets/session/${props.sessionId}`, { credentials: 'include' })
           const data = await res.json()
           if (data.ticket && data.ticket.description) {
             text.value = data.ticket.description
-            previousText = ''
           } else if (data.idTicketRedmine) {
             text.value = '*(El ticket asignado no tiene descripción)*'
           } else {
@@ -126,7 +126,7 @@ export default {
           loadingDesc.value = false
         }
       } else {
-        text.value = previousText
+        text.value = previousText.value
       }
     })
 

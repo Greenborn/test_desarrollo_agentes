@@ -188,6 +188,7 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 | `redmine_parent_id` | VARCHAR(255) | nullable — ID del proyecto padre en Redmine |
 | `redmine_parent_name` | VARCHAR(255) | nullable — nombre del proyecto padre |
 | `url_github` | VARCHAR(500) | nullable — URL del repositorio GitHub |
+| `color` | VARCHAR(7) | DEFAULT `'#6b7280'` — color identificativo del proyecto para iconos de sesión de chat |
 | `despliegue_config` | TEXT | nullable — JSON con configuración de despliegue cargada desde `deploy.json` vía `/despliegue_actualizar_config` |
 
 ---

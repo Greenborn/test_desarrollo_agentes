@@ -118,8 +118,9 @@ export const useOpencodeStore = defineStore('opencode', () => {
       saveCurrentToMap(currentActiveChatSession.value)
     }
     currentActiveChatSession.value = chatSid
-    const loaded = loadFromMap(chatSid)
-    if (!loaded) {
+    loadFromMap(chatSid)
+    const hasValidOcSession = chatSessionId.value && String(chatSessionId.value) === String(chatSid)
+    if (!hasValidOcSession) {
       _resetValues()
     }
     const sKey = String(chatSid)
@@ -133,7 +134,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
       streamText.value = ''
       streamThinking.value = ''
     }
-    return loaded
+    return hasValidOcSession
   }
 
   function _persist() {
@@ -396,27 +397,8 @@ export const useOpencodeStore = defineStore('opencode', () => {
       currentActiveChatSession.value = activeId
       return loadFromMap(activeId)
     }
-    const firstKey = Object.keys(sessionsMap.value)[0]
-    if (firstKey) {
-      currentActiveChatSession.value = firstKey
-      return loadFromMap(firstKey)
-    }
-    const ocStep = savedState.ocStep
-    const ocSid = savedState.ocSessionId
-    if (!ocSid && (!ocStep || ocStep === 'idle')) return false
-    step.value = ocStep || 'idle'
-    ocSessionId.value = ocSid || null
-    chatSessionId.value = savedState.ocChatSessionId || null
-    selectedProvider.value = savedState.ocProvider || ''
-    selectedModel.value = savedState.ocModel || ''
-    selectedThinking.value = savedState.ocThinking || ''
-    selectedMode.value = savedState.ocMode || ''
-    selectedTemperature.value = savedState.ocTemperature || ''
-    if (chatSessionId.value) {
-      currentActiveChatSession.value = chatSessionId.value
-      saveCurrentToMap(chatSessionId.value)
-    }
-    return true
+    _resetValues()
+    return false
   }
 
   function restoreFromSession() {

@@ -11,9 +11,15 @@
       <button class="tab-btn ms-3" :class="{ active: tab === 'archived' }" @click="selectChatTab('archived')">Archivados</button>
     </div>
     <div v-if="tab === 'chats'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
-    <button class="btn btn-sm mb-2 flex-shrink-0 btn-argentina" @click="createSession" :disabled="creating">
-      {{ creating ? 'Creando...' : '＋ Nuevo chat' }}
-    </button>
+    <div class="d-flex align-items-center gap-2 mb-2 flex-shrink-0">
+      <button class="btn btn-sm flex-shrink-0 btn-argentina" @click="createSession" :disabled="creating" style="flex:1;">
+        {{ creating ? 'Creando...' : '＋ Nuevo chat' }}
+      </button>
+      <label class="session-nav-toggle" title="Barra flotante de sesiones">
+        <input type="checkbox" v-model="sessionNavEnabled" />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
     <div class="overflow-y-auto flex-grow-1" style="min-height: 0;">
       <div class="list-group list-group-flush" style="min-height: 0;">
         <button
@@ -24,15 +30,16 @@
           :title="sessionTooltip(s)"
           @click="selectSession(s.id)"
         >
-          <span class="status-led" :class="getSessionStatus(s.id)"></span>
-          <span v-if="pendingNotifications[s.id]" class="notification-dot" title="Novedades pendientes"></span>
+          <div class="session-icon" :style="sessionIconStyle(s)">
+            <span v-if="pendingNotifications[s.id]" class="session-icon-notif" title="Novedades pendientes"></span>
             <a v-if="s.id_ticket_redmine"
-               class="ticket-badge"
+               class="session-icon-ticket"
                :href="`${s.session_redmine_url || redmineUrl}/issues/${s.id_ticket_redmine}`"
                target="_blank" rel="noopener noreferrer"
                @click.stop
-               :style="ticketBadgeStyle(s)"
                title="Abrir ticket en Redmine">#{{ s.id_ticket_redmine }}</a>
+            <span class="session-icon-led" :class="getSessionStatus(s.id)"></span>
+          </div>
           <div class="d-flex flex-column flex-grow-1 min-width-0">
             <span class="text-truncate">{{ s.title }}</span>
             <span class="text-muted" style="font-size: 0.6rem; line-height: 1.2;">{{ formatDate(s.updated_at) }}</span>
@@ -71,14 +78,15 @@
             :title="sessionTooltip(s)"
             @click="selectSession(s.id)"
           >
-            <span class="status-led archived"></span>
-            <a v-if="s.id_ticket_redmine"
-               class="ticket-badge"
-               :href="`${s.session_redmine_url || redmineUrl}/issues/${s.id_ticket_redmine}`"
-               target="_blank" rel="noopener noreferrer"
-               @click.stop
-               :style="ticketBadgeStyle(s)"
-               title="Abrir ticket en Redmine">#{{ s.id_ticket_redmine }}</a>
+            <div class="session-icon" :style="sessionIconStyle(s)">
+              <a v-if="s.id_ticket_redmine"
+                 class="session-icon-ticket"
+                 :href="`${s.session_redmine_url || redmineUrl}/issues/${s.id_ticket_redmine}`"
+                 target="_blank" rel="noopener noreferrer"
+                 @click.stop
+                 title="Abrir ticket en Redmine">#{{ s.id_ticket_redmine }}</a>
+              <span class="session-icon-led archived"></span>
+            </div>
             <div class="d-flex flex-column flex-grow-1 min-width-0">
               <span class="text-truncate">{{ s.title }}</span>
               <span class="text-muted" style="font-size: 0.6rem; line-height: 1.2;">{{ formatDate(s.updated_at) }}</span>
@@ -111,6 +119,22 @@
       <div class="sidebar-resize-handle-bar"></div>
     </div>
   </div>
+  <!-- Floating session nav bar -->
+  <div v-if="sessionNavEnabled && filteredSessions.length" class="session-nav-bar">
+    <button
+      v-for="s in filteredSessions"
+      :key="s.id"
+      class="session-nav-btn"
+      :class="{ active: s.id === activeSessionId }"
+      :title="s.title || `Sesión #${s.id}`"
+      @click="selectSession(s.id)"
+    >
+      <div class="session-nav-icon" :style="navIconStyle(s)">
+        <span v-if="s.id_ticket_redmine" class="session-nav-ticket">#{{ s.id_ticket_redmine }}</span>
+        <span class="session-nav-led" :class="getSessionStatus(s.id)"></span>
+      </div>
+    </button>
+  </div>
 </template>
 
 <script>
@@ -139,6 +163,28 @@ export default {
     const { redmineUrl } = storeToRefs(settings)
     const { workspaces, selectedIds } = storeToRefs(ws)
 
+    const sessionNavEnabled = ref(false)
+
+    async function loadSessionNavPref() {
+      try {
+        const { settingGet } = await import('../../services/settingService.js')
+        const data = await settingGet('session_nav_enabled')
+        if (data.value !== null) sessionNavEnabled.value = data.value === 'true'
+      } catch (err) {
+        console.error('Error loading session nav pref:', err)
+      }
+    }
+    loadSessionNavPref()
+
+    watch(sessionNavEnabled, async (val) => {
+      try {
+        const { settingSet } = await import('../../services/settingService.js')
+        await settingSet('session_nav_enabled', String(val))
+      } catch (err) {
+        console.error('Error saving session nav pref:', err)
+      }
+    })
+
     const showWorkspaceBadges = computed(() => selectedIds.value.length > 1)
     const workspaceMap = computed(() => {
       const map = {}
@@ -153,10 +199,14 @@ export default {
       return { backgroundColor: ws.color, color: contrastTextColor(ws.color) }
     }
 
-    function ticketBadgeStyle(s) {
-      const ws = workspaceMap.value[s.workspace_id]
-      if (ws && ws.color) return { color: ws.color }
-      return {}
+    function sessionIconStyle(s) {
+      const color = s.proyecto_color || '#374151'
+      return { backgroundColor: color }
+    }
+
+    function navIconStyle(s) {
+      const color = s.proyecto_color || '#374151'
+      return { backgroundColor: color }
     }
 
     const sidebarTransitioning = ref(false)
@@ -318,9 +368,11 @@ export default {
       ticketPriorityClass,
       onResizeStart,
       workspaceBadgeStyle,
-      ticketBadgeStyle,
+      sessionIconStyle,
+      navIconStyle,
       archiveSession,
       unarchiveSession,
+      sessionNavEnabled,
     }
   },
 }
@@ -460,61 +512,73 @@ export default {
 .btn-argentina:disabled {
   opacity: 0.6;
 }
-.status-led {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
+.session-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  margin-right: 8px;
+  position: relative;
+  gap: 1px;
+}
+.session-icon-led {
+  display: block;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  margin-right: 6px;
   transition: background-color 0.2s ease;
 }
-.status-led.idle {
+.session-icon-led.idle {
   background-color: #6b7280;
 }
-.status-led.executing {
+.session-icon-led.executing {
   background-color: #22c55e;
   box-shadow: 0 0 6px #22c55e;
 }
-.status-led.error {
+.session-icon-led.error {
   background-color: #ef4444;
   box-shadow: 0 0 6px #ef4444;
 }
-.status-led.flash {
+.session-icon-led.flash {
   background-color: #3b82f6;
   box-shadow: 0 0 6px #3b82f6;
 }
-.status-led.archived {
+.session-icon-led.archived {
   background-color: #6b7280;
   opacity: 0.4;
 }
-.notification-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-right: 4px;
-  background-color: #75AADB;
-  box-shadow: 0 0 6px #75AADB;
-  animation: pulse-dot 1.5s ease-in-out infinite;
-}
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.8); }
-}
-.ticket-badge {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 600;
-  margin-right: 4px;
-  flex-shrink: 0;
+.session-icon-ticket {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
   text-decoration: none;
   cursor: pointer;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
-.ticket-badge:hover {
+.session-icon-ticket:hover {
   filter: brightness(1.3);
   text-decoration: underline;
+}
+.session-icon-notif {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #75AADB;
+  box-shadow: 0 0 6px #75AADB;
+  animation: pulse-icon-dot 1.5s ease-in-out infinite;
+}
+@keyframes pulse-icon-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
 }
 .workspace-badge {
   display: inline-block;
@@ -561,5 +625,130 @@ export default {
   border-left: 3px solid var(--priority-immediate-color, #ef4444) !important;
   border-left-width: 4px !important;
   background: color-mix(in srgb, var(--priority-immediate-color, #ef4444) 18%, transparent) !important;
+}
+
+.session-nav-toggle {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.session-nav-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background-color: #374151;
+  border-radius: 9px;
+  transition: background-color 0.2s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 2px;
+  top: 2px;
+  background-color: #9ca3af;
+  border-radius: 50%;
+  transition: transform 0.2s, background-color 0.2s;
+}
+.session-nav-toggle input:checked + .toggle-slider {
+  background-color: #75AADB;
+}
+.session-nav-toggle input:checked + .toggle-slider::before {
+  transform: translateX(14px);
+  background-color: #fff;
+}
+
+.session-nav-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(17, 24, 39, 0.92);
+  border-top: 1px solid #374151;
+  overflow-x: auto;
+  backdrop-filter: blur(6px);
+}
+.session-nav-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  border: 1px solid #374151;
+  background: #1f2937;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s;
+  padding: 0;
+}
+.session-nav-btn:hover {
+  border-color: #75AADB;
+}
+.session-nav-btn.active {
+  border-color: #75AADB;
+}
+.session-nav-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  gap: 1px;
+}
+.session-nav-ticket {
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+.session-nav-ticket:hover {
+  filter: brightness(1.3);
+  text-decoration: underline;
+}
+.session-nav-led {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.session-nav-led.idle {
+  background-color: #6b7280;
+}
+.session-nav-led.executing {
+  background-color: #22c55e;
+  box-shadow: 0 0 4px #22c55e;
+}
+.session-nav-led.error {
+  background-color: #ef4444;
+  box-shadow: 0 0 4px #ef4444;
+}
+.session-nav-led.flash {
+  background-color: #3b82f6;
+  box-shadow: 0 0 4px #3b82f6;
+}
+.session-nav-led.archived {
+  background-color: #6b7280;
+  opacity: 0.4;
 }
 </style>

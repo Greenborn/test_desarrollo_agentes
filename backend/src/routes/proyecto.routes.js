@@ -131,6 +131,28 @@ router.post('/proyecto/pin', async (req, res) => {
   }
 });
 
+router.put('/proyecto/:id/color', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const { color } = req.body;
+  if (!color) {
+    return res.status(400).json({ error: 'color es requerido' });
+  }
+  try {
+    const wsIds = req.session.workspaceIds || [1];
+    const updated = await db('proyectos')
+      .where({ id: req.params.id })
+      .whereIn('workspace_id', wsIds)
+      .update({ color });
+    if (!updated) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al actualizar color de proyecto:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.put('/proyecto/repositorio', async (req, res) => {
   if (!authGuard(req, res)) return;
   const { proyectoId, url_github } = req.body;

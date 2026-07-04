@@ -132,32 +132,107 @@ export default {
 
     const cwd = computed(() => activeSession.value?.cwd || null)
 
-    const skills = ref([])
-    const loadingSkills = ref(false)
-    const selectedSkill = ref(null)
-    const editorContent = ref('')
-    const editorDirty = ref(false)
-    const savingSkill = ref(false)
+const skills = ref([])
+const loadingSkills = ref(false)
+const selectedSkill = ref(null)
+const editorContent = ref('')
+const editorDirty = ref(false)
+const savingSkill = ref(false)
 
-    const formatMd = ref(true)
-    const agentWidth = ref(200)
-    const skillsEditorMinWidth = ref(SKILLS_EDITOR_MIN_WIDTH)
+const formatMd = ref(true)
+const agentWidth = ref(200)
+const skillsEditorMinWidth = ref(SKILLS_EDITOR_MIN_WIDTH)
 
-    const agentReady = ref(false)
-    const agentStarting = ref(false)
-    const agentProvider = ref('')
-    const agentModel = ref('')
-    const agentThinking = ref('medium')
-    const agentMode = ref('Plan')
-    const agentTemperature = ref('0.7')
-    const agentOcSessionId = ref(null)
-    const agentMessages = ref([])
-    const agentPrompt = ref('')
-    const agentStreaming = ref(false)
-    const agentStreamText = ref('')
-    const agentAbortController = ref(null)
-    const agentThinkingText = ref('')
-    const thinkingExpanded = ref(false)
+const agentReady = ref(false)
+const agentStarting = ref(false)
+const agentProvider = ref('')
+const agentModel = ref('')
+const agentThinking = ref('medium')
+const agentMode = ref('Plan')
+const agentTemperature = ref('0.7')
+const agentOcSessionId = ref(null)
+const agentMessages = ref([])
+const agentPrompt = ref('')
+const agentStreaming = ref(false)
+const agentStreamText = ref('')
+const agentAbortController = ref(null)
+const agentThinkingText = ref('')
+const thinkingExpanded = ref(false)
+
+const SESSION_AGENT_STORAGE_KEY = 'skills_session_agent_states'
+const sessionAgentStates = ref(loadSessionAgentStates())
+
+function loadSessionAgentStates() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_AGENT_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch (e) {
+    console.error('Error loading session agent states:', e)
+    return {}
+  }
+}
+
+function persistSessionAgentStates() {
+  try {
+    sessionStorage.setItem(SESSION_AGENT_STORAGE_KEY, JSON.stringify(sessionAgentStates.value))
+  } catch (e) {
+    console.error('Error persisting session agent states:', e)
+  }
+}
+
+function saveAgentState(sessionId) {
+  if (!sessionId) return
+  sessionAgentStates.value[String(sessionId)] = {
+    ready: agentReady.value,
+    provider: agentProvider.value,
+    model: agentModel.value,
+    thinking: agentThinking.value,
+    mode: agentMode.value,
+    temperature: agentTemperature.value,
+    messages: agentMessages.value.map(m => ({ ...m })),
+    streaming: agentStreaming.value,
+    streamText: agentStreamText.value,
+    thinkingText: agentThinkingText.value,
+    ocSessionId: agentOcSessionId.value,
+    cwd: cwd.value,
+  }
+  persistSessionAgentStates()
+}
+
+function restoreAgentState(sessionId) {
+  const state = sessionAgentStates.value[String(sessionId)]
+  if (!state) return
+  const sameCwd = state.cwd === cwd.value
+  agentReady.value = sameCwd ? (state.ready || false) : false
+  agentProvider.value = state.provider || ''
+  agentModel.value = state.model || ''
+  agentThinking.value = state.thinking || 'medium'
+  agentMode.value = state.mode || 'Plan'
+  agentTemperature.value = state.temperature || '0.7'
+  agentMessages.value = state.messages || []
+  agentStreaming.value = sameCwd ? (state.streaming || false) : false
+  agentStreamText.value = state.streamText || ''
+  agentThinkingText.value = state.thinkingText || ''
+  agentOcSessionId.value = state.ocSessionId || null
+}
+
+function resetAgentState() {
+  agentReady.value = false
+  agentStarting.value = false
+  agentProvider.value = ''
+  agentModel.value = ''
+  agentThinking.value = 'medium'
+  agentMode.value = 'Plan'
+  agentTemperature.value = '0.7'
+  agentOcSessionId.value = null
+  agentMessages.value = []
+  agentPrompt.value = ''
+  agentStreaming.value = false
+  agentStreamText.value = ''
+  agentAbortController.value = null
+  agentThinkingText.value = ''
+  thinkingExpanded.value = false
+}
 
     async function loadAgentWidth() {
       try {
@@ -446,7 +521,7 @@ ${text}`
       }).catch(err => console.error('Error al abortar agente:', err))
     }
 
-    async function finalizarAgente() {
+    async function finalizarAgente(skipCleanup = false) {
       if (agentStreaming.value) {
         detenerAgente()
       }
@@ -460,10 +535,11 @@ ${text}`
       } catch (err) {
         console.error('Error al finalizar agente:', err)
       }
-      agentReady.value = false
-      agentMessages.value = []
-      agentStreamText.value = ''
-      agentOcSessionId.value = null
+      if (activeSessionId.value && !skipCleanup) {
+        delete sessionAgentStates.value[String(activeSessionId.value)]
+        persistSessionAgentStates()
+      }
+      resetAgentState()
     }
 
     async function refrescarSkill() {
@@ -482,7 +558,24 @@ ${text}`
       }
     }
 
-    watch(cwd, () => {
+    watch(cwd, (newCwd, oldCwd) => {
+      if (oldCwd && newCwd !== oldCwd) {
+        if (activeSessionId.value) {
+          saveAgentState(activeSessionId.value)
+          const sId = String(activeSessionId.value)
+          if (sessionAgentStates.value[sId]) {
+            sessionAgentStates.value[sId].ready = false
+            sessionAgentStates.value[sId].streaming = false
+          }
+          persistSessionAgentStates()
+        }
+        if (agentReady.value || agentStreaming.value) {
+          if (agentStreaming.value) {
+            detenerAgente()
+          }
+          finalizarAgente(true)
+        }
+      }
       selectedSkill.value = null
       editorContent.value = ''
       editorDirty.value = false
@@ -490,9 +583,16 @@ ${text}`
       cargarSkills()
     })
 
-    watch(activeSessionId, () => {
-      if (agentReady.value) {
-        finalizarAgente()
+    watch(activeSessionId, (newId, oldId) => {
+      if (oldId && String(oldId) !== String(newId)) {
+        if (agentStreaming.value) {
+          detenerAgente()
+        }
+        saveAgentState(oldId)
+        resetAgentState()
+      }
+      if (newId) {
+        restoreAgentState(newId)
       }
     })
 
@@ -502,6 +602,9 @@ ${text}`
     })
 
     onUnmounted(() => {
+      if (activeSessionId.value) {
+        saveAgentState(activeSessionId.value)
+      }
       if (agentReady.value) {
         finalizarAgente()
       }

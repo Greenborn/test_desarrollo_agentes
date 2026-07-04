@@ -167,27 +167,19 @@ export default {
     parsedControl() {
       try {
         return this.msg.controlData || (typeof this.msg.content === 'string' ? JSON.parse(this.msg.content) : this.msg.content)
-      } catch {
-        return null
-      }
-    },
-    parsedResult() {
-      try {
-        const data = typeof this.msg.content === 'string' ? JSON.parse(this.msg.content) : this.msg.content
-        if (data && data.type === 'opencode_result') return data
-        return data
-      } catch {
+      } catch (e) {
+        console.error('Error parsing control message:', e)
         return null
       }
     },
     parsedInfo() {
       if (this.msg.role !== 'opencode_result') return null
-      // Look for hash in sibling opencode_info messages (not available here)
-      // Try to parse content as JSON with hash
       try {
         const data = JSON.parse(this.msg.content)
         if (data.hash || data.extra?.hash) return data
-      } catch {}
+      } catch (e) {
+        console.error('Error parsing info message:', e)
+      }
       return this.msg.extra || null
     },
 
@@ -196,7 +188,9 @@ export default {
       try {
         const data = JSON.parse(this.msg.content)
         if (data && (data.type === 'console_errors' || data.type === 'network_errors')) return data
-      } catch {}
+      } catch (e) {
+        console.error('Error parsing infoContent message:', e)
+      }
       return null
     },
 
@@ -205,12 +199,6 @@ export default {
 </script>
 
 <style scoped>
-.blink {
-  animation: blink 1s step-end infinite;
-}
-@keyframes blink {
-  50% { opacity: 0; }
-}
 .mb-3 > div {
   overflow-wrap: break-word;
   word-break: break-word;

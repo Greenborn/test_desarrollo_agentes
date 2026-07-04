@@ -80,7 +80,7 @@ export default {
       error.value = ''
       try {
         const target = currentPath.value === '/' ? '/' : currentPath.value
-        const res = await fetch(`/api/command/list-directories?prefix=${encodeURIComponent(target)}&cwd=${encodeURIComponent(target)}`)
+        const res = await fetch(`/api/command/list-directories?prefix=${encodeURIComponent(target)}&cwd=${encodeURIComponent(target)}`, { credentials: 'include' })
         const data = await res.json()
         if (data.directories) {
           directories.value = data.directories.map(fp => ({

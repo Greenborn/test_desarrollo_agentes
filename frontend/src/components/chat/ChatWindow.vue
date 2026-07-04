@@ -1,25 +1,30 @@
 <template>
   <div class="d-flex flex-column h-100 overflow-x-hidden" @click="closeCtxMenu">
     <TicketInfoBar :ticket-info="ticketInfo" :active-session-id="activeSessionId" :dev-instance-running="devInstanceRunning" @clear-chat="clearChat" @generar-commit="generarCommit" @iniciar-instancia-dev="iniciarInstanciaDev" @detener-instancia-dev="detenerInstanciaDev" @iniciar-opencode="iniciarOpencode" @crear-ticket="crearTicket" />
-    <div class="flex-grow-1 overflow-y-auto" ref="messagesContainer" style="min-height: 0;" :style="{ fontSize: gitStore.chatZoom + '%' }">
-      <div v-if="!activeSessionId" class="text-center text-muted mt-5">
-        <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
-      </div>
-      <div v-else class="messages-list p-3">
-        <div v-if="loadingMore" class="text-center text-muted small py-2">
-          <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-          Cargando mensajes anteriores...
+    <div class="d-flex flex-column flex-grow-1 overflow-hidden" style="min-height: 0;" :style="{ display: (ocMaximized && isOcSessionActive) ? 'none' : '' }">
+      <div class="flex-grow-1 overflow-y-auto" ref="messagesContainer" style="min-height: 0;" :style="{ fontSize: gitStore.chatZoom + '%' }">
+        <div v-if="!activeSessionId" class="text-center text-muted mt-5">
+          <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
         </div>
-        <div v-if="!loadingMore && !hasMoreMessages && messages.length > 50" class="text-center text-muted small py-1">
-          — Todos los mensajes cargados —
+        <div v-else class="messages-list p-3">
+          <div v-if="loadingMore" class="text-center text-muted small py-2">
+            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            Cargando mensajes anteriores...
+          </div>
+          <div v-if="!loadingMore && !hasMoreMessages && messages.length > 50" class="text-center text-muted small py-1">
+            — Todos los mensajes cargados —
+          </div>
+          <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
+          <XtermTerminal v-if="chat.showTerminal && activeSessionId && chat._terminalSessionId === activeSessionId" :label="chat.terminalLabel" :cwd="chat.terminalCwd" :initCommand="chat.terminalInitCommand" @close="onTerminalClose" />
         </div>
-        <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
-        <XtermTerminal label="bash" @close="onTerminalClose" v-if="showTerminal" />
       </div>
+      <DeteccionStateBar v-if="deteccionState.running && activeSessionId && getDeteccionSessionId() === activeSessionId" :deteccion-state="deteccionState" @abort="abortDeteccion" />
     </div>
-    <DeteccionStateBar :deteccion-state="deteccionState" @abort="abortDeteccion" />
-    <OpenCodeStickyBar :active-session-id="activeSessionId" v-model:oc-input="ocInput" :oc-streaming="ocStreaming" @send="sendToOpencodeFromSticky" @finish="finishOpencode" @toggle-terminal="showTerminal = !showTerminal" />
-    <DeepSeekChatFab v-if="activeSessionId && !(ocStore.chatSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId))" :active-session-id="activeSessionId" @send="handleFabSend" />
+    <OpenCodeStickyBar v-if="ocStore.chatSessionId && activeSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId)" :active-session-id="activeSessionId" v-model:oc-input="ocInput" :oc-streaming="ocStreaming" :maximized="ocMaximized" :style="ocMaximized && isOcSessionActive ? { flex: '1 1 0' } : {}" @send="sendToOpencodeFromSticky" @finish="finishOpencode" @toggle-terminal="showAgentTerminal = !showAgentTerminal" @toggle-maximize="toggleOcMaximized" />
+
+    <OpenCodeAgentTerminal v-if="showAgentTerminal && ocStore.chatSessionId && activeSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId)" :content="terminalContent" @close="showAgentTerminal = false" @clear="clearAgentTerminal" />
+
+    <DeepSeekChatFab v-show="!(ocMaximized && isOcSessionActive) && activeSessionId && !isOcSessionActive" :active-session-id="activeSessionId" @send="handleFabSend" />
     <ContextMenuChat :ctx-menu="ctxMenu" :raw-msg-keys="rawMsgKeys" :msg-key="msgKey" @toggle-raw="toggleRawView" @copy-plain="copyPlainText" @delete="deleteMessage" @close="closeCtxMenu" />
   </div>
 </template>
@@ -34,7 +39,8 @@ import { useOpencodeStore } from '../../stores/opencode.js'
 import { useGitStore } from '../../stores/git.js'
 import { useDevInstanceStore } from '../../stores/devInstance.js'
 import { useProjectVariablesStore } from '../../stores/projectVariables.js'
-import { deteccionState, abortDeteccion } from '../../composables/commands/deteccionFuncionalidades.js'
+import { useUiStore } from '../../stores/ui.js'
+import { deteccionState, abortDeteccion, getDeteccionSessionId } from '../../composables/commands/deteccionFuncionalidades.js'
 import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
 import { useConsoleLogStream } from '../../composables/useConsoleLogStream.js'
 import { useNetworkLogStream } from '../../composables/useNetworkLogStream.js'
@@ -45,13 +51,14 @@ import TicketInfoBar from './TicketInfoBar.vue'
 import ChatMessage from './ChatMessage.vue'
 import DeepSeekChatFab from './DeepSeekChatFab.vue'
 import XtermTerminal from './XtermTerminal.vue'
+import OpenCodeAgentTerminal from './OpenCodeAgentTerminal.vue'
 import DeteccionStateBar from './DeteccionStateBar.vue'
 import OpenCodeStickyBar from './OpenCodeStickyBar.vue'
 import ContextMenuChat from './ContextMenuChat.vue'
 import HelpContent from '../help/HelpModal.vue'
 
 export default {
-  components: { TicketInfoBar, ChatMessage, DeepSeekChatFab, XtermTerminal, DeteccionStateBar, OpenCodeStickyBar, ContextMenuChat },
+  components: { TicketInfoBar, ChatMessage, DeepSeekChatFab, XtermTerminal, OpenCodeAgentTerminal, DeteccionStateBar, OpenCodeStickyBar, ContextMenuChat },
   setup() {
     const chat = useChatStore()
     const cmdStore = useCommandStore()
@@ -60,10 +67,11 @@ export default {
     const gitStore = useGitStore()
     const devInstanceStore = useDevInstanceStore()
     const projectVarStore = useProjectVariablesStore()
+    const ui = useUiStore()
     const { find } = useCommandRegistry()
     const { activeSessionId, messages, streaming, currentChunk, currentThinking, sessions, loadingMore, hasMoreMessages } = storeToRefs(chat)
 
-    const { messagesContainer, _isNearBottom, scrollToBottom } = useChatScroll()
+    const { messagesContainer, _isNearBottom, scrollToBottom, checkNearBottom } = useChatScroll()
 
     const streamingApi = useOpencodeStreaming()
     const {
@@ -116,9 +124,12 @@ export default {
       ticketInfo, loadTicketInfo,
     })
 
-    const showTerminal = ref(false)
     const input = ref('')
     const ocInput = ref('')
+    const showAgentTerminal = ref(false)
+    function clearAgentTerminal() {
+      terminalContent.value = ''
+    }
     const ctxMenu = reactive({ show: false, x: 0, y: 0, msg: null })
     const rawMsgKeys = reactive(new Set())
 
@@ -165,7 +176,7 @@ export default {
       raw = await resolveInput(raw)
       if (raw.startsWith('/')) {
         executeCommand(raw)
-      } else if (ocStore.ocSessionId) {
+      } else if (ocStore.chatSessionId && Number(ocStore.chatSessionId) === Number(chat.activeSessionId)) {
         if (ocStreaming.value) {
           ocStore.messageQueue.push(raw)
           chat.pushMessage({
@@ -191,7 +202,7 @@ export default {
         }, sid)
         return
       }
-      const targetSessionId = overrideSessionId || ocStore.chatSessionId || chat.activeSessionId
+      const targetSessionId = overrideSessionId || chat.activeSessionId || ocStore.chatSessionId
       await opencodeStreamPrompt(
         targetSessionId, prompt,
         ocStore.selectedProvider, ocStore.selectedModel,
@@ -221,7 +232,7 @@ export default {
         content: JSON.stringify({ type: 'info', message: '⏹ Tarea detenida por el usuario.' }),
         _key: 'abort-' + Date.now(),
       })
-      ocStore.messageQueue.value = []
+      ocStore.messageQueue = []
     }
 
     async function sendToOpencodeFromSticky() {
@@ -348,7 +359,7 @@ export default {
     }
 
     function onTerminalClose() {
-      showTerminal.value = false
+      chat.closeTerminal()
     }
 
     async function executeCommand(raw) {
@@ -383,7 +394,7 @@ export default {
     function onScrollLoadMore() {
       const el = messagesContainer.value
       if (!el) return
-      _isNearBottom.value = (el.scrollHeight - el.scrollTop - el.clientHeight) < 200
+      _isNearBottom.value = checkNearBottom()
       if (el.scrollTop === 0 && !loadingMore.value && hasMoreMessages.value && activeSessionId.value) {
         const oldScrollHeight = el.scrollHeight
         chat.loadMoreMessages(activeSessionId.value)
@@ -450,19 +461,30 @@ export default {
       }
     })
 
+    const ocMaximized = computed(() => ui.ocMaximized)
+
+    const isOcSessionActive = computed(() => {
+      return ocStore.chatSessionId && activeSessionId.value && Number(activeSessionId.value) === Number(ocStore.chatSessionId)
+    })
+
+    function toggleOcMaximized() {
+      ui.toggleOcMaximized()
+    }
+
     return {
-      activeSessionId, messages, streaming, currentChunk, currentThinking,
+      chat, activeSessionId, messages, streaming, currentChunk, currentThinking,
       sessions, loadingMore, hasMoreMessages, input, gitStore, ocStore,
-      ocInput, ocStreaming, terminalContent, sessionCwd, showTerminal, onTerminalClose,
-      ticketInfo, devInstanceRunning,
+      ocInput, ocStreaming, terminalContent, sessionCwd, onTerminalClose,
+      ticketInfo, devInstanceRunning, ocMaximized, isOcSessionActive,
       deteccionState, abortDeteccion,
       ctxMenu, rawMsgKeys, msgKey,
       messagesContainer,
       send, handleFabSend, sendToOpencodeFromSticky, finishOpencode,
       generarCommit, iniciarInstanciaDev, detenerInstanciaDev,
       clearChat, crearTicket, iniciarOpencode,
-      onControlConfirm,
+      onControlConfirm, toggleOcMaximized,
       onContextMenu, closeCtxMenu, toggleRawView, copyPlainText, deleteMessage,
+      showAgentTerminal, clearAgentTerminal,
     }
   },
 }

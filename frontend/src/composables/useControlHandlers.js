@@ -723,6 +723,7 @@ export function useControlHandlers(api) {
         ocStore.selectedMode,
         ocStore.selectedTemperature,
       )
+      return
     } else if (controlType === 'opencode_form') {
       let { model, thinking, mode, temperature, prompt } = value
       if (!prompt) return
@@ -740,6 +741,7 @@ export function useControlHandlers(api) {
         ocStore.selectedMode,
         ocStore.selectedTemperature,
       )
+      return
     } else {
       try {
         await fetch('/api/opencode/control', {

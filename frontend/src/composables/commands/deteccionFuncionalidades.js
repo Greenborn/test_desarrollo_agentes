@@ -14,6 +14,10 @@ export const deteccionState = reactive({
   processed: 0,
 })
 
+export function getDeteccionSessionId() {
+  return _deteccionSessionId
+}
+
 export function abortDeteccion() {
   _deteccionAbort = true
 }

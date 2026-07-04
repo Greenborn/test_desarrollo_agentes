@@ -52,10 +52,10 @@
           ref="ocTextarea"
           :value="ocInput"
           class="form-control form-control-sm bg-dark text-light border-secondary font-monospace w-100"
-          rows="5"
+          rows="10"
           :placeholder="ocStreaming ? 'OpenCode está procesando...' : 'Escribe tu mensaje para OpenCode...'"
           :disabled="ocStreaming"
-          style="resize: vertical; min-height: 100px; max-height: 300px;"
+          style="resize: vertical; min-height: 200px; max-height: 600px;"
           @keydown="onOcTextareaKeydown"
           @input="onOcTextareaInput($event)"
           @click="onOcTextareaClick"
@@ -73,6 +73,7 @@
         <button class="btn btn-sm btn-success" :disabled="ocStreaming || !ocInput.trim()" @click="send">Enviar</button>
         <button class="btn btn-sm btn-outline-danger" @click="$emit('finish')">⏹ Finalizar</button>
         <button class="btn btn-sm btn-outline-info" @click="$emit('toggle-terminal')">📟 Terminal</button>
+        <button class="btn btn-sm" :class="maximized ? 'btn-warning' : 'btn-outline-secondary'" @click="$emit('toggle-maximize')" :title="maximized ? 'Restaurar' : 'Pantalla completa'">⛶</button>
       </div>
     </div>
   </div>
@@ -92,8 +93,9 @@ export default {
     activeSessionId: { type: [Number, String], default: null },
     ocStreaming: { type: Boolean, default: false },
     ocInput: { type: String, default: '' },
+    maximized: { type: Boolean, default: false },
   },
-  emits: ['update:ocInput', 'send', 'finish'],
+  emits: ['update:ocInput', 'send', 'finish', 'toggle-terminal', 'toggle-maximize'],
   setup(props, { emit }) {
     const ocStore = useOpencodeStore()
     const chat = useChatStore()
@@ -132,7 +134,7 @@ export default {
       const ta = ocTextarea.value
       if (!ta) return
       ta.style.height = 'auto'
-      ta.style.height = Math.min(ta.scrollHeight, 300) + 'px'
+      ta.style.height = Math.min(ta.scrollHeight, 600) + 'px'
     }
 
     function onOcTextareaClick(e) {
@@ -196,32 +198,33 @@ export default {
     const loadingDesc = ref(false)
     let previousText = ''
 
-    watch(useTicketDesc, async (enabled) => {
+    watch(useTicketDesc, (enabled) => {
       if (enabled) {
+        previousText = props.ocInput
         if (!props.activeSessionId) {
           emit('update:ocInput', '*(No hay sesión activa para obtener el ticket)*')
           return
         }
         loadingDesc.value = true
-        try {
-          const res = await fetch(`/api/tickets/session/${props.activeSessionId}`, { credentials: 'include' })
-          const data = await res.json()
-          if (data.ticket && data.ticket.description) {
-            emit('update:ocInput', data.ticket.description)
-            previousText = ''
-          } else if (data.idTicketRedmine) {
-            emit('update:ocInput', '*(El ticket asignado no tiene descripción)*')
-          } else {
-            emit('update:ocInput', '*(No hay ticket asignado a esta sesión)*')
-          }
-        } catch (err) {
-          console.error('Error al obtener descripción del ticket:', err.message)
-          emit('update:ocInput', '*(Error al obtener la descripción del ticket)*')
-        } finally {
-          loadingDesc.value = false
-        }
+        fetch(`/api/tickets/session/${props.activeSessionId}`, { credentials: 'include' })
+          .then(res => res.json())
+          .then(data => {
+            if (data.ticket && data.ticket.description) {
+              emit('update:ocInput', data.ticket.description)
+            } else if (data.idTicketRedmine) {
+              emit('update:ocInput', '*(El ticket asignado no tiene descripción)*')
+            } else {
+              emit('update:ocInput', '*(No hay ticket asignado a esta sesión)*')
+            }
+          })
+          .catch(err => {
+            console.error('Error al obtener descripción del ticket:', err.message)
+            emit('update:ocInput', '*(Error al obtener la descripción del ticket)*')
+          })
+          .finally(() => { loadingDesc.value = false })
       } else {
         emit('update:ocInput', previousText)
+        previousText = ''
       }
     })
 
