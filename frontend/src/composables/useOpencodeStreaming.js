@@ -78,21 +78,30 @@ export function useOpencodeStreaming() {
       onToolResult(content) { sd.text += `\`\`\`\n${content}\n\`\`\`\n`; updateText() },
       onToolData(content, partType) { sd.text += `\n> ${partType || 'data'}: ${content}\n`; updateText() },
       onTerminalLine(line, partType) {
-        terminalContent.value += line + '\n'
         if (!_ocStreamData.value[sKey]) {
           _ocStreamData.value[sKey] = { text: '', thinking: '', streaming: false, terminalContent: '' }
         }
-        _ocStreamData.value[sKey].terminalContent = terminalContent.value
+        _ocStreamData.value[sKey].terminalContent += line + '\n'
+        if (isActiveSession(sessionId)) {
+          terminalContent.value = _ocStreamData.value[sKey].terminalContent
+        }
       },
     }
   }
 
-  function _ensureStreamData(sid) {
-    const sKey = String(sid)
-    if (!_ocStreamData.value[sKey]) {
-      _ocStreamData.value[sKey] = { text: '', thinking: '', streaming: false }
+  function getTerminalContentForSession(sid) {
+    const sKey = sid ? String(sid) : null
+    if (sKey && _ocStreamData.value[sKey]) {
+      return _ocStreamData.value[sKey].terminalContent || ''
     }
-    return _ocStreamData.value[sKey]
+    return ''
+  }
+
+  function clearTerminalContentForSession(sid) {
+    const sKey = sid ? String(sid) : null
+    if (sKey && _ocStreamData.value[sKey]) {
+      _ocStreamData.value[sKey].terminalContent = ''
+    }
   }
 
   function isActiveSession(sid) {
@@ -142,6 +151,7 @@ export function useOpencodeStreaming() {
     ocStreaming.value = true
     streamSessionId.value = sessionId
     terminalContent.value = ''
+    clearTerminalContentForSession(sessionId)
     if (isActiveSession(sessionId)) {
       ocChunk.value = ''
       ocThinking.value = ''
@@ -359,6 +369,7 @@ export function useOpencodeStreaming() {
     ocStreaming.value = true
     streamSessionId.value = sessionId
     terminalContent.value = ''
+    clearTerminalContentForSession(sessionId)
     if (isActiveSession(sessionId)) {
       ocChunk.value = ''
       ocThinking.value = ''
@@ -457,6 +468,7 @@ export function useOpencodeStreaming() {
     ocStreaming.value = true
     streamSessionId.value = sessionId
     terminalContent.value = ''
+    clearTerminalContentForSession(sessionId)
     if (isActiveSession(sessionId)) {
       ocChunk.value = ''
       ocThinking.value = ''
@@ -731,6 +743,7 @@ export function useOpencodeStreaming() {
     ocStreaming.value = true
     streamSessionId.value = sessionId
     terminalContent.value = ''
+    clearTerminalContentForSession(sessionId)
     if (isActiveSession(sessionId)) {
       ocChunk.value = ''
       ocThinking.value = ''
@@ -831,7 +844,7 @@ export function useOpencodeStreaming() {
   return {
     ocStreaming, ocChunk, ocThinking, streamSessionId, streamingConsole, terminalContent,
     isActiveSession, _getProyectoId, resolveInput, fetchGitBranch, addMessage,
-    _syncStreamData,
+    _syncStreamData, getTerminalContentForSession, clearTerminalContentForSession,
     opencodeStreamPrompt, opencodeStreamPromptCommit, opencodeStreamPromptTestingNotes,
     opencodeStreamPromptDocUpdate, opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
     DOC_LABELS,

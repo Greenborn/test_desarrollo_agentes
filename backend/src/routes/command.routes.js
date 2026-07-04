@@ -874,4 +874,25 @@ router.post('/write-file', async (req, res) => {
   }
 });
 
+router.post('/delete-file', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { path: filePath } = req.body;
+    if (!filePath) {
+      return res.status(400).json({ success: false, error: 'El campo path es requerido' });
+    }
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: `El archivo '${filePath}' no existe` });
+    }
+    if (!fs.statSync(filePath).isFile()) {
+      return res.status(400).json({ success: false, error: `'${filePath}' no es un archivo` });
+    }
+    fs.unlinkSync(filePath);
+    res.json({ success: true, path: filePath });
+  } catch (err) {
+    console.log('Error en delete-file:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;

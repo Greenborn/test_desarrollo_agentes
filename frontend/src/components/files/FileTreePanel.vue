@@ -42,6 +42,8 @@
     <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
       <div class="context-menu-item" @click="copyRelativePath">📋 Copiar ruta relativa</div>
       <div class="context-menu-item" @click="copyFullPath">📋 Copiar ruta completa</div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item text-danger" @click="confirmDeleteFile">🗑️ Eliminar</div>
     </div>
   </div>
 </template>
@@ -89,7 +91,7 @@ export default {
     const fileTreeStore = useFileTreeStore()
 
     const selectedFile = ref(null)
-    const ctxMenu = ref({ show: false, x: 0, y: 0, path: '', fullPath: '' })
+    const ctxMenu = ref({ show: false, x: 0, y: 0, path: '', fullPath: '', type: '' })
     let clickTimer = null
 
     const tree = computed(() => props.sessionId ? fileTreeStore.getTree(props.sessionId) : null)
@@ -146,6 +148,7 @@ export default {
         y: event.clientY,
         path: item.node.path,
         fullPath: item.node.path,
+        type: item.node.type,
       }
     }
 
@@ -171,6 +174,40 @@ export default {
       closeCtxMenu()
     }
 
+    function confirmDeleteFile() {
+      const filePath = ctxMenu.value.path
+      const fileName = filePath.split('/').pop() || filePath
+      const confirmed = confirm(`¿Eliminar archivo "${fileName}"?\n\nRuta: ${filePath}\n\nEsta acción no se puede deshacer.`)
+      if (confirmed) {
+        deleteFile(filePath)
+      }
+      closeCtxMenu()
+    }
+
+    async function deleteFile(filePath) {
+      try {
+        const res = await fetch('/api/command/delete-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ path: filePath }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          if (props.sessionId) {
+            selectedFile.value = null
+            emit('file-selected', null)
+            fileTreeStore.fetchTree(props.sessionId)
+          }
+        } else {
+          alert(`Error al eliminar archivo: ${data.error}`)
+        }
+      } catch (err) {
+        console.error('Error al eliminar archivo:', err)
+        alert(`Error al eliminar archivo: ${err.message}`)
+      }
+    }
+
     onBeforeUnmount(() => {
       if (clickTimer) clearTimeout(clickTimer)
     })
@@ -184,6 +221,7 @@ export default {
       getFileIcon, reloadTree, handleToggleDirectory, handleIsExpanded,
       handleSelectFile, handleFileClick, openFile,
       onContextMenu, closeCtxMenu, copyRelativePath, copyFullPath,
+      confirmDeleteFile, deleteFile,
     }
   },
 }
@@ -256,5 +294,16 @@ export default {
 }
 .context-menu-item:hover {
   background: #1a2a4e;
+}
+.context-menu-item.text-danger {
+  color: #f87171;
+}
+.context-menu-item.text-danger:hover {
+  background: rgba(248, 113, 113, 0.12);
+}
+.context-menu-divider {
+  height: 1px;
+  background: #374151;
+  margin: 4px 0;
 }
 </style>

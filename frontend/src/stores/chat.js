@@ -29,20 +29,23 @@ export const useChatStore = defineStore('chat', () => {
   const _ocSessionStreamCache = ref({})
   const ledFlash = ref({})
   const ledFlashTimers = {}
-  const showTerminal = ref(false)
+  const _terminalSessionId = ref(null)
+  const showTerminal = computed(() => _terminalSessionId.value !== null)
   const terminalCwd = ref('')
   const terminalInitCommand = ref('')
   const terminalLabel = ref('terminal')
 
   function openTerminal(config = {}) {
+    const sid = config.sessionId || activeSessionId.value
+    if (!sid) return
     terminalCwd.value = config.cwd || ''
     terminalInitCommand.value = config.initCommand || ''
     terminalLabel.value = config.label || 'terminal'
-    showTerminal.value = true
+    _terminalSessionId.value = sid
   }
 
   function closeTerminal() {
-    showTerminal.value = false
+    _terminalSessionId.value = null
     terminalCwd.value = ''
     terminalInitCommand.value = ''
     terminalLabel.value = 'terminal'
@@ -353,9 +356,9 @@ export const useChatStore = defineStore('chat', () => {
             try {
               const parsed = JSON.parse(m.content)
               m.controlData = parsed
-            } catch {
-              // malformed controlData saved in DB, skip silently
-            }
+        } catch (e) {
+          console.error('Error parsing controlData from DB:', e.message)
+        }
           }
           return m
         })
@@ -395,9 +398,9 @@ export const useChatStore = defineStore('chat', () => {
             try {
               const parsed = JSON.parse(m.content)
               m.controlData = parsed
-            } catch {
-              // malformed controlData saved in DB, skip silently
-            }
+        } catch (e) {
+          console.error('Error parsing controlData from DB:', e.message)
+        }
           }
           return m
         })
@@ -509,8 +512,10 @@ export const useChatStore = defineStore('chat', () => {
                 pendingNotifications.value[sessionId] = Date.now()
               }
             }
-          } catch {
-            // skip malformed chunks
+          } catch (e) {
+            if (e.message !== 'Unexpected end of JSON input') {
+              console.error('Error parsing SSE chunk:', e.message)
+            }
           }
         }
       }
@@ -805,7 +810,7 @@ export const useChatStore = defineStore('chat', () => {
     setOcStreaming, getIsOcStreaming, updateOcStreamCache, clearOcStreamCache,
     sessionTickets, activeSessionTicket, setSessionTicket, clearSessionTicket,
     _saveMessageToDb, clearPendingNotification, ledFlash, flashLed, showTerminal,
-    terminalCwd, terminalInitCommand, terminalLabel,
+    _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel,
     openTerminal, closeTerminal,
     saveUiState,
   }

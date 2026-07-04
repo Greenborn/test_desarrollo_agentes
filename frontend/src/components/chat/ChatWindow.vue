@@ -15,12 +15,14 @@
             — Todos los mensajes cargados —
           </div>
           <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
-          <XtermTerminal v-if="chat.showTerminal" :label="chat.terminalLabel" :cwd="chat.terminalCwd" :initCommand="chat.terminalInitCommand" @close="onTerminalClose" />
+          <XtermTerminal v-if="chat.showTerminal && activeSessionId && chat._terminalSessionId === activeSessionId" :label="chat.terminalLabel" :cwd="chat.terminalCwd" :initCommand="chat.terminalInitCommand" @close="onTerminalClose" />
         </div>
       </div>
-      <DeteccionStateBar :deteccion-state="deteccionState" @abort="abortDeteccion" />
+      <DeteccionStateBar v-if="deteccionState.running && activeSessionId && getDeteccionSessionId() === activeSessionId" :deteccion-state="deteccionState" @abort="abortDeteccion" />
     </div>
-    <OpenCodeStickyBar :active-session-id="activeSessionId" v-model:oc-input="ocInput" :oc-streaming="ocStreaming" :maximized="ocMaximized" :style="ocMaximized && isOcSessionActive ? { flex: '1 1 0' } : {}" @send="sendToOpencodeFromSticky" @finish="finishOpencode" @toggle-terminal="chat.showTerminal = !chat.showTerminal" @toggle-maximize="toggleOcMaximized" />
+    <OpenCodeStickyBar v-if="ocStore.chatSessionId && activeSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId)" :active-session-id="activeSessionId" v-model:oc-input="ocInput" :oc-streaming="ocStreaming" :maximized="ocMaximized" :style="ocMaximized && isOcSessionActive ? { flex: '1 1 0' } : {}" @send="sendToOpencodeFromSticky" @finish="finishOpencode" @toggle-terminal="showAgentTerminal = !showAgentTerminal" @toggle-maximize="toggleOcMaximized" />
+
+    <OpenCodeAgentTerminal v-if="showAgentTerminal && ocStore.chatSessionId && activeSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId)" :content="terminalContent" @close="showAgentTerminal = false" @clear="clearAgentTerminal" />
 
     <DeepSeekChatFab v-show="!(ocMaximized && isOcSessionActive) && activeSessionId && !isOcSessionActive" :active-session-id="activeSessionId" @send="handleFabSend" />
     <ContextMenuChat :ctx-menu="ctxMenu" :raw-msg-keys="rawMsgKeys" :msg-key="msgKey" @toggle-raw="toggleRawView" @copy-plain="copyPlainText" @delete="deleteMessage" @close="closeCtxMenu" />
@@ -38,7 +40,7 @@ import { useGitStore } from '../../stores/git.js'
 import { useDevInstanceStore } from '../../stores/devInstance.js'
 import { useProjectVariablesStore } from '../../stores/projectVariables.js'
 import { useUiStore } from '../../stores/ui.js'
-import { deteccionState, abortDeteccion } from '../../composables/commands/deteccionFuncionalidades.js'
+import { deteccionState, abortDeteccion, getDeteccionSessionId } from '../../composables/commands/deteccionFuncionalidades.js'
 import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
 import { useConsoleLogStream } from '../../composables/useConsoleLogStream.js'
 import { useNetworkLogStream } from '../../composables/useNetworkLogStream.js'
@@ -49,13 +51,14 @@ import TicketInfoBar from './TicketInfoBar.vue'
 import ChatMessage from './ChatMessage.vue'
 import DeepSeekChatFab from './DeepSeekChatFab.vue'
 import XtermTerminal from './XtermTerminal.vue'
+import OpenCodeAgentTerminal from './OpenCodeAgentTerminal.vue'
 import DeteccionStateBar from './DeteccionStateBar.vue'
 import OpenCodeStickyBar from './OpenCodeStickyBar.vue'
 import ContextMenuChat from './ContextMenuChat.vue'
 import HelpContent from '../help/HelpModal.vue'
 
 export default {
-  components: { TicketInfoBar, ChatMessage, DeepSeekChatFab, XtermTerminal, DeteccionStateBar, OpenCodeStickyBar, ContextMenuChat },
+  components: { TicketInfoBar, ChatMessage, DeepSeekChatFab, XtermTerminal, OpenCodeAgentTerminal, DeteccionStateBar, OpenCodeStickyBar, ContextMenuChat },
   setup() {
     const chat = useChatStore()
     const cmdStore = useCommandStore()
@@ -68,7 +71,7 @@ export default {
     const { find } = useCommandRegistry()
     const { activeSessionId, messages, streaming, currentChunk, currentThinking, sessions, loadingMore, hasMoreMessages } = storeToRefs(chat)
 
-    const { messagesContainer, _isNearBottom, scrollToBottom } = useChatScroll()
+    const { messagesContainer, _isNearBottom, scrollToBottom, checkNearBottom } = useChatScroll()
 
     const streamingApi = useOpencodeStreaming()
     const {
@@ -123,6 +126,10 @@ export default {
 
     const input = ref('')
     const ocInput = ref('')
+    const showAgentTerminal = ref(false)
+    function clearAgentTerminal() {
+      terminalContent.value = ''
+    }
     const ctxMenu = reactive({ show: false, x: 0, y: 0, msg: null })
     const rawMsgKeys = reactive(new Set())
 
@@ -169,7 +176,7 @@ export default {
       raw = await resolveInput(raw)
       if (raw.startsWith('/')) {
         executeCommand(raw)
-      } else if (ocStore.ocSessionId) {
+      } else if (ocStore.chatSessionId && Number(ocStore.chatSessionId) === Number(chat.activeSessionId)) {
         if (ocStreaming.value) {
           ocStore.messageQueue.push(raw)
           chat.pushMessage({
@@ -195,7 +202,7 @@ export default {
         }, sid)
         return
       }
-      const targetSessionId = overrideSessionId || ocStore.chatSessionId || chat.activeSessionId
+      const targetSessionId = overrideSessionId || chat.activeSessionId || ocStore.chatSessionId
       await opencodeStreamPrompt(
         targetSessionId, prompt,
         ocStore.selectedProvider, ocStore.selectedModel,
@@ -225,7 +232,7 @@ export default {
         content: JSON.stringify({ type: 'info', message: '⏹ Tarea detenida por el usuario.' }),
         _key: 'abort-' + Date.now(),
       })
-      ocStore.messageQueue.value = []
+      ocStore.messageQueue = []
     }
 
     async function sendToOpencodeFromSticky() {
@@ -387,7 +394,7 @@ export default {
     function onScrollLoadMore() {
       const el = messagesContainer.value
       if (!el) return
-      _isNearBottom.value = (el.scrollHeight - el.scrollTop - el.clientHeight) < 200
+      _isNearBottom.value = checkNearBottom()
       if (el.scrollTop === 0 && !loadingMore.value && hasMoreMessages.value && activeSessionId.value) {
         const oldScrollHeight = el.scrollHeight
         chat.loadMoreMessages(activeSessionId.value)
@@ -477,6 +484,7 @@ export default {
       clearChat, crearTicket, iniciarOpencode,
       onControlConfirm, toggleOcMaximized,
       onContextMenu, closeCtxMenu, toggleRawView, copyPlainText, deleteMessage,
+      showAgentTerminal, clearAgentTerminal,
     }
   },
 }

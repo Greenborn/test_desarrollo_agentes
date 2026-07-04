@@ -164,7 +164,7 @@ export default {
           return 'No hay directorio asociado a esta sesión. Usá /cd para establecer un directorio de trabajo.'
         }
 
-        chatStore.openTerminal({ cwd, initCommand: 'opencode', label: 'OpenCode' })
+        chatStore.openTerminal({ cwd, initCommand: 'opencode', label: 'OpenCode', sessionId })
 
         return `✅ OpenCode iniciado en: ${cwd}`
       },
