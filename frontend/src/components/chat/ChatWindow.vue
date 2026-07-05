@@ -386,9 +386,10 @@ export default {
       chat.closeTerminal()
     }
 
-    function onTerminalReady({ terminalId }) {
-      if (terminalId && activeSessionId.value) {
-        chat.openTerminal({ sessionId: activeSessionId.value, terminalId })
+    function onTerminalReady({ terminalId, sessionId }) {
+      const sid = sessionId || activeSessionId.value
+      if (terminalId && sid) {
+        chat.openTerminal({ sessionId: sid, terminalId })
       }
     }
 

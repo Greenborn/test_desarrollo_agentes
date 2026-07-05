@@ -29,8 +29,8 @@ export function createTerminalRecord({ chatSessionId, cwd, cmd }) {
     cmd: record.cmd,
     createdAt: record.createdAt,
     status: 'pending',
-  }).catch(() => {});
-  updateChatIndex(chatSessionId, terminalId, 'add').catch(() => {});
+  }).catch(err => console.log('[procesos_consola] Error al guardar terminal en memoria:', err.message));
+  updateChatIndex(chatSessionId, terminalId, 'add').catch(err => console.log('[procesos_consola] Error al actualizar índice de chat_terminals:', err.message));
 
   return terminalId;
 }
@@ -76,7 +76,7 @@ export function activateTerminal(terminalId, pty, ws) {
     createdAt: record.createdAt,
     activatedAt: record.activatedAt,
     status: 'active',
-  }).catch(() => {});
+  }).catch(err => console.log('[procesos_consola] Error al actualizar terminal en memoria:', err.message));
 
   return record;
 }
@@ -136,9 +136,9 @@ export async function closeTerminal(terminalId) {
   record.status = 'closed';
   terminals.delete(terminalId);
 
-  memoriaClient.delKey(`terminal:${terminalId}`).catch(() => {});
+  memoriaClient.delKey(`terminal:${terminalId}`).catch(err => console.log('[procesos_consola] Error al eliminar terminal de memoria:', err.message));
   if (record.chatSessionId) {
-    updateChatIndex(record.chatSessionId, terminalId, 'remove').catch(() => {});
+    updateChatIndex(record.chatSessionId, terminalId, 'remove').catch(err => console.log('[procesos_consola] Error al actualizar índice de chat_terminals:', err.message));
   }
 
   return record;

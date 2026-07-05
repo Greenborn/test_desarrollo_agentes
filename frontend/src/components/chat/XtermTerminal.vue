@@ -21,7 +21,9 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 
 const PROCESOS_API = '/api/procesos'
-const TERMINAL_WS_HOST = window.location.hostname + ':3575'
+const WS_PORT = import.meta.env.VITE_PROCESOS_CONSOLA_PORT || '3575'
+const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+const TERMINAL_WS_HOST = `${WS_PROTOCOL}//${window.location.hostname}:${WS_PORT}`
 
 export default {
   props: {
@@ -41,6 +43,7 @@ export default {
     let ws = null
     let resizeObserver = null
     let currentTerminalId = props.terminalId
+    let closingIntentionally = false
 
     function fitTerminal() {
       if (!fitAddon || !terminal) return
@@ -100,7 +103,7 @@ export default {
       }
 
       currentTerminalId = terminalId
-      const wsUrl = `ws://${TERMINAL_WS_HOST}?terminalId=${terminalId}`
+      const wsUrl = `${TERMINAL_WS_HOST}?terminalId=${terminalId}`
       ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {
@@ -129,6 +132,9 @@ export default {
         if (terminal) {
           terminal.write(`\r\n\x1b[38;5;245m[conexión terminada]\x1b[0m\r\n`)
         }
+        if (!closingIntentionally) {
+          emit('close')
+        }
       }
 
       ws.onerror = (err) => {
@@ -142,15 +148,18 @@ export default {
     }
 
     async function newTerminal() {
-      currentTerminalId = null
+      await closeTerminalViaApi(currentTerminalId)
       const tid = await createTerminalViaApi()
       if (tid) {
+        currentTerminalId = tid
         connectWebSocket(tid)
         terminal.clear()
+        emit('terminal-ready', { terminalId: tid })
       }
     }
 
     async function disconnect() {
+      closingIntentionally = true
       await closeTerminalViaApi(currentTerminalId)
       if (ws) {
         try { ws.close() } catch {}
@@ -246,10 +255,11 @@ export default {
         resizeObserver.observe(wrapperRef.value)
       }
 
+      const sessionIdAtMount = props.sessionId
       const tid = await findOrCreateTerminal()
       if (tid) {
         connectWebSocket(tid)
-        emit('terminal-ready', { terminalId: tid })
+        emit('terminal-ready', { terminalId: tid, sessionId: sessionIdAtMount })
       }
     })
 
