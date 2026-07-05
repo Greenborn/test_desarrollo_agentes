@@ -53,22 +53,18 @@ export const useChatStore = defineStore('chat', () => {
     const sid = config.sessionId || activeSessionId.value
     if (!sid) return
     const existing = _terminalSessions.value[sid] || {}
-    _terminalSessions.value = {
-      ..._terminalSessions.value,
-      [sid]: {
-        terminalId: config.terminalId || existing.terminalId || null,
-        cwd: config.cwd || existing.cwd || '',
-        initCommand: config.initCommand || existing.initCommand || '',
-        label: config.label || existing.label || 'terminal',
-      },
+    _terminalSessions.value[sid] = {
+      terminalId: config.terminalId || existing.terminalId || null,
+      cwd: config.cwd || existing.cwd || '',
+      initCommand: config.initCommand || existing.initCommand || '',
+      label: config.label || existing.label || 'terminal',
     }
   }
 
   function closeTerminal() {
     const sid = activeSessionId.value
     if (!sid) return
-    const { [sid]: _, ...rest } = _terminalSessions.value
-    _terminalSessions.value = rest
+    delete _terminalSessions.value[sid]
   }
 
   const streaming = computed(() => {
