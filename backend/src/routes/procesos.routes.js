@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import http from 'http';
+import db from '../config/db.js';
 
 const router = Router();
 
@@ -49,12 +50,23 @@ function authGuard(req, res, next) {
   next();
 }
 
-router.post('/terminal', authGuard, (req, res) => {
-  const { cwd, cmd } = req.body;
+router.post('/terminal', authGuard, async (req, res) => {
   const chatSessionId = req.body.chatSessionId || req.session.activeSessionId;
   if (!chatSessionId) {
     return res.status(400).json({ error: 'chatSessionId es requerido' });
   }
+
+  if (!req.body.cwd) {
+    try {
+      const session = await db('chat_sessions').select('cwd').where({ id: chatSessionId }).first();
+      if (session && session.cwd) {
+        req.body.cwd = session.cwd;
+      }
+    } catch (err) {
+      console.log('[procesos] Error al obtener cwd de sesión:', err.message);
+    }
+  }
+
   proxyRequest(req, res);
 });
 

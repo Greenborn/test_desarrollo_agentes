@@ -333,6 +333,12 @@ export const useChatStore = defineStore('chat', () => {
 
   async function loadMessages(sessionId) {
     activeSessionId.value = sessionId
+    const session = sessions.value.find(s => Number(s.id) === Number(sessionId))
+    if (session && session.cwd) {
+      const { useCommandStore } = await import('../stores/command.js')
+      const cmdStore = useCommandStore()
+      cmdStore.setDirectory(session.cwd)
+    }
     messages.value = []
     clearPendingNotification(sessionId)
     loadingMore.value = false
