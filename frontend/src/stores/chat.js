@@ -29,29 +29,42 @@ export const useChatStore = defineStore('chat', () => {
   const _ocSessionStreamCache = ref({})
   const ledFlash = ref({})
   const ledFlashTimers = {}
-  const _terminalSessionId = ref(null)
+  const _terminalSessions = ref({})
+
+  function _getSessionTerminal(sid) {
+    return sid ? _terminalSessions.value[sid] : null
+  }
+
+  const _terminalSessionId = computed(() => {
+    const sid = activeSessionId.value
+    return sid && _terminalSessions.value[sid] ? sid : null
+  })
   const showTerminal = computed(() => _terminalSessionId.value !== null)
-  const terminalCwd = ref('')
-  const terminalInitCommand = ref('')
-  const terminalLabel = ref('terminal')
-  const terminalId = ref(null)
+  const terminalCwd = computed(() => _getSessionTerminal(activeSessionId.value)?.cwd || '')
+  const terminalInitCommand = computed(() => _getSessionTerminal(activeSessionId.value)?.initCommand || '')
+  const terminalLabel = computed(() => _getSessionTerminal(activeSessionId.value)?.label || 'terminal')
+  const terminalId = computed(() => _getSessionTerminal(activeSessionId.value)?.terminalId || null)
 
   function openTerminal(config = {}) {
     const sid = config.sessionId || activeSessionId.value
     if (!sid) return
-    terminalCwd.value = config.cwd || ''
-    terminalInitCommand.value = config.initCommand || ''
-    terminalLabel.value = config.label || 'terminal'
-    terminalId.value = config.terminalId || null
-    _terminalSessionId.value = sid
+    const existing = _terminalSessions.value[sid] || {}
+    _terminalSessions.value = {
+      ..._terminalSessions.value,
+      [sid]: {
+        terminalId: config.terminalId || existing.terminalId || null,
+        cwd: config.cwd || existing.cwd || '',
+        initCommand: config.initCommand || existing.initCommand || '',
+        label: config.label || existing.label || 'terminal',
+      },
+    }
   }
 
   function closeTerminal() {
-    _terminalSessionId.value = null
-    terminalCwd.value = ''
-    terminalInitCommand.value = ''
-    terminalLabel.value = 'terminal'
-    terminalId.value = null
+    const sid = activeSessionId.value
+    if (!sid) return
+    const { [sid]: _, ...rest } = _terminalSessions.value
+    _terminalSessions.value = rest
   }
 
   const streaming = computed(() => {
@@ -819,7 +832,7 @@ export const useChatStore = defineStore('chat', () => {
     setOcStreaming, getIsOcStreaming, updateOcStreamCache, clearOcStreamCache,
     sessionTickets, activeSessionTicket, setSessionTicket, clearSessionTicket,
     _saveMessageToDb, clearPendingNotification, ledFlash, flashLed, showTerminal,
-    _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel,
+    _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel, terminalId,
     openTerminal, closeTerminal,
     saveUiState,
   }
