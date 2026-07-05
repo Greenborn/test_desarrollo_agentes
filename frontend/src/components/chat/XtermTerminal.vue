@@ -16,7 +16,6 @@
 
 <script>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import { useChatStore } from '../../stores/chat.js'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -32,7 +31,7 @@ export default {
     sessionId: { type: [String, Number], default: null },
     terminalId: { type: String, default: null },
   },
-  emits: ['close'],
+  emits: ['close', 'terminal-ready'],
   setup(props, { emit }) {
     const containerRef = ref(null)
     const wrapperRef = ref(null)
@@ -74,7 +73,6 @@ export default {
         }
         const data = await res.json()
         currentTerminalId = data.terminalId
-        useChatStore().openTerminal({ sessionId: props.sessionId, terminalId: data.terminalId })
         return data.terminalId
       } catch (err) {
         console.log('[xterm] Error en petición REST:', err.message)
@@ -164,10 +162,8 @@ export default {
     async function findOrCreateTerminal() {
       if (currentTerminalId && ws) return currentTerminalId
 
-      const storedId = useChatStore().terminalId
-      if (storedId) {
-        currentTerminalId = storedId
-        return storedId
+      if (currentTerminalId) {
+        return currentTerminalId
       }
 
       try {
@@ -179,7 +175,6 @@ export default {
           if (list.length > 0) {
             const existing = list.find((t) => t.status === 'active') || list[0]
             currentTerminalId = existing.terminalId
-            useChatStore().openTerminal({ sessionId: props.sessionId, terminalId: existing.terminalId })
             return currentTerminalId
           }
         }
@@ -254,6 +249,7 @@ export default {
       const tid = await findOrCreateTerminal()
       if (tid) {
         connectWebSocket(tid)
+        emit('terminal-ready', { terminalId: tid })
       }
     })
 

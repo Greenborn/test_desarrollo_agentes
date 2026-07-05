@@ -15,7 +15,7 @@
             — Todos los mensajes cargados —
           </div>
           <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
-          <XtermTerminal v-if="chat.showTerminal && activeSessionId && chat._terminalSessionId === activeSessionId" :label="chat.terminalLabel" :cwd="chat.terminalCwd" :initCommand="chat.terminalInitCommand" :session-id="activeSessionId" :terminal-id="chat.terminalId" @close="onTerminalClose" />
+          <XtermTerminal v-if="chat.showTerminal && activeSessionId && chat._terminalSessionId === activeSessionId" :label="chat.terminalLabel" :cwd="chat.terminalCwd" :initCommand="chat.terminalInitCommand" :session-id="activeSessionId" :terminal-id="chat.terminalId" @close="onTerminalClose" @terminal-ready="onTerminalReady" />
         </div>
       </div>
       <DeteccionStateBar v-if="deteccionState.running && activeSessionId && getDeteccionSessionId() === activeSessionId" :deteccion-state="deteccionState" @abort="abortDeteccion" />
@@ -362,6 +362,12 @@ export default {
       chat.closeTerminal()
     }
 
+    function onTerminalReady({ terminalId }) {
+      if (terminalId && activeSessionId.value) {
+        chat.openTerminal({ sessionId: activeSessionId.value, terminalId })
+      }
+    }
+
     async function executeCommand(raw) {
       const parts = raw.split(/\s+/)
       const cmdName = parts[0].toLowerCase()
@@ -480,7 +486,7 @@ export default {
     return {
       chat, activeSessionId, messages, streaming, currentChunk, currentThinking,
       sessions, loadingMore, hasMoreMessages, input, gitStore, ocStore,
-      ocInput, ocStreaming, terminalContent, sessionCwd, onTerminalClose,
+      ocInput, ocStreaming, terminalContent, sessionCwd, onTerminalClose, onTerminalReady,
       ticketInfo, devInstanceRunning, ocMaximized, isOcSessionActive,
       deteccionState, abortDeteccion,
       ctxMenu, rawMsgKeys, msgKey,
