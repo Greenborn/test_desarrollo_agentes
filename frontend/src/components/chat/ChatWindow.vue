@@ -434,6 +434,9 @@ export default {
         if (savedTerminal && !terminalContent.value) {
           terminalContent.value = savedTerminal
         }
+        if (chat._hasTerminal(newId)) {
+          chat.openTerminal({ sessionId: newId })
+        }
       }
       loadTicketInfo()
       fetchGitBranch()

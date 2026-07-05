@@ -35,6 +35,10 @@ export const useChatStore = defineStore('chat', () => {
     return sid ? _terminalSessions.value[sid] : null
   }
 
+  function _hasTerminal(sid) {
+    return !!_getSessionTerminal(sid)
+  }
+
   const _terminalSessionId = computed(() => {
     const sid = activeSessionId.value
     return sid && _terminalSessions.value[sid] ? sid : null
@@ -833,7 +837,7 @@ export const useChatStore = defineStore('chat', () => {
     sessionTickets, activeSessionTicket, setSessionTicket, clearSessionTicket,
     _saveMessageToDb, clearPendingNotification, ledFlash, flashLed, showTerminal,
     _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel, terminalId,
-    openTerminal, closeTerminal,
+    _hasTerminal, openTerminal, closeTerminal,
     saveUiState,
   }
 })

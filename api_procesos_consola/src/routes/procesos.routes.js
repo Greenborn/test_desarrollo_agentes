@@ -23,6 +23,7 @@ router.post('/terminal', (req, res) => {
 router.get('/terminal', (req, res) => {
   const { chatSessionId } = req.query;
   const terminals = terminalManager.listTerminals(chatSessionId || undefined);
+  console.log(`[procesos_consola] GET /terminal chatSessionId=${chatSessionId} encontrados=${terminals.length} total=${terminalManager.listTerminals().length}`);
 
   const safe = terminals.map((t) => ({
     terminalId: t.terminalId,
