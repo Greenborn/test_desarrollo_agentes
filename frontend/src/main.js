@@ -64,6 +64,7 @@ import './composables/commands/capturasListar.js'
 import './composables/commands/navegadorEvaluarSelector.js'
 import './composables/commands/navegadorSimularEvento.js'
 import './composables/commands/terminalToggle.js'
+import './composables/commands/terminalCerrar.js'
 import './composables/commands/dbExport.js'
 
 const app = createApp(App)

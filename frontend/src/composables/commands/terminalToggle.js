@@ -5,14 +5,9 @@ const { register } = useCommandRegistry()
 register({
   name: '/terminal',
   category: 'Sistema',
-  description: 'Abre una terminal interactiva (bash) en el panel de chat. Permite ejecutar comandos del sistema directamente desde el navegador.',
+  description: 'Abre o reconecta una terminal interactiva (bash) en el panel de chat para la sesión actual.',
   usage: '/terminal',
   async execute(args, { chatStore, sessionId }) {
-    if (chatStore.showTerminal && chatStore._terminalSessionId === sessionId) {
-      chatStore.closeTerminal()
-      return
-    }
-
     chatStore.openTerminal({ sessionId })
   },
 })

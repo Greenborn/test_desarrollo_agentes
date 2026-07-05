@@ -20,7 +20,8 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 |---|---|---|
 | `/help` | Muestra la ayuda general de comandos organizada por categoría | `/help` |
 | `/history` | Muestra el historial de comandos ejecutados | `/history` |
-| `/terminal` | Abre/cierra una terminal interactiva (bash) en el panel de chat. Crea una sesión de terminal catalogada por `chatSessionId` en `api_procesos_consola`. Cada terminal se asocia a la sesión de chat activa y puede gestionarse vía REST. Soporta múltiples terminales por sesión | `/terminal` |
+| `/terminal` | Abre o reconecta una terminal interactiva (bash) en el panel de chat para la sesión actual. La terminal se cataloga por `chatSessionId` en `api_procesos_consola`. Si ya existe una terminal activa para la sesión, reconecta a ella | `/terminal` |
+| `/terminal_cerrar` | Cierra la terminal de la sesión actual. Mata el proceso bash y libera recursos | `/terminal_cerrar` |
 
 ---
 
