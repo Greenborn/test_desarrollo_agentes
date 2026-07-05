@@ -1,5 +1,4 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
-import { useChatStore } from '../../stores/chat.js'
 
 const { register } = useCommandRegistry()
 
@@ -9,7 +8,7 @@ register({
   description: 'Abre una terminal interactiva (bash) en el panel de chat. Permite ejecutar comandos del sistema directamente desde el navegador.',
   usage: '/terminal',
   async execute(args, { chatStore, sessionId }) {
-    if (chatStore.showTerminal) {
+    if (chatStore.showTerminal && chatStore._terminalSessionId === sessionId) {
       chatStore.closeTerminal()
       return
     }
