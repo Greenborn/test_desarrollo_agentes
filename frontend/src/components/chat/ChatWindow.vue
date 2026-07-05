@@ -15,7 +15,9 @@
             — Todos los mensajes cargados —
           </div>
           <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
-          <XtermTerminal v-if="activeSessionId && chat._terminalSessions?.[activeSessionId]" :label="chat.terminalLabel" :cwd="chat.terminalCwd" :initCommand="chat.terminalInitCommand" :session-id="activeSessionId" :terminal-id="chat.terminalId" @close="onTerminalClose" @terminal-ready="onTerminalReady" />
+          <template v-for="ts in terminalSessions" :key="ts.sid">
+            <XtermTerminal v-show="ts.isActive" :label="ts.label" :cwd="ts.cwd" :init-command="ts.initCommand" :session-id="ts.sid" :terminal-id="ts.terminalId" @close="onTerminalClose" @terminal-ready="onTerminalReady" />
+          </template>
         </div>
       </div>
       <DeteccionStateBar v-if="deteccionState.running && activeSessionId && getDeteccionSessionId() === activeSessionId" :deteccion-state="deteccionState" @abort="abortDeteccion" />
@@ -89,6 +91,18 @@ export default {
     const sessionCwd = computed(() => {
       const s = sessions.value.find(s => Number(s.id) === Number(activeSessionId.value))
       return s?.cwd || '~'
+    })
+
+    const terminalSessions = computed(() => {
+      const ts = chat._terminalSessions || {}
+      return Object.keys(ts).map(k => ({
+        sid: k,
+        terminalId: ts[k]?.terminalId || null,
+        label: ts[k]?.label || 'terminal',
+        cwd: ts[k]?.cwd || '',
+        initCommand: ts[k]?.initCommand || '',
+        isActive: Number(k) === Number(activeSessionId.value),
+      }))
     })
 
     const terminalDebug = computed(() => {
@@ -499,7 +513,7 @@ export default {
     return {
       chat, activeSessionId, messages, streaming, currentChunk, currentThinking,
       sessions, loadingMore, hasMoreMessages, input, gitStore, ocStore,
-      ocInput, ocStreaming, terminalContent, sessionCwd, terminalDebug, onTerminalClose, onTerminalReady,
+      ocInput, ocStreaming, terminalContent, sessionCwd, terminalSessions, terminalDebug, onTerminalClose, onTerminalReady,
       ticketInfo, devInstanceRunning, ocMaximized, isOcSessionActive,
       deteccionState, abortDeteccion,
       ctxMenu, rawMsgKeys, msgKey,
