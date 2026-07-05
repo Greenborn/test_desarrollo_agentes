@@ -15,7 +15,7 @@
             — Todos los mensajes cargados —
           </div>
           <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
-          <XtermTerminal v-if="chat.showTerminal && activeSessionId && chat._terminalSessionId === activeSessionId" :label="chat.terminalLabel" :cwd="chat.terminalCwd" :initCommand="chat.terminalInitCommand" :session-id="activeSessionId" :terminal-id="chat.terminalId" @close="onTerminalClose" @terminal-ready="onTerminalReady" />
+          <XtermTerminal v-if="activeSessionId && chat._terminalSessions?.[activeSessionId]" :label="chat.terminalLabel" :cwd="chat.terminalCwd" :initCommand="chat.terminalInitCommand" :session-id="activeSessionId" :terminal-id="chat.terminalId" @close="onTerminalClose" @terminal-ready="onTerminalReady" />
         </div>
       </div>
       <DeteccionStateBar v-if="deteccionState.running && activeSessionId && getDeteccionSessionId() === activeSessionId" :deteccion-state="deteccionState" @abort="abortDeteccion" />
