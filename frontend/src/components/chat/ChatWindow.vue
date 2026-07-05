@@ -19,6 +19,9 @@
         </div>
       </div>
       <DeteccionStateBar v-if="deteccionState.running && activeSessionId && getDeteccionSessionId() === activeSessionId" :deteccion-state="deteccionState" @abort="abortDeteccion" />
+    <div class="terminal-debug px-3 py-1 small text-muted font-monospace" style="font-size:11px; background:#0d1117; border-bottom:1px solid #21262d; white-space:pre">
+🔍 debug: activeSessId={{activeSessionId}} _termSessId={{chat._terminalSessionId}} termId={{chat.terminalId}} showTerm={{chat.showTerminal}} _sessions={{{ "{ " + (chat._terminalSessions ? Object.keys(chat._terminalSessions).map(k => k + ':(' + (chat._terminalSessions[k].terminalId || 'noId') + ')').join(', ') : 'empty') + " }" }}}
+    </div>
     </div>
     <OpenCodeStickyBar v-if="ocStore.chatSessionId && activeSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId)" :active-session-id="activeSessionId" v-model:oc-input="ocInput" :oc-streaming="ocStreaming" :maximized="ocMaximized" :style="ocMaximized && isOcSessionActive ? { flex: '1 1 0' } : {}" @send="sendToOpencodeFromSticky" @finish="finishOpencode" @toggle-terminal="showAgentTerminal = !showAgentTerminal" @toggle-maximize="toggleOcMaximized" />
 
