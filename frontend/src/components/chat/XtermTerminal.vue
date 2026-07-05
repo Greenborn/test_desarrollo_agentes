@@ -16,6 +16,7 @@
 
 <script>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { useChatStore } from '../../stores/chat.js'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -73,6 +74,7 @@ export default {
         }
         const data = await res.json()
         currentTerminalId = data.terminalId
+        useChatStore().openTerminal({ sessionId: props.sessionId, terminalId: data.terminalId })
         return data.terminalId
       } catch (err) {
         console.log('[xterm] Error en petición REST:', err.message)
@@ -162,6 +164,12 @@ export default {
     async function findOrCreateTerminal() {
       if (currentTerminalId && ws) return currentTerminalId
 
+      const storedId = useChatStore().terminalId
+      if (storedId) {
+        currentTerminalId = storedId
+        return storedId
+      }
+
       try {
         const listRes = await fetch(`${PROCESOS_API}/terminal?chatSessionId=${props.sessionId}`, {
           credentials: 'include',
@@ -171,6 +179,7 @@ export default {
           if (list.length > 0) {
             const existing = list.find((t) => t.status === 'active') || list[0]
             currentTerminalId = existing.terminalId
+            useChatStore().openTerminal({ sessionId: props.sessionId, terminalId: existing.terminalId })
             return currentTerminalId
           }
         }
