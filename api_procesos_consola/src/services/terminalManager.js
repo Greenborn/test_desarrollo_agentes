@@ -118,7 +118,11 @@ export function listTerminals(chatSessionId) {
 
 export async function closeTerminal(terminalId) {
   const record = terminals.get(terminalId);
-  if (!record) return null;
+  if (!record) {
+    console.log(`[procesos_consola] closeTerminal(${terminalId}): no encontrado (by: ${new Error().stack?.split('\n')[2]?.trim() || '?'})`);
+    return null;
+  }
+  console.log(`[procesos_consola] closeTerminal(${terminalId}): cerrando (by: ${new Error().stack?.split('\n')[2]?.trim() || '?'})`);
 
   if (record.ws) {
     try { record.ws.close(); } catch {}
