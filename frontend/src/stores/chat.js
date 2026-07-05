@@ -34,6 +34,7 @@ export const useChatStore = defineStore('chat', () => {
   const terminalCwd = ref('')
   const terminalInitCommand = ref('')
   const terminalLabel = ref('terminal')
+  const terminalId = ref(null)
 
   function openTerminal(config = {}) {
     const sid = config.sessionId || activeSessionId.value
@@ -41,6 +42,7 @@ export const useChatStore = defineStore('chat', () => {
     terminalCwd.value = config.cwd || ''
     terminalInitCommand.value = config.initCommand || ''
     terminalLabel.value = config.label || 'terminal'
+    terminalId.value = config.terminalId || null
     _terminalSessionId.value = sid
   }
 
@@ -49,6 +51,7 @@ export const useChatStore = defineStore('chat', () => {
     terminalCwd.value = ''
     terminalInitCommand.value = ''
     terminalLabel.value = 'terminal'
+    terminalId.value = null
   }
 
   const streaming = computed(() => {
@@ -692,9 +695,9 @@ export const useChatStore = defineStore('chat', () => {
     import('./opencode.js').then(({ useOpencodeStore }) => {
       try {
         const ocStore = useOpencodeStore()
-        ocStore.clearAllSessions()
+        ocStore.resetAllSessionsExecutionState()
       } catch (e) {
-        console.error('Error limpiando opencode en stopAllExecutions:', e.message)
+        console.error('Error reseteando estado opencode en stopAllExecutions:', e.message)
       }
     }).catch(e => console.error('Error importando opencode store:', e.message))
   }

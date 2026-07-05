@@ -1,8 +1,9 @@
 # ENDPOINTS — API REST
 
 - **api_gestor_servicios:** Puerto `4200` (configurable vía `SERVICIO_GESTOR_PORT`). Punto de entrada que orquesta el resto de servicios. Los endpoints operativos requieren `GESTOR_API_KEY`. El frontend no lo llama directamente.
-- **Backend Express principal:** Puerto `4000` (configurable vía `PORT` en `.env`). Actúa como proxy para `api_gestor_servicios` (inyecta la API key automáticamente).
+- **Backend Express principal:** Puerto `4000` (configurable vía `PORT` en `.env`). Actúa como proxy para `api_gestor_servicios` y `api_procesos_consola` (inyecta la API key automáticamente).
 - **api_memoria (`memoriaClient.js`):** La comunicación desde el backend hacia el servicio de memoria se realiza **exclusivamente por WebSocket** (`ws://`, puerto 4101, path `/api/memoria`). Los endpoints HTTP del servicio de memoria se mantienen para compatibilidad con consumidores externos.
+- **api_procesos_consola:** Puerto `3575` (configurable vía `SERVICIO_PROCESOS_CONSOLA_PORT`). Gestiona procesos de terminal (PTY) catalogados por sesión de chat. HTTP REST para gestión + WebSocket para streaming de terminal. Ver sección específica más abajo.
 - Todas las rutas protegidas requieren sesión activa (cookie `session_token` almacenada en el servicio de memoria `api_memoria`).
 
 ---
@@ -26,7 +27,8 @@ Endpoints del orquestador `api_gestor_servicios`. Los endpoints operativos (`/se
     { "name": "playwright", "port": 4098, "running": true },
     { "name": "documental", "port": 4099, "running": false },
     { "name": "gastos", "port": 4100, "running": true },
-    { "name": "memoria", "port": 4101, "running": true }
+    { "name": "memoria", "port": 4101, "running": true },
+    { "name": "procesos_consola", "port": 3575, "running": true }
   ]
 }
 ```
@@ -34,10 +36,81 @@ Endpoints del orquestador `api_gestor_servicios`. Los endpoints operativos (`/se
 
 ### `POST /api/gestor/services/:name/restart`
 - **Auth:** GESTOR_API_KEY
-- **Params:** `name` — nombre del servicio (`backend`, `playwright`, `documental`, `gastos`, `memoria`)
+- **Params:** `name` — nombre del servicio (`backend`, `playwright`, `documental`, `gastos`, `memoria`, `procesos_consola`)
 - **Respuesta 200:** `{ success: true, message: "Servicio \"backend\" reiniciado", running: true }`
 - **Respuesta 404:** `{ error: "Servicio \"...\" no encontrado" }`
 - **Descripción:** Mata el proceso del servicio y lo vuelve a spawnear.
+
+---
+
+## Procesos Consola (`/api/procesos`)
+
+Servicio independiente `api_procesos_consola` (puerto `3575`, configurable vía `SERVICIO_PROCESOS_CONSOLA_PORT`). Gestiona terminales interactivas bash por sesión de chat. Los metadatos de cada terminal se almacenan en `api_memoria`.
+
+### Autenticación
+
+Los endpoints REST requieren `PROCESOS_CONSOLA_API_KEY` (header `X-API-Key` o `Authorization: Bearer`). El frontend accede a través del backend (puerto 4000) que inyecta la API key automáticamente. Las conexiones WebSocket se autentican mediante el `terminalId` (sin API key).
+
+### `POST /api/procesos/terminal`
+- **Auth:** Sesión activa (backend), API key (directo)
+- **Body:** `{ chatSessionId: number, cwd?: string, cmd?: string }`
+- **Respuesta 201:**
+```json
+{ "terminalId": "a1b2c3d4e5f6...", "wsUrl": "ws://localhost:3575?terminalId=a1b2c3d4e5f6..." }
+```
+- **Descripción:** Crea un registro de terminal en `api_memoria` con estado `pending`. El `terminalId` se usa para conectar vía WebSocket. El PTY se crea al conectarse el WebSocket (creación perezosa). Si no se especifica `cwd`, usa `process.cwd()`.
+
+### `GET /api/procesos/terminal`
+- **Auth:** Sesión activa (backend), API key (directo)
+- **Query:** `?chatSessionId=xxx` (opcional — filtra por sesión)
+- **Respuesta 200:**
+```json
+[
+  { "terminalId": "...", "chatSessionId": 1, "cwd": "/home", "cmd": null, "pid": 12345, "status": "active", "createdAt": "...", "activatedAt": "..." }
+]
+```
+- **Descripción:** Lista las terminales activas. Sin filtro devuelve todas las del servicio.
+
+### `DELETE /api/procesos/terminal/:terminalId`
+- **Auth:** Sesión activa (backend), API key (directo)
+- **Respuesta 200:** `{ "terminalId": "...", "status": "closed" }`
+- **Descripción:** Cierra/kill una terminal específica. Elimina sus metadatos de `api_memoria`.
+
+### `DELETE /api/procesos/terminal`
+- **Auth:** Sesión activa (backend), API key (directo)
+- **Query:** `?chatSessionId=xxx` (requerido)
+- **Respuesta 200:** `{ "closed": 3 }`
+- **Descripción:** Cierra TODAS las terminales de una sesión de chat. Útil para limpieza al cambiar de workspace o cerrar sesión.
+
+### `GET /api/health` (directo, sin auth)
+- **Respuesta:** `{ "status": "ok", "service": "api_procesos_consola" }`
+
+### Protocolo WebSocket
+
+**URL de conexión:** `ws://localhost:3575?terminalId=xxx`
+
+Una vez conectado, el servidor crea el PTY (bash), envía `{ "type": "created", "terminalId": "xxx" }` y comienza a transmitir datos.
+
+**Mensajes Cliente → Servidor:**
+
+| type | Campos | Descripción |
+|------|--------|-------------|
+| `input` | `{ data: string }` | Escribe datos en el PTY |
+| `resize` | `{ cols: number, rows: number }` | Redimensiona el PTY |
+
+**Mensajes Servidor → Cliente:**
+
+| type | Campos | Descripción |
+|------|--------|-------------|
+| `data` | `{ data: string }` | Salida del PTY (puede contener códigos ANSI) |
+| `exit` | `{ code: number, signal: string\|null }` | Proceso terminado |
+| `created` | `{ terminalId: string }` | Confirmación de creación del PTY |
+| `error` | `{ message: string }` | Error (ej: terminalId inválido) |
+
+**Almacenamiento en api_memoria:**
+
+- `terminal:{terminalId}` → `{ chatSessionId, cwd, cmd, pid, createdAt, activatedAt, status }`
+- `chat_terminals:{chatSessionId}` → `[terminalId1, terminalId2, ...]` (índice para listado rápido)
 
 ---
 

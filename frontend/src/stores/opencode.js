@@ -61,6 +61,10 @@ export const useOpencodeStore = defineStore('opencode', () => {
       selectedMode: selectedMode.value,
       selectedTemperature: selectedTemperature.value,
       messageQueue: [...messageQueue.value],
+      processing: processing.value,
+      streaming: streaming.value,
+      streamText: streamText.value,
+      streamThinking: streamThinking.value,
       ...extraFields,
     }
   }
@@ -91,6 +95,10 @@ export const useOpencodeStore = defineStore('opencode', () => {
       selectedMode.value = saved.selectedMode || ''
       selectedTemperature.value = saved.selectedTemperature || ''
       messageQueue.value = saved.messageQueue || []
+      processing.value = saved.processing || false
+      streaming.value = saved.streaming || false
+      streamText.value = saved.streamText || ''
+      streamThinking.value = saved.streamThinking || ''
       return true
     }
     return false
@@ -118,9 +126,9 @@ export const useOpencodeStore = defineStore('opencode', () => {
       saveCurrentToMap(currentActiveChatSession.value)
     }
     currentActiveChatSession.value = chatSid
-    loadFromMap(chatSid)
+    const loaded = loadFromMap(chatSid)
     const hasValidOcSession = chatSessionId.value && String(chatSessionId.value) === String(chatSid)
-    if (!hasValidOcSession) {
+    if (!hasValidOcSession && !loaded) {
       _resetValues()
     }
     const sKey = String(chatSid)
@@ -147,6 +155,24 @@ export const useOpencodeStore = defineStore('opencode', () => {
     } else {
       sessionStorage.removeItem(SESSION_KEY)
     }
+  }
+
+  function setSessionShowTerminal(chatSid, val) {
+    const key = String(chatSid)
+    if (!sessionsMap.value[key]) return
+    sessionsMap.value[key].showTerminal = val
+    _persist()
+  }
+
+  function getSessionShowTerminal(chatSid) {
+    const key = String(chatSid)
+    return sessionsMap.value[key]?.showTerminal || false
+  }
+
+  function getSessionExtra(chatSid, field) {
+    const key = String(chatSid)
+    const s = sessionsMap.value[key]
+    return s ? s[field] : undefined
   }
 
   function saveUiState() {
@@ -375,6 +401,28 @@ export const useOpencodeStore = defineStore('opencode', () => {
     sessionStorage.removeItem(SESSION_KEY)
   }
 
+  function resetAllSessionsExecutionState() {
+    const keys = Object.keys(sessionsMap.value)
+    for (const key of keys) {
+      const s = sessionsMap.value[key]
+      s.step = 'idle'
+      s.ocSessionId = null
+      s.processing = false
+      s.streaming = false
+      s.streamText = ''
+      s.streamThinking = ''
+    }
+    _sessionStreamData.value = {}
+    currentActiveChatSession.value = null
+    step.value = 'idle'
+    ocSessionId.value = null
+    processing.value = false
+    streaming.value = false
+    streamText.value = ''
+    streamThinking.value = ''
+    _persist()
+  }
+
   function finish() {
     _resetValues()
     const key = currentActiveChatSession.value ? String(currentActiveChatSession.value) : null
@@ -422,7 +470,9 @@ export const useOpencodeStore = defineStore('opencode', () => {
     sessionsMap, currentActiveChatSession,
     saveCurrentToMap, activateSession, getActiveSessionsCount, clearAllSessions,
     setSessionOcInput, getSessionOcInput,
+    setSessionShowTerminal, getSessionShowTerminal, getSessionExtra,
     getAvailableProviders, getModelsForProvider, modelSupportsReasoning,
     start, select, streamPrompt, finish, restoreFromState, restoreFromSession, saveUiState,
+    resetAllSessionsExecutionState,
   }
 })

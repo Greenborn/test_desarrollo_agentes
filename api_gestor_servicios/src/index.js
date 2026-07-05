@@ -48,6 +48,11 @@ const serviceConfig = {
     cwd: path.resolve(__dirname, '../../api_gastos'),
     port: process.env.SERVICIO_GASTOS_PORT,
   },
+  procesos_consola: {
+    script: '../../api_procesos_consola/src/index.js',
+    cwd: path.resolve(__dirname, '../../api_procesos_consola'),
+    port: process.env.SERVICIO_PROCESOS_CONSOLA_PORT,
+  },
 };
 
 export function getProcess(name) {
@@ -123,8 +128,9 @@ function startAllServices() {
 
 function killPort(port) {
   try {
-    execSync(`fuser -k ${port}/tcp 2>/dev/null || lsof -ti :${port} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' });
-  } catch {
+    execSync(`fuser -k ${port}/tcp 2>/dev/null || lsof -ti :${port} | xargs kill -9 2>/dev/null || true`, { stdio: 'ignore' });
+  } catch (err) {
+    console.log('[gestor] Error al ejecutar killPort:', err.message);
   }
 }
 

@@ -20,15 +20,16 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 
-const TERMINAL_WS_HOST = 'localhost:4201'
-
-let terminalIdCounter = 0
+const PROCESOS_API = '/api/procesos'
+const TERMINAL_WS_HOST = window.location.hostname + ':3575'
 
 export default {
   props: {
     label: { type: String, default: 'terminal' },
     cwd: { type: String, default: '' },
     initCommand: { type: String, default: '' },
+    sessionId: { type: [String, Number], default: null },
+    terminalId: { type: String, default: null },
   },
   emits: ['close'],
   setup(props, { emit }) {
@@ -39,6 +40,7 @@ export default {
     let fitAddon = null
     let ws = null
     let resizeObserver = null
+    let currentTerminalId = props.terminalId
 
     function fitTerminal() {
       if (!fitAddon || !terminal) return
@@ -53,17 +55,52 @@ export default {
       }
     }
 
-    function connectWebSocket() {
+    async function createTerminalViaApi() {
+      try {
+        const res = await fetch(`${PROCESOS_API}/terminal`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            chatSessionId: props.sessionId,
+            cwd: props.cwd || undefined,
+            cmd: props.initCommand || undefined,
+          }),
+        })
+        if (!res.ok) {
+          console.log('[xterm] Error al crear terminal:', res.status, await res.text())
+          return null
+        }
+        const data = await res.json()
+        currentTerminalId = data.terminalId
+        return data.terminalId
+      } catch (err) {
+        console.log('[xterm] Error en petición REST:', err.message)
+        return null
+      }
+    }
+
+    async function closeTerminalViaApi(terminalId) {
+      if (!terminalId) return
+      try {
+        await fetch(`${PROCESOS_API}/terminal/${terminalId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+      } catch (err) {
+        console.log('[xterm] Error al cerrar terminal vía API:', err.message)
+      }
+    }
+
+    function connectWebSocket(terminalId) {
+      if (!terminalId) return
       if (ws) {
         try { ws.close() } catch {}
         ws = null
       }
 
-      const params = new URLSearchParams()
-      if (props.cwd) params.set('cwd', props.cwd)
-      if (props.initCommand) params.set('cmd', props.initCommand)
-      const qs = params.toString()
-      const wsUrl = `ws://${TERMINAL_WS_HOST}${qs ? '?' + qs : ''}`
+      currentTerminalId = terminalId
+      const wsUrl = `ws://${TERMINAL_WS_HOST}?terminalId=${terminalId}`
       ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {
@@ -104,17 +141,46 @@ export default {
       nextTick(() => fitTerminal())
     }
 
-    function newTerminal() {
-      connectWebSocket()
-      terminal.clear()
+    async function newTerminal() {
+      currentTerminalId = null
+      const tid = await createTerminalViaApi()
+      if (tid) {
+        connectWebSocket(tid)
+        terminal.clear()
+      }
     }
 
-    function disconnect() {
+    async function disconnect() {
+      await closeTerminalViaApi(currentTerminalId)
       if (ws) {
         try { ws.close() } catch {}
         ws = null
       }
       emit('close')
+    }
+
+    async function findOrCreateTerminal() {
+      if (currentTerminalId && ws) return currentTerminalId
+
+      try {
+        const listRes = await fetch(`${PROCESOS_API}/terminal?chatSessionId=${props.sessionId}`, {
+          credentials: 'include',
+        })
+        if (listRes.ok) {
+          const list = await listRes.json()
+          if (list.length > 0) {
+            const existing = list.find((t) => t.status === 'active') || list[0]
+            currentTerminalId = existing.terminalId
+            return currentTerminalId
+          }
+        }
+      } catch (err) {
+        console.log('[xterm] Error al buscar terminales:', err.message)
+      }
+
+      const tid = await createTerminalViaApi()
+      if (tid) currentTerminalId = tid
+      return tid
     }
 
     onMounted(async () => {
@@ -176,7 +242,10 @@ export default {
         resizeObserver.observe(wrapperRef.value)
       }
 
-      connectWebSocket()
+      const tid = await findOrCreateTerminal()
+      if (tid) {
+        connectWebSocket(tid)
+      }
     })
 
     onUnmounted(() => {

@@ -174,11 +174,11 @@ export default {
     },
     parsedInfo() {
       if (this.msg.role !== 'opencode_result') return null
+      if (typeof this.msg.content !== 'string' || !this.msg.content.startsWith('{')) return this.msg.extra || null
       try {
         const data = JSON.parse(this.msg.content)
         if (data.hash || data.extra?.hash) return data
-      } catch (e) {
-        console.error('Error parsing info message:', e)
+      } catch {
       }
       return this.msg.extra || null
     },

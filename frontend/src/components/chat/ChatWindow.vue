@@ -15,7 +15,7 @@
             — Todos los mensajes cargados —
           </div>
           <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
-          <XtermTerminal v-if="chat.showTerminal && activeSessionId && chat._terminalSessionId === activeSessionId" :label="chat.terminalLabel" :cwd="chat.terminalCwd" :initCommand="chat.terminalInitCommand" @close="onTerminalClose" />
+          <XtermTerminal v-if="chat.showTerminal && activeSessionId && chat._terminalSessionId === activeSessionId" :label="chat.terminalLabel" :cwd="chat.terminalCwd" :initCommand="chat.terminalInitCommand" :session-id="activeSessionId" :terminal-id="chat.terminalId" @close="onTerminalClose" />
         </div>
       </div>
       <DeteccionStateBar v-if="deteccionState.running && activeSessionId && getDeteccionSessionId() === activeSessionId" :deteccion-state="deteccionState" @abort="abortDeteccion" />
@@ -413,7 +413,8 @@ export default {
 
     watch(activeSessionId, (newId, oldId) => {
       if (oldId) {
-        ocStore.saveCurrentToMap(oldId, { ocInput: ocInput.value })
+        ocStore.saveCurrentToMap(oldId, { ocInput: ocInput.value, showTerminal: showAgentTerminal.value, terminalContent: terminalContent.value })
+        ocStore.setSessionShowTerminal(oldId, showAgentTerminal.value)
         ocInput.value = ''
       }
       if (newId) {
@@ -422,6 +423,11 @@ export default {
         streamingConsole.value = false
         streamingApi._syncStreamData(newId)
         ocInput.value = ocStore.getSessionOcInput(newId)
+        showAgentTerminal.value = ocStore.getSessionShowTerminal(newId)
+        const savedTerminal = ocStore.getSessionExtra(newId, 'terminalContent')
+        if (savedTerminal && !terminalContent.value) {
+          terminalContent.value = savedTerminal
+        }
       }
       loadTicketInfo()
       fetchGitBranch()

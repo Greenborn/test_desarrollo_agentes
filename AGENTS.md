@@ -72,6 +72,11 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 │       ├── services/
 │       │   └── memoriaStore.js  # Lógica compartida del store in-memory
 │       └── routes/        # memoria.routes.js (set/get/del/keys/clear/expire)
+├── api_procesos_consola/   # Servicio de gestión de terminales/procesos (Express + WS)
+│   └── src/
+│       ├── index.js        # Entrypoint (Express + WebSocket, puerto 3575)
+│       ├── routes/         # procesos.routes.js
+│       └── services/       # terminalManager.js, wsHandler.js, memoriaClient.js
 ├── playwright/            # Servicio Playwright (Express wrapper)
 │   └── src/
 │       ├── index.js       # Entrypoint (Express)
@@ -133,6 +138,13 @@ npm start                 # Iniciar servidor en producción
 ```bash
 npm run setup             # npm install + instalar navegadores chromium y firefox
 npm run dev               # Iniciar servidor con --watch (puerto 4098)
+npm start                 # Iniciar servidor en producción
+```
+
+### API Procesos Consola (`api_procesos_consola/`)
+
+```bash
+npm run dev               # Iniciar servidor con --watch (puerto 3575)
 npm start                 # Iniciar servidor en producción
 ```
 

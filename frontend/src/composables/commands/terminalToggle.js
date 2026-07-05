@@ -1,4 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
+import { useChatStore } from '../../stores/chat.js'
 
 const { register } = useCommandRegistry()
 
@@ -10,8 +11,9 @@ register({
   async execute(args, { chatStore, sessionId }) {
     if (chatStore.showTerminal) {
       chatStore.closeTerminal()
-    } else {
-      chatStore.openTerminal({ sessionId })
+      return
     }
+
+    chatStore.openTerminal({ sessionId })
   },
 })
