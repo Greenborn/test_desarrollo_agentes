@@ -832,7 +832,7 @@ export const useChatStore = defineStore('chat', () => {
     setOcStreaming, getIsOcStreaming, updateOcStreamCache, clearOcStreamCache,
     sessionTickets, activeSessionTicket, setSessionTicket, clearSessionTicket,
     _saveMessageToDb, clearPendingNotification, ledFlash, flashLed, showTerminal,
-    _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel, terminalId,
+    _terminalSessions, _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel, terminalId,
     _hasTerminal, openTerminal, closeTerminal,
     saveUiState,
   }
