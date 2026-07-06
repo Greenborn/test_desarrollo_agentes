@@ -112,18 +112,21 @@
 <script>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useChatStore } from '../../stores/chat.js'
-import { settingSet, settingGet } from '../../services/settingService.js'
-import ChatFormatter from '../chat/ChatFormatter.vue'
+import { useChatStore } from '../../../stores/chat.js'
+import { useModalStore } from '../../../stores/modal.js'
+import { settingSet, settingGet } from '../../../services/settingService.js'
+import ChatFormatter from '../../../components/chat/ChatFormatter.vue'
+import AlertModal from '../../../components/modals/AlertModal.vue'
 
 const SKILLS_AGENT_WIDTH_KEY = 'skills_agent_width'
 const SKILLS_AGENT_MIN_WIDTH = 120
 const SKILLS_EDITOR_MIN_WIDTH = 120
 
 export default {
-  components: { ChatFormatter },
+  components: { ChatFormatter, AlertModal },
   setup() {
     const chat = useChatStore()
+    const modal = useModalStore()
     const { sessions, activeSessionId } = storeToRefs(chat)
 
     const activeSession = computed(() => {
@@ -361,11 +364,11 @@ function resetAgentState() {
           const nuevo = skills.value.find(s => s.name === name.trim())
           if (nuevo) selectSkill(nuevo)
         } else {
-          alert(data.error || 'Error al crear skill')
+          modal.open(AlertModal, { message: data.error || 'Error al crear skill' }, { title: 'Error' })
         }
       } catch (err) {
         console.error('Error al crear skill:', err)
-        alert('Error al crear skill')
+        modal.open(AlertModal, { message: 'Error al crear skill' }, { title: 'Error' })
       }
     }
 

@@ -24,7 +24,7 @@ import gestorRoutes from './routes/gestor.routes.js';
 import comandosPersonalizadosRoutes, { stopAll as stopComandosPersonalizados } from './routes/comandosPersonalizados.routes.js';
 import proxyRoutes from './routes/proxy.routes.js';
 import archivosRoutes, { ensureStorageDir } from './routes/archivos.routes.js';
-import skillsRoutes from './routes/skills.routes.js';
+import { loadModuleRoutes } from './loadModules.js';
 import dbRoutes from './routes/db.routes.js';
 import procesosRoutes from './routes/procesos.routes.js';
 import opencode from './services/opencode.js';
@@ -65,12 +65,12 @@ app.use('/api/gestor', gestorRoutes);
 app.use('/api/comandos-personalizados', comandosPersonalizadosRoutes);
 app.use('/api/proxy', proxyRoutes);
 app.use('/api/archivos', archivosRoutes);
-app.use('/api/skills', skillsRoutes);
 app.use('/api/db', dbRoutes);
 app.use('/api/procesos', procesosRoutes);
 
 async function start() {
   ensureStorageDir();
+  await loadModuleRoutes(app);
   try {
     console.log('[migrate] Ejecutando migraciones pendientes...');
     await db.migrate.latest();

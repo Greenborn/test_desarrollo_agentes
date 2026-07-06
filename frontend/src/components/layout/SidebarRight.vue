@@ -12,7 +12,7 @@
       <button class="tab-btn" :class="{ active: tab === 'capturas' }" @click="selectTab('capturas')">Capturas</button>
       <button class="tab-btn" :class="{ active: tab === 'casos_prueba' }" @click="selectTab('casos_prueba')">Casos de Prueba</button>
       <button class="tab-btn" :class="{ active: tab === 'documentacion' }" @click="selectTab('documentacion')">Documentación</button>
-      <button class="tab-btn" :class="{ active: tab === 'skills' }" @click="selectTab('skills')">Skills</button>
+      <button v-for="t in moduleTabs" :key="t.id" class="tab-btn" :class="{ active: tab === t.id }" @click="selectTab(t.id)">{{ t.label }}</button>
     </div>
 
     <template v-if="tab === 'comentarios'">
@@ -191,8 +191,8 @@
     <template v-else-if="tab === 'documentacion'">
       <DocumentacionPanel :proyecto-id="proyectoId" :ticket-id="activeTicketId" />
     </template>
-    <template v-else-if="tab === 'skills'">
-      <SkillsTab />
+    <template v-for="t in moduleTabs" :key="t.id">
+      <component :is="t.component" v-if="tab === t.id" />
     </template>
     <div class="sidebar-right-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-right-resize-handle-bar"></div>
@@ -211,6 +211,7 @@ import { useComandosPersonalizadosStore } from '../../stores/comandosPersonaliza
 import { useDocumentacionNotasStore } from '../../stores/documentacionNotas.js'
 import { useModalStore } from '../../stores/modal.js'
 import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
+import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
 import { settingSet, settingGet } from '../../services/settingService.js'
 import VariableDetailModal from '../modals/VariableDetailModal.vue'
 import CreateVariableModal from '../modals/CreateVariableModal.vue'
@@ -218,10 +219,8 @@ import CapturaDetailModal from '../modals/CapturaDetailModal.vue'
 import FileTreePanel from '../files/FileTreePanel.vue'
 import FilePreviewPanel from '../files/FilePreviewPanel.vue'
 import DocumentacionPanel from '../documentation/DocumentacionPanel.vue'
-import SkillsTab from '../skills/SkillsTab.vue'
-
 export default {
-  components: { FileTreePanel, FilePreviewPanel, DocumentacionPanel, CreateVariableModal, SkillsTab },
+  components: { FileTreePanel, FilePreviewPanel, DocumentacionPanel, CreateVariableModal },
   setup() {
     const ui = useUiStore()
     const chat = useChatStore()
@@ -233,6 +232,10 @@ export default {
     const { rightPanelCollapsed, rightPanelWidth, centralPanelCollapsed, sidebarWidthPct, sidebarCollapsed, sidebarRightTab } = storeToRefs(ui)
     const { activeSessionId, sessions } = storeToRefs(chat)
     const { find } = useCommandRegistry()
+    const { sidebarRightTabs } = useModuleRegistry()
+    const moduleTabs = computed(() => {
+      return [...sidebarRightTabs].sort((a, b) => (a.priority || 50) - (b.priority || 50))
+    })
     const tab = ref('comentarios')
     const stopTabSync = watch(sidebarRightTab, (v) => { tab.value = v; stopTabSync() })
 

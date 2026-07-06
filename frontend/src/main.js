@@ -6,6 +6,9 @@ import 'bootstrap/dist/css/bootstrap.min.css'
 import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 
 import { useAuthStore } from './stores/auth.js'
+import { initModules } from './modules/index.js'
+
+initModules()
 
 import './composables/commands/iniciarNavegador.js'
 import './composables/commands/nuevaFuncionalidad.js'

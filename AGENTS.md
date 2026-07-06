@@ -33,6 +33,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 - **Prohibido ocultar errores en consola:** nunca silenciar un error sin registrarlo. Si un error es esperado y manejado, documentar por qué.
 - **Sistema de comandos extensible:** usar `useCommandRegistry.js` para registrar comandos via `register({ name, category, description, usage, execute })`. No agregar nuevos comandos fuera del registry.
 - **Espacios de trabajo (workspaces):** tabla `workspaces` con id y name. La selección activa se guarda como array en la sesión (`req.session.workspaceIds`). Settings, chat_sessions, proyectos y tickets se filtran por los workspaces seleccionados (IN). Al cambiar/seleccionar workspaces se detienen procesos OpenCode y navegador si se deseleccionó alguno.
+- **Prohibido `alert()` en el frontend:** toda notificación al usuario debe mostrarse mediante el sistema de modales personalizado (`AppModal.vue` + `stores/modal.js`). Usar `AlertModal.vue` para notificaciones simples de una línea. Cualquier `alert()` existente debe reemplazarse por un modal apropiado.
 
 ## Estructura
 

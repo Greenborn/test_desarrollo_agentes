@@ -53,12 +53,74 @@
         <pre v-else class="code-pre m-0"><code class="hljs" v-html="highlightedCode"></code></pre>
       </div>
     </template>
+    <template v-else-if="isCsv">
+      <div class="preview-header small text-muted px-2 py-1 flex-shrink-0 text-truncate d-flex align-items-center justify-content-between">
+        <span class="text-truncate">{{ fileName }}</span>
+      </div>
+      <div v-if="csvLoading" class="d-flex align-items-center justify-content-center text-secondary small py-4">
+        Cargando vista previa CSV…
+      </div>
+      <div v-else-if="csvError" class="d-flex flex-column align-items-center justify-content-center text-danger small px-3 py-3">
+        <span>{{ csvError }}</span>
+        <button class="btn btn-sm btn-outline-secondary mt-2" @click="loadPreview">Reintentar</button>
+      </div>
+      <template v-else>
+        <div class="csv-controls d-flex flex-wrap align-items-center gap-2 px-2 py-1 flex-shrink-0" style="background: #1a1a2e; border-bottom: 1px solid #374151;">
+          <div class="d-flex align-items-center gap-1">
+            <label class="small text-muted" style="white-space: nowrap; font-size: 0.65rem;">Delimitador:</label>
+            <select class="form-select form-select-sm" v-model="csvDelimiter" style="width: 90px;" @change="reparseCsv">
+              <option value=",">Coma (,)</option>
+              <option value=";">Punto y coma (;)</option>
+              <option value="	">Tabulador</option>
+              <option value="|">Pipe (|)</option>
+            </select>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <label class="small text-muted" style="white-space: nowrap; font-size: 0.65rem;">Calificador:</label>
+            <select class="form-select form-select-sm" v-model="csvQuoteChar" style="width: 80px;" @change="reparseCsv">
+              <option value='"'>""</option>
+              <option value="'">''</option>
+            </select>
+          </div>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="checkbox" id="previewHasHeader" v-model="csvHasHeader" @change="reparseCsv" style="transform: scale(0.8);">
+            <label class="form-check-label small text-muted" for="previewHasHeader" style="font-size: 0.65rem;">Header</label>
+          </div>
+          <span class="text-muted small ms-auto" style="font-size: 0.65rem;">{{ csvColumns.length }} col · {{ csvTotalRows }} filas</span>
+        </div>
+        <div class="csv-table-wrapper overflow-auto flex-grow-1" style="min-height: 0;">
+          <table class="table table-sm table-dark table-bordered mb-0" style="font-size: 0.65rem;">
+            <thead v-if="csvColumns.length > 0">
+              <tr>
+                <th class="text-center" style="width: 24px; color: #6b7280;">#</th>
+                <th v-for="(col, ci) in csvColumns" :key="ci" class="text-nowrap" style="color: #75AADB;">{{ col }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, ri) in csvPreviewRows" :key="ri">
+                <td class="text-center text-muted" style="font-size: 0.6rem;">{{ ri + 1 }}</td>
+                <td v-for="(cell, ci) in row" :key="ci" class="text-nowrap">{{ cell }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="csvPreviewRows.length < csvTotalRows" class="text-muted small text-center py-2" style="font-size: 0.65rem;">
+            Mostrando {{ csvPreviewRows.length }} de {{ csvTotalRows }} filas
+          </div>
+          <div v-if="csvColumns.length === 0 && !csvLoading" class="text-muted small text-center p-3" style="font-size: 0.65rem;">
+            No se pudieron parsear filas. Revise los parámetros de parseo.
+          </div>
+        </div>
+        <div class="d-flex align-items-center px-2 py-1 flex-shrink-0" style="background: #1a1a2e; border-top: 1px solid #374151;">
+          <button class="btn btn-sm btn-outline-secondary ms-auto" style="font-size: 0.65rem;" @click="openCsvDetail">Ver detalle</button>
+        </div>
+      </template>
+    </template>
     <template v-else>
       <div class="preview-header small text-muted px-2 py-1 flex-shrink-0 text-truncate">
         {{ fileName }}
       </div>
       <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
-        <span>Vista previa solo disponible para archivos .md y código</span>
+        <span>Vista previa solo disponible para archivos .md, código y .csv</span>
       </div>
     </template>
   </div>
@@ -70,6 +132,9 @@ import hljs from 'highlight.js'
 import 'highlight.js/styles/atom-one-dark.css'
 import ChatFormatter from '../chat/ChatFormatter.vue'
 import { useSettingsStore } from '../../stores/settings.js'
+import { useModalStore } from '../../stores/modal.js'
+import { useCsvParser } from '../../composables/useCsvParser.js'
+import CsvViewerModal from './CsvViewerModal.vue'
 
 const EXT_TO_LANG = {
   js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
@@ -144,6 +209,10 @@ export default {
       return codeExtensions.value.includes(fileExtension.value)
     })
 
+    const isCsv = computed(() => {
+      return props.filePath ? props.filePath.toLowerCase().endsWith('.csv') : false
+    })
+
     const detectedLanguage = computed(() => {
       const ext = fileExtension.value
       return EXT_TO_LANG[ext] || null
@@ -158,6 +227,32 @@ export default {
       navigator.clipboard.writeText(content.value).catch(err => {
         console.error('Error al copiar al portapapeles:', err)
       })
+    }
+
+    const modal = useModalStore()
+    const { parseCsv: parseCsvRaw } = useCsvParser()
+
+    const csvRawContent = ref('')
+    const csvLoading = ref(false)
+    const csvError = ref(null)
+    const csvDelimiter = ref(',')
+    const csvQuoteChar = ref('"')
+    const csvHasHeader = ref(true)
+    const csvColumns = ref([])
+    const csvRows = ref([])
+
+    const csvTotalRows = computed(() => csvRows.value.length)
+    const MAX_PREVIEW_ROWS = 30
+    const csvPreviewRows = computed(() => csvRows.value.slice(0, MAX_PREVIEW_ROWS))
+
+    function reparseCsv() {
+      const result = parseCsvRaw(csvRawContent.value, csvDelimiter.value, csvQuoteChar.value, csvHasHeader.value)
+      csvColumns.value = result.columns
+      csvRows.value = result.rows
+    }
+
+    function openCsvDetail() {
+      modal.open(CsvViewerModal, { filePath: props.filePath }, { title: `CSV: ${fileName.value}`, wide: true })
     }
 
     const isTooLarge = computed(() => {
@@ -187,7 +282,36 @@ export default {
     }
 
     async function loadPreview() {
-      if (!props.filePath || (!isMarkdown.value && !isCodeFile.value)) {
+      if (!props.filePath) {
+        content.value = ''
+        error.value = null
+        csvRawContent.value = ''
+        csvRows.value = []
+        csvColumns.value = []
+        return
+      }
+      if (isCsv.value) {
+        csvLoading.value = true
+        csvError.value = null
+        try {
+          const res = await fetch(`/api/command/read-file?path=${encodeURIComponent(props.filePath)}`, {
+            credentials: 'include',
+          })
+          const data = await res.json()
+          if (data.success) {
+            csvRawContent.value = data.content
+            reparseCsv()
+          } else {
+            csvError.value = data.error || 'Error al leer el archivo'
+          }
+        } catch (err) {
+          csvError.value = err.message || 'Error de conexión'
+        } finally {
+          csvLoading.value = false
+        }
+        return
+      }
+      if (!isMarkdown.value && !isCodeFile.value) {
         content.value = ''
         error.value = null
         return
@@ -215,7 +339,7 @@ export default {
       loadPreview()
     })
 
-    return { content, loading, error, fileName, isMarkdown, isCodeFile, canCopy, copyToClipboard, isTooLarge, maxSizeKb, highlightedCode, loadPreview }
+    return { content, loading, error, fileName, isMarkdown, isCodeFile, isCsv, canCopy, copyToClipboard, isTooLarge, maxSizeKb, highlightedCode, loadPreview, csvLoading, csvError, csvDelimiter, csvQuoteChar, csvHasHeader, csvColumns, csvRows, csvTotalRows, csvPreviewRows, reparseCsv, openCsvDetail }
   },
 }
 </script>
@@ -255,5 +379,30 @@ export default {
   font-size: 0.8rem;
   line-height: 1.5;
   color: #c9d1d9;
+}
+.csv-controls {
+  font-size: 0.65rem;
+}
+.csv-table-wrapper {
+  background: #0d1117;
+}
+.csv-table-wrapper table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.csv-table-wrapper th {
+  position: sticky;
+  top: 0;
+  background: #1a1a2e;
+  z-index: 1;
+}
+.csv-table-wrapper td,
+.csv-table-wrapper th {
+  padding: 2px 6px;
+  border-color: #30363d;
+  white-space: nowrap;
+}
+.csv-table-wrapper tbody tr:hover {
+  background: rgba(117, 170, 219, 0.06);
 }
 </style>

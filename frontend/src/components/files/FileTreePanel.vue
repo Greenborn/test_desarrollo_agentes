@@ -53,6 +53,8 @@ import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useModalStore } from '../../stores/modal.js'
 import { useFileTreeStore } from '../../stores/fileTree.js'
 import FileEditorModal from './FileEditorModal.vue'
+import CsvViewerModal from './CsvViewerModal.vue'
+import AlertModal from '../modals/AlertModal.vue'
 
 const FILE_ICONS = {
   js: '\u{1F4D1}',
@@ -77,6 +79,7 @@ const FILE_ICONS = {
   lock: '\u{1F512}',
   sql: '\u{1F4BE}',
   xml: '\u{1F4C4}',
+  csv: '\u{1F4CA}',
   txt: '\u{1F4C4}',
   log: '\u{1F4C4}',
 }
@@ -120,7 +123,11 @@ export default {
     function openFile(path) {
       const name = path.split('/').pop() || path
       selectedFile.value = path
-      modal.open(FileEditorModal, { filePath: path, sessionId: props.sessionId }, { title: `Editar: ${name}`, wide: true })
+      if (name.toLowerCase().endsWith('.csv')) {
+        modal.open(CsvViewerModal, { filePath: path }, { title: `CSV: ${name}`, wide: true })
+      } else {
+        modal.open(FileEditorModal, { filePath: path, sessionId: props.sessionId }, { title: `Editar: ${name}`, wide: true })
+      }
     }
 
     function getFileIcon(node) {
@@ -200,11 +207,11 @@ export default {
             fileTreeStore.fetchTree(props.sessionId)
           }
         } else {
-          alert(`Error al eliminar archivo: ${data.error}`)
+          modal.open(AlertModal, { message: `Error al eliminar archivo: ${data.error}` }, { title: 'Error' })
         }
       } catch (err) {
         console.error('Error al eliminar archivo:', err)
-        alert(`Error al eliminar archivo: ${err.message}`)
+        modal.open(AlertModal, { message: `Error al eliminar archivo: ${err.message}` }, { title: 'Error' })
       }
     }
 

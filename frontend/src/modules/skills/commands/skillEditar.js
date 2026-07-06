@@ -1,8 +1,4 @@
-import { useCommandRegistry } from '../useCommandRegistry.js'
-
-const { register } = useCommandRegistry()
-
-register({
+export default {
   name: '/skill_editar',
   category: 'Skills',
   description: 'Crea o edita un skill usando OpenCode. Si no existe, lo crea automáticamente. Toma el cwd de la sesión de chat.',
@@ -255,4 +251,4 @@ ${cleanedResponse ? '**Respuesta del agente:**\n' + cleanedResponse + '\n\n' : '
 ${finalContent}
 \`\`\``
   },
-})
+}

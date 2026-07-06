@@ -161,7 +161,14 @@ export default {
         const session = chatStore.sessions.find(s => Number(s.id) === Number(sessionId))
         const cwd = session?.cwd || ''
         if (!cwd) {
-          return 'No hay directorio asociado a esta sesión. Usá /cd para establecer un directorio de trabajo.'
+          return {
+            role: 'opencode_control',
+            controlData: {
+              controlType: 'cd_selector',
+              controlId: 'cd-' + Date.now(),
+              currentDir: '/',
+            },
+          }
         }
 
         chatStore.openTerminal({ cwd, initCommand: 'opencode', label: 'OpenCode', sessionId })

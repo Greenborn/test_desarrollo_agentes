@@ -31,14 +31,17 @@
 <script>
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useModalStore } from '../../stores/modal.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useChatStore } from '../../stores/chat.js'
+import AlertModal from '../modals/AlertModal.vue'
 
 export default {
   emits: ['close'],
   setup(props, { emit }) {
     const wsStore = useWorkspaceStore()
+    const modal = useModalStore()
     const auth = useAuthStore()
     const chatStore = useChatStore()
     const { workspaces } = storeToRefs(wsStore)
@@ -62,7 +65,7 @@ export default {
     async function applySelection() {
       let ids = [...selected.value]
       if (ids.length === 0) {
-        alert('Debe seleccionar al menos un espacio de trabajo.')
+        modal.open(AlertModal, { message: 'Debe seleccionar al menos un espacio de trabajo.' }, { title: 'Aviso' })
         return
       }
 
