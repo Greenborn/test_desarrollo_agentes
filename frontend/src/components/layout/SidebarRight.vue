@@ -87,24 +87,57 @@
       <div v-else-if="loadingComandos" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small">
         <span>Cargando comandos…</span>
       </div>
-      <div v-else-if="comandos.length === 0" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
-        <span>No hay comandos personalizados para este proyecto</span>
-        <button class="btn btn-sm btn-outline-argentina mt-2" style="font-size: 0.7rem;" @click.stop="crearComando">+ Crear comando</button>
-      </div>
       <div v-else class="comandos-list flex-grow-1 overflow-y-auto px-2 py-1">
-        <button class="btn btn-sm btn-outline-argentina w-100 mb-2" style="font-size: 0.7rem;" @click.stop="crearComando">+ Crear comando</button>
-        <div v-for="c in comandos" :key="c.id" class="comando-item d-flex flex-column px-2 py-2 mb-1 rounded">
-          <div class="d-flex align-items-center gap-1 mb-1">
-            <span class="comando-label small fw-semibold text-truncate">{{ c.label }}</span>
+        <!-- Personal commands -->
+        <template v-if="comandos.length > 0">
+          <button class="btn btn-sm btn-outline-argentina w-100 mb-2" style="font-size: 0.7rem;" @click.stop="crearComando">+ Crear comando</button>
+          <div v-for="c in comandos" :key="c.id" class="comando-item d-flex flex-column px-2 py-2 mb-1 rounded">
+            <div class="d-flex align-items-center gap-1 mb-1">
+              <span class="comando-label small fw-semibold text-truncate">{{ c.label }}</span>
+            </div>
+            <div v-if="c.descripcion" class="comando-desc text-muted small text-truncate mb-2">{{ c.descripcion }}</div>
+            <div class="d-flex gap-1 justify-content-end">
+              <button v-if="!executingCommands.has(c.id)" class="btn btn-sm btn-outline-success py-0 px-2" style="font-size: 0.65rem;" @click.stop="ejecutarComando(c)">▶ Ejecutar</button>
+              <button v-else class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size: 0.65rem;" @click.stop="detenerComando(c)">⏹ Detener</button>
+              <button class="btn btn-sm btn-outline-info py-0 px-2" style="font-size: 0.65rem;" @click.stop="editarComando(c)">✏</button>
+              <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.65rem;" @click.stop="copiarComando(c)">📋</button>
+              <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.65rem;" @click.stop="eliminarComando(c)">🗑</button>
+            </div>
           </div>
-          <div v-if="c.descripcion" class="comando-desc text-muted small text-truncate mb-2">{{ c.descripcion }}</div>
-          <div class="d-flex gap-1 justify-content-end">
-            <button v-if="!executingCommands.has(c.id)" class="btn btn-sm btn-outline-success py-0 px-2" style="font-size: 0.65rem;" @click.stop="ejecutarComando(c)">▶ Ejecutar</button>
-            <button v-else class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size: 0.65rem;" @click.stop="detenerComando(c)">⏹ Detener</button>
-            <button class="btn btn-sm btn-outline-info py-0 px-2" style="font-size: 0.65rem;" @click.stop="editarComando(c)">✏</button>
-            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.65rem;" @click.stop="copiarComando(c)">📋</button>
-            <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.65rem;" @click.stop="eliminarComando(c)">🗑</button>
+        </template>
+
+        <!-- Package.json scripts -->
+        <template v-if="packageScripts.length > 0">
+          <div class="section-divider d-flex align-items-center gap-2 my-2 px-1">
+            <span class="text-muted flex-shrink-0" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">Scripts package.json</span>
+            <div class="flex-grow-1" style="height: 1px; background: #374151;"></div>
           </div>
+          <div v-if="loadingPackageScripts" class="d-flex align-items-center justify-content-center text-secondary small py-2">
+            <span>Cargando scripts…</span>
+          </div>
+          <div v-else>
+            <div v-for="pkg in packageScripts" :key="pkg.relativePath" class="package-group mb-2">
+              <div class="package-path small text-muted px-1 mb-1" style="font-size: 0.6rem;">📦 {{ pkg.relativePath }}</div>
+              <div v-for="script in pkg.scripts" :key="script.name" class="script-item d-flex align-items-center px-2 py-1 mb-1 rounded">
+                <div class="flex-grow-1 min-width-0">
+                  <div class="script-name small fw-semibold text-truncate">{{ script.name }}</div>
+                  <div class="script-command text-muted" style="font-size: 0.55rem; font-family: monospace;">$ {{ script.command }}</div>
+                </div>
+                <button v-if="!executingScripts.has(pkg.relativePath + '/' + script.name)"
+                        class="btn btn-sm btn-outline-success py-0 px-2 flex-shrink-0" style="font-size: 0.65rem;"
+                        @click.stop="ejecutarNpmScript(pkg.relativePath, script.name, script.command)">▶ Ejecutar</button>
+                <button v-else
+                        class="btn btn-sm btn-outline-warning py-0 px-2 flex-shrink-0" style="font-size: 0.65rem;"
+                        @click.stop="detenerNpmScript(pkg.relativePath, script.name)">⏹</button>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Empty state fallback -->
+        <div v-if="comandos.length === 0 && packageScripts.length === 0" class="d-flex flex-column align-items-center justify-content-center text-secondary small px-3 text-center py-3">
+          <span>No hay comandos disponibles para este proyecto</span>
+          <button class="btn btn-sm btn-outline-argentina mt-2" style="font-size: 0.7rem;" @click.stop="crearComando">+ Crear comando</button>
         </div>
       </div>
     </template>
@@ -746,9 +779,47 @@ export default {
       if (proyectoId.value && filtrarPorSesion.value) {
         loadCapturas(proyectoId.value)
       }
+      if (activeSessionId.value) {
+        loadPackageScripts()
+      } else {
+        packageScripts.value = []
+      }
+    })
+
+    watch(tab, (newTab) => {
+      if (newTab === 'comandos' && activeSessionId.value) {
+        loadPackageScripts()
+      }
     })
 
     const executingCommands = ref(new Map())
+
+    const packageScripts = ref([])
+    const loadingPackageScripts = ref(false)
+    const executingScripts = ref(new Map())
+
+    async function loadPackageScripts() {
+      const sid = activeSessionId.value
+      if (!sid) {
+        packageScripts.value = []
+        return
+      }
+      loadingPackageScripts.value = true
+      try {
+        const res = await fetch(`/api/command/package-json-scripts?sessionId=${sid}`, { credentials: 'include' })
+        if (res.ok) {
+          const data = await res.json()
+          packageScripts.value = data.packages || []
+        } else {
+          packageScripts.value = []
+        }
+      } catch (err) {
+        console.error('Error al cargar scripts package.json:', err)
+        packageScripts.value = []
+      } finally {
+        loadingPackageScripts.value = false
+      }
+    }
 
     function _updateStreamMsg(streamKey, content) {
       const idx = chat.messages.findIndex(m => m._key === streamKey)
@@ -865,6 +936,114 @@ export default {
 
     function detenerComando(c) {
       const abortController = executingCommands.value.get(c.id)
+      if (abortController) {
+        abortController.abort()
+      }
+    }
+
+    async function ejecutarNpmScript(pkgDir, scriptName, scriptCommand) {
+      const sid = activeSessionId.value
+      if (!sid || executingScripts.value.has(pkgDir + '/' + scriptName)) return
+
+      const abortController = new AbortController()
+      executingScripts.value.set(pkgDir + '/' + scriptName, abortController)
+
+      const streamKey = 'stream-npm-' + Date.now()
+      const isActive = () => Number(chat.activeSessionId) === Number(sid)
+
+      if (isActive()) {
+        chat.messages.push({ role: 'result', content: '⏳ Ejecutando npm run ' + scriptName + '...', _key: streamKey })
+        chat.flashLed(sid)
+      }
+      chat.setSessionStatus(sid, 'executing')
+
+      const done = () => {
+        executingScripts.value.delete(pkgDir + '/' + scriptName)
+        chat.setSessionStatus(sid, 'idle')
+      }
+
+      let fullOutput = ''
+      try {
+        const res = await fetch('/api/command/execute-npm-script', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ sessionId: sid, dir: pkgDir, scriptName }),
+          signal: abortController.signal,
+        })
+        if (!res.ok) {
+          const errData = await res.json()
+          throw new Error(errData.error || 'Error al ejecutar script npm')
+        }
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buf = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buf += decoder.decode(value, { stream: true })
+          const lines = buf.split('\n')
+          buf = lines.pop() || ''
+
+          for (const line of lines) {
+            const t = line.trim()
+            if (!t || t === 'data: [DONE]') continue
+            if (!t.startsWith('data: ')) continue
+            try {
+              const json = JSON.parse(t.slice(6))
+              if (json.type === 'stdout' || json.type === 'stderr') {
+                fullOutput += json.content
+                if (isActive()) _updateStreamMsg(streamKey, fullOutput)
+              } else if (json.type === 'error') {
+                fullOutput += '\n[Error: ' + json.content + ']'
+              }
+            } catch {}
+          }
+        }
+
+        const finalContent = fullOutput || '(sin salida)'
+        await fetch('/api/chat/sessions/' + sid + '/save-messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            messages: [
+              { role: 'command', content: 'npm run ' + scriptName },
+              { role: 'result', content: finalContent },
+            ],
+          }),
+        })
+        if (isActive()) _updateStreamMsg(streamKey, finalContent)
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          const finalContent = '(ejecución detenida)'
+          await fetch('/api/chat/sessions/' + sid + '/save-messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              messages: [
+                { role: 'command', content: 'npm run ' + scriptName },
+                { role: 'result', content: finalContent },
+              ],
+            }),
+          })
+          if (isActive()) _updateStreamMsg(streamKey, finalContent)
+        } else {
+          console.error('Error ejecutando npm script:', err)
+          chat.setSessionStatus(sid, 'error')
+          if (isActive()) _updateStreamMsg(streamKey, 'Error: ' + err.message)
+        }
+      } finally {
+        done()
+      }
+    }
+
+    function detenerNpmScript(pkgDir, scriptName) {
+      const key = pkgDir + '/' + scriptName
+      const abortController = executingScripts.value.get(key)
       if (abortController) {
         abortController.abort()
       }
@@ -1035,6 +1214,11 @@ export default {
       copiarComando,
       eliminarComando,
       executingCommands,
+      packageScripts,
+      loadingPackageScripts,
+      executingScripts,
+      ejecutarNpmScript,
+      detenerNpmScript,
       onResizeStart,
       selectedFilePath,
       effectiveArchivosTreeWidth,
@@ -1238,6 +1422,28 @@ export default {
 .comando-desc {
   font-size: 0.65rem;
   line-height: 1.2;
+}
+.package-group {
+  background: transparent;
+}
+.package-path {
+  color: #6b7280;
+}
+.script-item {
+  background: #1a2744;
+  border: 1px solid #374151;
+  cursor: default;
+}
+.script-item:hover {
+  background: #1e3050;
+}
+.script-name {
+  color: #e8b800;
+  font-size: 0.7rem;
+}
+.script-command {
+  color: #6b7280;
+  font-family: monospace;
 }
 .archivos-container {
   min-height: 0;

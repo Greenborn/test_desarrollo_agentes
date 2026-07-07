@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import db from '../config/db.js';
 
 const router = Router();
@@ -894,5 +894,150 @@ router.post('/delete-file', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+const EXCLUDE_DIRS = new Set(['node_modules', '.git', '.opencode', 'vendor', '.cache', 'dist', 'build'])
+
+function scanPackageJsonScripts(baseDir, maxDepth = 3) {
+  const results = []
+  function walk(dir, depth) {
+    if (depth > maxDepth) return
+    let entries
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (EXCLUDE_DIRS.has(entry.name)) continue
+      if (entry.name === 'package.json' && entry.isFile()) {
+        try {
+          const content = fs.readFileSync(path.join(dir, entry.name), 'utf-8')
+          const json = JSON.parse(content)
+          if (json.scripts && typeof json.scripts === 'object') {
+            const relativePath = path.relative(baseDir, dir) || '.'
+            const scripts = Object.entries(json.scripts)
+              .filter(([, cmd]) => cmd && typeof cmd === 'string' && cmd.trim())
+              .map(([name, command]) => ({ name, command: command.trim() }))
+            if (scripts.length > 0) {
+              results.push({ relativePath, scripts })
+            }
+          }
+        } catch {
+          // skip invalid package.json
+        }
+        continue
+      }
+      if (entry.isDirectory()) {
+        walk(path.join(dir, entry.name), depth + 1)
+      }
+    }
+  }
+  walk(baseDir, 0)
+  return results.sort((a, b) => a.relativePath.localeCompare(b.relativePath))
+}
+
+router.get('/package-json-scripts', async (req, res) => {
+  if (!authGuard(req, res)) return
+  try {
+    let cwd = process.cwd()
+    const sessionId = req.query.sessionId ? parseInt(req.query.sessionId) : null
+    if (sessionId) {
+      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first()
+      if (session && session.cwd) cwd = session.cwd
+    }
+    const packages = scanPackageJsonScripts(cwd)
+    res.json({ packages })
+  } catch (err) {
+    console.log('Error al escanear package.json scripts:', err.message)
+    res.json({ packages: [] })
+  }
+})
+
+router.post('/execute-npm-script', async (req, res) => {
+  if (!authGuard(req, res)) return
+  const { sessionId, dir, scriptName } = req.body
+  if (!scriptName) {
+    return res.status(400).json({ error: 'scriptName es requerido' })
+  }
+
+  try {
+    let cwd = process.cwd()
+    if (sessionId) {
+      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first()
+      if (session && session.cwd) cwd = session.cwd
+    }
+
+    const targetDir = dir ? path.resolve(cwd, dir) : cwd
+    if (!fs.existsSync(targetDir)) {
+      return res.status(400).json({ error: `El directorio '${targetDir}' no existe` })
+    }
+    if (!fs.statSync(targetDir).isDirectory()) {
+      return res.status(400).json({ error: `'${targetDir}' no es un directorio` })
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    })
+
+    const proc = spawn('npm', ['run', scriptName], {
+      cwd: targetDir,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+
+    let aborted = false
+    const cleanup = () => {
+      if (!aborted) {
+        aborted = true
+        proc.kill('SIGTERM')
+      }
+    }
+
+    req.on('close', cleanup)
+
+    proc.stdout.on('data', (data) => {
+      if (aborted) return
+      const text = data.toString()
+      if (text) {
+        res.write(`data: ${JSON.stringify({ type: 'stdout', content: text })}\n\n`)
+      }
+    })
+
+    proc.stderr.on('data', (data) => {
+      if (aborted) return
+      const text = data.toString()
+      if (text) {
+        res.write(`data: ${JSON.stringify({ type: 'stderr', content: text })}\n\n`)
+      }
+    })
+
+    proc.on('exit', (code) => {
+      if (!aborted) {
+        res.write(`data: ${JSON.stringify({ type: 'exit', code })}\n\n`)
+        res.write('data: [DONE]\n\n')
+      }
+      res.end()
+    })
+
+    proc.on('error', (err) => {
+      if (!aborted) {
+        res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`)
+        res.write('data: [DONE]\n\n')
+      }
+      res.end()
+    })
+  } catch (err) {
+    console.log('Error al ejecutar npm script:', err.message)
+    if (res.headersSent) {
+      res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`)
+      res.write('data: [DONE]\n\n')
+      res.end()
+    } else {
+      res.status(500).json({ error: err.message })
+    }
+  }
+})
 
 export default router;
