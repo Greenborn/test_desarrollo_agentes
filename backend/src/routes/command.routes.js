@@ -895,6 +895,38 @@ router.post('/delete-file', async (req, res) => {
   }
 });
 
+router.post('/open-in-explorer', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { path: targetPath } = req.body;
+    if (!targetPath) {
+      return res.status(400).json({ success: false, error: 'El campo path es requerido' });
+    }
+    if (!fs.existsSync(targetPath)) {
+      return res.status(404).json({ success: false, error: `La ruta '${targetPath}' no existe` });
+    }
+
+    let openPath = targetPath;
+    if (!fs.statSync(targetPath).isDirectory()) {
+      openPath = path.dirname(targetPath);
+    }
+
+    const platform = process.platform;
+    if (platform === 'darwin') {
+      execSync(`open "${openPath}"`);
+    } else if (platform === 'win32') {
+      execSync(`explorer "${openPath}"`);
+    } else {
+      execSync(`xdg-open "${openPath}"`);
+    }
+
+    res.json({ success: true, path: openPath });
+  } catch (err) {
+    console.log('Error en open-in-explorer:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 const EXCLUDE_DIRS = new Set(['node_modules', '.git', '.opencode', 'vendor', '.cache', 'dist', 'build'])
 
 function scanPackageJsonScripts(baseDir, maxDepth = 3) {

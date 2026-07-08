@@ -412,6 +412,12 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - Si `sessionId` existe, guarda `command`/`result` en `chat_messages`
 - **Respuesta:** `{ success: boolean, result: string, command: string }`
 
+### `POST /api/command/open-in-explorer`
+- **Auth:** Requerida
+- **Body:** `{ path: string }` — ruta absoluta del archivo o directorio
+- **Descripción:** Abre la carpeta en el explorador de archivos del sistema. Si `path` es un archivo, abre la carpeta contenedora. Usa `xdg-open` (Linux), `open` (macOS) o `explorer` (Windows).
+- **Respuesta:** `{ success: true, path: string }`
+
 ---
 
 ## OpenCode (`/api/opencode`)

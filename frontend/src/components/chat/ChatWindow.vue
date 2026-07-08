@@ -1,6 +1,5 @@
 <template>
   <div class="d-flex flex-column h-100 overflow-x-hidden" @click="closeCtxMenu">
-    <TicketInfoBar :ticket-info="ticketInfo" :active-session-id="activeSessionId" :dev-instance-running="devInstanceRunning" @clear-chat="clearChat" @generar-commit="generarCommit" @iniciar-instancia-dev="iniciarInstanciaDev" @detener-instancia-dev="detenerInstanciaDev" @iniciar-opencode="iniciarOpencode" @crear-ticket="crearTicket" />
     <div class="d-flex flex-column flex-grow-1 overflow-hidden" style="min-height: 0;" :style="{ display: (ocMaximized && isOcSessionActive) ? 'none' : '' }">
       <div class="flex-grow-1 overflow-y-auto" ref="messagesContainer" style="min-height: 0;" :style="{ fontSize: gitStore.chatZoom + '%' }">
         <div v-if="!activeSessionId" class="text-center text-muted mt-5">
@@ -49,7 +48,6 @@ import { useNetworkLogStream } from '../../composables/useNetworkLogStream.js'
 import { useChatScroll } from '../../composables/useChatScroll.js'
 import { useOpencodeStreaming } from '../../composables/useOpencodeStreaming.js'
 import { useControlHandlers } from '../../composables/useControlHandlers.js'
-import TicketInfoBar from './TicketInfoBar.vue'
 import ChatMessage from './ChatMessage.vue'
 import DeepSeekChatFab from './DeepSeekChatFab.vue'
 import XtermTerminal from './XtermTerminal.vue'
@@ -60,7 +58,7 @@ import ContextMenuChat from './ContextMenuChat.vue'
 import HelpContent from '../help/HelpModal.vue'
 
 export default {
-  components: { TicketInfoBar, ChatMessage, DeepSeekChatFab, XtermTerminal, OpenCodeAgentTerminal, DeteccionStateBar, OpenCodeStickyBar, ContextMenuChat },
+  components: { ChatMessage, DeepSeekChatFab, XtermTerminal, OpenCodeAgentTerminal, DeteccionStateBar, OpenCodeStickyBar, ContextMenuChat },
   setup() {
     const chat = useChatStore()
     const cmdStore = useCommandStore()
@@ -161,8 +159,6 @@ export default {
         (streamingConsole.value || devInstanceStore.browserSessions.length > 0)
       )
     })
-
-    const devInstanceRunning = computed(() => devInstanceStore.hasProcesses)
 
     function refreshVariablesOnConsoleLog() {
       const sid = chat.activeSessionId
@@ -336,39 +332,6 @@ export default {
         console.error('Error al eliminar mensaje:', err)
       }
       closeCtxMenu()
-    }
-
-    async function generarCommit() {
-      if (!chat.activeSessionId) return
-      await executeCommand('/dev_opencode_generar_commit')
-    }
-
-    async function iniciarInstanciaDev() {
-      if (!chat.activeSessionId) return
-      await executeCommand('/despliegue_iniciar_instancia')
-      await devInstanceStore.fetchStatus()
-    }
-
-    async function detenerInstanciaDev() {
-      if (!chat.activeSessionId) return
-      await executeCommand('/despliegue_detener_instancia')
-      await devInstanceStore.fetchStatus()
-    }
-
-    async function crearTicket() {
-      if (!chat.activeSessionId) return
-      await executeCommand('/redmine_crear_ticket')
-    }
-
-    async function clearChat() {
-      const confirmed = confirm('¿Eliminar todos los mensajes de este chat? Esta acción no se puede deshacer.')
-      if (!confirmed) return
-      await chat.clearMessages(chat.activeSessionId)
-    }
-
-    async function iniciarOpencode() {
-      if (!chat.activeSessionId) return
-      await executeCommand('/dev_opencode_iniciar')
     }
 
     async function handleFabSend(text) {
@@ -550,13 +513,11 @@ export default {
       chat, activeSessionId, messages, streaming, currentChunk, currentThinking,
       sessions, loadingMore, hasMoreMessages, input, gitStore, ocStore,
       ocInput, ocStreaming, terminalContent, sessionCwd, terminalSessions, onTerminalClose, onTerminalReady, onTerminalExit,
-      ticketInfo, devInstanceRunning, ocMaximized, isOcSessionActive,
+      ticketInfo, ocMaximized, isOcSessionActive,
       deteccionState, abortDeteccion,
       ctxMenu, rawMsgKeys, msgKey,
       messagesContainer,
       send, handleFabSend, sendToOpencodeFromSticky, finishOpencode,
-      generarCommit, iniciarInstanciaDev, detenerInstanciaDev,
-      clearChat, crearTicket, iniciarOpencode,
       onControlConfirm, toggleOcMaximized,
       onContextMenu, closeCtxMenu, toggleRawView, copyPlainText, deleteMessage,
       showAgentTerminal, clearAgentTerminal,

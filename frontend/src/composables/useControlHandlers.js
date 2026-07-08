@@ -679,6 +679,8 @@ export function useControlHandlers(api) {
         const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
         if (data.success) {
           cmdStore.currentDir = data.result
+          const session = chat.sessions.find(s => Number(s.id) === Number(chat.activeSessionId))
+          if (session) session.cwd = data.result
           if (idx >= 0) {
             chat.messages[idx] = {
               role: 'result',

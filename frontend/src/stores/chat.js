@@ -91,6 +91,7 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
       terminals.push({ terminalId: null, cwd: '', initCommand: '', label: 'terminal' })
+      flashLed(sid)
       return
     }
 
@@ -100,6 +101,7 @@ export const useChatStore = defineStore('chat', () => {
         if (config.cwd !== undefined) existing.cwd = config.cwd
         if (config.initCommand !== undefined) existing.initCommand = config.initCommand
         if (config.label !== undefined) existing.label = config.label
+        flashLed(sid)
         return
       }
       const unnamed = terminals.find(t => !t.terminalId)
@@ -108,6 +110,7 @@ export const useChatStore = defineStore('chat', () => {
         if (config.cwd !== undefined) unnamed.cwd = config.cwd
         if (config.initCommand !== undefined) unnamed.initCommand = config.initCommand
         if (config.label !== undefined) unnamed.label = config.label
+        flashLed(sid)
         return
       }
     }
@@ -118,6 +121,7 @@ export const useChatStore = defineStore('chat', () => {
         if (config.cwd !== undefined) unnamed.cwd = config.cwd
         if (config.initCommand !== undefined) unnamed.initCommand = config.initCommand
         if (config.label !== undefined) unnamed.label = config.label
+        flashLed(sid)
         return
       }
     }
@@ -140,6 +144,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     terminals.push(newTerminal)
+    flashLed(sid)
   }
 
   function closeTerminal(terminalId) {
@@ -150,8 +155,10 @@ export const useChatStore = defineStore('chat', () => {
       const idx = _terminalSessions.value[sid].findIndex(t => t.terminalId === terminalId)
       if (idx >= 0) {
         _terminalSessions.value[sid].splice(idx, 1)
+        flashLed(sid)
       }
     } else {
+      if (_terminalSessions.value[sid].length > 0) flashLed(sid)
       _terminalSessions.value[sid].pop()
     }
 
@@ -239,6 +246,9 @@ export const useChatStore = defineStore('chat', () => {
       sessions.value.unshift(data.session)
       activeSessionId.value = data.session.id
       messages.value = []
+      const { useCommandStore } = await import('../stores/command.js')
+      const cmdStore = useCommandStore()
+      if (data.session.cwd) cmdStore.setDirectory(data.session.cwd)
       _pushNewSessionSetup(data.session)
     } catch (err) {
       console.error('Error al crear chat:', err)

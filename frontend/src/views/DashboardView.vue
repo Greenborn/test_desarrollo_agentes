@@ -1,6 +1,7 @@
 <template>
   <div class="d-flex flex-column vh-100">
     <Topbar />
+    <GlobalCommandBar />
     <div class="d-flex flex-grow-1 overflow-hidden" style="height: 0; min-height: 0;">
       <SidebarChat />
       <div v-if="!centralPanelCollapsed" class="d-flex flex-column flex-grow-1 overflow-hidden" style="min-width: 0;">
@@ -27,6 +28,7 @@
 import { onMounted, watch, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import Topbar from '../components/layout/Topbar.vue'
+import GlobalCommandBar from '../components/layout/GlobalCommandBar.vue'
 import SidebarChat from '../components/layout/SidebarChat.vue'
 import SidebarRight from '../components/layout/SidebarRight.vue'
 import ChatWindow from '../components/chat/ChatWindow.vue'
@@ -42,7 +44,7 @@ import { useTicketStore } from '../stores/ticket.js'
 import { useUiStore } from '../stores/ui.js'
 
 export default {
-  components: { Topbar, SidebarChat, SidebarRight, ChatWindow, ProjectDetail, TicketDetail, DevInstancePanel },
+  components: { Topbar, GlobalCommandBar, SidebarChat, SidebarRight, ChatWindow, ProjectDetail, TicketDetail, DevInstancePanel },
   setup() {
     const auth = useAuthStore()
     const chat = useChatStore()

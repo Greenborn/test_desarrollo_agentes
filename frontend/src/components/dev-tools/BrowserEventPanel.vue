@@ -288,6 +288,7 @@
       @click.stop
     >
       <div class="context-menu-item" @click="deleteContextEvent">Eliminar evento</div>
+      <div class="context-menu-item" @click="copyComponentRef">📋 Copiar referencia</div>
     </div>
   </div>
 </template>
@@ -304,6 +305,7 @@ import { useSettingsStore } from '../../stores/settings.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useModalStore } from '../../stores/modal.js'
 import { storeToRefs } from 'pinia'
+import { useComponentContextMenu } from '../../composables/useComponentContextMenu.js'
 import AlertModal from '../modals/AlertModal.vue'
 
 export default {
@@ -385,7 +387,7 @@ export default {
     const uncategorizedCount = computed(() => logsStore.uncategorizedCount)
 
     function showContextMenu(e, evt) {
-      contextMenu.value = { show: true, x: e.clientX, y: e.clientY, event: evt }
+      contextMenu.value = { show: true, x: e.clientX, y: e.clientY, event: evt, target: e.target }
     }
 
     function closeContextMenu() {
@@ -419,6 +421,15 @@ export default {
       if (!evt || !evt.id) return
       closeContextMenu()
       await deleteEventById(evt.id)
+    }
+
+    function copyComponentRef() {
+      const { buildComponentRef } = useComponentContextMenu()
+      const ref = buildComponentRef(contextMenu.value.target)
+      if (ref) {
+        navigator.clipboard.writeText(ref).catch(err => console.error('Error al copiar referencia:', err))
+      }
+      closeContextMenu()
     }
 
     function onDocumentClick(e) {
@@ -1083,6 +1094,7 @@ export default {
       showContextMenu,
       closeContextMenu,
       deleteContextEvent,
+      copyComponentRef,
       deleteSingleEvent,
       startingInstancia,
       iniciarInstancia,

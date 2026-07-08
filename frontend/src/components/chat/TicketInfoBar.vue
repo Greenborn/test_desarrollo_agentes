@@ -8,12 +8,12 @@
     </template>
     <span v-if="currentBranchDisplay && currentBranchDisplay !== 'Sin repo'" class="branch-name ms-2" :class="{ 'branch-mismatch': branchMismatch }">· rama: {{ currentBranchDisplay }}</span>
     <div class="ms-auto d-flex align-items-center gap-2">
-      <button class="btn btn-sm btn-outline-argentina px-2" @click="$emit('crear-ticket')" title="Crear ticket">🎫</button>
-      <button v-if="!devInstanceRunning" class="btn btn-sm btn-outline-argentina px-2" @click="$emit('iniciar-instancia-dev')" title="Iniciar instancia desarrollo">▶️</button>
-      <button v-else class="btn btn-sm btn-outline-danger px-2" @click="$emit('detener-instancia-dev')" title="Detener instancia desarrollo">⏹️</button>
-      <button class="btn btn-sm btn-outline-argentina px-2" @click="$emit('generar-commit')" title="Generar commit">💾</button>
-      <button class="btn btn-sm btn-outline-argentina px-2" @click="$emit('iniciar-opencode')" title="Iniciar OpenCode">🚀</button>
-      <button class="btn btn-sm btn-outline-danger px-2" @click="$emit('clear-chat')" title="Limpiar chat">🗑️</button>
+      <button class="btn btn-sm btn-outline-argentina px-2" @click="crearTicket" title="Crear ticket">🎫</button>
+      <button v-if="!devInstanceRunning" class="btn btn-sm btn-outline-argentina px-2" @click="iniciarInstanciaDev" title="Iniciar instancia desarrollo">▶️</button>
+      <button v-else class="btn btn-sm btn-outline-danger px-2" @click="detenerInstanciaDev" title="Detener instancia desarrollo">⏹️</button>
+      <button class="btn btn-sm btn-outline-argentina px-2" @click="generarCommit" title="Generar commit">💾</button>
+      <button class="btn btn-sm btn-outline-argentina px-2" @click="iniciarOpencode" title="Iniciar OpenCode">🚀</button>
+      <button class="btn btn-sm btn-outline-danger px-2" @click="clearChat" title="Limpiar chat">🗑️</button>
       <div class="zoom-controls d-flex align-items-center gap-1">
         <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomOut" :disabled="gitStore.chatZoom <= 50" title="Alejar">−</button>
         <span class="zoom-level small" @click="gitStore.chatZoom = 100; gitStore.saveZoom('chat', 100)" style="cursor:pointer; min-width:36px; text-align:center;" title="Restablecer zoom">{{ gitStore.chatZoom }}%</span>
@@ -24,28 +24,61 @@
 </template>
 
 <script>
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useChatStore } from '../../stores/chat.js'
 import { useGitStore } from '../../stores/git.js'
 import { useSettingsStore } from '../../stores/settings.js'
-import { useChatStore } from '../../stores/chat.js'
+import { useDevInstanceStore } from '../../stores/devInstance.js'
+import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
 
 export default {
-  props: {
-    ticketInfo: { type: Object, default: null },
-    activeSessionId: { type: [Number, String], default: null },
-    devInstanceRunning: { type: Boolean, default: false },
-  },
-  emits: ['clear-chat', 'generar-commit', 'iniciar-instancia-dev', 'detener-instancia-dev', 'iniciar-opencode', 'crear-ticket'],
-  setup(props) {
+  setup() {
+    const chatStore = useChatStore()
     const gitStore = useGitStore()
     const settingsStore = useSettingsStore()
-    const chatStore = useChatStore()
+    const devInstanceStore = useDevInstanceStore()
+    const { activeSessionId } = storeToRefs(chatStore)
+    const { sessions } = storeToRefs(chatStore)
+    const { find } = useCommandRegistry()
 
-    const currentBranchDisplay = computed(() => gitStore.getCurrentBranch(props.activeSessionId))
+    const ticketInfo = ref(null)
+    const devInstanceRunning = computed(() => devInstanceStore.hasProcesses)
+
+    async function loadTicketInfo() {
+      ticketInfo.value = null
+      if (!activeSessionId.value) return
+      const session = sessions.value.find(s => Number(s.id) === Number(activeSessionId.value))
+      if (!session?.id_ticket_redmine) return
+      try {
+        const res = await fetch(`/api/tickets/session/${activeSessionId.value}`, { credentials: 'include' })
+        const data = await res.json()
+        if (data.ticket) {
+          ticketInfo.value = data.ticket
+          chatStore.setSessionTicket(activeSessionId.value, data.ticket)
+        }
+      } catch (err) {
+        console.error('Error al cargar info del ticket:', err)
+      }
+    }
+
+    watch(activeSessionId, () => {
+      loadTicketInfo()
+    })
+
+    watch(
+      () => {
+        const s = sessions.value.find(s => Number(s.id) === Number(activeSessionId.value))
+        return s?.id_ticket_redmine
+      },
+      () => { loadTicketInfo() }
+    )
+
+    const currentBranchDisplay = computed(() => gitStore.getCurrentBranch(activeSessionId.value))
 
     const idTicketRedmine = computed(() => {
-      if (props.ticketInfo?.redmine_id) return props.ticketInfo.redmine_id
-      const session = chatStore.sessions.find(s => Number(s.id) === Number(props.activeSessionId))
+      if (ticketInfo.value?.redmine_id) return ticketInfo.value.redmine_id
+      const session = sessions.value.find(s => Number(s.id) === Number(activeSessionId.value))
       return session?.id_ticket_redmine || null
     })
 
@@ -61,8 +94,8 @@ export default {
     })
 
     const truncatedSubject = computed(() => {
-      if (!props.ticketInfo?.subject) return ''
-      const s = props.ticketInfo.subject
+      if (!ticketInfo.value?.subject) return ''
+      const s = ticketInfo.value.subject
       return s.length > 50 ? s.slice(0, 50) + '…' : s
     })
 
@@ -84,7 +117,71 @@ export default {
       gitStore.zoomOut('chat')
     }
 
-    return { gitStore, currentBranchDisplay, branchMismatch, truncatedSubject, priorityClass, zoomIn, zoomOut }
+    async function executeCommand(raw) {
+      const sid = activeSessionId.value
+      if (!sid) return
+      const parts = raw.split(/\s+/)
+      const cmdName = parts[0].toLowerCase()
+      const known = find(cmdName)
+      try {
+        await chatStore.runCommand(raw, async (loadingIdx, sessionId) => {
+          if (known) {
+            return known.execute(parts.slice(1), { cmdStore: null, chatStore, loadingIdx, sessionId })
+          }
+          const res = await fetch('/api/command/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: raw }),
+          })
+          const data = await res.json()
+          if (data.success) return data.result
+          throw new Error(data.result || 'Error al ejecutar comando')
+        })
+      } finally {
+        gitStore.fetchGitBranch(sid)
+      }
+    }
+
+    async function generarCommit() {
+      if (!activeSessionId.value) return
+      await executeCommand('/dev_opencode_generar_commit')
+    }
+
+    async function iniciarInstanciaDev() {
+      if (!activeSessionId.value) return
+      await executeCommand('/despliegue_iniciar_instancia')
+      await devInstanceStore.fetchStatus()
+    }
+
+    async function detenerInstanciaDev() {
+      if (!activeSessionId.value) return
+      await executeCommand('/despliegue_detener_instancia')
+      await devInstanceStore.fetchStatus()
+    }
+
+    async function crearTicket() {
+      if (!activeSessionId.value) return
+      await executeCommand('/redmine_crear_ticket')
+    }
+
+    async function iniciarOpencode() {
+      if (!activeSessionId.value) return
+      await executeCommand('/dev_opencode_iniciar')
+    }
+
+    async function clearChat() {
+      if (!activeSessionId.value) return
+      await chatStore.clearMessages(activeSessionId.value)
+    }
+
+    return {
+      gitStore, ticketInfo, activeSessionId, currentBranchDisplay,
+      branchMismatch, truncatedSubject, priorityClass, devInstanceRunning,
+      zoomIn, zoomOut,
+      generarCommit, iniciarInstanciaDev, detenerInstanciaDev,
+      crearTicket, iniciarOpencode, clearChat,
+    }
   },
 }
 </script>

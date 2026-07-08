@@ -8,7 +8,7 @@
       <span v-if="selectedWorkspaces.length === 0" class="text-muted small">Agent Orchestrator</span>
     </a>
     <LayoutControls />
-    <CommandInput v-if="user" />
+    <TicketInfoBar v-if="user" />
     <div class="dropdown" v-if="user">
       <button class="btn btn-dark dropdown-toggle" data-bs-toggle="dropdown">
         {{ user.username }}
@@ -37,7 +37,7 @@ import { useChatStore } from '../../stores/chat.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { contrastTextColor } from '../../utils/color.js'
 import wsClient from '../../services/wsClient.js'
-import CommandInput from '../chat/CommandInput.vue'
+import TicketInfoBar from '../chat/TicketInfoBar.vue'
 import LayoutControls from './LayoutControls.vue'
 import HelpContent from '../help/HelpModal.vue'
 import CrearProyectoModal from '../projects/CrearProyectoModal.vue'
@@ -45,7 +45,7 @@ import WorkspaceSwitcherModal from '../modals/WorkspaceSwitcherModal.vue'
 import SettingsView from '../../views/SettingsView.vue'
 
 export default {
-  components: { CommandInput, LayoutControls },
+  components: { TicketInfoBar, LayoutControls },
   setup() {
     const auth = useAuthStore()
     const cmdStore = useCommandStore()

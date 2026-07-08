@@ -3,11 +3,15 @@
   <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
     <div class="context-menu-item" @click="toggleRaw(ctxMenu.msg)">{{ isRaw ? '🎨 Vista formateada' : '📄 Vista texto plano' }}</div>
     <div class="context-menu-item" @click="copyPlain(ctxMenu.msg)">📋 Copiar texto plano</div>
+    <div class="context-menu-item" @click="copyRef">📋 Copiar referencia</div>
+    <div class="context-menu-divider"></div>
     <div class="context-menu-item text-danger" @click="deleteMsg(ctxMenu.msg)">🗑️ Eliminar mensaje</div>
   </div>
 </template>
 
 <script>
+import { useComponentContextMenu } from '../../composables/useComponentContextMenu.js'
+
 export default {
   props: {
     ctxMenu: { type: Object, required: true },
@@ -26,6 +30,14 @@ export default {
     copyPlain(msg) { this.$emit('copyPlain', msg) },
     deleteMsg(msg) { this.$emit('delete', msg) },
     close() { this.$emit('close') },
+    copyRef() {
+      const { buildComponentRef } = useComponentContextMenu()
+      const ref = buildComponentRef(this.ctxMenu.target)
+      if (ref) {
+        navigator.clipboard.writeText(ref).catch(err => console.error('Error al copiar referencia:', err))
+      }
+      this.$emit('close')
+    },
   },
 }
 </script>
@@ -60,5 +72,10 @@ export default {
 }
 .context-menu-item.text-danger:hover {
   background: #3a1a1a;
+}
+.context-menu-divider {
+  height: 1px;
+  background: #374151;
+  margin: 4px 0;
 }
 </style>

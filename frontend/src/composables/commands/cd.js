@@ -46,6 +46,8 @@ register({
       const data = await res.json()
       if (data.success) {
         cmdStore.currentDir = data.result
+        const session = chatStore.sessions.find(s => Number(s.id) === Number(sessionId))
+        if (session) session.cwd = data.result
         return data.result
       } else {
         throw new Error(data.result || 'Error al cambiar de directorio')

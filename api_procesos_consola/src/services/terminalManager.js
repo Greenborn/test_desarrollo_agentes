@@ -49,11 +49,15 @@ export function activateTerminal(terminalId, pty, ws) {
   record.status = 'active';
   record.pid = pty.pid;
   record.activatedAt = new Date().toISOString();
+  record.output = '';
 
   pty.onData((data) => {
     const r = terminals.get(terminalId);
-    if (r && r.ws && r.ws.readyState === r.ws.OPEN) {
-      r.ws.send(JSON.stringify({ type: 'data', data }));
+    if (r) {
+      r.output += data;
+      if (r.ws && r.ws.readyState === r.ws.OPEN) {
+        r.ws.send(JSON.stringify({ type: 'data', data }));
+      }
     }
   });
 
@@ -61,7 +65,7 @@ export function activateTerminal(terminalId, pty, ws) {
     console.log(`[procesos_consola] terminal ${terminalId}: terminada (pid ${pty.pid}), código: ${exitCode}, señal: ${signal}`);
     const r = terminals.get(terminalId);
     if (r && r.ws && r.ws.readyState === r.ws.OPEN) {
-      r.ws.send(JSON.stringify({ type: 'exit', code: exitCode, signal }));
+      r.ws.send(JSON.stringify({ type: 'exit', code: exitCode, signal, output: r.output || '' }));
       r.ws.close();
     }
     closeTerminal(terminalId);

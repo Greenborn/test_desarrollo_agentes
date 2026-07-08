@@ -1,16 +1,18 @@
 <template>
-  <div class="xterm-wrapper" ref="wrapperRef" :class="{ 'xterm-fullscreen': fullscreen }">
+  <div class="xterm-wrapper" ref="wrapperRef" :class="{ 'xterm-fullscreen': fullscreen }" @contextmenu.prevent="onContextMenu">
     <div class="xterm-toolbar">
       <span class="toolbar-title">{{ label }}</span>
       <div class="toolbar-actions">
         <button class="toolbar-btn" @click="toggleFullscreen" :title="fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'">
           {{ fullscreen ? '⛶' : '⛶' }}
         </button>
-        <button class="toolbar-btn" @click="newTerminal" title="Nueva terminal">+</button>
         <button class="toolbar-btn" @click="disconnect" title="Cerrar terminal">✕</button>
       </div>
     </div>
-    <div ref="containerRef" class="xterm-container"></div>
+    <div ref="containerRef" class="xterm-container" @contextmenu.prevent="onContextMenu"></div>
+    <div v-if="ctxMenu.show" class="xterm-ctx-menu" :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }" @click.stop>
+      <button class="xterm-ctx-btn" @click="copySelection" :disabled="!hasSelection">📋 Copiar</button>
+    </div>
   </div>
 </template>
 
@@ -38,6 +40,8 @@ export default {
     const containerRef = ref(null)
     const wrapperRef = ref(null)
     const fullscreen = ref(false)
+    const ctxMenu = ref({ show: false, x: 0, y: 0 })
+    const hasSelection = ref(false)
     let terminal = null
     let fitAddon = null
     let ws = null
@@ -46,6 +50,7 @@ export default {
     let currentTerminalId = props.terminalId
     let closingIntentionally = false
     let accumulatedOutput = ''
+    let ctxCloseHandler = null
 
     function fitTerminal() {
       if (!fitAddon || !terminal) return
@@ -199,17 +204,6 @@ export default {
       nextTick(() => fitTerminal())
     }
 
-    async function newTerminal() {
-      await closeTerminalViaApi(currentTerminalId)
-      const tid = await createTerminalViaApi()
-      if (tid) {
-        currentTerminalId = tid
-        connectWebSocket(tid)
-        terminal.clear()
-        emit('terminal-ready', { terminalId: tid })
-      }
-    }
-
     async function disconnect() {
       closingIntentionally = true
       await closeTerminalViaApi(currentTerminalId)
@@ -246,6 +240,34 @@ export default {
       const tid = await createTerminalViaApi()
       if (tid) currentTerminalId = tid
       return tid
+    }
+
+    function onContextMenu(e) {
+      if (!terminal) return
+      hasSelection.value = !!terminal.getSelection()
+      const rect = wrapperRef.value?.getBoundingClientRect()
+      if (rect) {
+        ctxMenu.value = {
+          show: true,
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        }
+      } else {
+        ctxMenu.value = { show: true, x: e.clientX, y: e.clientY }
+      }
+      if (ctxCloseHandler) document.removeEventListener('click', ctxCloseHandler)
+      ctxCloseHandler = () => { ctxMenu.value.show = false }
+      setTimeout(() => document.addEventListener('click', ctxCloseHandler), 0)
+    }
+
+    function copySelection() {
+      if (!terminal) return
+      const text = terminal.getSelection()
+      if (!text) return
+      navigator.clipboard.writeText(text).catch(err => {
+        console.log('[xterm] Error al copiar:', err.message)
+      })
+      ctxMenu.value.show = false
     }
 
     onMounted(async () => {
@@ -316,6 +338,10 @@ export default {
     })
 
     onUnmounted(() => {
+      if (ctxCloseHandler) {
+        document.removeEventListener('click', ctxCloseHandler)
+        ctxCloseHandler = null
+      }
       if (resizeObserver) {
         resizeObserver.disconnect()
       }
@@ -332,13 +358,14 @@ export default {
       }
     })
 
-    return { containerRef, wrapperRef, fullscreen, toggleFullscreen, newTerminal, disconnect }
+    return { containerRef, wrapperRef, fullscreen, ctxMenu, hasSelection, toggleFullscreen, disconnect, onContextMenu, copySelection }
   },
 }
 </script>
 
 <style scoped>
 .xterm-wrapper {
+  position: relative;
   border: 1px solid #30363d;
   border-radius: 8px;
   overflow: hidden;
@@ -407,5 +434,37 @@ export default {
 .xterm-container :deep(.xterm) {
   height: 100%;
   padding: 0 8px;
+}
+
+.xterm-ctx-menu {
+  position: absolute;
+  z-index: 1100;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  min-width: 120px;
+}
+.xterm-ctx-btn {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #e6edf3;
+  font-size: 0.75rem;
+  padding: 6px 12px;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.xterm-ctx-btn:hover:not(:disabled) {
+  background: #1f6feb;
+  color: #fff;
+}
+.xterm-ctx-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 </style>

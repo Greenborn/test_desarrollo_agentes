@@ -42,6 +42,10 @@
     <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
       <div class="context-menu-item" @click="copyRelativePath">📋 Copiar ruta relativa</div>
       <div class="context-menu-item" @click="copyFullPath">📋 Copiar ruta completa</div>
+      <div class="context-menu-item" @click="copyComponentRef">📋 Copiar referencia</div>
+      <div class="context-menu-divider"></div>
+      <div v-if="ctxMenu.type === 'directory'" class="context-menu-item" @click="openInExplorer">📂 Abrir carpeta</div>
+      <div v-else class="context-menu-item" @click="openInExplorer">📂 Abrir carpeta contenedora</div>
       <div class="context-menu-divider"></div>
       <div class="context-menu-item text-danger" @click="confirmDeleteFile">🗑️ Eliminar</div>
     </div>
@@ -52,6 +56,7 @@
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useModalStore } from '../../stores/modal.js'
 import { useFileTreeStore } from '../../stores/fileTree.js'
+import { useComponentContextMenu } from '../../composables/useComponentContextMenu.js'
 import FileEditorModal from './FileEditorModal.vue'
 import CsvViewerModal from './CsvViewerModal.vue'
 import AlertModal from '../modals/AlertModal.vue'
@@ -156,6 +161,7 @@ export default {
         path: item.node.path,
         fullPath: item.node.path,
         type: item.node.type,
+        target: event.target,
       }
     }
 
@@ -187,6 +193,34 @@ export default {
       const confirmed = confirm(`¿Eliminar archivo "${fileName}"?\n\nRuta: ${filePath}\n\nEsta acción no se puede deshacer.`)
       if (confirmed) {
         deleteFile(filePath)
+      }
+      closeCtxMenu()
+    }
+
+    function copyComponentRef() {
+      const { buildComponentRef } = useComponentContextMenu()
+      const ref = buildComponentRef(ctxMenu.value.target)
+      if (ref) {
+        navigator.clipboard.writeText(ref).catch(err => console.error('Error al copiar referencia:', err))
+      }
+      closeCtxMenu()
+    }
+
+    async function openInExplorer() {
+      const targetPath = ctxMenu.value.path
+      try {
+        const res = await fetch('/api/command/open-in-explorer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ path: targetPath }),
+        })
+        const data = await res.json()
+        if (!data.success) {
+          console.error('Error al abrir en explorador:', data.error)
+        }
+      } catch (err) {
+        console.error('Error al abrir en explorador:', err)
       }
       closeCtxMenu()
     }
@@ -227,8 +261,8 @@ export default {
       tree, loading, error, flatTree, selectedFile, ctxMenu,
       getFileIcon, reloadTree, handleToggleDirectory, handleIsExpanded,
       handleSelectFile, handleFileClick, openFile,
-      onContextMenu, closeCtxMenu, copyRelativePath, copyFullPath,
-      confirmDeleteFile, deleteFile,
+      onContextMenu, closeCtxMenu, copyRelativePath, copyFullPath, copyComponentRef,
+      openInExplorer, confirmDeleteFile, deleteFile,
     }
   },
 }

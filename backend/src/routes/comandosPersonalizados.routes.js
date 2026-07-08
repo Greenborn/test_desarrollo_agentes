@@ -171,6 +171,61 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+router.post('/:id/resolve', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const { sessionId } = req.body;
+  try {
+    const comando = await db('comandos_personalizados_proyectos')
+      .where({ id: req.params.id })
+      .first();
+    if (!comando) {
+      return res.status(404).json({ error: 'Comando no encontrado' });
+    }
+
+    let cwd = process.cwd();
+    if (sessionId) {
+      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
+      if (session && session.cwd) cwd = session.cwd;
+    }
+
+    let shellCommand = comando.comando;
+    if (comando.id_proyecto && shellCommand.includes('{{')) {
+      try {
+        const dbVariables = await db('project_variables')
+          .select('key', 'value', 'type')
+          .where({ proyecto_id: comando.id_proyecto });
+
+        const variableMap = {};
+        const memoryNamespace = `proyecto:${comando.id_proyecto}`;
+
+        for (const v of dbVariables) {
+          if (v.type === 'memory') {
+            try {
+              const memResult = await memoriaClient.get(memoryNamespace, v.key);
+              variableMap[v.key] = memResult.value;
+            } catch {
+              variableMap[v.key] = '';
+            }
+          } else {
+            variableMap[v.key] = v.value;
+          }
+        }
+
+        shellCommand = shellCommand.replace(/\{\{(.+?)\}\}/g, (match, key) => {
+          return key in variableMap ? variableMap[key] : match;
+        });
+      } catch (err) {
+        console.log('Error al resolver variables para comando personalizado:', err.message);
+      }
+    }
+
+    res.json({ comando: shellCommand, cwd, id_proyecto: comando.id_proyecto, ocultar_ejecucion: comando.ocultar_ejecucion, label: comando.label });
+  } catch (err) {
+    console.log('Error al resolver comando personalizado:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/:id/execute', async (req, res) => {
   if (!authGuard(req, res)) return;
   const { sessionId } = req.body;

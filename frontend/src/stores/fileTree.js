@@ -67,7 +67,7 @@ export const useFileTreeStore = defineStore('fileTree', () => {
     errorMap.value[sessionId] = null
     trees.value[sessionId] = null
     try {
-      const res = await fetch(`${API}/command/arbol-directorios?sessionId=${sessionId}&useGitignore=true&showHidden=true`, {
+      const res = await fetch(`${API}/command/arbol-directorios?sessionId=${sessionId}&useGitignore=false&showHidden=true`, {
         credentials: 'include',
       })
       const data = await res.json()
