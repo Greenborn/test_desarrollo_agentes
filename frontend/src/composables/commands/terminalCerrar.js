@@ -5,16 +5,19 @@ const { register } = useCommandRegistry()
 register({
   name: '/terminal_cerrar',
   category: 'Sistema',
-  description: 'Cierra la terminal de la sesión actual. Mata el proceso bash asociado.',
+  description: 'Cierra la terminal más reciente de la sesión actual. Mata el proceso bash asociado.',
   usage: '/terminal_cerrar',
   async execute(args, { chatStore, sessionId }) {
-    if (!chatStore.showTerminal || chatStore._terminalSessionId !== sessionId) {
-      return 'No hay terminal activa en esta sesión.'
-    }
+    const sid = sessionId || chatStore.activeSessionId
+    if (!sid) return 'No hay sesión activa.'
 
-    if (chatStore.terminalId) {
+    const terminals = chatStore.getTerminals(sid)
+    if (terminals.length === 0) return 'No hay terminal activa en esta sesión.'
+
+    const last = terminals[terminals.length - 1]
+    if (last.terminalId) {
       try {
-        await fetch(`/api/procesos/terminal/${chatStore.terminalId}`, {
+        await fetch(`/api/procesos/terminal/${last.terminalId}`, {
           method: 'DELETE',
           credentials: 'include',
         })
@@ -23,6 +26,6 @@ register({
       }
     }
 
-    chatStore.closeTerminal()
+    chatStore.closeTerminal(last.terminalId)
   },
 })

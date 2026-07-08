@@ -29,19 +29,38 @@ export const useChatStore = defineStore('chat', () => {
   const _ocSessionStreamCache = ref({})
   const ledFlash = ref({})
   const ledFlashTimers = {}
+  const _cmdStreamingSessions = ref({})
+  const _cmdSessionStreamCache = ref({})
+  const _cmdPendingSave = ref({})
   const _terminalSessions = ref({})
+  const maxTerminalsLimit = ref(2)
 
-  function _getSessionTerminal(sid) {
+  function _getSessionTerminals(sid) {
     return sid ? _terminalSessions.value[sid] : null
   }
 
+  function _getSessionTerminal(sid) {
+    const terminals = _getSessionTerminals(sid)
+    return terminals && terminals.length > 0 ? terminals[0] : null
+  }
+
   function _hasTerminal(sid) {
-    return !!_getSessionTerminal(sid)
+    const terminals = _getSessionTerminals(sid)
+    return !!terminals && terminals.length > 0
+  }
+
+  function getTerminalCount(sid) {
+    const terminals = _getSessionTerminals(sid)
+    return terminals ? terminals.length : 0
+  }
+
+  function getTerminals(sid) {
+    return _getSessionTerminals(sid) || []
   }
 
   const _terminalSessionId = computed(() => {
     const sid = activeSessionId.value
-    return sid && _terminalSessions.value[sid] ? sid : null
+    return sid && _terminalSessions.value[sid] && _terminalSessions.value[sid].length > 0 ? sid : null
   })
   const showTerminal = computed(() => _terminalSessionId.value !== null)
   const terminalCwd = computed(() => _getSessionTerminal(activeSessionId.value)?.cwd || '')
@@ -52,19 +71,116 @@ export const useChatStore = defineStore('chat', () => {
   function openTerminal(config = {}) {
     const sid = config.sessionId || activeSessionId.value
     if (!sid) return
-    const existing = _terminalSessions.value[sid] || {}
-    _terminalSessions.value[sid] = {
-      terminalId: config.terminalId || existing.terminalId || null,
-      cwd: config.cwd || existing.cwd || '',
-      initCommand: config.initCommand || existing.initCommand || '',
-      label: config.label || existing.label || 'terminal',
+
+    const hasData = config.terminalId || config.cwd || config.initCommand || config.label
+
+    if (!_terminalSessions.value[sid]) {
+      _terminalSessions.value[sid] = []
+    }
+
+    const terminals = _terminalSessions.value[sid]
+
+    if (!hasData) {
+      if (terminals.length >= maxTerminalsLimit.value) {
+        const oldest = terminals.shift()
+        if (oldest.terminalId) {
+          fetch(`/api/procesos/terminal/${oldest.terminalId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+          }).catch(() => {})
+        }
+      }
+      terminals.push({ terminalId: null, cwd: '', initCommand: '', label: 'terminal' })
+      return
+    }
+
+    if (config.terminalId) {
+      const existing = terminals.find(t => t.terminalId === config.terminalId)
+      if (existing) {
+        if (config.cwd !== undefined) existing.cwd = config.cwd
+        if (config.initCommand !== undefined) existing.initCommand = config.initCommand
+        if (config.label !== undefined) existing.label = config.label
+        return
+      }
+      const unnamed = terminals.find(t => !t.terminalId)
+      if (unnamed) {
+        unnamed.terminalId = config.terminalId
+        if (config.cwd !== undefined) unnamed.cwd = config.cwd
+        if (config.initCommand !== undefined) unnamed.initCommand = config.initCommand
+        if (config.label !== undefined) unnamed.label = config.label
+        return
+      }
+    }
+
+    if (!config.terminalId) {
+      const unnamed = terminals.find(t => !t.terminalId)
+      if (unnamed) {
+        if (config.cwd !== undefined) unnamed.cwd = config.cwd
+        if (config.initCommand !== undefined) unnamed.initCommand = config.initCommand
+        if (config.label !== undefined) unnamed.label = config.label
+        return
+      }
+    }
+
+    const newTerminal = {
+      terminalId: config.terminalId || null,
+      cwd: config.cwd || '',
+      initCommand: config.initCommand || '',
+      label: config.label || 'terminal',
+    }
+
+    if (terminals.length >= maxTerminalsLimit.value) {
+      const oldest = terminals.shift()
+      if (oldest.terminalId) {
+        fetch(`/api/procesos/terminal/${oldest.terminalId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        }).catch(() => {})
+      }
+    }
+
+    terminals.push(newTerminal)
+  }
+
+  function closeTerminal(terminalId) {
+    const sid = activeSessionId.value
+    if (!sid || !_terminalSessions.value[sid]) return
+
+    if (terminalId) {
+      const idx = _terminalSessions.value[sid].findIndex(t => t.terminalId === terminalId)
+      if (idx >= 0) {
+        _terminalSessions.value[sid].splice(idx, 1)
+      }
+    } else {
+      _terminalSessions.value[sid].pop()
+    }
+
+    if (_terminalSessions.value[sid].length === 0) {
+      delete _terminalSessions.value[sid]
     }
   }
 
-  function closeTerminal() {
-    const sid = activeSessionId.value
-    if (!sid) return
-    delete _terminalSessions.value[sid]
+  async function loadMaxTerminalsConfig() {
+    try {
+      const { settingGet } = await import('../services/settingService.js')
+      const res = await settingGet('terminal_max_terminals')
+      if (res && res.value) {
+        maxTerminalsLimit.value = Math.max(1, parseInt(res.value, 10) || 2)
+      }
+    } catch (err) {
+      console.error('Error loading maxTerminals config:', err)
+    }
+  }
+
+  async function setMaxTerminalsConfig(val) {
+    const num = Math.max(1, parseInt(val, 10) || 2)
+    maxTerminalsLimit.value = num
+    try {
+      const { settingSet } = await import('../services/settingService.js')
+      await settingSet('terminal_max_terminals', String(num))
+    } catch (err) {
+      console.error('Error saving maxTerminals config:', err)
+    }
   }
 
   const streaming = computed(() => {
@@ -399,6 +515,15 @@ export const useChatStore = defineStore('chat', () => {
           _key: ocCache.msgKey || 'stream-oc-' + Date.now(),
         })
       }
+      const cmdCache = _cmdSessionStreamCache.value[sessionId]
+      if (cmdCache && _cmdStreamingSessions.value[sessionId]) {
+        messages.value.push({
+          role: 'result',
+          content: cmdCache.content || '⏳ Ejecutando...',
+          _key: cmdCache.streamKey,
+          streaming: true,
+        })
+      }
     } catch (err) {
       console.error('Error al cargar mensajes:', err)
     }
@@ -711,6 +836,9 @@ export const useChatStore = defineStore('chat', () => {
     sessionTickets.value = {}
     _sessionStreamCache.value = {}
     _ocSessionStreamCache.value = {}
+    _cmdStreamingSessions.value = {}
+    _cmdSessionStreamCache.value = {}
+    _cmdPendingSave.value = {}
     import('./opencode.js').then(({ useOpencodeStore }) => {
       try {
         const ocStore = useOpencodeStore()
@@ -793,6 +921,45 @@ export const useChatStore = defineStore('chat', () => {
     if (sessionId) delete _ocSessionStreamCache.value[sessionId]
   }
 
+  function setCmdStreaming(sessionId, active) {
+    if (!sessionId) return
+    if (active) {
+      _cmdStreamingSessions.value[sessionId] = true
+    } else {
+      delete _cmdStreamingSessions.value[sessionId]
+    }
+  }
+
+  function updateCmdStreamCache(sessionId, content, streamKey) {
+    if (!sessionId) return
+    if (!_cmdSessionStreamCache.value[sessionId]) {
+      _cmdSessionStreamCache.value[sessionId] = { content: '', streamKey: '' }
+    }
+    const cache = _cmdSessionStreamCache.value[sessionId]
+    if (content !== undefined) cache.content = content
+    if (streamKey) cache.streamKey = streamKey
+  }
+
+  function clearCmdStreamCache(sessionId) {
+    if (sessionId) delete _cmdSessionStreamCache.value[sessionId]
+  }
+
+  function registerCmdPendingSave(sessionId, data) {
+    if (!sessionId) return
+    _cmdPendingSave.value[sessionId] = data
+  }
+
+  function consumeCmdPendingSave(sessionId) {
+    if (!sessionId) return null
+    const data = _cmdPendingSave.value[sessionId]
+    delete _cmdPendingSave.value[sessionId]
+    return data || null
+  }
+
+  function hasCmdPendingSave(sessionId) {
+    return !!_cmdPendingSave.value[sessionId]
+  }
+
   function flashLed(sessionId) {
     if (!sessionId) return
     ledFlash.value[sessionId] = true
@@ -830,10 +997,13 @@ export const useChatStore = defineStore('chat', () => {
     sendMessage, deleteMessage, deleteSession, clearMessages, stopAllExecutions,
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
     setOcStreaming, getIsOcStreaming, updateOcStreamCache, clearOcStreamCache,
+    setCmdStreaming, updateCmdStreamCache, clearCmdStreamCache,
+    registerCmdPendingSave, consumeCmdPendingSave, hasCmdPendingSave,
     sessionTickets, activeSessionTicket, setSessionTicket, clearSessionTicket,
     _saveMessageToDb, clearPendingNotification, ledFlash, flashLed, showTerminal,
     _terminalSessions, _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel, terminalId,
-    _hasTerminal, openTerminal, closeTerminal,
+    _hasTerminal, openTerminal, closeTerminal, getTerminalCount, getTerminals,
+    maxTerminalsLimit, loadMaxTerminalsConfig, setMaxTerminalsConfig,
     saveUiState,
   }
 })

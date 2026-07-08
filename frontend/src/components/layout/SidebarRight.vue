@@ -835,13 +835,15 @@ export default {
       const esOculto = c.ocultar_ejecucion ? true : false
 
       const abortController = new AbortController()
-      executingCommands.value.set(c.id, abortController)
+      executingCommands.value.set(c.id, { abortController, terminalId: null })
 
       const streamKey = 'stream-sb-' + Date.now()
       const isActive = () => Number(chat.activeSessionId) === Number(sid)
 
+      chat.setCmdStreaming(sid, true)
+      chat.updateCmdStreamCache(sid, '', streamKey)
       if (isActive()) {
-        chat.messages.push({ role: 'result', content: '⏳ Ejecutando...', _key: streamKey })
+        chat.messages.push({ role: 'result', content: '⏳ Resolviendo...', _key: streamKey })
         chat.flashLed(sid)
       }
       chat.setSessionStatus(sid, 'executing')
@@ -851,93 +853,86 @@ export default {
         chat.setSessionStatus(sid, 'idle')
       }
 
-      let fullOutput = ''
       try {
-        const res = await fetch(`/api/comandos-personalizados/${c.id}/execute`, {
+        if (isActive()) _updateStreamMsg(streamKey, '⏳ Resolviendo comando...')
+        chat.updateCmdStreamCache(sid, '⏳ Resolviendo comando...')
+
+        const resolveRes = await fetch(`/api/comandos-personalizados/${c.id}/resolve`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ sessionId: sid }),
           signal: abortController.signal,
         })
-        if (!res.ok) {
-          const errData = await res.json()
-          throw new Error(errData.error || 'Error al ejecutar comando')
+        if (!resolveRes.ok) {
+          const errData = await resolveRes.json()
+          throw new Error(errData.error || 'Error al resolver comando')
         }
+        const resolved = await resolveRes.json()
 
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buf = ''
+        if (isActive()) _updateStreamMsg(streamKey, '⏳ Creando terminal...')
+        chat.updateCmdStreamCache(sid, '⏳ Creando terminal...')
 
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buf += decoder.decode(value, { stream: true })
-          const lines = buf.split('\n')
-          buf = lines.pop() || ''
-
-          for (const line of lines) {
-            const t = line.trim()
-            if (!t || t === 'data: [DONE]') continue
-            if (!t.startsWith('data: ')) continue
-            try {
-              const json = JSON.parse(t.slice(6))
-              if (json.type === 'stdout' || json.type === 'stderr') {
-                fullOutput += json.content
-                if (isActive()) _updateStreamMsg(streamKey, fullOutput)
-              } else if (json.type === 'error') {
-                fullOutput += '\n[Error: ' + json.content + ']'
-              }
-            } catch {}
-          }
+        const procRes = await fetch('/api/procesos/terminal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            chatSessionId: sid,
+            cwd: resolved.cwd || undefined,
+            cmd: resolved.comando,
+          }),
+          signal: abortController.signal,
+        })
+        if (!procRes.ok) {
+          const errData = await procRes.json()
+          throw new Error(errData.error || 'Error al crear terminal')
         }
+        const { terminalId } = await procRes.json()
 
-        const finalContent = fullOutput || '(sin salida)'
-        if (!esOculto) {
-          await fetch(`/api/chat/sessions/${sid}/save-messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              messages: [
-                { role: 'command', content: `$ ${c.label}` },
-                { role: 'result', content: finalContent },
-              ],
-            }),
-          })
-        }
-        if (isActive()) _updateStreamMsg(streamKey, finalContent)
+        const entry = executingCommands.value.get(c.id)
+        if (entry) entry.terminalId = terminalId
+
+        chat.openTerminal({
+          sessionId: sid,
+          terminalId,
+          cwd: resolved.cwd || undefined,
+          initCommand: resolved.comando,
+          label: c.label || 'comando',
+        })
+
+        chat.registerCmdPendingSave(sid, {
+          commandLabel: c.label,
+          ocultarEjecucion: esOculto,
+          streamKey,
+        })
+
+        if (isActive()) _updateStreamMsg(streamKey, '⏳ Ejecutando en terminal...')
+        chat.updateCmdStreamCache(sid, '⏳ Ejecutando en terminal...')
       } catch (err) {
         if (err.name === 'AbortError') {
-          const finalContent = '(ejecución detenida)'
-          if (!esOculto) {
-            await fetch(`/api/chat/sessions/${sid}/save-messages`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                messages: [
-                  { role: 'command', content: `$ ${c.label}` },
-                  { role: 'result', content: finalContent },
-                ],
-              }),
-            })
-          }
-          if (isActive()) _updateStreamMsg(streamKey, finalContent)
+          if (isActive()) _updateStreamMsg(streamKey, '(ejecución detenida)')
         } else {
           console.error('Error ejecutando comando:', err)
           chat.setSessionStatus(sid, 'error')
           if (isActive()) _updateStreamMsg(streamKey, 'Error: ' + err.message)
         }
+        chat.setCmdStreaming(sid, false)
+        chat.clearCmdStreamCache(sid)
       } finally {
         done()
       }
     }
 
     function detenerComando(c) {
-      const abortController = executingCommands.value.get(c.id)
-      if (abortController) {
-        abortController.abort()
+      const entry = executingCommands.value.get(c.id)
+      if (entry) {
+        entry.abortController.abort()
+        if (entry.terminalId) {
+          fetch(`/api/procesos/terminal/${entry.terminalId}`, {
+            method: 'DELETE', credentials: 'include',
+          }).catch(() => {})
+        }
       }
     }
 
@@ -946,11 +941,13 @@ export default {
       if (!sid || executingScripts.value.has(pkgDir + '/' + scriptName)) return
 
       const abortController = new AbortController()
-      executingScripts.value.set(pkgDir + '/' + scriptName, abortController)
+      executingScripts.value.set(pkgDir + '/' + scriptName, { abortController, terminalId: null })
 
       const streamKey = 'stream-npm-' + Date.now()
       const isActive = () => Number(chat.activeSessionId) === Number(sid)
 
+      chat.setCmdStreaming(sid, true)
+      chat.updateCmdStreamCache(sid, '', streamKey)
       if (isActive()) {
         chat.messages.push({ role: 'result', content: '⏳ Ejecutando npm run ' + scriptName + '...', _key: streamKey })
         chat.flashLed(sid)
@@ -962,80 +959,56 @@ export default {
         chat.setSessionStatus(sid, 'idle')
       }
 
-      let fullOutput = ''
       try {
-        const res = await fetch('/api/command/execute-npm-script', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ sessionId: sid, dir: pkgDir, scriptName }),
-          signal: abortController.signal,
-        })
-        if (!res.ok) {
-          const errData = await res.json()
-          throw new Error(errData.error || 'Error al ejecutar script npm')
-        }
+        if (isActive()) _updateStreamMsg(streamKey, '⏳ Creando terminal...')
+        chat.updateCmdStreamCache(sid, '⏳ Creando terminal...')
 
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buf = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buf += decoder.decode(value, { stream: true })
-          const lines = buf.split('\n')
-          buf = lines.pop() || ''
-
-          for (const line of lines) {
-            const t = line.trim()
-            if (!t || t === 'data: [DONE]') continue
-            if (!t.startsWith('data: ')) continue
-            try {
-              const json = JSON.parse(t.slice(6))
-              if (json.type === 'stdout' || json.type === 'stderr') {
-                fullOutput += json.content
-                if (isActive()) _updateStreamMsg(streamKey, fullOutput)
-              } else if (json.type === 'error') {
-                fullOutput += '\n[Error: ' + json.content + ']'
-              }
-            } catch {}
-          }
-        }
-
-        const finalContent = fullOutput || '(sin salida)'
-        await fetch('/api/chat/sessions/' + sid + '/save-messages', {
+        const procRes = await fetch('/api/procesos/terminal', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({
-            messages: [
-              { role: 'command', content: 'npm run ' + scriptName },
-              { role: 'result', content: finalContent },
-            ],
+            chatSessionId: sid,
+            cwd: pkgDir || undefined,
+            cmd: scriptCommand || ('npm run ' + scriptName),
           }),
+          signal: abortController.signal,
         })
-        if (isActive()) _updateStreamMsg(streamKey, finalContent)
+        if (!procRes.ok) {
+          const errData = await procRes.json()
+          throw new Error(errData.error || 'Error al crear terminal para npm script')
+        }
+        const { terminalId } = await procRes.json()
+
+        const entry = executingScripts.value.get(pkgDir + '/' + scriptName)
+        if (entry) entry.terminalId = terminalId
+
+        chat.openTerminal({
+          sessionId: sid,
+          terminalId,
+          cwd: pkgDir || undefined,
+          initCommand: scriptCommand || ('npm run ' + scriptName),
+          label: 'npm run ' + scriptName,
+        })
+
+        chat.registerCmdPendingSave(sid, {
+          commandLabel: 'npm run ' + scriptName,
+          ocultarEjecucion: false,
+          streamKey,
+        })
+
+        if (isActive()) _updateStreamMsg(streamKey, '⏳ Ejecutando en terminal...')
+        chat.updateCmdStreamCache(sid, '⏳ Ejecutando en terminal...')
       } catch (err) {
         if (err.name === 'AbortError') {
-          const finalContent = '(ejecución detenida)'
-          await fetch('/api/chat/sessions/' + sid + '/save-messages', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              messages: [
-                { role: 'command', content: 'npm run ' + scriptName },
-                { role: 'result', content: finalContent },
-              ],
-            }),
-          })
-          if (isActive()) _updateStreamMsg(streamKey, finalContent)
+          if (isActive()) _updateStreamMsg(streamKey, '(ejecución detenida)')
         } else {
           console.error('Error ejecutando npm script:', err)
           chat.setSessionStatus(sid, 'error')
           if (isActive()) _updateStreamMsg(streamKey, 'Error: ' + err.message)
         }
+        chat.setCmdStreaming(sid, false)
+        chat.clearCmdStreamCache(sid)
       } finally {
         done()
       }
@@ -1043,9 +1016,14 @@ export default {
 
     function detenerNpmScript(pkgDir, scriptName) {
       const key = pkgDir + '/' + scriptName
-      const abortController = executingScripts.value.get(key)
-      if (abortController) {
-        abortController.abort()
+      const entry = executingScripts.value.get(key)
+      if (entry) {
+        entry.abortController.abort()
+        if (entry.terminalId) {
+          fetch(`/api/procesos/terminal/${entry.terminalId}`, {
+            method: 'DELETE', credentials: 'include',
+          }).catch(() => {})
+        }
       }
     }
 

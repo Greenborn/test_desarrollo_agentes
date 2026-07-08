@@ -15,8 +15,8 @@
             — Todos los mensajes cargados —
           </div>
           <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
-          <template v-for="ts in terminalSessions" :key="ts.sid">
-            <XtermTerminal v-show="ts.isActive" :label="ts.label" :cwd="ts.cwd" :init-command="ts.initCommand" :session-id="ts.sid" :terminal-id="ts.terminalId" @close="onTerminalClose" @terminal-ready="onTerminalReady" />
+          <template v-for="ts in terminalSessions" :key="ts.sid + '-' + (ts.terminalId || ts._idx)">
+            <XtermTerminal v-show="ts.isActive" :label="ts.label" :cwd="ts.cwd" :init-command="ts.initCommand" :session-id="ts.sid" :terminal-id="ts.terminalId" @close="onTerminalClose" @terminal-ready="onTerminalReady" @exit="onTerminalExit" />
           </template>
         </div>
       </div>
@@ -92,14 +92,22 @@ export default {
 
     const terminalSessions = computed(() => {
       const ts = chat._terminalSessions || {}
-      return Object.keys(ts).map(k => ({
-        sid: k,
-        terminalId: ts[k]?.terminalId || null,
-        label: ts[k]?.label || 'terminal',
-        cwd: ts[k]?.cwd || '',
-        initCommand: ts[k]?.initCommand || '',
-        isActive: Number(k) === Number(activeSessionId.value),
-      }))
+      const result = []
+      for (const [sid, terminals] of Object.entries(ts)) {
+        if (!Array.isArray(terminals)) continue
+        terminals.forEach((t, idx) => {
+          result.push({
+            sid,
+            _idx: idx,
+            terminalId: t.terminalId,
+            label: t.label,
+            cwd: t.cwd,
+            initCommand: t.initCommand,
+            isActive: Number(sid) === Number(activeSessionId.value),
+          })
+        })
+      }
+      return result
     })
 
     async function loadTicketInfo() {
@@ -294,6 +302,7 @@ export default {
       ctxMenu.x = e.clientX
       ctxMenu.y = e.clientY
       ctxMenu.msg = msg
+      ctxMenu.target = e.target
     }
 
     function closeCtxMenu() {
@@ -372,8 +381,8 @@ export default {
       }
     }
 
-    function onTerminalClose() {
-      chat.closeTerminal()
+    function onTerminalClose(terminalId) {
+      chat.closeTerminal(terminalId)
     }
 
     function onTerminalReady({ terminalId, sessionId }) {
@@ -381,6 +390,42 @@ export default {
       if (terminalId && sid) {
         chat.openTerminal({ sessionId: sid, terminalId })
       }
+    }
+
+    async function onTerminalExit({ code, output, terminalId }) {
+      const sid = activeSessionId.value
+      if (!sid || !terminalId) return
+
+      const pending = chat.consumeCmdPendingSave(sid)
+      if (!pending) return
+
+      const finalContent = output || '(sin salida)'
+      if (!pending.ocultarEjecucion) {
+        try {
+          await fetch('/api/chat/sessions/' + sid + '/save-messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              messages: [
+                { role: 'command', content: '$ ' + pending.commandLabel },
+                { role: 'result', content: finalContent },
+              ],
+            }),
+          })
+        } catch (err) {
+          console.error('Error guardando resultado de comando en terminal:', err)
+        }
+      }
+
+      if (pending.streamKey) {
+        const idx = chat.messages.findIndex(m => m._key === pending.streamKey)
+        if (idx >= 0) {
+          chat.messages[idx].content = finalContent
+        }
+      }
+      chat.setCmdStreaming(sid, false)
+      chat.clearCmdStreamCache(sid)
     }
 
     async function executeCommand(raw) {
@@ -450,7 +495,7 @@ export default {
           terminalContent.value = savedTerminal
         }
         if (chat._hasTerminal(newId)) {
-          chat.openTerminal({ sessionId: newId })
+          // terminal already tracked, XtermTerminal will reconnect via findOrCreateTerminal
         }
       }
       loadTicketInfo()
@@ -504,7 +549,7 @@ export default {
     return {
       chat, activeSessionId, messages, streaming, currentChunk, currentThinking,
       sessions, loadingMore, hasMoreMessages, input, gitStore, ocStore,
-      ocInput, ocStreaming, terminalContent, sessionCwd, terminalSessions, onTerminalClose, onTerminalReady,
+      ocInput, ocStreaming, terminalContent, sessionCwd, terminalSessions, onTerminalClose, onTerminalReady, onTerminalExit,
       ticketInfo, devInstanceRunning, ocMaximized, isOcSessionActive,
       deteccionState, abortDeteccion,
       ctxMenu, rawMsgKeys, msgKey,

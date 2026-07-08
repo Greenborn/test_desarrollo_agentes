@@ -1,5 +1,5 @@
 <template>
-  <div class="xterm-wrapper" ref="wrapperRef">
+  <div class="xterm-wrapper" ref="wrapperRef" :class="{ 'xterm-fullscreen': fullscreen }">
     <div class="xterm-toolbar">
       <span class="toolbar-title">{{ label }}</span>
       <div class="toolbar-actions">
@@ -33,7 +33,7 @@ export default {
     sessionId: { type: [String, Number], default: null },
     terminalId: { type: String, default: null },
   },
-  emits: ['close', 'terminal-ready'],
+  emits: ['close', 'terminal-ready', 'exit'],
   setup(props, { emit }) {
     const containerRef = ref(null)
     const wrapperRef = ref(null)
@@ -42,8 +42,10 @@ export default {
     let fitAddon = null
     let ws = null
     let resizeObserver = null
+    let fsResizeObserver = null
     let currentTerminalId = props.terminalId
     let closingIntentionally = false
+    let accumulatedOutput = ''
 
     function fitTerminal() {
       if (!fitAddon || !terminal) return
@@ -120,9 +122,11 @@ export default {
           return
         }
         if (msg.type === 'data' && terminal) {
+          accumulatedOutput += msg.data
           terminal.write(msg.data)
         } else if (msg.type === 'exit' && terminal) {
           terminal.write(`\r\n\x1b[38;5;245m[proceso terminado: código ${msg.code}]\x1b[0m\r\n`)
+          emit('exit', { code: msg.code, output: msg.output || accumulatedOutput, terminalId: currentTerminalId })
         }
       }
 
@@ -133,7 +137,7 @@ export default {
           terminal.write(`\r\n\x1b[38;5;245m[conexión terminada]\x1b[0m\r\n`)
         }
         if (!closingIntentionally) {
-          emit('close')
+          emit('close', currentTerminalId)
         }
       }
 
@@ -142,8 +146,56 @@ export default {
       }
     }
 
+    function enterFullscreen() {
+      const el = wrapperRef.value
+      if (!el) return
+      const chatRoot = el.closest('.d-flex.flex-column.h-100')
+      if (!chatRoot) return
+      const rect = chatRoot.getBoundingClientRect()
+      el.style.position = 'fixed'
+      el.style.top = rect.top + 'px'
+      el.style.left = rect.left + 'px'
+      el.style.width = rect.width + 'px'
+      el.style.height = rect.height + 'px'
+      el.style.zIndex = 1050
+      el.style.margin = '0'
+      el.style.borderRadius = '0'
+      fsResizeObserver = new ResizeObserver(() => {
+        if (!fullscreen.value) return
+        const r = chatRoot.getBoundingClientRect()
+        el.style.top = r.top + 'px'
+        el.style.left = r.left + 'px'
+        el.style.width = r.width + 'px'
+        el.style.height = r.height + 'px'
+        fitTerminal()
+      })
+      fsResizeObserver.observe(chatRoot)
+    }
+
+    function exitFullscreen() {
+      const el = wrapperRef.value
+      if (!el) return
+      el.style.position = ''
+      el.style.top = ''
+      el.style.left = ''
+      el.style.width = ''
+      el.style.height = ''
+      el.style.zIndex = ''
+      el.style.margin = ''
+      el.style.borderRadius = ''
+      if (fsResizeObserver) {
+        fsResizeObserver.disconnect()
+        fsResizeObserver = null
+      }
+    }
+
     function toggleFullscreen() {
       fullscreen.value = !fullscreen.value
+      if (fullscreen.value) {
+        enterFullscreen()
+      } else {
+        exitFullscreen()
+      }
       nextTick(() => fitTerminal())
     }
 
@@ -165,7 +217,7 @@ export default {
         try { ws.close() } catch {}
         ws = null
       }
-      emit('close')
+      emit('close', currentTerminalId)
     }
 
     async function findOrCreateTerminal() {
@@ -267,6 +319,9 @@ export default {
       if (resizeObserver) {
         resizeObserver.disconnect()
       }
+      if (fsResizeObserver) {
+        fsResizeObserver.disconnect()
+      }
       if (ws) {
         try { ws.close() } catch {}
         ws = null
@@ -337,8 +392,16 @@ export default {
   background: #0d1117;
 }
 
-.xterm-wrapper:fullscreen .xterm-container {
-  height: 100vh;
+.xterm-wrapper.xterm-fullscreen {
+  position: fixed;
+  z-index: 1050;
+  margin: 0 !important;
+  border-radius: 0;
+}
+.xterm-wrapper.xterm-fullscreen .xterm-container {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
 }
 
 .xterm-container :deep(.xterm) {
