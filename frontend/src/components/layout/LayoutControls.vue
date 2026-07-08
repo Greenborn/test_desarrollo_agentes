@@ -1,5 +1,5 @@
 <template>
-  <div class="layout-controls d-inline-flex align-items-center me-1">
+  <div class="layout-controls d-flex align-items-center flex-shrink-0">
     <button
       class="layout-btn"
       :class="{ active: !sidebarCollapsed }"

@@ -1,6 +1,6 @@
 <template>
-  <nav class="navbar navbar-dark px-3" style="background: #1a2744; border-bottom: 2px solid #75AADB;">
-    <a class="navbar-brand mb-0 h1 text-decoration-none" href="#" @click.prevent="openWorkspaceSwitcher">
+  <nav class="navbar navbar-dark px-2 gap-1" style="background: #1a2744; border-bottom: 2px solid #75AADB;">
+    <a class="navbar-brand mb-0 h1 text-decoration-none flex-shrink-0" href="#" @click.prevent="openWorkspaceSwitcher">
       <span v-for="(ws, i) in selectedWorkspaces" :key="ws.id" class="d-inline-flex align-items-center">
         <span v-if="i > 0" class="mx-1 text-secondary" style="font-size: 0.6rem;">▸</span>
         <span class="badge" :style="{ ...workspaceBadgeStyle(ws), fontSize: '0.7rem' }">{{ ws.name }}</span>
@@ -8,7 +8,7 @@
       <span v-if="selectedWorkspaces.length === 0" class="text-muted small">Agent Orchestrator</span>
     </a>
     <LayoutControls />
-    <TicketInfoBar v-if="user" />
+    <TicketInfoBar v-if="user" class="flex-grow-1" />
     <div class="dropdown" v-if="user">
       <button class="btn btn-dark dropdown-toggle" data-bs-toggle="dropdown">
         {{ user.username }}
