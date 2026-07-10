@@ -665,19 +665,25 @@ router.delete('/comments/sent', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const { sessionId } = req.body;
-    if (!sessionId) {
-      return res.status(400).json({ error: 'sessionId es requerido' });
+    const { sessionId, ticket_redmine_id } = req.body;
+    if (!sessionId && !ticket_redmine_id) {
+      return res.status(400).json({ error: 'sessionId o ticket_redmine_id es requerido' });
     }
 
     const wsIds = req.session.workspaceIds || [];
 
-    const deletedCount = await db('redmine_comentarios')
+    let query = db('redmine_comentarios')
       .join('chat_sessions', 'redmine_comentarios.session_id', 'chat_sessions.id')
-      .where('redmine_comentarios.session_id', sessionId)
       .where('redmine_comentarios.estado', 'enviado')
-      .whereIn('chat_sessions.workspace_id', wsIds.length > 0 ? wsIds : [0])
-      .del();
+      .whereIn('chat_sessions.workspace_id', wsIds.length > 0 ? wsIds : [0]);
+
+    if (ticket_redmine_id) {
+      query = query.where('redmine_comentarios.ticket_redmine_id', ticket_redmine_id);
+    } else {
+      query = query.where('redmine_comentarios.session_id', sessionId);
+    }
+
+    const deletedCount = await query.del();
 
     res.json({ success: true, deletedCount });
   } catch (err) {

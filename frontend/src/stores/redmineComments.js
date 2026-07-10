@@ -2,31 +2,28 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useRedmineCommentsStore = defineStore('redmineComments', () => {
-  const commentsBySession = ref({})
-  const loadingBySession = ref({})
-  const activeTicketBySession = ref({})
+  const commentsByTicket = ref({})
+  const loadingByTicket = ref({})
 
-  async function loadComments(ticketRedmineId, sessionId) {
-    if (!sessionId) return
-    activeTicketBySession.value[sessionId] = ticketRedmineId
-    loadingBySession.value[sessionId] = true
+  async function loadComments(ticketRedmineId) {
+    if (!ticketRedmineId) return
+    loadingByTicket.value[ticketRedmineId] = true
     try {
-      let url = `/api/redmine/comments?ticket_redmine_id=${ticketRedmineId}&estado=todos`
-      if (sessionId) url += `&sessionId=${sessionId}`
+      const url = `/api/redmine/comments?ticket_redmine_id=${ticketRedmineId}&estado=todos`
       const res = await fetch(url, { credentials: 'include' })
       const data = await res.json()
-      commentsBySession.value[sessionId] = data.comentarios || []
+      commentsByTicket.value[ticketRedmineId] = data.comentarios || []
     } catch (err) {
       console.error('Error al cargar comentarios Redmine:', err)
-      commentsBySession.value[sessionId] = []
+      commentsByTicket.value[ticketRedmineId] = []
     } finally {
-      loadingBySession.value[sessionId] = false
+      loadingByTicket.value[ticketRedmineId] = false
     }
   }
 
-  async function refreshComments(sessionId) {
-    if (sessionId && activeTicketBySession.value[sessionId]) {
-      await loadComments(activeTicketBySession.value[sessionId], sessionId)
+  async function refreshComments(ticketRedmineId) {
+    if (ticketRedmineId) {
+      await loadComments(ticketRedmineId)
     }
   }
 
@@ -43,45 +40,43 @@ export const useRedmineCommentsStore = defineStore('redmineComments', () => {
     if (!data.success) {
       throw new Error(data.error || 'Error al encolar comentario')
     }
-    await loadComments(ticketRedmineId, sessionId)
+    await loadComments(ticketRedmineId)
     return data
   }
 
-  async function deleteComment(commentId, sessionId) {
+  async function deleteComment(commentId, ticketRedmineId) {
     const res = await fetch(`/api/redmine/comments/${commentId}`, {
       method: 'DELETE',
       credentials: 'include',
     })
     const data = await res.json()
     if (!data.success) throw new Error(data.error || 'Error al eliminar comentario')
-    await refreshComments(sessionId)
+    await refreshComments(ticketRedmineId)
     return data
   }
 
-  function clearComments(sessionId) {
-    if (sessionId) {
-      delete commentsBySession.value[sessionId]
-      delete loadingBySession.value[sessionId]
-      delete activeTicketBySession.value[sessionId]
+  function clearComments(ticketRedmineId) {
+    if (ticketRedmineId) {
+      delete commentsByTicket.value[ticketRedmineId]
+      delete loadingByTicket.value[ticketRedmineId]
     } else {
-      commentsBySession.value = {}
-      loadingBySession.value = {}
-      activeTicketBySession.value = {}
+      commentsByTicket.value = {}
+      loadingByTicket.value = {}
     }
   }
 
-  async function deleteSentComments(sessionId) {
+  async function deleteSentComments(ticketRedmineId) {
     const res = await fetch('/api/redmine/comments/sent', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ sessionId }),
+      body: JSON.stringify({ ticket_redmine_id: ticketRedmineId }),
     })
     const data = await res.json()
     if (!data.success) throw new Error(data.error || 'Error al eliminar comentarios enviados')
-    await refreshComments(sessionId)
+    await refreshComments(ticketRedmineId)
     return data
   }
 
-  return { commentsBySession, loadingBySession, activeTicketBySession, loadComments, refreshComments, queueComment, deleteComment, deleteSentComments, clearComments }
+  return { commentsByTicket, loadingByTicket, loadComments, refreshComments, queueComment, deleteComment, deleteSentComments, clearComments }
 })

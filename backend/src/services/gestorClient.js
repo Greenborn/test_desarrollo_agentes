@@ -1,4 +1,4 @@
-const GESTOR_PORT = process.env.SERVICIO_GESTOR_PORT || 4200;
+const GESTOR_PORT = process.env.SERVICIO_GESTOR_PORT || 4250;
 const API_KEY = process.env.GESTOR_API_KEY;
 const BASE_URL = `http://localhost:${GESTOR_PORT}/api/gestor`;
 

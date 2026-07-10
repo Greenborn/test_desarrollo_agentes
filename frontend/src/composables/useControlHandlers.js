@@ -506,7 +506,7 @@ export function useControlHandlers(api) {
         const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
         if (idx >= 0) {
           if (data.success) {
-            redmineComments.refreshComments(chat.activeSessionId)
+            redmineComments.refreshComments(data.ticket_id)
             chat.messages[idx] = {
               role: 'result',
               content: `✓ ${data.cantidad} comentario${data.cantidad !== 1 ? 's' : ''} enviado${data.cantidad !== 1 ? 's' : ''} al ticket #${data.ticket_id} correctamente.`,
@@ -1548,7 +1548,53 @@ export function useControlHandlers(api) {
         prompt = 'Analizá los cambios realizados en el proyecto actual (revisando el diff de Git) y generá un mensaje de commit descriptivo. El mensaje debe ser conciso (máximo 300 caracteres) y reflejar claramente las modificaciones aplicadas al código. Debes comenzar en modo planificación mostrando primero la propuesta de commit. IMPORTANTE: Devuelve ÚNICAMENTE el mensaje de commit, sin explicaciones, análisis ni ningún otro texto adicional.'
       }
 
-      commitData.prompt = prompt
+      let ticketContext = ''
+      const sessionId = chat.activeSessionId
+      if (sessionId) {
+        try {
+          const session = chat.sessions.find(s => Number(s.id) === Number(sessionId))
+          const ticketRedmineId = session?.id_ticket_redmine || null
+          if (ticketRedmineId) {
+            const ticketRes = await fetch(`/api/tickets/session/${sessionId}?comments=true`, { credentials: 'include' })
+            const ticketData = await ticketRes.json()
+            if (ticketData.ticket) {
+              ticketContext += `## Contexto del ticket #${ticketRedmineId}\n\n`
+              ticketContext += `- **Título:** ${ticketData.ticket.subject || ''}\n`
+              ticketContext += `- **Estado:** ${ticketData.ticket.status_name || ''}\n`
+              ticketContext += `- **Prioridad:** ${ticketData.ticket.priority_name || ''}\n`
+              ticketContext += `- **Asignado a:** ${ticketData.ticket.assigned_to_name || ''}\n`
+              if (ticketData.ticket.description) {
+                ticketContext += `- **Descripción:** ${ticketData.ticket.description}\n`
+              }
+            }
+            if (ticketData.comments && ticketData.comments.length > 0) {
+              ticketContext += `\n### Comentarios existentes en Redmine (${ticketData.comments.length})\n\n`
+              for (const c of ticketData.comments) {
+                ticketContext += `- **${c.user}** (${c.created_on}): ${c.notes}\n`
+              }
+            }
+            const pendingRes = await fetch(`/api/redmine/comments?ticket_redmine_id=${ticketRedmineId}&estado=todos`, { credentials: 'include' })
+            const pendingData = await pendingRes.json()
+            if (pendingData.comentarios && pendingData.comentarios.length > 0) {
+              const comentariosPendientes = pendingData.comentarios.filter(c => c.estado !== 'enviado')
+              if (comentariosPendientes.length > 0) {
+                ticketContext += `\n### Comentarios pendientes de enviar a Redmine (${comentariosPendientes.length})\n\n`
+                for (const c of comentariosPendientes) {
+                  const estado = c.estado === 'pendiente' ? '⏳ Pendiente' : c.estado === 'error' ? '❌ Error' : c.estado
+                  ticketContext += `- [${estado}] ${c.comentario}\n`
+                }
+              }
+            }
+            ticketContext += '\n---\n\n'
+          }
+        } catch (err) {
+          console.error('Error al obtener contexto del ticket para commit:', err.message)
+        }
+      }
+
+      const fullPrompt = ticketContext + prompt
+
+      commitData.prompt = fullPrompt
       commitData.provider = commitSetupData.provider
       commitData.model = model
       commitData.thinking = thinking
@@ -1557,7 +1603,7 @@ export function useControlHandlers(api) {
 
       await opencodeStreamPromptCommit(
         chat.activeSessionId,
-        prompt,
+        fullPrompt,
         commitSetupData.provider,
         model,
         thinking,

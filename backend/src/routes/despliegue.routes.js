@@ -62,6 +62,92 @@ router.post('/upd-config', async (req, res) => {
   }
 });
 
+function scanSubprojects(rootDir) {
+  const results = [];
+  const entries = fs.readdirSync(rootDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+    const subDir = path.join(rootDir, entry.name);
+    const pkgPath = path.join(subDir, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+      let pkg = {};
+      try {
+        pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+      } catch {}
+      const name = pkg.name || entry.name;
+      const hasExpress = (pkg.dependencies && pkg.dependencies.express) || (pkg.devDependencies && pkg.devDependencies.express);
+      const hasVue = (pkg.dependencies && (pkg.dependencies.vue || pkg.dependencies['vue-router'])) ||
+                     (pkg.devDependencies && (pkg.devDependencies.vue || pkg.devDependencies['vue-router']));
+      const hasVite = (pkg.devDependencies && pkg.devDependencies.vite) || (pkg.scripts && pkg.scripts.dev && pkg.scripts.dev.includes('vite'));
+      const type = hasVue && (hasVite || hasExpress === false) ? 'frontend' : hasExpress ? 'backend' : 'backend';
+      results.push({ name, cwd: subDir, type });
+    }
+  }
+  return results;
+}
+
+router.post('/crear-config', async (req, res) => {
+  try {
+    const { sessionId, dir } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: 'Se requiere sessionId.' });
+    }
+
+    const session = await db('chat_sessions')
+      .where({ id: sessionId, user_id: req.session.userId })
+      .select('proyecto_id', 'cwd')
+      .first();
+
+    if (!session || !session.proyecto_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'La sesión de chat no está vinculada a un proyecto. Use /chat_set_proyecto para seleccionar un proyecto.',
+      });
+    }
+
+    const projectDir = dir || session.cwd;
+    if (!projectDir) {
+      return res.status(400).json({ success: false, error: 'No se pudo determinar el directorio del proyecto.' });
+    }
+
+    if (!fs.existsSync(projectDir)) {
+      return res.status(400).json({ success: false, error: `El directorio no existe: ${projectDir}` });
+    }
+
+    const subprojects = scanSubprojects(projectDir);
+
+    if (subprojects.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: `No se encontraron subproyectos con package.json en: ${projectDir}`,
+      });
+    }
+
+    const deployConfig = {
+      install: subprojects.map(sp => ({ cwd: sp.cwd })),
+      pm2: subprojects.filter(sp => sp.type === 'backend').map(sp => ({ cwd: sp.cwd })),
+      build: subprojects.filter(sp => sp.type === 'frontend').map(sp => ({ cwd: sp.cwd })),
+    };
+
+    const deployPath = path.resolve(projectDir, 'deploy.json');
+    fs.writeFileSync(deployPath, JSON.stringify(deployConfig, null, 2), 'utf-8');
+
+    await db('proyectos')
+      .where({ id: session.proyecto_id })
+      .update({ despliegue_config: JSON.stringify(deployConfig) });
+
+    res.json({
+      success: true,
+      message: `deploy.json creado en ${deployPath} con ${subprojects.length} subproyecto(s) detectado(s).`,
+      config: deployConfig,
+    });
+  } catch (err) {
+    console.log('Error en POST /api/despliegue/crear-config:', err);
+    res.status(500).json({ success: false, error: 'Error al crear configuración de despliegue.' });
+  }
+});
+
 router.post('/save-config', async (req, res) => {
   try {
     const { sessionId, subprojects } = req.body;

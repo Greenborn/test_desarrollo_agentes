@@ -13,6 +13,7 @@
       <button v-else class="btn btn-sm btn-outline-danger px-2" @click="detenerInstanciaDev" title="Detener instancia desarrollo">⏹️</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="generarCommit" title="Generar commit">💾</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="iniciarOpencode" title="Iniciar OpenCode">🚀</button>
+      <button class="btn btn-sm btn-outline-argentina px-2" @click="iniciarTerminal" title="Abrir terminal">💻</button>
       <button class="btn btn-sm btn-outline-danger px-2" @click="clearChat" title="Limpiar chat">🗑️</button>
       <div class="zoom-controls d-flex align-items-center gap-1">
         <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomOut" :disabled="gitStore.chatZoom <= 50" title="Alejar">−</button>
@@ -170,6 +171,11 @@ export default {
       await executeCommand('/dev_opencode_iniciar')
     }
 
+    async function iniciarTerminal() {
+      if (!activeSessionId.value) return
+      await executeCommand('/terminal')
+    }
+
     async function clearChat() {
       if (!activeSessionId.value) return
       await chatStore.clearMessages(activeSessionId.value)
@@ -180,7 +186,7 @@ export default {
       branchMismatch, truncatedSubject, priorityClass, devInstanceRunning,
       zoomIn, zoomOut,
       generarCommit, iniciarInstanciaDev, detenerInstanciaDev,
-      crearTicket, iniciarOpencode, clearChat,
+      crearTicket, iniciarOpencode, iniciarTerminal, clearChat,
     }
   },
 }

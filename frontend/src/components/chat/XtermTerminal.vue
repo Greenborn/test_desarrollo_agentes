@@ -221,20 +221,24 @@ export default {
         return currentTerminalId
       }
 
-      try {
-        const listRes = await fetch(`${PROCESOS_API}/terminal?chatSessionId=${props.sessionId}`, {
-          credentials: 'include',
-        })
-        if (listRes.ok) {
-          const list = await listRes.json()
-          if (list.length > 0) {
-            const existing = list.find((t) => t.status === 'active') || list[0]
-            currentTerminalId = existing.terminalId
-            return currentTerminalId
+      // Solo reusar terminales existentes si hay un initCommand (npm, opencode, etc.)
+      // Las terminales interactivas sin comando (/terminal) siempre crean una nueva
+      if (props.initCommand) {
+        try {
+          const listRes = await fetch(`${PROCESOS_API}/terminal?chatSessionId=${props.sessionId}`, {
+            credentials: 'include',
+          })
+          if (listRes.ok) {
+            const list = await listRes.json()
+            if (list.length > 0) {
+              const existing = list.find((t) => t.status === 'active') || list[0]
+              currentTerminalId = existing.terminalId
+              return currentTerminalId
+            }
           }
+        } catch (err) {
+          console.log('[xterm] Error al buscar terminales:', err.message)
         }
-      } catch (err) {
-        console.log('[xterm] Error al buscar terminales:', err.message)
       }
 
       const tid = await createTerminalViaApi()

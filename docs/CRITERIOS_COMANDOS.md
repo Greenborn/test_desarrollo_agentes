@@ -260,6 +260,7 @@ Todo comando que gestione la configuración e instancias de desarrollo **debe co
 
 | Nombre | Verbo | Sustantivo | Significado |
 |---|---|---|---|
+| `/despliegue_crear_config` | `crear` | `config` | Escanear proyecto y generar deploy.json |
 | `/despliegue_actualizar_config` | `actualizar` | `config` | Cargar configuración desde deploy.json |
 | `/despliegue_mostrar_config` | `mostrar` | `config` | Mostrar configuración guardada |
 | `/despliegue_iniciar_instancia` | `iniciar` | `instancia` | Iniciar procesos de desarrollo |

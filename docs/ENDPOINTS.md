@@ -1,6 +1,6 @@
 # ENDPOINTS — API REST
 
-- **api_gestor_servicios:** Puerto `4200` (configurable vía `SERVICIO_GESTOR_PORT`). Punto de entrada que orquesta el resto de servicios. Los endpoints operativos requieren `GESTOR_API_KEY`. El frontend no lo llama directamente.
+- **api_gestor_servicios:** Puerto `4250` (configurable vía `SERVICIO_GESTOR_PORT`). Punto de entrada que orquesta el resto de servicios. Los endpoints operativos requieren `GESTOR_API_KEY`. El frontend no lo llama directamente.
 - **Backend Express principal:** Puerto `4000` (configurable vía `PORT` en `.env`). Actúa como proxy para `api_gestor_servicios` y `api_procesos_consola` (inyecta la API key automáticamente).
 - **api_memoria (`memoriaClient.js`):** La comunicación desde el backend hacia el servicio de memoria se realiza **exclusivamente por WebSocket** (`ws://`, puerto 4101, path `/api/memoria`). Los endpoints HTTP del servicio de memoria se mantienen para compatibilidad con consumidores externos.
 - **api_procesos_consola:** Puerto `3575` (configurable vía `SERVICIO_PROCESOS_CONSOLA_PORT`). Gestiona procesos de terminal (PTY) catalogados por sesión de chat. HTTP REST para gestión + WebSocket para streaming de terminal. Ver sección específica más abajo.
@@ -961,6 +961,13 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Respuesta 200:** `{ success: true, message: "Configuración de despliegue guardada correctamente." }`
 - **Respuesta 400:** `{ success: false, error: "La sesión de chat no está vinculada a un proyecto. Use /chat_set_proyecto para seleccionar un proyecto." }`
 - **Respuesta (cuando no existe deploy.json):** `{ success: false, code: "MISSING_DEPLOY_JSON", cwd: "<ruta>", error: "No se pudo obtener configuración de despliegue: falta el archivo \"deploy.json\". Se esperaba en: <ruta>" }`
+
+### `POST /api/despliegue/crear-config`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number, dir?: string }`
+- **Descripción:** Escanea el directorio del proyecto (o `dir` si se especifica) buscando subdirectorios con `package.json`, detecta automáticamente el tipo (`backend` si tiene `express` como dependencia, `frontend` si tiene `vue` o `vite`), genera `deploy.json` con las secciones `install`, `pm2` y `build`, y lo guarda en el proyecto.
+- **Respuesta 200:** `{ success: true, message: "deploy.json creado en <ruta> con N subproyecto(s) detectado(s).", config: { install: [...], pm2: [...], build: [...] } }`
+- **Respuesta 400:** `{ success: false, error: "..." }` (sin sesión, sin proyecto, sin package.json, directorio no existe)
 
 ### `POST /api/despliegue/save-config`
 - **Auth:** Requerida

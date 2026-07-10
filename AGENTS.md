@@ -59,7 +59,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 │       └── components/     # Topbar, SidebarChat, ChatWindow, ChatMessage
 ├── api_gestor_servicios/  # Punto de entrada — orquestador de servicios (spawn + keepalive)
 │   └── src/
-│       ├── index.js       # Entrypoint (Express, puerto 4200)
+│       ├── index.js       # Entrypoint (Express, puerto 4250)
 │       └── routes/        # gestor.routes.js
 ├── api_gastos/            # Servicio de registro de gastos de tokens
 │   └── src/
@@ -97,7 +97,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 ### API Gestor Servicios (`api_gestor_servicios/`) — Punto de entrada
 
 ```bash
-npm run dev               # Iniciar servidor con --watch (puerto 4200)
+npm run dev               # Iniciar servidor con --watch (puerto 4250)
 npm start                 # Iniciar servidor en producción
 ```
 
