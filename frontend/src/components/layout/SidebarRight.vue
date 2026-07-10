@@ -267,20 +267,21 @@ export default {
     const { find } = useCommandRegistry()
     const { sidebarRightTabs } = useModuleRegistry()
     const moduleTabs = computed(() => {
+      if (!sidebarRightTabs) return []
       return [...sidebarRightTabs].sort((a, b) => (a.priority || 50) - (b.priority || 50))
     })
     const tab = ref('comentarios')
     const stopTabSync = watch(sidebarRightTab, (v) => { tab.value = v; stopTabSync() })
 
     const comments = computed(() => {
-      const list = redmineComments.commentsBySession[activeSessionId.value] || []
+      const list = redmineComments.commentsByTicket[activeTicketId.value] || []
       return [...list].sort((a, b) => {
         if (a.estado === 'pendiente' && b.estado !== 'pendiente') return -1
         if (a.estado !== 'pendiente' && b.estado === 'pendiente') return 1
         return new Date(a.created_at) - new Date(b.created_at)
       })
     })
-    const loading = computed(() => redmineComments.loadingBySession[activeSessionId.value] || false)
+    const loading = computed(() => redmineComments.loadingByTicket[activeTicketId.value] || false)
     const hasSentComments = computed(() => comments.value.some(c => c.estado === 'enviado'))
     const hasPendingComments = computed(() => comments.value.some(c => c.estado === 'pendiente'))
 
@@ -718,7 +719,7 @@ export default {
     async function deleteComment(c) {
       if (!confirm('¿Eliminar este comentario?')) return
       try {
-        await redmineComments.deleteComment(c.id, activeSessionId.value)
+        await redmineComments.deleteComment(c.id, activeTicketId.value)
       } catch (err) {
         console.error('Error al eliminar comentario:', err)
       }
@@ -727,7 +728,7 @@ export default {
     async function deleteSentComments() {
       if (!confirm('¿Eliminar todos los comentarios ya enviados?')) return
       try {
-        await redmineComments.deleteSentComments(activeSessionId.value)
+        await redmineComments.deleteSentComments(activeTicketId.value)
       } catch (err) {
         console.error('Error al eliminar comentarios enviados:', err)
       }
@@ -742,15 +743,13 @@ export default {
     }
 
     watch(activeSessionId, (newId) => {
-      if (!newId) {
-        redmineComments.clearComments()
-        return
-      }
-      const session = sessions.value.find(s => s.id === newId)
-      if (session?.id_ticket_redmine) {
-        redmineComments.loadComments(session.id_ticket_redmine, newId)
-      } else {
-        redmineComments.clearComments()
+      if (newId) {
+        const session = sessions.value.find(s => s.id === newId)
+        if (session?.id_ticket_redmine) {
+          redmineComments.loadComments(session.id_ticket_redmine)
+        } else {
+          redmineComments.clearComments()
+        }
       }
     })
 
@@ -1212,6 +1211,7 @@ export default {
       onCapturasSplitStart,
       filtrarPorSesion,
       tomarCaptura,
+      moduleTabs,
       effectiveCasosPruebaListWidth,
       onCasosPruebaSplitStart,
       effectiveCasosPruebaMiddleWidth,
