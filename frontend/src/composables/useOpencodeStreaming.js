@@ -460,6 +460,142 @@ export function useOpencodeStreaming() {
     })
   }
 
+  async function deepseekStreamCommit(sessionId, prompt, systemPrompt) {
+    const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
+    streamMsg._key = 'stream-' + Date.now()
+
+    if (sessionId) chat.setSessionStatus(sessionId, 'executing')
+    chat.setOcStreaming(sessionId, true)
+
+    try {
+      const res = await fetch('/api/chat/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ text: prompt, systemPrompt, sessionId }),
+      })
+
+      if (!res.ok) {
+        let errMsg = 'Error al generar mensaje de commit'
+        try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
+        throw new Error(errMsg)
+      }
+
+      let refinedText = ''
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() || ''
+
+        for (const line of lines) {
+          const t = line.trim()
+          if (!t || !t.startsWith('data: ')) continue
+          try {
+            const j = JSON.parse(t.slice(6))
+            if (j.type === 'response') {
+              refinedText += j.content
+              if (isActiveSession(sessionId)) {
+                const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+                if (idx >= 0) {
+                  chat.messages[idx].content = refinedText
+                }
+              }
+            } else if (j.type === 'error') {
+              throw new Error(j.content)
+            }
+          } catch (e) {
+            if (e.message && e.message !== 'Unexpected end of JSON input') throw e
+          }
+        }
+      }
+
+      chat.setOcStreaming(sessionId, false)
+      if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+
+      if (isActiveSession(sessionId)) {
+        const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+        if (idx >= 0) {
+          let repoUrl = ''
+          try {
+            const sess = chat.sessions.find(s => Number(s.id) === Number(sessionId))
+            const proyectoId = sess?.proyecto_id || null
+            let url_github = null
+            if (proyectoId) {
+              const repoRes = await fetch('/api/proyecto/repositorio/' + encodeURIComponent(proyectoId) + '?sessionId=' + sessionId, { credentials: 'include' })
+              const repoData = await repoRes.json()
+              url_github = repoData.url_github || null
+            }
+            if (!url_github) {
+              const remoteRes = await fetch('/api/command/git', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ command: 'remote get-url origin', sessionId }),
+              })
+              const remoteData = await remoteRes.json()
+              if (remoteData.success && remoteData.stdout) {
+                const remote = remoteData.stdout.trim().replace(/\.git$/, '')
+                if (/^git@/.test(remote)) {
+                  const m = remote.match(/^git@([^:]+):(.+)$/)
+                  if (m) url_github = 'https://' + m[1] + '/' + m[2]
+                } else if (/^https?:\/\//.test(remote)) {
+                  url_github = remote
+                }
+              }
+            }
+            if (url_github) {
+              repoUrl = url_github.replace(/\/+$/, '')
+            }
+          } catch (err) {
+            console.error('Error al obtener URL del repositorio:', err.message)
+          }
+
+          chat.messages[idx] = {
+            role: 'opencode_control',
+            controlData: {
+              controlId: 'commit-result-' + Date.now(),
+              controlType: 'commit_result',
+              message: refinedText || '(sin respuesta)',
+              repoUrl: repoUrl,
+              loading: false,
+              modo_envio: 'encolar',
+            },
+            _key: 'control-' + Date.now(),
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error al generar commit:', err.message)
+      chat.setOcStreaming(sessionId, false)
+      if (sessionId) chat.setSessionStatus(sessionId, 'idle')
+
+      if (isActiveSession(sessionId)) {
+        const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+        if (idx >= 0) {
+          chat.messages[idx] = {
+            role: 'opencode_control',
+            controlData: {
+              controlId: 'commit-result-' + Date.now(),
+              controlType: 'commit_result',
+              message: '[Error al generar commit: ' + err.message + ']',
+              loading: false,
+              modo_envio: 'encolar',
+            },
+            _key: 'control-' + Date.now(),
+          }
+        }
+      }
+    }
+
+    fetchGitBranch()
+  }
+
   async function opencodeStreamPromptCommit(sessionId, prompt, provider, model, thinking, mode, temperature) {
     const sd = _ensureStreamData(sessionId)
     sd.text = ''
@@ -630,12 +766,49 @@ export function useOpencodeStreaming() {
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (idx >= 0) {
               const finalMessage = refinedText || opencodeResponse
+
+              let repoUrl = ''
+              try {
+                const sess = chat.sessions.find(s => Number(s.id) === Number(sessionId))
+                const proyectoId = sess?.proyecto_id || null
+                let url_github = null
+                if (proyectoId) {
+                  const repoRes = await fetch('/api/proyecto/repositorio/' + encodeURIComponent(proyectoId) + '?sessionId=' + sessionId, { credentials: 'include' })
+                  const repoData = await repoRes.json()
+                  url_github = repoData.url_github || null
+                }
+                if (!url_github) {
+                  const remoteRes = await fetch('/api/command/git', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ command: 'remote get-url origin', sessionId }),
+                  })
+                  const remoteData = await remoteRes.json()
+                  if (remoteData.success && remoteData.stdout) {
+                    const remote = remoteData.stdout.trim().replace(/\.git$/, '')
+                    if (/^git@/.test(remote)) {
+                      const m = remote.match(/^git@([^:]+):(.+)$/)
+                      if (m) url_github = 'https://' + m[1] + '/' + m[2]
+                    } else if (/^https?:\/\//.test(remote)) {
+                      url_github = remote
+                    }
+                  }
+                }
+                if (url_github) {
+                  repoUrl = url_github.replace(/\/+$/, '')
+                }
+              } catch (err) {
+                console.error('Error al obtener URL del repositorio:', err.message)
+              }
+
               chat.messages[idx] = {
                 role: 'opencode_control',
                 controlData: {
                   controlId: 'commit-result-' + Date.now(),
                   controlType: 'commit_result',
                   message: finalMessage,
+                  repoUrl: repoUrl,
                   loading: false,
                   modo_envio: 'encolar',
                 },
@@ -652,7 +825,8 @@ export function useOpencodeStreaming() {
           if (isActiveSession(sessionId)) {
             const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
             if (idx >= 0) {
-              const fallbackMessage = opencodeResponse + (err ? '\n\n[Error al reducir: ' + err.message + ']' : '')
+              const opencodeResponse2 = json.fullResponse || fullText || '(sin respuesta)'
+              const fallbackMessage = opencodeResponse2 + (err ? '\n\n[Error al reducir: ' + err.message + ']' : '')
               chat.messages[idx] = {
                 role: 'opencode_control',
                 controlData: {
@@ -891,8 +1065,9 @@ export function useOpencodeStreaming() {
     ocStreaming, ocChunk, ocThinking, streamSessionId, streamingConsole, terminalContent,
     isActiveSession, _getProyectoId, resolveInput, fetchGitBranch, addMessage,
     _syncStreamData, getTerminalContentForSession, clearTerminalContentForSession,
-    opencodeStreamPrompt, opencodeStreamPromptCommit, opencodeStreamPromptTestingNotes,
-    opencodeStreamPromptDocUpdate, opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
+    opencodeStreamPrompt, opencodeStreamPromptCommit, deepseekStreamCommit,
+    opencodeStreamPromptTestingNotes, opencodeStreamPromptDocUpdate,
+    opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
     DOC_LABELS,
   }
 }

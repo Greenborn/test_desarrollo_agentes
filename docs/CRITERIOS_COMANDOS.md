@@ -303,7 +303,7 @@ Todo comando que forme parte del ecosistema de desarrollo (funcionalidades, docu
 | `/dev_documento_actualizar` | documento | actualizar | — | Actualizar documentación con OpenCode |
 | `/dev_opencode_iniciar` | opencode | iniciar | — | Iniciar sesión OpenCode |
 | `/dev_opencode_finalizar` | opencode | finalizar | — | Finalizar sesión OpenCode |
-| `/dev_opencode_generar_commit` | opencode | generar | commit | Generar mensaje de commit |
+| `/dev_generar_commit` | git | generar | commit | Generar mensaje de commit |
 | `/dev_git_crear_rama` | git | crear | rama | Crear rama desde proyecto y ticket |
 
 ## 12. Comandos de gastos

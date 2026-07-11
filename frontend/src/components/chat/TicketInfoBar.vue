@@ -146,7 +146,7 @@ export default {
 
     async function generarCommit() {
       if (!activeSessionId.value) return
-      await executeCommand('/dev_opencode_generar_commit')
+      await executeCommand('/dev_generar_commit')
     }
 
     async function iniciarInstanciaDev() {

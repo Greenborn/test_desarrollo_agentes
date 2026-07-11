@@ -516,7 +516,7 @@ Composable que orquesta el streaming de OpenCode para diferentes casos de uso. U
 | Función | Descripción |
 |---|---|
 | `opencodeStreamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature)` | Prompt genérico. Crea un mensaje `opencode_stream` en el chat, actualiza en vivo el contenido y al finalizar lo convierte a `opencode_result`. |
-| `opencodeStreamPromptCommit(sessionId, prompt, provider, model, thinking, mode, temperature)` | Prompt para generar commits. Al finalizar, envía la respuesta a `/api/chat/refine` para reducir el mensaje a ≤256 caracteres. Muestra el resultado como `commit_result` (control). |
+| `deepseekStreamCommit(sessionId, prompt, systemPrompt)` | Envía prompt + systemPrompt a `/api/chat/refine` (DeepSeek directo), streamea la respuesta en vivo, y al finalizar muestra `commit_result` (control) con la URL del repo. Usado por `/dev_generar_commit`. |
 | `opencodeStreamPromptTestingNotes(sessionId, prompt, provider, model, thinking, mode, temperature, origen, destino)` | Prompt para generar notas de testing. Muestra el resultado como `ambientes_diff_comment` (control). |
 | `opencodeStreamPromptDocUpdate(sessionId, prompt, provider, model, thinking, mode, temperature, proyectoId, tipo)` | Prompt para actualizar documentación. Al finalizar, guarda la respuesta en la documentación del proyecto vía `PUT /api/documentacion/:tipo/:proyectoId`. |
 | `opencodeStreamDescripcion(sessionId, prompt, provider, model, thinking, mode, temperature, ticket)` | Prompt para generar/mejorar descripciones de tickets. Muestra el resultado como `descripcion_result` (control). |
@@ -673,5 +673,5 @@ sessionStorage.setItem('oc_opencode_state', JSON.stringify({
 |---|---|---|
 | `OpenCodeStickyBar` | `frontend/src/components/chat/OpenCodeStickyBar.vue` | Barra inferior con selector de proveedor (si no hay), modelo/pensamiento/temperatura/modo, switch "Usar descripción del ticket" y textarea (5 filas, auto-resize). Incluye autocompletado de variables `{{...}}`. Se activa al ejecutar `/dev_opencode_iniciar`. |
 | `OpenCodeStreamDisplay` | `frontend/src/components/chat/OpenCodeStreamDisplay.vue` | Visualización del streaming en vivo (thinking colapsable + respuesta). |
-| `ChatOpencodeForm` | `frontend/src/components/chat-controls/ChatOpencodeForm.vue` | Formulario completo con selector de modelo, thinking, temperatura, modo y opción de usar descripción del ticket. Usado en comandos `/dev_opencode_generar_commit` y otros flujos que requieren wizard paso a paso. |
+| `ChatOpencodeForm` | `frontend/src/components/chat-controls/ChatOpencodeForm.vue` | Formulario completo con selector de modelo, thinking, temperatura, modo y opción de usar descripción del ticket. Usado en comandos que requieren wizard paso a paso. |
 | `VariableAutocomplete` | `frontend/src/components/chat/VariableAutocomplete.vue` | Autocompletado de variables `{{...}}` usando datos reales del proyecto. |

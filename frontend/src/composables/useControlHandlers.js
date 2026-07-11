@@ -21,15 +21,15 @@ export function useControlHandlers(api) {
   const projectVarStore = useProjectVariablesStore()
 
   const {
-    opencodeStreamPrompt, opencodeStreamPromptCommit, opencodeStreamPromptTestingNotes,
-    opencodeStreamPromptDocUpdate, opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
+    opencodeStreamPrompt, opencodeStreamPromptCommit, deepseekStreamCommit,
+    opencodeStreamPromptTestingNotes, opencodeStreamPromptDocUpdate,
+    opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
     fetchGitBranch, _getProyectoId, resolveInput, isActiveSession, addMessage,
     ocStreaming, ocChunk, ocThinking, streamSessionId,
     ticketInfo, loadTicketInfo,
   } = api
 
   let ocSetupData = { provider: '', model: '', thinking: '', mode: '', prompt: '' }
-  let commitSetupData = { provider: '', model: '', thinking: '', mode: '', temperature: '' }
   let commitData = { prompt: '', provider: '', model: '', thinking: '', mode: '', temperature: '' }
   let testingNotesSetupData = { provider: '', model: '', thinking: '', mode: 'Plan', temperature: '' }
   let testingNotesData = { prompt: '', provider: '', model: '', thinking: '', mode: '', temperature: '', origen: '', destino: '' }
@@ -46,8 +46,6 @@ export function useControlHandlers(api) {
 
     if (stepType === 'opencode_setup') {
       await handleOpencodeSetup(controlId, value, controlMsg)
-    } else if (stepType === 'generar_commit_setup') {
-      await handleGenerarCommitSetup(controlId, value, controlMsg)
     } else if (stepType === 'ambientes_diff_testing_setup') {
       await handleAmbientesDiffTestingSetup(controlId, value, controlMsg)
     } else if (stepType === 'documentacion_update') {
@@ -1495,124 +1493,6 @@ export function useControlHandlers(api) {
     }
   }
 
-  async function handleGenerarCommitSetup(controlId, value, controlMsg) {
-    const subStepType = controlMsg.controlData.subStepType
-
-    if (subStepType === 'provider') {
-      commitSetupData.provider = value
-      await ocStore.select('provider', value)
-      ocStore.selectedProvider = value
-      const models = ocStore.getModelsForProvider(value)
-      chat.pushMessage({
-        role: 'opencode_control',
-        controlData: {
-          controlId: 'gc-form-' + Date.now(),
-          controlType: 'generar_commit_form',
-          stepType: 'generar_commit_setup',
-          subStepType: 'form',
-          models,
-          modelValue: ocStore.savedModel || '',
-          thinkingOptions: ocStore.thinkingOptions,
-          thinkingValue: ocStore.savedThinking || '',
-          temperatureOptions: ocStore.temperatureOptions,
-          temperatureValue: ocStore.savedTemperature || '0.7',
-        },
-        _key: 'control-' + Date.now(),
-      })
-    } else if (subStepType === 'form') {
-      const { model, thinking = '', mode = 'Plan', temperature = '0.7' } = value || {}
-      commitSetupData.model = model
-      commitSetupData.thinking = thinking
-      commitSetupData.mode = mode
-      commitSetupData.temperature = temperature
-      await ocStore.select('model', model)
-      await ocStore.select('thinking', thinking || '')
-      await ocStore.select('mode', mode)
-      if (temperature) await ocStore.select('temperature', temperature)
-      ocStore.selectedModel = model
-      ocStore.selectedThinking = thinking || ''
-      ocStore.selectedMode = mode
-      ocStore.selectedTemperature = temperature || ''
-
-      let prompt
-      try {
-        const tmplRes = await fetch('/api/templates/commit-prompt', { credentials: 'include' })
-        if (tmplRes.ok) {
-          const tmplData = await tmplRes.json()
-          prompt = tmplData.content
-        } else {
-          prompt = 'Analizá los cambios realizados en el proyecto actual (revisando el diff de Git) y generá un mensaje de commit descriptivo. El mensaje debe ser conciso (máximo 300 caracteres) y reflejar claramente las modificaciones aplicadas al código. Debes comenzar en modo planificación mostrando primero la propuesta de commit. IMPORTANTE: Devuelve ÚNICAMENTE el mensaje de commit, sin explicaciones, análisis ni ningún otro texto adicional.'
-        }
-      } catch (err) {
-        console.error('Error al cargar plantilla commit-prompt:', err)
-        prompt = 'Analizá los cambios realizados en el proyecto actual (revisando el diff de Git) y generá un mensaje de commit descriptivo. El mensaje debe ser conciso (máximo 300 caracteres) y reflejar claramente las modificaciones aplicadas al código. Debes comenzar en modo planificación mostrando primero la propuesta de commit. IMPORTANTE: Devuelve ÚNICAMENTE el mensaje de commit, sin explicaciones, análisis ni ningún otro texto adicional.'
-      }
-
-      let ticketContext = ''
-      const sessionId = chat.activeSessionId
-      if (sessionId) {
-        try {
-          const session = chat.sessions.find(s => Number(s.id) === Number(sessionId))
-          const ticketRedmineId = session?.id_ticket_redmine || null
-          if (ticketRedmineId) {
-            const ticketRes = await fetch(`/api/tickets/session/${sessionId}?comments=true`, { credentials: 'include' })
-            const ticketData = await ticketRes.json()
-            if (ticketData.ticket) {
-              ticketContext += `## Contexto del ticket #${ticketRedmineId}\n\n`
-              ticketContext += `- **Título:** ${ticketData.ticket.subject || ''}\n`
-              ticketContext += `- **Estado:** ${ticketData.ticket.status_name || ''}\n`
-              ticketContext += `- **Prioridad:** ${ticketData.ticket.priority_name || ''}\n`
-              ticketContext += `- **Asignado a:** ${ticketData.ticket.assigned_to_name || ''}\n`
-              if (ticketData.ticket.description) {
-                ticketContext += `- **Descripción:** ${ticketData.ticket.description}\n`
-              }
-            }
-            if (ticketData.comments && ticketData.comments.length > 0) {
-              ticketContext += `\n### Comentarios existentes en Redmine (${ticketData.comments.length})\n\n`
-              for (const c of ticketData.comments) {
-                ticketContext += `- **${c.user}** (${c.created_on}): ${c.notes}\n`
-              }
-            }
-            const pendingRes = await fetch(`/api/redmine/comments?ticket_redmine_id=${ticketRedmineId}&estado=todos`, { credentials: 'include' })
-            const pendingData = await pendingRes.json()
-            if (pendingData.comentarios && pendingData.comentarios.length > 0) {
-              const comentariosPendientes = pendingData.comentarios.filter(c => c.estado !== 'enviado')
-              if (comentariosPendientes.length > 0) {
-                ticketContext += `\n### Comentarios pendientes de enviar a Redmine (${comentariosPendientes.length})\n\n`
-                for (const c of comentariosPendientes) {
-                  const estado = c.estado === 'pendiente' ? '⏳ Pendiente' : c.estado === 'error' ? '❌ Error' : c.estado
-                  ticketContext += `- [${estado}] ${c.comentario}\n`
-                }
-              }
-            }
-            ticketContext += '\n---\n\n'
-          }
-        } catch (err) {
-          console.error('Error al obtener contexto del ticket para commit:', err.message)
-        }
-      }
-
-      const fullPrompt = ticketContext + prompt
-
-      commitData.prompt = fullPrompt
-      commitData.provider = commitSetupData.provider
-      commitData.model = model
-      commitData.thinking = thinking
-      commitData.mode = mode
-      commitData.temperature = temperature
-
-      await opencodeStreamPromptCommit(
-        chat.activeSessionId,
-        fullPrompt,
-        commitSetupData.provider,
-        model,
-        thinking,
-        mode,
-        temperature,
-      )
-    }
-  }
-
   async function handleAmbientesDiffTestingSetup(controlId, value, controlMsg) {
     const subStepType = controlMsg.controlData.subStepType
 
@@ -1708,15 +1588,41 @@ export function useControlHandlers(api) {
     if (idx >= 0) {
       chat.messages[idx].controlData.loading = true
     }
-    await opencodeStreamPromptCommit(
-      chat.activeSessionId,
-      commitData.prompt,
-      commitData.provider,
-      commitData.model,
-      commitData.thinking,
-      commitData.mode,
-      commitData.temperature,
-    )
+
+    const sessionId = chat.activeSessionId
+    if (!sessionId) return
+
+    let gitDiff = ''
+    try {
+      const res = await fetch('/api/command/git', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ command: 'diff HEAD', sessionId }),
+      })
+      const data = await res.json()
+      if (data.success && data.stdout) gitDiff = data.stdout
+      if (!gitDiff) {
+        const res2 = await fetch('/api/command/git', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ command: 'diff --cached', sessionId }),
+        })
+        const data2 = await res2.json()
+        if (data2.success && data2.stdout) gitDiff = data2.stdout
+      }
+    } catch (err) {
+      console.error('Error al obtener diff de git en regenerate:', err.message)
+    }
+
+    const prompt = gitDiff
+      ? `## Git diff de los cambios realizados\n\n\`\`\`diff\n${gitDiff.slice(0, 15000)}\n\`\`\``
+      : '(No se pudo obtener el diff de git)'
+
+    const systemPrompt = 'Eres un asistente experto en generar mensajes de commit. Recibes los cambios realizados (git diff). Debés generar un mensaje de commit claro, descriptivo y profesional que refleje los cambios realizados. El mensaje debe ser conciso (máximo 256 caracteres). Devolvé ÚNICAMENTE el mensaje de commit, sin explicaciones ni formato adicional.'
+
+    await deepseekStreamCommit(sessionId, prompt, systemPrompt)
   }
 
   async function executeCommit(controlId, controlMsg, message, addComment, modo_envio) {
@@ -1824,35 +1730,63 @@ export function useControlHandlers(api) {
         resultLines.push('', '⚠ Push: ' + pushData.stderr.trim())
       }
 
+      let commitUrl = ''
+      try {
+        let url_github = null
+        if (proyectoId) {
+          const repoRes = await fetch('/api/proyecto/repositorio/' + encodeURIComponent(proyectoId) + '?sessionId=' + sessionId, { credentials: 'include' })
+          const repoData = await repoRes.json()
+          url_github = repoData.url_github || null
+        }
+        if (!url_github) {
+          const remoteRes = await fetch('/api/command/git', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: 'remote get-url origin', sessionId }),
+          })
+          const remoteData = await remoteRes.json()
+          if (remoteData.success && remoteData.stdout) {
+            const remote = remoteData.stdout.trim().replace(/\.git$/, '')
+            if (/^git@/.test(remote)) {
+              const m = remote.match(/^git@([^:]+):(.+)$/)
+              if (m) url_github = 'https://' + m[1] + '/' + m[2]
+            } else if (/^https?:\/\//.test(remote)) {
+              url_github = remote
+            }
+          }
+        }
+        if (url_github) {
+          const hashRes = await fetch('/api/command/git', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: 'rev-parse HEAD', sessionId }),
+          })
+          const hashData = await hashRes.json()
+          if (hashData.success && hashData.stdout) {
+            const hash = hashData.stdout.trim()
+            commitUrl = url_github.replace(/\/+$/, '') + '/commit/' + hash
+          }
+        }
+      } catch (err) {
+        console.error('Error al construir URL del commit:', err.message)
+      }
+
+      if (commitUrl) {
+        resultLines.push('', 'URL: ' + commitUrl)
+      }
+
       if (addComment && idTicket) {
         const modoEnvio = modo_envio || 'encolar'
+        const notesBody = commitUrl ? cleanMsg + '\n\n' + commitUrl : cleanMsg
         if (modoEnvio === 'enviar') {
           try {
-            let commitUrl = ''
-            if (proyectoId) {
-              const repoRes = await fetch('/api/proyecto/repositorio/' + encodeURIComponent(proyectoId) + '?sessionId=' + sessionId, { credentials: 'include' })
-              const repoData = await repoRes.json()
-              if (repoData.url_github) {
-                const hashRes = await fetch('/api/command/git', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: JSON.stringify({ command: 'rev-parse HEAD', sessionId }),
-                })
-                const hashData = await hashRes.json()
-                if (hashData.success && hashData.stdout) {
-                  const hash = hashData.stdout.trim()
-                  commitUrl = repoData.url_github.replace(/\/+$/, '') + '/commit/' + hash
-                }
-              }
-            }
-
-            const notes = cleanMsg + '\n\n' + commitUrl
             const ticketRes = await fetch('/api/tickets/session/' + sessionId, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
-              body: JSON.stringify({ notes }),
+              body: JSON.stringify({ notes: notesBody }),
             })
             const ticketData = await ticketRes.json()
             if (ticketData.success) {
@@ -1866,27 +1800,7 @@ export function useControlHandlers(api) {
           }
         } else {
           try {
-            let commitUrl = ''
-            if (proyectoId) {
-              const repoRes = await fetch('/api/proyecto/repositorio/' + encodeURIComponent(proyectoId) + '?sessionId=' + sessionId, { credentials: 'include' })
-              const repoData = await repoRes.json()
-              if (repoData.url_github) {
-                const hashRes = await fetch('/api/command/git', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: JSON.stringify({ command: 'rev-parse HEAD', sessionId }),
-                })
-                const hashData = await hashRes.json()
-                if (hashData.success && hashData.stdout) {
-                  const hash = hashData.stdout.trim()
-                  commitUrl = repoData.url_github.replace(/\/+$/, '') + '/commit/' + hash
-                }
-              }
-            }
-
-            const notesBody = commitUrl ? cleanMsg + '\n\n' + commitUrl : cleanMsg
-            const commentData = await redmineComments.queueComment(sessionId, idTicket, notesBody)
+            await redmineComments.queueComment(sessionId, idTicket, notesBody)
             resultLines.push('', '✓ Comentario encolado para el ticket #' + idTicket + '. Usá /dev_redmine_comentarios_enviar para enviarlo.')
           } catch (err) {
             console.error('Error al encolar comentario:', err.message)
@@ -1912,17 +1826,7 @@ export function useControlHandlers(api) {
         }
       }
     } finally {
-      try {
-        await fetch('/api/opencode/finish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, sessionId }),
-        })
-      } catch (finishErr) {
-        console.error('Error al finalizar sesión OpenCode tras commit:', finishErr.message)
-      }
-      ocStore.finish()
+      // No OpenCode session to close
     }
   }
 
