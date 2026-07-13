@@ -1,15 +1,12 @@
-import { useCommandRegistry } from '../useCommandRegistry.js';
-import { useOpencodeStore } from '../../stores/opencode.js';
-import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
+import { parseCommandArgs, getUsedFlags } from '../../../composables/parseCommandArgs.js'
 
-const { register } = useCommandRegistry();
-const DOC_TYPES = ['base_datos', 'subproyectos', 'endpoints', 'web_sockets', 'funcionalidades', 'all'];
+const DOC_TYPES = ['base_datos', 'subproyectos', 'endpoints', 'web_sockets', 'funcionalidades', 'all']
 
-register({
+export default {
   name: '/dev_documento_actualizar',
   category: 'Desarrollo',
   description: 'Actualiza la documentación del proyecto usando OpenCode para el tipo indicado.',
-  usage: '/dev_documento_actualizar --tipo=&lt;tipo&gt;',
+  usage: '/dev_documento_actualizar --tipo=<tipo>',
   async autocomplete(args, cmdStore) {
     const usedFlags = getUsedFlags(args)
     if (usedFlags.includes('--tipo=')) {
@@ -52,6 +49,7 @@ register({
       throw new Error('No hay proyecto seleccionado. Use /chat_set_proyecto primero.');
     }
 
+    const { useOpencodeStore } = await import('../../../stores/opencode.js')
     const ocStore = useOpencodeStore();
     const data = await ocStore.start(sessionId);
     if (!data) {
@@ -80,4 +78,4 @@ register({
       },
     }
   },
-});
+}

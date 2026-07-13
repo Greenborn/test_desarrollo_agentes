@@ -59,10 +59,10 @@ export const useBrowserStore = defineStore('browser', () => {
     hasBrowserSession.value = false
   }
 
-  async function startRecording(recordingId, sessionId) {
+  async function startRecording(recordingId) {
     starting.value = true
     try {
-      const data = await navegadorCommand('start_event_recording', { recording_id: recordingId }, sessionId)
+      const data = await navegadorCommand('start_event_recording', { recording_id: recordingId })
       if (data.error) {
         return { error: data.error }
       }

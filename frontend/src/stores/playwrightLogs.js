@@ -135,7 +135,7 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ name, chat_session_id: chatSessionId, project_id: projectId || null }),
+      body: JSON.stringify({ name, chat_session_id: chatSessionId || null, project_id: projectId || null }),
     })
     const data = await res.json()
     if (!res.ok) {

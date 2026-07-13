@@ -342,9 +342,10 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 | Columna | Tipo | Restricciones |
 |---------|------|---------------|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
-| `chat_session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
+| `chat_session_id` | INTEGER UNSIGNED | nullable, FK → `chat_sessions(id)` ON DELETE SET NULL |
+| `recording_id` | INTEGER UNSIGNED | nullable, FK → `playwright_event_recordings(id)` ON DELETE SET NULL |
 | `playwright_session_id` | VARCHAR(36) | NOT NULL — UUID de la sesión del navegador en Playwright |
-| `event_type` | VARCHAR(50) | NOT NULL — `click`, `dblclick`, `input`, `change`, `submit`, `keydown`, `scroll`, `focus`, `blur` |
+| `event_type` | VARCHAR(50) | NOT NULL — `click`, `dblclick`, `input`, `change`, `submit`, `keydown`, `scroll`, `focus`, `blur`, `query` |
 | `selector` | TEXT | nullable — selector CSS del elemento donde ocurrió el evento |
 | `tag_name` | VARCHAR(50) | nullable — tag del elemento (`input`, `button`, `select`, etc.) |
 | `text_content` | TEXT | nullable — texto del elemento (truncado a 1000 chars) |
@@ -364,7 +365,7 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 | `metadata` | TEXT | nullable — JSON con datos extra del evento |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 
-**Índices:** `chat_session_id`, `playwright_session_id`
+**Índices:** `chat_session_id`, `playwright_session_id`, `recording_id`
 
 ---
 
@@ -373,8 +374,9 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 | Columna | Tipo | Restricciones |
 |---------|------|---------------|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
-| `chat_session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
-| `name` | VARCHAR(255) | NOT NULL, **UNIQUE** — nombre único global de la grabación |
+| `project_id` | VARCHAR(255) | NOT NULL — FK lógica → `proyectos(id)` |
+| `chat_session_id` | INTEGER UNSIGNED | nullable, FK → `chat_sessions(id)` ON DELETE SET NULL |
+| `name` | VARCHAR(255) | NOT NULL — nombre de la grabación |
 | `playwright_session_id` | VARCHAR(36) | nullable — UUID de la sesión del navegador en Playwright |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 
@@ -505,9 +507,10 @@ El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos
 | `project_variables` | `proyecto_id` | `proyectos` | `id` | CASCADE |
 | `redmine_comentarios` | `session_id` | `chat_sessions` | `id` | CASCADE |
 | `playwright_network_logs` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
-| `playwright_events` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
+| `playwright_events` | `chat_session_id` | `chat_sessions` | `id` | SET NULL |
+| `playwright_events` | `recording_id` | `playwright_event_recordings` | `id` | SET NULL |
 | `playwright_console_logs` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
-| `playwright_event_recordings` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
+| `playwright_event_recordings` | `chat_session_id` | `chat_sessions` | `id` | SET NULL |
 | `documentacion_escaneo` | `session_id` | `chat_sessions` | `id` | CASCADE |
 | `comandos_personalizados_proyectos` | `id_proyecto` | `proyectos` | `id` | — (FK lógica) |
 | `documentacion_archivo` | `escaneo_id` | `documentacion_escaneo` | `id` | CASCADE |

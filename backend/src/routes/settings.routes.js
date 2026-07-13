@@ -61,9 +61,7 @@ router.get('/', async (req, res) => {
       } else if (row.setting_key === 'screen_resolutions') {
         try {
           keys.screen_resolutions = JSON.parse(row.setting_value);
-        } catch {
-          keys.screen_resolutions = [];
-        }
+        } catch (err) { console.log('[settings] Error al parsear screen_resolutions:', err.message); keys.screen_resolutions = []; }
       } else if (row.setting_key.startsWith('priority_color_')) {
         keys[row.setting_key] = row.setting_value;
       } else if (row.setting_key === 'replay_interval_ms') {
@@ -208,7 +206,7 @@ router.get('/export-all', async (req, res) => {
           }
         }
         if (row.setting_key === 'screen_resolutions') {
-          try { keys.screen_resolutions = JSON.parse(value); } catch { keys.screen_resolutions = []; }
+          try { keys.screen_resolutions = JSON.parse(value); } catch (err) { console.log('[settings] Error al parsear screen_resolutions en export:', err.message); keys.screen_resolutions = []; }
         } else {
           keys[row.setting_key] = value;
         }

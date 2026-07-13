@@ -130,7 +130,7 @@ function loadGitignore(dirPath) {
   return []
 }
 
-function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeBytes) {
+function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeBytes, maxDepth = 0, currentDepth = 0) {
   const name = path.basename(dirPath) || dirPath
   const stat = fs.statSync(dirPath)
   const node = { name, type: stat.isDirectory() ? 'directory' : 'file', path: dirPath }
@@ -149,15 +149,19 @@ function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeByt
           return !matchesGitignore(e, dirPath, patterns)
         })
       }
-      node.children = filtered.map((e) => {
-        const fullPath = path.join(dirPath, e.name)
-        try {
-          return buildTree(fullPath, patterns, useGitignore, showHidden, maxSizeBytes)
-        } catch (err) {
-          console.log(`Error al procesar ${fullPath}: ${err.message}`)
-          return { name: e.name, type: 'error', error: err.message, path: fullPath }
-        }
-      })
+      if (maxDepth > 0 && currentDepth >= maxDepth) {
+        node.children = []
+      } else {
+        node.children = filtered.map((e) => {
+          const fullPath = path.join(dirPath, e.name)
+          try {
+            return buildTree(fullPath, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth + 1)
+          } catch (err) {
+            console.log(`Error al procesar ${fullPath}: ${err.message}`)
+            return { name: e.name, type: 'error', error: err.message, path: fullPath }
+          }
+        })
+      }
     } catch (err) {
       console.log(`Error al leer directorio ${dirPath}: ${err.message}`)
       node.children = []
@@ -206,6 +210,7 @@ router.get('/arbol-directorios', async (req, res) => {
     const filterExtension = (req.query.filterExtension || '').replace(/^["']|["']$/g, '');
     const codeExtensions = (req.query.codeExtensions || '').replace(/^["']|["']$/g, '');
     const maxSizeKb = parseInt(req.query.maxSizeKb, 10) || 0;
+    const depth = parseInt(req.query.depth, 10) || 0;
     let baseDir = process.cwd();
     if (sessionId) {
       const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
@@ -226,7 +231,7 @@ router.get('/arbol-directorios', async (req, res) => {
       return res.status(400).json({ success: false, error: `'${targetDir}' no es un directorio` });
     }
     const maxSizeBytes = maxSizeKb > 0 ? maxSizeKb * 1024 : 0;
-    const tree = buildTree(targetDir, [], useGitignore, showHidden, maxSizeBytes || undefined);
+    const tree = buildTree(targetDir, [], useGitignore, showHidden, maxSizeBytes || undefined, depth);
 
     if (codeExtensions) {
       const extensions = codeExtensions.split(',').map((s) => s.trim().replace(/^\./, '')).filter(Boolean)
@@ -421,7 +426,7 @@ router.post('/git-log-structured', async (req, res) => {
         const isCurrent = line.startsWith('*');
         return { name: line.replace(/^\*\s*/, '').trim(), isCurrent };
       });
-    } catch (e) { /* ignore */ }
+    } catch (e) { console.log('[git-log-structured] Error al listar branches:', e.message); }
 
     let tagCommits = [];
     try {
@@ -433,7 +438,7 @@ router.post('/git-log-structured', async (req, res) => {
         const [name, commitHash] = line.split('|');
         return { name, commitHash };
       });
-    } catch (e) { /* ignore */ }
+    } catch (e) { console.log('[git-log-structured] Error al listar tags:', e.message); }
 
     res.json({ success: true, commits, branches: branchList, tags: tagCommits, error: null });
   } catch (err) {
@@ -936,9 +941,7 @@ function scanPackageJsonScripts(baseDir, maxDepth = 3) {
     let entries
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true })
-    } catch {
-      return
-    }
+    } catch (err) { console.log('[command] Error al leer directorio:', err.message); return; }
     for (const entry of entries) {
       if (EXCLUDE_DIRS.has(entry.name)) continue
       if (entry.name === 'package.json' && entry.isFile()) {
@@ -954,9 +957,7 @@ function scanPackageJsonScripts(baseDir, maxDepth = 3) {
               results.push({ relativePath, scripts })
             }
           }
-        } catch {
-          // skip invalid package.json
-        }
+        } catch (err) { console.log('[command] Error al parsear package.json:', err.message); }
         continue
       }
       if (entry.isDirectory()) {

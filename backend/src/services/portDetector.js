@@ -13,9 +13,7 @@ export function detectPortsByPID(pid) {
       }
     }
     return [...ports];
-  } catch {
-    return [];
-  }
+  } catch (err) { console.log('[portDetector] Error al detectar puertos:', err.message); return []; }
 }
 
 export async function waitForPortsByPID(pid, timeout = 15000, interval = 500) {

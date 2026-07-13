@@ -8,7 +8,7 @@ const runningProcesses = new Set();
 
 export function stopAll() {
   for (const proc of runningProcesses) {
-    try { proc.kill('SIGTERM'); } catch {}
+    try { proc.kill('SIGTERM'); } catch (err) { console.log('[comandosPersonalizados] Error al matar proceso:', err.message); }
   }
   runningProcesses.clear();
 }
@@ -203,7 +203,8 @@ router.post('/:id/resolve', async (req, res) => {
             try {
               const memResult = await memoriaClient.get(memoryNamespace, v.key);
               variableMap[v.key] = memResult.value;
-            } catch {
+            } catch (err) {
+              console.log('[comandosPersonalizados] Error al obtener variable de memoria:', err.message);
               variableMap[v.key] = '';
             }
           } else {
@@ -258,7 +259,8 @@ router.post('/:id/execute', async (req, res) => {
             try {
               const memResult = await memoriaClient.get(memoryNamespace, v.key);
               variableMap[v.key] = memResult.value;
-            } catch {
+            } catch (err) {
+              console.log('[comandosPersonalizados] Error al obtener variable de memoria:', err.message);
               variableMap[v.key] = '';
             }
           } else {

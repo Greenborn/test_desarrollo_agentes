@@ -73,7 +73,7 @@ function scanSubprojects(rootDir) {
       let pkg = {};
       try {
         pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
-      } catch {}
+      } catch (err) { console.log('[despliegue] Error al parsear package.json:', err.message); }
       const name = pkg.name || entry.name;
       const hasExpress = (pkg.dependencies && pkg.dependencies.express) || (pkg.devDependencies && pkg.devDependencies.express);
       const hasVue = (pkg.dependencies && (pkg.dependencies.vue || pkg.dependencies['vue-router'])) ||

@@ -23,7 +23,8 @@ function handleMessage(ws, raw) {
   let msg;
   try {
     msg = JSON.parse(raw);
-  } catch {
+  } catch (err) {
+    console.log('[memoria-ws] Error al parsear mensaje JSON:', err.message);
     return sendError(ws, null, 'Mensaje JSON inválido');
   }
 
@@ -128,7 +129,8 @@ export default function setupWebSocket(wss) {
         let msg;
         try {
           msg = JSON.parse(raw);
-        } catch {
+        } catch (err) {
+          console.log('[memoria-ws] Error al parsear mensaje auth:', err.message);
           return sendError(ws, null, 'Mensaje JSON inválido');
         }
 

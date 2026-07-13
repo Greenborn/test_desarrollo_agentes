@@ -1,6 +1,6 @@
 import { spawn } from 'node-pty';
 import crypto from 'crypto';
-import * as memoriaClient from './memoriaClient.js';
+import memoriaClient from './memoriaClient.js';
 
 const terminals = new Map();
 
@@ -22,7 +22,7 @@ export function createTerminalRecord({ chatSessionId, cwd, cmd }) {
   };
   terminals.set(terminalId, record);
 
-  memoriaClient.setKey(`terminal:${terminalId}`, {
+  memoriaClient.set('procesos_consola', `terminal:${terminalId}`, {
     terminalId,
     chatSessionId: record.chatSessionId,
     cwd: record.cwd,
@@ -71,7 +71,7 @@ export function activateTerminal(terminalId, pty, ws) {
     closeTerminal(terminalId);
   });
 
-  memoriaClient.setKey(`terminal:${terminalId}`, {
+  memoriaClient.set('procesos_consola', `terminal:${terminalId}`, {
     terminalId,
     chatSessionId: record.chatSessionId,
     cwd: record.cwd,
@@ -129,18 +129,18 @@ export async function closeTerminal(terminalId) {
   console.log(`[procesos_consola] closeTerminal(${terminalId}): cerrando (by: ${new Error().stack?.split('\n')[2]?.trim() || '?'})`);
 
   if (record.ws) {
-    try { record.ws.close(); } catch {}
+    try { record.ws.close(); } catch (err) { console.log('[procesos_consola] Error al cerrar WS:', err.message); }
     record.ws = null;
   }
   if (record.pty) {
-    try { record.pty.kill(); } catch {}
+    try { record.pty.kill(); } catch (err) { console.log('[procesos_consola] Error al matar PTY:', err.message); }
     record.pty = null;
   }
 
   record.status = 'closed';
   terminals.delete(terminalId);
 
-  memoriaClient.delKey(`terminal:${terminalId}`).catch(err => console.log('[procesos_consola] Error al eliminar terminal de memoria:', err.message));
+  memoriaClient.del('procesos_consola', `terminal:${terminalId}`).catch(err => console.log('[procesos_consola] Error al eliminar terminal de memoria:', err.message));
   if (record.chatSessionId) {
     updateChatIndex(record.chatSessionId, terminalId, 'remove').catch(err => console.log('[procesos_consola] Error al actualizar índice de chat_terminals:', err.message));
   }
@@ -164,14 +164,14 @@ export async function closeTerminalsBySession(chatSessionId) {
 async function updateChatIndex(chatSessionId, terminalId, action) {
   const key = `chat_terminals:${chatSessionId}`;
   try {
-    const existing = await memoriaClient.getKey(key);
-    let list = Array.isArray(existing) ? existing : [];
+    const result = await memoriaClient.get('procesos_consola', key);
+    let list = (result && result.value && Array.isArray(result.value)) ? result.value : [];
     if (action === 'add') {
       if (!list.includes(terminalId)) list.push(terminalId);
     } else if (action === 'remove') {
       list = list.filter((id) => id !== terminalId);
     }
-    await memoriaClient.setKey(key, list);
+    await memoriaClient.set('procesos_consola', key, list);
   } catch (err) {
     console.log('[memoria] error actualizando índice de chat_terminals:', err.message);
   }

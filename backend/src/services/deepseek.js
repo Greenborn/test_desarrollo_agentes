@@ -115,9 +115,7 @@ export async function* streamChat(messages, workspaceId, customSystemPrompt = nu
         if (delta.content) {
           yield { type: 'response', content: delta.content };
         }
-      } catch {
-        // skip malformed chunks
-      }
+      } catch (err) { console.log('[deepseek] Error al parsear chunk SSE:', err.message); }
     }
   }
 }

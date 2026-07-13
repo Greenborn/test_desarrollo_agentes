@@ -463,8 +463,6 @@ export default {
       const name = newRecordingName.value.trim()
       if (!name) return
       showNewRecordingInput.value = false
-      const sessionId = activeSessionId.value
-      if (!sessionId) return
       if (!currentProjectId.value) {
         modal.open(AlertModal, { message: 'No hay un proyecto activo. Seleccione o cree un proyecto antes de crear una grabación.' }, { title: 'Aviso' })
         newRecordingName.value = ''
@@ -474,7 +472,6 @@ export default {
       try {
         const rec = await logsStore.createEventRecording({
           name,
-          chatSessionId: sessionId,
           projectId: currentProjectId.value,
         })
         await fetchRecordings()
@@ -625,9 +622,7 @@ export default {
     }
 
     async function doStartRecording(recordingId) {
-      const sessionId = activeSessionId.value
-      if (!sessionId) return
-      const result = await browserStore.startRecording(recordingId, sessionId)
+      const result = await browserStore.startRecording(recordingId)
       if (result.error) {
         recordError.value = result.error
       }

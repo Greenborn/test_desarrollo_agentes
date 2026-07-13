@@ -139,7 +139,8 @@ async function handleProyectoVarListar(payload) {
       try {
         const memResult = await memoriaClient.get(memoryNamespace, v.key);
         variables.push({ key: v.key, value: memResult.value, type: 'memory', created_at: v.created_at, updated_at: v.updated_at });
-      } catch {
+      } catch (err) {
+        console.log('[frontendWs] Error al obtener variable de memoria:', err.message);
         variables.push({ key: v.key, value: '', type: 'memory', created_at: v.created_at, updated_at: v.updated_at });
       }
     } else {
@@ -156,7 +157,8 @@ async function handleProyectoVarListar(payload) {
           try {
             const memResult = await memoriaClient.get(memoryNamespace, memKey);
             variables.push({ key: memKey, value: memResult.value, type: 'memory', created_at: null, updated_at: null });
-          } catch {
+          } catch (err) {
+            console.log('[frontendWs] Error al obtener variable de memoria:', err.message);
             variables.push({ key: memKey, value: '', type: 'memory', created_at: null, updated_at: null });
           }
         }
@@ -285,7 +287,7 @@ async function handleLogin(payload) {
     try {
       const parsed = JSON.parse(userWs.value);
       wsIds = Array.isArray(parsed) ? parsed : [parseInt(userWs.value, 10) || 1];
-    } catch {
+    } catch (err) { console.log('[frontendWs] Error al parsear workspaceIds:', err.message);
       wsIds = [parseInt(userWs.value, 10) || 1];
     }
   }
@@ -411,7 +413,7 @@ export function setupFrontendWebSocket(server) {
       let msg;
       try {
         msg = JSON.parse(raw);
-      } catch {
+      } catch (err) { console.log('[frontendWs] Error al parsear mensaje JSON:', err.message);
         ws.send(JSON.stringify({ id: null, type: 'error', error: 'JSON inválido' }));
         return;
       }

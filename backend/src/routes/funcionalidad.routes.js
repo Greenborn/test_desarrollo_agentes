@@ -18,7 +18,8 @@ router.get('/funcionalidad/:sessionId', async (req, res) => {
     if (row && row.parametros) {
       try {
         row.parametros = JSON.parse(row.parametros);
-      } catch {
+      } catch (err) {
+        console.log('[funcionalidad] Error al parsear parametros:', err.message);
         row.parametros = {};
       }
     }
@@ -69,7 +70,8 @@ router.post('/funcionalidad', async (req, res) => {
     if (saved && saved.parametros) {
       try {
         saved.parametros = JSON.parse(saved.parametros);
-      } catch {
+      } catch (err) {
+        console.log('[funcionalidad] Error al parsear parametros:', err.message);
         saved.parametros = {};
       }
     }

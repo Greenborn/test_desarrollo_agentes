@@ -21,7 +21,7 @@ function addSSEConnection(chatSessionId, res) {
   const keepAlive = setInterval(() => {
     try {
       res.write(':ping\n\n');
-    } catch {
+    } catch (err) { console.log('[playwrightLogs] Error en keepAlive:', err.message);
       clearInterval(keepAlive);
     }
   }, 30000);
@@ -358,15 +358,15 @@ router.post('/event-recordings', async (req, res) => {
   if (!name) {
     return res.status(400).json({ error: 'El nombre es requerido' });
   }
-  if (!chat_session_id) {
-    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  if (!project_id) {
+    return res.status(400).json({ error: 'project_id es requerido' });
   }
 
   try {
     const [id] = await db('playwright_event_recordings').insert({
       name,
-      chat_session_id: parseInt(chat_session_id),
-      project_id: project_id || null,
+      chat_session_id: chat_session_id != null ? parseInt(chat_session_id) : null,
+      project_id,
     });
 
     const created = await db('playwright_event_recordings').where({ id }).first();
@@ -413,8 +413,8 @@ router.post('/events', async (req, res) => {
 
   const { chat_session_id, recording_id, event_type, selector, tag_name, text_content, value, url, x, y, key, key_code, alt_key, ctrl_key, shift_key, meta_key, scroll_x, scroll_y, metadata } = req.body;
 
-  if (!chat_session_id) {
-    return res.status(400).json({ error: 'chat_session_id es requerido' });
+  if (!chat_session_id && !recording_id) {
+    return res.status(400).json({ error: 'chat_session_id o recording_id es requerido' });
   }
   if (!event_type) {
     return res.status(400).json({ error: 'event_type es requerido' });
@@ -422,7 +422,7 @@ router.post('/events', async (req, res) => {
 
   try {
     const [id] = await db('playwright_events').insert({
-      chat_session_id: parseInt(chat_session_id),
+      chat_session_id: chat_session_id != null ? parseInt(chat_session_id) : null,
       recording_id: recording_id != null ? parseInt(recording_id) : null,
       event_type,
       selector: selector || null,

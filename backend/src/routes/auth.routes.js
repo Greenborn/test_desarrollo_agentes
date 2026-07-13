@@ -36,7 +36,7 @@ router.post('/login', async (req, res) => {
       try {
         const parsed = JSON.parse(userWs.value);
         wsIds = Array.isArray(parsed) ? parsed : [parseInt(userWs.value, 10) || 1];
-      } catch {
+      } catch (err) { console.log('[auth] Error al parsear workspaceIds:', err.message);
         wsIds = [parseInt(userWs.value, 10) || 1];
       }
     }

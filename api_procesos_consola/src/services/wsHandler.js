@@ -31,7 +31,8 @@ export function handleConnection(ws, req, terminalId) {
     let msg;
     try {
       msg = JSON.parse(raw);
-    } catch {
+    } catch (err) {
+      console.log('[procesos_consola] Error al parsear mensaje WS:', err.message);
       return;
     }
 

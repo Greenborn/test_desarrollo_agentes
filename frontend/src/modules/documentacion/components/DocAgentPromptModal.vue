@@ -12,7 +12,7 @@
 
 <script>
 import { ref } from 'vue'
-import { settingSet } from '../../services/settingService.js'
+import { settingSet } from '../../../services/settingService.js'
 
 const AGENT_SYSTEM_PROMPT_KEY = 'doc_agent_system_prompt'
 

@@ -12,9 +12,6 @@ initModules()
 
 import './composables/commands/iniciarNavegador.js'
 import './composables/commands/nuevaFuncionalidad.js'
-import './composables/commands/documentacionAll.js'
-import './composables/commands/documentacionUpdate.js'
-import './composables/commands/documentacionNotas.js'
 import './composables/commands/gastosAll.js'
 import './composables/commands/gastosProyecto.js'
 import './composables/commands/cd.js'

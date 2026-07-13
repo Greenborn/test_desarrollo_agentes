@@ -18,7 +18,7 @@ async function request(method, path, body) {
   if (!res.ok) {
     const text = await res.text();
     let detail;
-    try { detail = JSON.parse(text).error; } catch { detail = text; }
+    try { detail = JSON.parse(text).error; } catch (err) { console.log('[gestorClient] Error al parsear respuesta:', err.message); detail = text; }
     throw new Error(`Gestor API error ${res.status}: ${detail}`);
   }
 

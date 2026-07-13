@@ -19,7 +19,8 @@ app.use('/api/memoria', authMiddleware, memoriaRoutes);
 function killPort(port) {
   try {
     execSync(`fuser -k ${port}/tcp 2>/dev/null || lsof -ti :${port} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' });
-  } catch {
+  } catch (err) {
+    console.log('[memoria] Error al matar puerto:', err.message);
   }
 }
 killPort(PORT);

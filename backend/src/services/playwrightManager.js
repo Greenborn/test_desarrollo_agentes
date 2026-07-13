@@ -18,9 +18,7 @@ async function isRunning() {
   try {
     const res = await fetch(`${baseUrl()}/api/health`, { signal: AbortSignal.timeout(2000) });
     return res.ok;
-  } catch {
-    return false;
-  }
+  } catch (err) { console.log('[playwrightManager] Error en health check:', err.message); return false; }
 }
 
 function start() {

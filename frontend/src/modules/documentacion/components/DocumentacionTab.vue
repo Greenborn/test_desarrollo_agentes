@@ -1,27 +1,22 @@
 <template>
   <div class="documentacion-panel d-flex flex-column flex-grow-1 overflow-hidden" style="min-height: 0;">
-    <!-- No session -->
     <template v-if="!proyectoId">
       <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
         <span>Seleccione una sesión de chat</span>
       </div>
     </template>
-    <!-- No project -->
     <template v-else-if="!proyectoId">
       <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
         <span>Sin proyecto asignado a esta sesión</span>
       </div>
     </template>
-    <!-- Loading -->
     <template v-else-if="loading">
       <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small">
         <span>Cargando notas…</span>
       </div>
     </template>
-    <!-- Content -->
     <template v-else>
       <div class="doc-notas-container d-flex flex-grow-1 overflow-hidden" style="min-height: 0;">
-        <!-- LEFT COLUMN: keys list -->
         <div class="doc-notas-list flex-shrink-0 overflow-y-auto" :style="{ width: listWidth + 'px' }">
           <button class="btn btn-sm btn-outline-argentina w-100 mb-2" style="font-size: 0.7rem;" @click.stop="abrirCrear">
             + Agregar nota
@@ -40,9 +35,7 @@
             <button class="doc-nota-delete-btn" title="Eliminar nota" @click.stop="eliminarNota(n)">×</button>
           </div>
         </div>
-        <!-- SPLITTER -->
         <div class="doc-notas-splitter" @mousedown.prevent="onSplitStart"></div>
-        <!-- RIGHT COLUMN: editor -->
         <div v-if="selectedNota" class="doc-notas-editor flex-grow-1 d-flex flex-column overflow-hidden">
           <div class="d-flex align-items-center gap-2 px-2 py-1 flex-shrink-0" style="border-bottom: 1px solid #374151;">
             <input v-if="!previewMode" ref="claveEditInput" v-model="editClave" @input="sanitizeClave"
@@ -69,9 +62,7 @@
         <div v-else class="doc-notas-editor flex-grow-1 d-flex align-items-center justify-content-center text-secondary small px-3 text-center">
           <span>Seleccione una nota para editar</span>
         </div>
-        <!-- SPLITTER 2 -->
         <div class="doc-notas-splitter" @mousedown.prevent="onToolsSplitStart"></div>
-        <!-- 3rd COLUMN: tools -->
         <div class="doc-notas-tools flex-shrink-0 overflow-hidden d-flex flex-column" :style="{ width: toolsWidth + 'px' }">
           <div class="doc-notas-tools-header">Herramientas</div>
           <div class="doc-notas-tools-body d-flex flex-column flex-grow-1 p-2 overflow-hidden">
@@ -89,19 +80,18 @@
         </div>
       </div>
     </template>
-
   </div>
 </template>
 
 <script>
 import { watch, ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useDocumentacionNotasStore } from '../../stores/documentacionNotas.js'
-import { useChatStore } from '../../stores/chat.js'
-import { useModalStore } from '../../stores/modal.js'
-import { settingGet, settingSet } from '../../services/settingService.js'
-import ChatFormatter from '../chat/ChatFormatter.vue'
-import JsonTreeView from '../utils/JsonTreeView.vue'
+import { useDocumentacionNotasStore } from '../../../stores/documentacionNotas.js'
+import { useChatStore } from '../../../stores/chat.js'
+import { useModalStore } from '../../../stores/modal.js'
+import { settingGet, settingSet } from '../../../services/settingService.js'
+import ChatFormatter from '../../../components/chat/ChatFormatter.vue'
+import JsonTreeView from '../../../components/utils/JsonTreeView.vue'
 import DocCreateModal from './DocCreateModal.vue'
 import DocAgentPromptModal from './DocAgentPromptModal.vue'
 
@@ -118,14 +108,17 @@ const AGENT_SYSTEM_PROMPT_KEY = 'doc_agent_system_prompt'
 
 export default {
   components: { ChatFormatter, JsonTreeView, DocCreateModal, DocAgentPromptModal },
-  props: {
-    proyectoId: { type: [String, Number], default: null },
-    ticketId: { type: [Number, String], default: null },
-  },
-  setup(props) {
+  setup() {
     const store = useDocumentacionNotasStore()
     const chat = useChatStore()
     const modal = useModalStore()
+    const { sessions, activeSessionId } = storeToRefs(chat)
+
+    const activeSession = computed(() => {
+      return sessions.value.find(s => s.id === activeSessionId.value) || null
+    })
+    const proyectoId = computed(() => activeSession.value?.proyecto_id || null)
+    const ticketId = computed(() => activeSession.value?.id_ticket_redmine || null)
 
     const listWidth = ref(LIST_DEFAULT)
     const toolsWidth = ref(TOOLS_DEFAULT)
@@ -140,8 +133,8 @@ export default {
     const agentError = ref('')
     const agentSystemPrompt = ref('')
 
-    const notas = computed(() => store.notasByProject[props.proyectoId] || [])
-    const loading = computed(() => store.loadingByProject[props.proyectoId] || false)
+    const notas = computed(() => store.notasByProject[proyectoId.value] || [])
+    const loading = computed(() => store.loadingByProject[proyectoId.value] || false)
 
     const parsedJson = computed(() => {
       if (!editValor.value) return null
@@ -253,8 +246,7 @@ export default {
       selectedNota.value = n
       editClave.value = n.clave
       store.currentClave = n.clave
-      // Load full content
-      const full = await store.getNota(props.proyectoId, n.clave)
+      const full = await store.getNota(proyectoId.value, n.clave)
       if (full) {
         editValor.value = full.valor || ''
         store.currentValor = full.valor || ''
@@ -274,7 +266,7 @@ export default {
           clave: newClave,
           valor: editValor.value,
           id_ticket: selectedNota.value.id_ticket,
-        }, props.proyectoId)
+        }, proyectoId.value)
         selectedNota.value.clave = newClave
         selectedNota.value.valor = editValor.value
         store.currentClave = newClave
@@ -286,8 +278,8 @@ export default {
 
     function abrirCrear() {
       modal.open(DocCreateModal, {
-        proyectoId: props.proyectoId,
-        ticketId: props.ticketId,
+        proyectoId: proyectoId.value,
+        ticketId: ticketId.value,
       }, {
         title: 'Nueva nota de documentación',
       })
@@ -296,7 +288,7 @@ export default {
     async function eliminarNota(n) {
       if (!confirm(`¿Eliminar la nota "${n.clave}"?`)) return
       try {
-        await store.deleteNota(n.id, props.proyectoId)
+        await store.deleteNota(n.id, proyectoId.value)
         if (selectedNota.value?.id === n.id) {
           selectedNota.value = null
           editValor.value = ''
@@ -409,7 +401,7 @@ export default {
       }
     }
 
-    watch(() => props.proyectoId, (newId) => {
+    watch(proyectoId, (newId) => {
       selectedNota.value = null
       editValor.value = ''
       store.currentClave = null
@@ -425,8 +417,8 @@ export default {
       loadListWidth()
       loadToolsWidth()
       loadAgentSystemPrompt()
-      if (props.proyectoId) {
-        store.loadNotas(props.proyectoId)
+      if (proyectoId.value) {
+        store.loadNotas(proyectoId.value)
       }
     })
 
@@ -456,6 +448,7 @@ export default {
       isJson,
       parsedJson,
       copiarContenido,
+      proyectoId,
     }
   },
 }

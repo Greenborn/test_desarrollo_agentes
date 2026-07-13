@@ -104,9 +104,7 @@ class OpenCodeServer {
     try {
       const res = await fetch(`${this.baseUrl()}/global/health`, { signal: AbortSignal.timeout(3000) });
       return res.ok;
-    } catch {
-      return false;
-    }
+    } catch (err) { console.log('[opencode] Error en health check:', err.message); return false; }
   }
 
   async api(path, options = {}) {

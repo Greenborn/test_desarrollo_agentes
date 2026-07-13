@@ -1,13 +1,10 @@
-import { useCommandRegistry } from '../useCommandRegistry.js';
-import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
+import { parseCommandArgs, getUsedFlags } from '../../../composables/parseCommandArgs.js'
 
-const { register } = useCommandRegistry();
-
-register({
+export default {
   name: '/dev_documento_listar',
   category: 'Desarrollo',
   description: 'Obtiene toda la documentación de un proyecto y la pega en el chat. Si no se especifica proyecto, usa el de la sesión actual.',
-  usage: '/dev_documento_listar [--id=&lt;id_proyecto&gt;]',
+  usage: '/dev_documento_listar [--id=<id_proyecto>]',
   async autocomplete(args, cmdStore) {
     const usedFlags = getUsedFlags(args)
     if (usedFlags.includes('--id=')) {
@@ -83,4 +80,4 @@ register({
       throw err;
     }
   },
-});
+}

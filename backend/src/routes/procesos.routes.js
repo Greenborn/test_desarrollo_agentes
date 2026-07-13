@@ -27,7 +27,7 @@ function proxyRequest(req, res) {
     proxyRes.on('end', () => {
       try {
         res.status(proxyRes.statusCode).json(JSON.parse(data));
-      } catch {
+      } catch (err) { console.log('[procesos] Error al parsear respuesta del proxy:', err.message);
         res.status(proxyRes.statusCode).send(data);
       }
     });

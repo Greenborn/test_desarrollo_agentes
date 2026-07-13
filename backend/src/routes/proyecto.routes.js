@@ -240,7 +240,7 @@ router.get('/proyecto/:id/variables', async (req, res) => {
             try {
               const memResult = await memoriaClient.get(memoryNamespace, memKey);
               variables.push({ key: memKey, value: memResult.value, type: 'memory', created_at: null, updated_at: null });
-            } catch {
+            } catch (err) { console.log('[proyecto] Error al obtener variable de memoria:', err.message);
               variables.push({ key: memKey, value: '', type: 'memory', created_at: null, updated_at: null });
             }
           }

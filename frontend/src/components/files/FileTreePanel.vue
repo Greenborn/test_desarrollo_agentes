@@ -29,7 +29,8 @@
           @contextmenu.prevent="onContextMenu($event, item)"
         >
           <span v-if="item.node.type === 'directory'" class="tree-toggle flex-shrink-0">
-            {{ handleIsExpanded(item.node.path) ? '▾' : '▸' }}
+            <span v-if="fileTreeStore.isLoadingChildren(sessionId, item.node.path)" class="tree-loading-spinner"></span>
+            <span v-else>{{ handleIsExpanded(item.node.path) ? '▾' : '▸' }}</span>
           </span>
           <span v-else class="tree-toggle-placeholder flex-shrink-0"></span>
           <span class="tree-icon flex-shrink-0">{{ getFileIcon(item.node) }}</span>
@@ -43,6 +44,8 @@
       <div class="context-menu-item" @click="copyRelativePath">📋 Copiar ruta relativa</div>
       <div class="context-menu-item" @click="copyFullPath">📋 Copiar ruta completa</div>
       <div class="context-menu-item" @click="copyComponentRef">📋 Copiar referencia</div>
+      <div class="context-menu-item" @click="copyName">📋 Copiar nombre</div>
+      <div v-if="ctxMenu.type === 'file'" class="context-menu-item" @click="copyFileContent">📋 Copiar contenido</div>
       <div class="context-menu-divider"></div>
       <div v-if="ctxMenu.type === 'directory'" class="context-menu-item" @click="openInExplorer">📂 Abrir carpeta</div>
       <div v-else class="context-menu-item" @click="openInExplorer">📂 Abrir carpeta contenedora</div>
@@ -145,8 +148,8 @@ export default {
       if (props.sessionId) fileTreeStore.fetchTree(props.sessionId)
     }
 
-    function handleToggleDirectory(path) {
-      if (props.sessionId) fileTreeStore.toggleDirectory(props.sessionId, path)
+    async function handleToggleDirectory(path) {
+      if (props.sessionId) await fileTreeStore.toggleDirectory(props.sessionId, path)
     }
 
     function handleIsExpanded(path) {
@@ -206,6 +209,33 @@ export default {
       closeCtxMenu()
     }
 
+    function copyName() {
+      const name = ctxMenu.value.path.split('/').pop() || ctxMenu.value.path
+      navigator.clipboard.writeText(name).catch(err => {
+        console.error('Error al copiar nombre:', err)
+      })
+      closeCtxMenu()
+    }
+
+    async function copyFileContent() {
+      const filePath = ctxMenu.value.path
+      try {
+        const res = await fetch(`/api/command/read-file?path=${encodeURIComponent(filePath)}`, {
+          credentials: 'include',
+        })
+        const data = await res.json()
+        if (data.success) {
+          await navigator.clipboard.writeText(data.content)
+        } else {
+          modal.open(AlertModal, { message: `Error al leer archivo: ${data.error}` }, { title: 'Error' })
+        }
+      } catch (err) {
+        console.error('Error al copiar contenido del archivo:', err)
+        modal.open(AlertModal, { message: `Error al copiar contenido: ${err.message}` }, { title: 'Error' })
+      }
+      closeCtxMenu()
+    }
+
     async function openInExplorer() {
       const targetPath = ctxMenu.value.path
       try {
@@ -258,10 +288,10 @@ export default {
     }, { immediate: true })
 
     return {
-      tree, loading, error, flatTree, selectedFile, ctxMenu,
+      tree, loading, error, flatTree, selectedFile, ctxMenu, fileTreeStore,
       getFileIcon, reloadTree, handleToggleDirectory, handleIsExpanded,
       handleSelectFile, handleFileClick, openFile,
-      onContextMenu, closeCtxMenu, copyRelativePath, copyFullPath, copyComponentRef,
+      onContextMenu, closeCtxMenu, copyRelativePath, copyFullPath, copyComponentRef, copyName, copyFileContent,
       openInExplorer, confirmDeleteFile, deleteFile,
     }
   },
@@ -346,5 +376,17 @@ export default {
   height: 1px;
   background: #374151;
   margin: 4px 0;
+}
+.tree-loading-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #9ca3af;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: tree-spin 0.6s linear infinite;
+}
+@keyframes tree-spin {
+  to { transform: rotate(360deg); }
 }
 </style>

@@ -46,7 +46,7 @@
 
 <script>
 import { ref, onMounted, nextTick } from 'vue'
-import { useDocumentacionNotasStore } from '../../stores/documentacionNotas.js'
+import { useDocumentacionNotasStore } from '../../../stores/documentacionNotas.js'
 
 export default {
   props: {

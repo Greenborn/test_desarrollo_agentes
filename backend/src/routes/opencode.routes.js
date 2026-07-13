@@ -174,7 +174,7 @@ router.post('/send', async (req, res) => {
     });
 
     const keepAlive = setInterval(() => {
-      try { res.write(':ping\n\n'); } catch { clearInterval(keepAlive); }
+      try { res.write(':ping\n\n'); } catch (err) { console.log('[opencode] Error en keepAlive ping:', err.message); clearInterval(keepAlive); }
     }, 30000);
     res.on('close', () => clearInterval(keepAlive));
 
@@ -322,7 +322,7 @@ router.post('/send', async (req, res) => {
             res.write(`data: ${JSON.stringify({ type: 'thinking', content: delta, sessionId })}\n\n`);
           } else if (partType === 'tool_call') {
             let toolName = delta;
-            try { const p = JSON.parse(delta); if (p.name) toolName = p.name; if (p.arguments) toolName += ' ' + JSON.stringify(p.arguments); } catch {}
+            try { const p = JSON.parse(delta); if (p.name) toolName = p.name; if (p.arguments) toolName += ' ' + JSON.stringify(p.arguments); } catch (err) { console.log('[opencode] Error al parsear tool call delta:', err.message); }
             terminalLine = `\x1b[38;5;214m$ ${toolName}\x1b[0m`;
             res.write(`data: ${JSON.stringify({ type: 'tool_call', content: delta, field, sessionId })}\n\n`);
           } else if (partType === 'tool_result') {
@@ -522,7 +522,7 @@ router.post('/editor-send', async (req, res) => {
     });
 
     const keepAliveEditor = setInterval(() => {
-      try { res.write(':ping\n\n'); } catch { clearInterval(keepAliveEditor); }
+      try { res.write(':ping\n\n'); } catch (err) { console.log('[opencode] Error en keepAliveEditor ping:', err.message); clearInterval(keepAliveEditor); }
     }, 30000);
     res.on('close', () => clearInterval(keepAliveEditor));
 

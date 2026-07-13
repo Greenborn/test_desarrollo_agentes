@@ -38,7 +38,7 @@ async function updateSessionTimestamp(sessionId) {
   try {
     const db = (await import('../config/db.js')).default;
     await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
-  } catch {}
+  } catch (err) { console.log('[navegador] Error al actualizar timestamp:', err.message); }
 }
 
 router.get('/status', async (req, res) => {
@@ -91,7 +91,7 @@ router.post('/command', async (req, res) => {
 
     await saveToChat(targetSessionId, 'command', `[navegador] ${comando}`);
 
-    const pwParametros = (comando === 'start' || comando === 'start_event_recording') ? { ...parametros, chat_session_id: sessionId } : parametros;
+    const pwParametros = comando === 'start' ? { ...parametros, chat_session_id: sessionId } : parametros;
 
     await playwrightManager.ensureRunning();
     playwrightManager.startKeepAlive();

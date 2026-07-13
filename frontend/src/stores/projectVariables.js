@@ -71,5 +71,19 @@ export const useProjectVariablesStore = defineStore('projectVariables', () => {
     }
   }
 
-  return { variablesByProject, loadingByProject, loadVariables, clearVariables, saveVariable }
+  async function deleteVariable(proyectoId, key) {
+    if (!proyectoId || !key) return
+    const auth = useAuthStore()
+    const data = await wsClient.send('proyectoVarEliminar', {
+      sessionToken: auth.getSessionToken(),
+      proyectoId,
+      key,
+    })
+    if (!data.success) throw new Error(data.error || 'Error al eliminar variable')
+    const list = variablesByProject.value[proyectoId] || []
+    const idx = list.findIndex(v => v.key === key)
+    if (idx !== -1) list.splice(idx, 1)
+  }
+
+  return { variablesByProject, loadingByProject, loadVariables, clearVariables, saveVariable, deleteVariable }
 })

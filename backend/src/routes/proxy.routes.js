@@ -41,7 +41,7 @@ router.post('/request', async (req, res) => {
     if (!['http:', 'https:'].includes(validatedUrl.protocol)) {
       return res.status(400).json({ error: 'Solo se permiten URLs HTTP/HTTPS.' });
     }
-  } catch {
+  } catch (err) { console.log('[proxy] Error al validar URL:', err.message);
     return res.status(400).json({ error: 'URL inválida.' });
   }
 
@@ -72,7 +72,7 @@ router.post('/request', async (req, res) => {
       try {
         JSON.parse(body);
         reqHeaders['Content-Type'] = 'application/json';
-      } catch {
+      } catch (err) { console.log('[proxy] Error al detectar content-type:', err.message);
         reqHeaders['Content-Type'] = 'text/plain';
       }
     }

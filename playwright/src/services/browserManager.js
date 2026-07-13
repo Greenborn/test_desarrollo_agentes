@@ -32,13 +32,12 @@ function getDefaultHeadless() {
 }
 
 function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
-  if (!chatSessionId) return;
 
   page.exposeFunction('__pwRecordEvent', async (eventData) => {
     try {
       if (!db) return;
       await db('playwright_events').insert({
-        chat_session_id: chatSessionId,
+        chat_session_id: chatSessionId || null,
         recording_id: recordingId || null,
         playwright_session_id: sessionId,
         event_type: eventData.type,
@@ -173,7 +172,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
               shiftKey: e.shiftKey,
               metaKey: e.metaKey,
             });
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en evento click:', e.message); }
         }, true);
 
         document.addEventListener('dblclick', function (e) {
@@ -189,9 +188,9 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
               url: window.location.href,
               x: Math.round(e.pageX),
               y: Math.round(e.pageY),
-              targetRect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+            targetRect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
             });
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en evento dblclick:', e.message); }
         }, true);
 
         document.addEventListener('change', function (e) {
@@ -210,7 +209,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
                 url: window.location.href,
               });
             }
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en evento change:', e.message); }
         }, true);
 
         document.addEventListener('submit', function (e) {
@@ -224,7 +223,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
               textContent: el.id || el.name || '',
               url: window.location.href,
             });
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en evento submit:', e.message); }
         }, true);
 
         document.addEventListener('input', function (e) {
@@ -248,7 +247,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
               });
               delete inputDebounceTimers[key];
             }, 300);
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en evento input:', e.message); }
         }, true);
 
         document.addEventListener('keydown', function (e) {
@@ -268,7 +267,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
               metaKey: e.metaKey,
               url: window.location.href,
             });
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en evento keydown:', e.message); }
         }, true);
 
         document.addEventListener('scroll', function () {
@@ -295,7 +294,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
               textContent: getLabel(el),
               url: window.location.href,
             });
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en evento focus:', e.message); }
         }, true);
 
         document.addEventListener('focusout', function (e) {
@@ -309,7 +308,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
               textContent: getLabel(el),
               url: window.location.href,
             });
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en evento blur:', e.message); }
         }, true);
       });
 
@@ -404,7 +403,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
           try {
             const el = e.target; const rect = el.getBoundingClientRect();
             window.__pwRecordEvent({ type: 'click', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), value: el.value || null, url: window.location.href, x: Math.round(e.pageX), y: Math.round(e.pageY), targetRect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) }, altKey: e.altKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, metaKey: e.metaKey });
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en init click:', e.message); }
         }, true);
 
         document.addEventListener('dblclick', function (e) {
@@ -412,7 +411,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
           try {
             const el = e.target; const rect = el.getBoundingClientRect();
             window.__pwRecordEvent({ type: 'dblclick', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), url: window.location.href, x: Math.round(e.pageX), y: Math.round(e.pageY), targetRect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) } });
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en init dblclick:', e.message); }
         }, true);
 
         document.addEventListener('change', function (e) {
@@ -423,7 +422,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
               let val = el.value; if (el.type === 'checkbox' || el.type === 'radio') val = el.checked;
               window.__pwRecordEvent({ type: 'change', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), value: String(val), url: window.location.href });
             }
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en init change:', e.message); }
         }, true);
 
         document.addEventListener('submit', function (e) {
@@ -431,7 +430,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
           try {
             const el = e.target;
             window.__pwRecordEvent({ type: 'submit', selector: el.id ? '#' + CSS.escape(el.id) : el.tagName.toLowerCase(), tagName: 'form', textContent: el.id || el.name || '', url: window.location.href });
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en init submit:', e.message); }
         }, true);
 
         document.addEventListener('input', function (e) {
@@ -446,7 +445,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
               window.__pwRecordEvent({ type: 'input', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), value: el.value ? el.value.substring(0, 500) : null, url: window.location.href, metadata: { inputType: el.type || 'text' } });
               delete inputDebounceTimers[key];
             }, 300);
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en init input:', e.message); }
         }, true);
 
         document.addEventListener('keydown', function (e) {
@@ -454,7 +453,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
           try {
             const el = e.target;
             window.__pwRecordEvent({ type: 'keydown', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), key: e.key, code: e.code, altKey: e.altKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, metaKey: e.metaKey, url: window.location.href });
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en init keydown:', e.message); }
         }, true);
 
         document.addEventListener('scroll', function () {
@@ -470,7 +469,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
           try {
             const el = e.target;
             window.__pwRecordEvent({ type: 'focus', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), url: window.location.href });
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en init focus:', e.message); }
         }, true);
 
         document.addEventListener('focusout', function (e) {
@@ -478,7 +477,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
           try {
             const el = e.target;
             window.__pwRecordEvent({ type: 'blur', selector: getSelector(el), tagName: el.tagName.toLowerCase(), textContent: getLabel(el), url: window.location.href });
-          } catch (e) {}
+          } catch (e) { console.error('[browserManager] Error en init blur:', e.message); }
         }, true);
       });
     } catch (err) {
@@ -491,7 +490,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
 
 function stopEventRecording(page) {
   if (page && !page.isClosed()) {
-    page.evaluate(() => { window.__pwRecording = false; }).catch(() => {});
+    page.evaluate(() => { window.__pwRecording = false; }).catch((err) => console.log('[browserManager] Error al detener recording:', err.message));
   }
 }
 
@@ -503,7 +502,7 @@ function notifyBackend(data) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
-  }).catch(() => {});
+  }).catch((err) => console.log('[browserManager] notifyBackend error:', err.message));
 }
 
 function notifyNetworkError(data) {
@@ -514,7 +513,7 @@ function notifyNetworkError(data) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
-  }).catch(() => {});
+  }).catch((err) => console.log('[browserManager] notifyNetworkError error:', err.message));
 }
 
 function notifyNetworkRequest(data) {
@@ -525,7 +524,7 @@ function notifyNetworkRequest(data) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
-  }).catch(() => {});
+  }).catch((err) => console.log('[browserManager] notifyNetworkRequest error:', err.message));
 }
 
 function setupPageListeners(page, sessionId, chatSessionId, instanceName) {
@@ -540,7 +539,8 @@ function setupPageListeners(page, sessionId, chatSessionId, instanceName) {
       const buf = await response.body();
       body = buf.toString('utf-8').substring(0, MAX_BODY_LENGTH);
       responseSize = buf.length;
-    } catch {
+    } catch (err) {
+      console.log('[browserManager] Error al leer response body:', err.message);
       body = null;
       responseSize = null;
     }
@@ -553,7 +553,8 @@ function setupPageListeners(page, sessionId, chatSessionId, instanceName) {
         requestSize = Buffer.byteLength(postData, 'utf-8');
         requestBody = postData.substring(0, MAX_REQUEST_BODY_LENGTH);
       }
-    } catch {
+    } catch (err) {
+      console.log('[browserManager] Error al leer request body:', err.message);
       requestBody = null;
       requestSize = null;
     }
@@ -617,7 +618,8 @@ function setupPageListeners(page, sessionId, chatSessionId, instanceName) {
         requestSize = Buffer.byteLength(postData, 'utf-8');
         requestBody = postData.substring(0, MAX_REQUEST_BODY_LENGTH);
       }
-    } catch {
+    } catch (err) {
+      console.log('[browserManager] Error al leer request data:', err.message);
       requestBody = null;
       requestSize = null;
     }
@@ -950,7 +952,7 @@ async function executeAction(idSession, action) {
         return val;
       });
     } catch (e) {
-      // Página no lista, se ignora
+      console.log('[browserManager] Error al pausar recording, página no lista:', e.message);
     }
 
     try {
@@ -1048,7 +1050,7 @@ async function executeAction(idSession, action) {
       try {
         await page.evaluate((val) => { window.__pwRecording = val; }, wasRecording);
       } catch (e) {
-        // Página cerrada o navegó, se ignora
+        console.log('[browserManager] Error al restaurar recording, página cerrada:', e.message);
       }
     }
 

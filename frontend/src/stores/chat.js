@@ -804,6 +804,7 @@ export const useChatStore = defineStore('chat', () => {
     delete pendingNotifications.value[sessionId]
     delete sessionTickets.value[sessionId]
     await loadSessions()
+    await loadArchivedSessions()
       }
     } catch (err) {
       console.error('Error al eliminar sesión:', err)
