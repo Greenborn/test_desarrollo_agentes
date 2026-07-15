@@ -14,6 +14,7 @@
       <button class="btn btn-sm btn-outline-argentina px-2" @click="generarCommit" title="Generar commit">💾</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="iniciarOpencode" title="Iniciar OpenCode">🚀</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="iniciarTerminal" title="Abrir terminal">💻</button>
+      <button class="btn btn-sm btn-outline-argentina px-2" @click="abrirNavegador" title="Abrir navegador Playwright">🌐</button>
       <button class="btn btn-sm btn-outline-danger px-2" @click="clearChat" title="Limpiar chat">🗑️</button>
       <div class="zoom-controls d-flex align-items-center gap-1">
         <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomOut" :disabled="gitStore.chatZoom <= 50" title="Alejar">−</button>
@@ -181,12 +182,25 @@ export default {
       await chatStore.clearMessages(activeSessionId.value)
     }
 
+    function abrirNavegador() {
+      if (!activeSessionId.value) return
+      chatStore.pushMessage({
+        role: 'opencode_control',
+        controlData: {
+          controlType: 'navegador_iniciar',
+          controlId: 'navegador-' + Date.now(),
+          sessionId: activeSessionId.value,
+        },
+        _key: 'ctrl-' + Date.now(),
+      }, activeSessionId.value)
+    }
+
     return {
       gitStore, ticketInfo, activeSessionId, currentBranchDisplay,
       branchMismatch, truncatedSubject, priorityClass, devInstanceRunning,
       zoomIn, zoomOut,
       generarCommit, iniciarInstanciaDev, detenerInstanciaDev,
-      crearTicket, iniciarOpencode, iniciarTerminal, clearChat,
+      crearTicket, iniciarOpencode, iniciarTerminal, clearChat, abrirNavegador,
     }
   },
 }
@@ -195,11 +209,11 @@ export default {
 <style>
 .ticket-info-bar {
   background: #0f1a2e;
-  border-bottom: 1px solid #374151;
+  border-bottom: 2px solid #374151;
   font-size: 0.8rem;
   color: #9ca3af;
-  min-height: 32px;
-  height: auto;
+  min-height: 48px;
+  height: 100%;
   flex-shrink: 0;
   transition: background 0.2s, border-color 0.2s;
 }

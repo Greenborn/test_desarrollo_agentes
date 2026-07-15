@@ -116,6 +116,14 @@ export function restartService(name) {
   if (current && !current.killed) {
     current.kill('SIGTERM');
     processes[name] = null;
+    try {
+      execSync(`sleep 2`, { stdio: 'ignore', timeout: 5000 });
+      current.kill('SIGKILL');
+    } catch (err) {
+      if (err.code !== 'ESRCH') {
+        console.log('[gestor] Error al forzar cierre de', name, 'en restart:', err.message);
+      }
+    }
   }
   return spawnService(name, name);
 }
@@ -128,17 +136,38 @@ function startAllServices() {
 
 function killPort(port) {
   try {
-    execSync(`fuser -k ${port}/tcp 2>/dev/null || lsof -ti :${port} | xargs kill -9 2>/dev/null || true`, { stdio: 'ignore' });
+    execSync(`fuser -k -TERM ${port}/tcp 2>/dev/null`, { stdio: 'ignore', timeout: 5000 });
+    execSync(`sleep 2`, { stdio: 'ignore', timeout: 5000 });
+    execSync(`fuser -k -KILL ${port}/tcp 2>/dev/null || lsof -ti :${port} | xargs kill -9 2>/dev/null || true`, { stdio: 'ignore', timeout: 5000 });
+    execSync(`sleep 1`, { stdio: 'ignore', timeout: 5000 });
+    const remain = execSync(`fuser ${port}/tcp 2>/dev/null || lsof -ti :${port} 2>/dev/null || true`, { encoding: 'utf8', timeout: 5000 }).toString().trim();
+    if (remain) {
+      console.log('[gestor] AVISO: Puerto', port, 'aún ocupado por:', remain);
+    }
   } catch (err) {
-    console.log('[gestor] Error al ejecutar killPort:', err.message);
+    console.log('[gestor] Error al cerrar puerto', port, ':', err.message);
   }
 }
 
 function cleanup() {
+  const targets = [];
   for (const name of Object.keys(processes)) {
     const proc = processes[name];
     if (proc && !proc.killed) {
-      proc.kill();
+      targets.push(proc);
+      proc.kill('SIGTERM');
+    }
+  }
+  try {
+    execSync(`sleep 2`, { stdio: 'ignore', timeout: 5000 });
+  } catch (e) {}
+  for (const proc of targets) {
+    try {
+      proc.kill('SIGKILL');
+    } catch (err) {
+      if (err.code !== 'ESRCH') {
+        console.log('[gestor] Error al forzar cierre:', err.message);
+      }
     }
   }
 }

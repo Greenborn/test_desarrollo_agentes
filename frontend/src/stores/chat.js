@@ -811,6 +811,26 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function cloneSession(sessionId) {
+    try {
+      const res = await fetch(`${API}/chat/sessions/${sessionId}/clone`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        console.error('Error al clonar sesión:', data.error || 'Error desconocido')
+        return
+      }
+      if (data.session) {
+        sessions.value.unshift(data.session)
+        return data.session
+      }
+    } catch (err) {
+      console.error('Error al clonar sesión:', err)
+    }
+  }
+
   async function clearMessages(sessionId) {
     try {
       const res = await fetch(`${API}/chat/sessions/${sessionId}/messages`, {
@@ -1005,7 +1025,7 @@ export const useChatStore = defineStore('chat', () => {
     loadSessions, loadArchivedSessions, archiveSession, unarchiveSession,
     createSession, createSessionIfNeeded, runCommand, loadMessages, loadMoreMessages,
     loadingMore, hasMoreMessages,
-    sendMessage, deleteMessage, deleteSession, clearMessages, stopAllExecutions,
+    sendMessage, deleteMessage, deleteSession, cloneSession, clearMessages, stopAllExecutions,
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
     setOcStreaming, getIsOcStreaming, updateOcStreamCache, clearOcStreamCache,
     setCmdStreaming, updateCmdStreamCache, clearCmdStreamCache,

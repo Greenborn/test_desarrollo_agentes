@@ -56,7 +56,9 @@ export function activateTerminal(terminalId, pty, ws) {
     if (r) {
       r.output += data;
       if (r.ws && r.ws.readyState === r.ws.OPEN) {
-        r.ws.send(JSON.stringify({ type: 'data', data }));
+        try { r.ws.send(JSON.stringify({ type: 'data', data })); } catch (err) {
+          console.log('[procesos_consola] Error al enviar data por WS:', err.message);
+        }
       }
     }
   });
@@ -65,8 +67,12 @@ export function activateTerminal(terminalId, pty, ws) {
     console.log(`[procesos_consola] terminal ${terminalId}: terminada (pid ${pty.pid}), código: ${exitCode}, señal: ${signal}`);
     const r = terminals.get(terminalId);
     if (r && r.ws && r.ws.readyState === r.ws.OPEN) {
-      r.ws.send(JSON.stringify({ type: 'exit', code: exitCode, signal, output: r.output || '' }));
-      r.ws.close();
+      try { r.ws.send(JSON.stringify({ type: 'exit', code: exitCode, signal, output: r.output || '' })); } catch (err) {
+        console.log('[procesos_consola] Error al enviar exit por WS:', err.message);
+      }
+      try { r.ws.close(); } catch (err) {
+        console.log('[procesos_consola] Error al cerrar WS en onExit:', err.message);
+      }
     }
     closeTerminal(terminalId);
   });
@@ -89,6 +95,12 @@ export function attachWebSocket(terminalId, ws) {
   const record = terminals.get(terminalId);
   if (!record) return false;
 
+  if (record.ws && record.ws !== ws) {
+    try { record.ws.close(); } catch (err) {
+      console.log('[procesos_consola] Error al cerrar WebSocket anterior:', err.message);
+    }
+  }
+
   record.ws = ws;
   if (record.status === 'pending' && record.pty) {
     record.status = 'active';
@@ -98,12 +110,14 @@ export function attachWebSocket(terminalId, ws) {
   return true;
 }
 
-export function detachWebSocket(terminalId) {
+export function detachWebSocket(terminalId, ws) {
   const record = terminals.get(terminalId);
   if (!record) return;
 
-  record.ws = null;
-  console.log(`[procesos_consola] terminal ${terminalId}: WebSocket desconectado, PTY sigue activo`);
+  if (!ws || record.ws === ws) {
+    record.ws = null;
+    console.log(`[procesos_consola] terminal ${terminalId}: WebSocket desconectado, PTY sigue activo`);
+  }
 }
 
 export function getTerminal(terminalId) {

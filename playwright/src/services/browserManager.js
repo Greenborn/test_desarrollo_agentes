@@ -31,7 +31,13 @@ function getDefaultHeadless() {
   return defaultHeadless;
 }
 
+const recordedPages = new Set();
+
 function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
+  if (recordedPages.has(page)) {
+    console.log(`[browserManager] __pwRecordEvent ya registrado para esta página, omitiendo`);
+    return;
+  }
 
   page.exposeFunction('__pwRecordEvent', async (eventData) => {
     try {
@@ -63,6 +69,7 @@ function setupEventRecording(page, sessionId, chatSessionId, recordingId) {
       console.log(`[browserManager] Error al guardar evento:`, err.message);
     }
   });
+  recordedPages.add(page);
 
   async function injectListeners() {
     try {
@@ -915,6 +922,7 @@ function getActiveSession() {
 function closeSession(idSession) {
   const session = sessions.get(idSession);
   if (!session) return false;
+  recordedPages.delete(session.page);
   session.browser.close();
   sessions.delete(idSession);
   return true;

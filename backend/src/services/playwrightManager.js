@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -90,7 +90,17 @@ function stop() {
     keepAliveInterval = null;
   }
   if (proc) {
-    proc.kill();
+    proc.kill('SIGTERM');
+    try {
+      execSync(`sleep 2`, { stdio: 'ignore', timeout: 5000 });
+    } catch (e) {}
+    try {
+      proc.kill('SIGKILL');
+    } catch (err) {
+      if (err.code !== 'ESRCH') {
+        console.log('[playwright] Error al forzar cierre:', err.message);
+      }
+    }
     proc = null;
     ready = false;
   }

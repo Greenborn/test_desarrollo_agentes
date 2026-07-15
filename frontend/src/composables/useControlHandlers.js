@@ -10,6 +10,7 @@ import { useRedmineCommentsStore } from '../stores/redmineComments.js'
 import { useProjectVariablesStore } from '../stores/projectVariables.js'
 import { useTicketStore } from '../stores/ticket.js'
 import { settingSet } from '../services/settingService.js'
+import { useCommandRegistry } from './useCommandRegistry.js'
 import FuncionalidadWizard from '../components/wizards/FuncionalidadWizard.vue'
 
 export function useControlHandlers(api) {
@@ -741,6 +742,39 @@ export function useControlHandlers(api) {
         ocStore.selectedMode,
         ocStore.selectedTemperature,
       )
+      return
+    } else if (controlType === 'navegador_iniciar') {
+      if (value === null) {
+        const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+        if (idx >= 0) {
+          chat.messages[idx] = { role: 'result', content: 'Inicio de navegador cancelado.', _key: 'result-' + Date.now() }
+        }
+        return
+      }
+
+      const { navegador, url, resolutionId } = value
+      let cmd = `/navegador_iniciar --navegador=${navegador || 'chrome'}`
+      if (url) cmd += ` --url=${url}`
+      if (resolutionId) cmd += ` --resolution=${resolutionId}`
+
+      const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+      if (idx >= 0) {
+        chat.messages[idx] = { role: 'opencode_confirmed', content: cmd, _key: 'confirmed-' + Date.now() }
+      }
+
+      const { find } = useCommandRegistry()
+      const parts = cmd.split(/\s+/)
+      const cmdName = parts[0].toLowerCase()
+      const known = find(cmdName)
+
+      if (!known) {
+        chat.pushMessage({ role: 'result', content: `Error: Comando ${cmdName} no encontrado`, _key: 'err-' + Date.now() })
+        return
+      }
+
+      await chat.runCommand(cmd, async (loadingIdx, sessionId) => {
+        return known.execute(parts.slice(1), { cmdStore: null, chatStore: chat, loadingIdx, sessionId })
+      })
       return
     } else {
       try {

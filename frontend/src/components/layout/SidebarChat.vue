@@ -6,9 +6,7 @@
   >
     <!-- Tab bar -->
     <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
-      <button class="tab-btn" :class="{ active: tab === 'chats' }" @click="selectChatTab('chats')">Chats</button>
-      <button class="tab-btn ms-3" :class="{ active: tab === 'servicios' }" @click="selectChatTab('servicios')">Servicios</button>
-      <button class="tab-btn ms-3" :class="{ active: tab === 'archived' }" @click="selectChatTab('archived')">Archivados</button>
+      <button v-for="t in allChatTabs" :key="t.id" class="tab-btn" :class="{ active: tab === t.id }" @click="selectChatTab(t.id)">{{ t.label }}</button>
     </div>
     <div v-if="tab === 'chats'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
     <div class="d-flex align-items-center gap-2 mb-2 flex-shrink-0">
@@ -29,6 +27,7 @@
           :class="[{ active: s.id === activeSessionId }, ticketPriorityClass(s.priority_id)]"
           :title="sessionTooltip(s)"
           @click="selectSession(s.id)"
+          @contextmenu.prevent="onSessionContextMenu($event, s)"
         >
           <div class="session-icon" :style="sessionIconStyle(s)">
             <span v-if="pendingNotifications[s.id]" class="session-icon-notif" title="Novedades pendientes"></span>
@@ -77,6 +76,7 @@
             :class="[{ active: s.id === activeSessionId }, ticketPriorityClass(s.priority_id)]"
             :title="sessionTooltip(s)"
             @click="selectSession(s.id)"
+            @contextmenu.prevent="onSessionContextMenu($event, s)"
           >
             <div class="session-icon" :style="sessionIconStyle(s)">
               <a v-if="s.id_ticket_redmine"
@@ -115,6 +115,7 @@
       </div>
     </div>
     <ServiciosPanel v-if="tab === 'servicios'" class="flex-grow-1" style="min-height: 0;" />
+    <component :is="activeRegistryChatComponent" v-if="activeRegistryChatComponent" class="flex-grow-1" style="min-height: 0;" />
     <div class="sidebar-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-resize-handle-bar"></div>
     </div>
@@ -135,10 +136,18 @@
       </div>
     </button>
   </div>
+  <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeSessionCtxMenu" @contextmenu.prevent="closeSessionCtxMenu"></div>
+  <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
+    <div v-if="tab === 'chats'" class="context-menu-item" @click="archiveFromCtxMenu">&#128451; Archivar</div>
+    <div v-if="tab === 'archived'" class="context-menu-item" @click="unarchiveFromCtxMenu">&#128194; Desarchivar</div>
+    <div class="context-menu-item" @click="cloneFromCtxMenu">&#128203; Clonar sesión</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item text-danger" @click="deleteFromCtxMenu">&times; Eliminar</div>
+  </div>
 </template>
 
 <script>
-import { computed, watch, ref, onMounted } from 'vue'
+import { computed, watch, ref, reactive, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../stores/chat.js'
 import { useCommandStore } from '../../stores/command.js'
@@ -147,6 +156,7 @@ import { useSettingsStore } from '../../stores/settings.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { contrastTextColor } from '../../utils/color.js'
 import ServiciosPanel from '../services/ServiciosPanel.vue'
+import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
 
 export default {
   components: { ServiciosPanel },
@@ -162,6 +172,22 @@ export default {
     const stopTabSync = watch(sidebarChatTab, (v) => { tab.value = v; stopTabSync() })
     const { redmineUrl } = storeToRefs(settings)
     const { workspaces, selectedIds } = storeToRefs(ws)
+    const { sidebarChatTabs } = useModuleRegistry()
+
+    const builtInChatTabs = [
+      { id: 'chats', label: 'Chats', priority: 10 },
+      { id: 'servicios', label: 'Servicios', priority: 20 },
+      { id: 'archived', label: 'Archivados', priority: 30 },
+    ]
+    const allChatTabs = computed(() => {
+      if (!sidebarChatTabs) return builtInChatTabs
+      return [...builtInChatTabs, ...sidebarChatTabs].sort((a, b) => (a.priority || 50) - (b.priority || 50))
+    })
+    const activeRegistryChatComponent = computed(() => {
+      if (!sidebarChatTabs) return null
+      const found = sidebarChatTabs.find(t => t.id === tab.value)
+      return found ? found.component : null
+    })
 
     const sessionNavEnabled = ref(false)
 
@@ -184,6 +210,51 @@ export default {
         console.error('Error saving session nav pref:', err)
       }
     })
+
+    const ctxMenu = reactive({ show: false, x: 0, y: 0, session: null })
+
+    function onSessionContextMenu(e, session) {
+      ctxMenu.show = true
+      ctxMenu.x = e.clientX
+      ctxMenu.y = e.clientY
+      ctxMenu.session = session
+    }
+
+    function closeSessionCtxMenu() {
+      ctxMenu.show = false
+      ctxMenu.session = null
+    }
+
+    function archiveFromCtxMenu() {
+      const session = ctxMenu.session
+      closeSessionCtxMenu()
+      if (session) chat.archiveSession(session.id)
+    }
+
+    function unarchiveFromCtxMenu() {
+      const session = ctxMenu.session
+      closeSessionCtxMenu()
+      if (session) chat.unarchiveSession(session.id)
+    }
+
+    async function cloneFromCtxMenu() {
+      const session = ctxMenu.session
+      closeSessionCtxMenu()
+      if (session) {
+        const cloned = await chat.cloneSession(session.id)
+        if (cloned) {
+          chat.loadMessages(cloned.id)
+        } else {
+          modal.open(AlertModal, { message: 'No se pudo clonar la sesión. Consulta la consola para más detalles.' }, { title: 'Error' })
+        }
+      }
+    }
+
+    function deleteFromCtxMenu() {
+      const session = ctxMenu.session
+      closeSessionCtxMenu()
+      if (session) chat.deleteSession(session.id)
+    }
 
     const showWorkspaceBadges = computed(() => selectedIds.value.length > 1)
     const workspaceMap = computed(() => {
@@ -372,7 +443,12 @@ export default {
       navIconStyle,
       archiveSession,
       unarchiveSession,
+      ctxMenu,
+      onSessionContextMenu,
+      closeSessionCtxMenu,
       sessionNavEnabled,
+      allChatTabs,
+      activeRegistryChatComponent,
     }
   },
 }
@@ -545,8 +621,8 @@ export default {
   box-shadow: 0 0 6px #ef4444;
 }
 .session-icon-led.flash {
-  background-color: #3b82f6;
-  box-shadow: 0 0 6px #3b82f6;
+  background-color: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
 }
 .session-icon-led.archived {
   background-color: #6b7280;
@@ -744,11 +820,46 @@ export default {
   box-shadow: 0 0 4px #ef4444;
 }
 .session-nav-led.flash {
-  background-color: #3b82f6;
-  box-shadow: 0 0 4px #3b82f6;
+  background-color: #22c55e;
+  box-shadow: 0 0 4px #22c55e;
 }
 .session-nav-led.archived {
   background-color: #6b7280;
   opacity: 0.4;
+}
+.context-menu-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1040;
+}
+.context-menu {
+  position: fixed;
+  z-index: 1050;
+  background: #1a2744;
+  border: 1px solid #75AADB;
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.context-menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #e0e0e0;
+}
+.context-menu-item:hover {
+  background: #1a2a4e;
+}
+.context-menu-item.text-danger {
+  color: #f87171;
+}
+.context-menu-item.text-danger:hover {
+  background: rgba(248, 113, 113, 0.12);
+}
+.context-menu-divider {
+  height: 1px;
+  background: #374151;
+  margin: 4px 0;
 }
 </style>

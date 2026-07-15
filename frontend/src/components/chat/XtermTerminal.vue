@@ -21,6 +21,7 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
+import { useChatStore } from '../../stores/chat.js'
 
 const PROCESOS_API = '/api/procesos'
 const WS_PORT = import.meta.env.VITE_PROCESOS_CONSOLA_PORT || '3575'
@@ -37,6 +38,7 @@ export default {
   },
   emits: ['close', 'terminal-ready', 'exit'],
   setup(props, { emit }) {
+    const chat = useChatStore()
     const containerRef = ref(null)
     const wrapperRef = ref(null)
     const fullscreen = ref(false)
@@ -127,6 +129,7 @@ export default {
           return
         }
         if (msg.type === 'data' && terminal) {
+          if (props.sessionId) chat.flashLed(props.sessionId)
           accumulatedOutput += msg.data
           terminal.write(msg.data)
         } else if (msg.type === 'exit' && terminal) {
@@ -231,9 +234,12 @@ export default {
           if (listRes.ok) {
             const list = await listRes.json()
             if (list.length > 0) {
-              const existing = list.find((t) => t.status === 'active') || list[0]
-              currentTerminalId = existing.terminalId
-              return currentTerminalId
+              const existing = list.find((t) => t.status === 'active' && t.cmd === props.initCommand)
+                || list.find((t) => t.cmd === props.initCommand)
+              if (existing) {
+                currentTerminalId = existing.terminalId
+                return currentTerminalId
+              }
             }
           }
         } catch (err) {

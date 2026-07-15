@@ -32,6 +32,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 - **Prohibido `catch {}` vacío o `catch { /* silencio */ }`:** todo error debe registrarse con `console.error` (frontend) o `console.log` (backend) como mínimo. El silencio absoluto solo se permite en casos excepcionales documentados con comentario.
 - **Prohibido ocultar errores en consola:** nunca silenciar un error sin registrarlo. Si un error es esperado y manejado, documentar por qué.
 - **Sistema de comandos extensible:** usar `useCommandRegistry.js` para registrar comandos via `register({ name, category, description, usage, execute })`. No agregar nuevos comandos fuera del registry.
+- **Módulos auto-registrables:** seguir el sistema descrito en `frontend/src/modules/` y `backend/src/modules/`. Ver sección "Sistema de Módulos" más abajo.
 - **Espacios de trabajo (workspaces):** tabla `workspaces` con id y name. La selección activa se guarda como array en la sesión (`req.session.workspaceIds`). Settings, chat_sessions, proyectos y tickets se filtran por los workspaces seleccionados (IN). Al cambiar/seleccionar workspaces se detienen procesos OpenCode y navegador si se deseleccionó alguno.
 - **Prohibido `alert()` en el frontend:** toda notificación al usuario debe mostrarse mediante el sistema de modales personalizado (`AppModal.vue` + `stores/modal.js`). Usar `AlertModal.vue` para notificaciones simples de una línea. Cualquier `alert()` existente debe reemplazarse por un modal apropiado.
 
@@ -155,6 +156,65 @@ npm start                 # Iniciar servidor en producción
 npm run dev               # Iniciar servidor con --watch (puerto 4101)
 npm start                 # Iniciar servidor en producción
 ```
+
+## Sistema de Módulos
+
+### Frontend — `frontend/src/modules/<name>/index.js`
+
+Cada módulo se auto-descubre vía `import.meta.glob`. El manifest debe exportar por defecto:
+
+```js
+export default {
+  id: 'mi_modulo',                    // único, snake_case
+  name: 'Mi Módulo',                  // nombre legible
+  tabs: {
+    sidebarRight: [ ... ],            // tabs en SidebarRight.vue
+    sidebarChat: [ ... ],             // tabs en SidebarChat.vue
+    devPanel: [ ... ],                // tabs en DevInstancePanel.vue
+  },
+  commands: [ ... ],                  // objetos de comando (NO auto-registrados)
+  init() { /* opcional */ },
+}
+```
+
+**Reglas:**
+- Cada tab requiere `id`, `label`, `component` (dynamic import) y `priority` numérico (menor = primero)
+- `priority` es obligatorio — define el orden izquierda→derecha
+- Los comandos deben exportarse como objetos planos con `name`, `category`, `description`, `usage`, `execute`
+- No definir stores dentro del módulo; usar Pinia stores existentes
+
+### Backend — `backend/src/modules/<name>/index.js`
+
+Solo crear backend module si el módulo necesita rutas API propias. Se descubre automáticamente vía `fs.readdirSync`:
+
+```js
+export default {
+  id: 'mi_modulo',
+  name: 'Mi Módulo',
+  routes: [
+    { path: '/api/mi-ruta', router: miRouter },
+  ],
+}
+```
+
+**Reglas:**
+- `id` debe coincidir con el frontend module si están vinculados
+- Usar Express Router estándar con `authGuard`
+- No crear backend module si el módulo solo agrega tabs o comandos sin API propia
+
+### Paneles consumidores
+
+| Panel | Slot en registry | Built-ins (prioridad) |
+|-------|-----------------|----------------------|
+| `SidebarRight.vue` | `sidebarRightTabs` | — |
+| `SidebarChat.vue` | `sidebarChatTabs` | chats(10), servicios(20), archived(30) |
+| `DevInstancePanel.vue` | `devPanelTabs` | instancias(10), repositorio(20), tickets(30), proyectos(40), console_logs(50), events(60), network_logs(70) |
+
+Los tabs built-in se fusionan con los del registry y se ordenan por `priority`.
+
+### Ejemplo completo
+
+- **skills** (`frontend/src/modules/skills/` + `backend/src/modules/skills/`) — referencia canónica de módulo frontend+backend vinculado
 
 ## Testing
 

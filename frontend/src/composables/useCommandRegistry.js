@@ -1,9 +1,19 @@
 import { reactive } from 'vue'
 
+const REQUIRED_COMMAND_FIELDS = ['name', 'category', 'description', 'usage', 'execute']
 const commands = reactive([])
 
 export function useCommandRegistry() {
   function register(command) {
+    if (!command || typeof command !== 'object') {
+      console.error('[CommandRegistry] register() requires a command object')
+      return
+    }
+    const missing = REQUIRED_COMMAND_FIELDS.filter(f => !command[f])
+    if (missing.length) {
+      console.error(`[CommandRegistry] Command "${command.name || '(unnamed)'}" missing required fields: ${missing.join(', ')}`)
+      return
+    }
     const existing = commands.findIndex((c) => c.name === command.name)
     if (existing >= 0) {
       commands[existing] = command

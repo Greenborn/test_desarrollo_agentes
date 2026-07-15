@@ -1,5 +1,5 @@
 <template>
-  <nav class="navbar navbar-dark px-2 gap-1" style="background: #1a2744; border-bottom: 2px solid #75AADB;">
+  <nav class="navbar navbar-dark px-2 gap-1" style="background: #1a2744; min-height: 48px;">
     <a class="navbar-brand mb-0 h1 text-decoration-none flex-shrink-0" href="#" @click.prevent="openWorkspaceSwitcher">
       <span v-for="(ws, i) in selectedWorkspaces" :key="ws.id" class="d-inline-flex align-items-center">
         <span v-if="i > 0" class="mx-1 text-secondary" style="font-size: 0.6rem;">▸</span>
@@ -532,3 +532,16 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+nav.navbar::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #75AADB;
+  pointer-events: none;
+}
+</style>

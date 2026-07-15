@@ -15,8 +15,17 @@ export function useModuleRegistry() {
       modules.push(mod)
     }
 
+    const validateTab = (tab, slot) => {
+      if (!tab.id || !tab.label || typeof tab.priority !== 'number') {
+        console.error(`[Module ${mod.id}] Tab "${tab.id || '(unnamed)'}" in ${slot} requires id, label, and numeric priority — skipped`)
+        return false
+      }
+      return true
+    }
+
     if (mod.tabs?.sidebarRight) {
       for (const tab of mod.tabs.sidebarRight) {
+        if (!validateTab(tab, 'sidebarRight')) continue
         if (!sidebarRightTabs.find((t) => t.id === tab.id)) {
           sidebarRightTabs.push(tab)
         }
@@ -24,6 +33,7 @@ export function useModuleRegistry() {
     }
     if (mod.tabs?.sidebarChat) {
       for (const tab of mod.tabs.sidebarChat) {
+        if (!validateTab(tab, 'sidebarChat')) continue
         if (!sidebarChatTabs.find((t) => t.id === tab.id)) {
           sidebarChatTabs.push(tab)
         }
@@ -31,6 +41,7 @@ export function useModuleRegistry() {
     }
     if (mod.tabs?.devPanel) {
       for (const tab of mod.tabs.devPanel) {
+        if (!validateTab(tab, 'devPanel')) continue
         if (!devPanelTabs.find((t) => t.id === tab.id)) {
           devPanelTabs.push(tab)
         }

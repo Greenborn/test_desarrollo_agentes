@@ -228,13 +228,33 @@ export async function stopBySession(sessionId) {
 
   for (const [key, entry] of session.instances) {
     if (entry.process) {
+      const pid = entry.process.pid;
       try {
-        process.kill(-entry.process.pid, 'SIGTERM');
+        process.kill(-pid, 'SIGTERM');
       } catch (err) {
         if (err.code !== 'ESRCH') {
-          console.log(`[dev] Error al matar proceso ${entry.name}:`, err.message);
+          console.log(`[dev] Error al enviar SIGTERM a ${entry.name}:`, err.message);
         }
       }
+
+      await new Promise(r => setTimeout(r, 2000));
+
+      try {
+        process.kill(-pid, 0);
+        try {
+          process.kill(-pid, 'SIGKILL');
+          console.log(`[dev] Forzado SIGKILL en ${entry.name} (no respondió a SIGTERM)`);
+        } catch (err2) {
+          if (err2.code !== 'ESRCH') {
+            console.log(`[dev] Error al enviar SIGKILL a ${entry.name}:`, err2.message);
+          }
+        }
+      } catch (err) {
+        if (err.code !== 'ESRCH') {
+          console.log(`[dev] Error al verificar proceso ${entry.name}:`, err.message);
+        }
+      }
+
       entry.process = null;
     }
     entry.status = 'stopped';
@@ -335,26 +355,38 @@ export function killPorts(ports) {
       continue;
     }
 
+    let freed = false;
+    let remanentes = '';
+
     try {
-      const output = execSync(`fuser -k ${portNum}/tcp 2>&1`, { timeout: 10000 });
-      const stdout = output.toString().trim();
+      execSync(`fuser -k -TERM ${portNum}/tcp 2>/dev/null`, { stdio: 'ignore', timeout: 5000 });
+      execSync(`sleep 2`, { stdio: 'ignore', timeout: 5000 });
+      execSync(`fuser -k -KILL ${portNum}/tcp 2>/dev/null || lsof -ti :${portNum} | xargs kill -9 2>/dev/null || true`, { stdio: 'ignore', timeout: 5000 });
+      execSync(`sleep 1`, { stdio: 'ignore', timeout: 5000 });
 
-      for (const [sid, session] of sessions) {
-        for (const [key, entry] of session.instances) {
-          if (entry.detectedPort === portNum) {
-            entry.process = null;
-            entry.status = 'stopped';
-            session.instances.delete(key);
-          }
-        }
-        session.frontendPorts = session.frontendPorts.filter(fp => fp.port !== portNum);
-      }
-
-      results.push({ port: portNum, status: 'ok', message: stdout || `Puerto ${portNum} liberado` });
+      const check = execSync(`fuser ${portNum}/tcp 2>/dev/null || lsof -ti :${portNum} 2>/dev/null || true`, { encoding: 'utf8', timeout: 5000 }).toString().trim();
+      freed = !check;
+      remanentes = check;
     } catch (err) {
-      const stderr = err.stderr ? err.stderr.toString().trim() : '';
-      results.push({ port: portNum, status: 'not_found', message: stderr || `No hay procesos en puerto ${portNum}` });
+      remanentes = err.message;
     }
+
+    for (const [sid, session] of sessions) {
+      for (const [key, entry] of session.instances) {
+        if (entry.detectedPort === portNum) {
+          entry.process = null;
+          entry.status = 'stopped';
+          session.instances.delete(key);
+        }
+      }
+      session.frontendPorts = session.frontendPorts.filter(fp => fp.port !== portNum);
+    }
+
+    results.push({
+      port: portNum,
+      status: freed ? 'ok' : 'error',
+      message: freed ? `Puerto ${portNum} liberado` : `No se pudo liberar completamente. Remanentes: ${remanentes}`,
+    });
   }
 
   return results;

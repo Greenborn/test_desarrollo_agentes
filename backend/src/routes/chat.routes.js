@@ -668,6 +668,73 @@ router.post('/sessions/:id/unarchive', async (req, res) => {
   }
 });
 
+router.post('/sessions/:id/clone', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const original = await db('chat_sessions')
+      .where({ id: req.params.id, user_id: req.session.userId })
+      .first();
+    if (!original) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+
+    const [newId] = await db('chat_sessions').insert({
+      user_id: original.user_id,
+      title: original.title,
+      cwd: original.cwd,
+      proyecto_id: original.proyecto_id,
+      id_ticket_redmine: original.id_ticket_redmine,
+      workspace_id: original.workspace_id,
+      archived: false,
+      created_at: db.fn.now(),
+      updated_at: db.fn.now(),
+    });
+
+    const messages = await db('chat_messages')
+      .where({ session_id: req.params.id })
+      .orderBy('created_at', 'asc');
+
+    if (messages.length > 0) {
+      const newMessages = messages.map(m => ({
+        session_id: newId,
+        role: m.role,
+        content: m.content,
+        thinking: m.thinking,
+        created_at: m.created_at,
+      }));
+      await db('chat_messages').insert(newMessages);
+    }
+
+    const newSession = await db('chat_sessions')
+      .where({ 'chat_sessions.id': newId })
+      .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
+      .leftJoin('tickets', 'chat_sessions.id_ticket_redmine', 'tickets.redmine_id')
+      .leftJoin('settings as ws_redmine', function () {
+        this.on('chat_sessions.workspace_id', '=', 'ws_redmine.workspace_id')
+          .andOn('ws_redmine.setting_key', '=', db.raw('?', ['redmine_url']));
+      })
+      .select(
+        'chat_sessions.id',
+        'title',
+        'chat_sessions.updated_at',
+        'cwd',
+        'chat_sessions.proyecto_id',
+        'id_ticket_redmine',
+        'chat_sessions.workspace_id',
+        'ws_redmine.setting_value as session_redmine_url',
+        'proyectos.descripcion as proyecto_descripcion',
+        'proyectos.color as proyecto_color',
+        'tickets.priority_id',
+        'tickets.priority_name'
+      )
+      .first();
+    res.json({ success: true, session: newSession });
+  } catch (err) {
+    console.log('Error al clonar sesión:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.delete('/sessions/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {

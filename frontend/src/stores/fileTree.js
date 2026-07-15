@@ -48,8 +48,12 @@ export const useFileTreeStore = defineStore('fileTree', () => {
 
     function flattenNodes(nodes, depth) {
       if (!nodes || !nodes.length) return []
+      const sorted = [...nodes].sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
+        return a.name.localeCompare(b.name)
+      })
       const result = []
-      for (const node of nodes) {
+      for (const node of sorted) {
         result.push({ node, depth })
         if (node.type === 'directory' && expanded[node.path] && node.children) {
           result.push(...flattenNodes(node.children, depth + 1))

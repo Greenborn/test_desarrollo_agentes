@@ -40,7 +40,9 @@ export function handleConnection(ws, req, terminalId) {
     if (!r || !r.pty) return;
 
     if (msg.type === 'input') {
-      r.pty.write(msg.data);
+      try { r.pty.write(msg.data); } catch (err) {
+        console.log(`[procesos_consola] terminal ${terminalId}: error al escribir en PTY:`, err.message);
+      }
     } else if (msg.type === 'resize') {
       try {
         r.pty.resize(msg.cols, msg.rows);
@@ -51,13 +53,15 @@ export function handleConnection(ws, req, terminalId) {
   });
 
   ws.on('close', () => {
-    terminalManager.detachWebSocket(terminalId);
+    terminalManager.detachWebSocket(terminalId, ws);
   });
 
   ws.on('error', (err) => {
     console.log(`[procesos_consola] terminal ${terminalId}: error en conexión:`, err.message);
-    terminalManager.detachWebSocket(terminalId);
+    terminalManager.detachWebSocket(terminalId, ws);
   });
 
-  ws.send(JSON.stringify({ type: 'created', terminalId }));
+  try { ws.send(JSON.stringify({ type: 'created', terminalId })); } catch (err) {
+    console.log(`[procesos_consola] terminal ${terminalId}: error al enviar created:`, err.message);
+  }
 }

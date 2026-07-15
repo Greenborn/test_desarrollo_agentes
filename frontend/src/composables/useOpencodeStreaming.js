@@ -71,12 +71,13 @@ export function useOpencodeStreaming() {
       block += '\n└──────────────\n'
       return block
     }
+    function flash() { chat.flashLed(sessionId) }
     return {
-      onChunk(content) { sd.text += content; updateText() },
-      onThinking(content) { sd.thinking += content; updateThinking() },
-      onToolCall(content) { sd.text += formatToolCall(content); updateText() },
-      onToolResult(content) { sd.text += `\`\`\`\n${content}\n\`\`\`\n`; updateText() },
-      onToolData(content, partType) { sd.text += `\n> ${partType || 'data'}: ${content}\n`; updateText() },
+      onChunk(content) { sd.text += content; updateText(); flash() },
+      onThinking(content) { sd.thinking += content; updateThinking(); flash() },
+      onToolCall(content) { sd.text += formatToolCall(content); updateText(); flash() },
+      onToolResult(content) { sd.text += `\`\`\`\n${content}\n\`\`\`\n`; updateText(); flash() },
+      onToolData(content, partType) { sd.text += `\n> ${partType || 'data'}: ${content}\n`; updateText(); flash() },
       onTerminalLine(line, partType) {
         if (!_ocStreamData.value[sKey]) {
           _ocStreamData.value[sKey] = { text: '', thinking: '', streaming: false, terminalContent: '' }
@@ -85,6 +86,7 @@ export function useOpencodeStreaming() {
         if (isActiveSession(sessionId)) {
           terminalContent.value = _ocStreamData.value[sKey].terminalContent
         }
+        flash()
       },
     }
   }

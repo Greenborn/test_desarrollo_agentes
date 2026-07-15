@@ -1,0 +1,349 @@
+<template>
+  <div class="h-100 d-flex flex-column" style="min-height: 0;">
+    <div class="d-flex align-items-center gap-2 px-2 py-1 flex-shrink-0 border-bottom border-secondary">
+      <label class="filter-session-toggle d-flex align-items-center gap-1 small text-secondary" style="font-size: 0.7rem; cursor: pointer;">
+        <input type="checkbox" v-model="filterBySession" class="form-check-input m-0" style="cursor: pointer; width: 14px; height: 14px;" />
+        Solo sesión actual
+      </label>
+      <button
+        class="btn btn-sm py-0 px-1"
+        style="font-size: 0.7rem; color: #6b7280; background: none; border: none; line-height: 1;"
+        @click="refrescar"
+        title="Refrescar estado"
+      >↻</button>
+      <button
+        v-if="hasProcesses"
+        class="btn btn-sm btn-outline-danger py-0 px-2 ms-auto"
+        @click="detener"
+        :disabled="deteniendo"
+        style="font-size: 0.75rem;"
+      >
+        {{ deteniendo ? 'Deteniendo…' : '🛑 Detener' }}
+      </button>
+    </div>
+
+    <div v-if="!hasProcesses" class="flex-grow-1 d-flex flex-column align-items-center justify-content-center text-muted small" style="gap: 10px;">
+      <span v-if="errorMsg">{{ errorMsg }}</span>
+      <template v-else>
+        <span>No hay instancia de desarrollo activa.</span>
+        <button
+          class="btn btn-sm py-1 px-3"
+          style="font-size: 0.75rem; background: rgba(117, 170, 219, 0.15); color: #75AADB; border: 1px solid rgba(117, 170, 219, 0.3);"
+          :disabled="!activeSessionId || startingInstancia"
+          @click="iniciarInstancia"
+        >{{ startingInstancia ? 'Iniciando…' : '▶ Iniciar Instancia Desarrollo' }}</button>
+        <span v-if="!activeSessionId" class="small" style="color: #6b7280;">Seleccione una sesión de chat para habilitar el botón.</span>
+      </template>
+    </div>
+
+    <div v-else-if="filterBySession && filteredProcesses.length === 0" class="flex-grow-1 d-flex flex-column align-items-center justify-content-center text-muted small" style="gap: 10px;">
+      <span>No hay instancias asociadas a la sesión actual.</span>
+      <button
+        class="btn btn-sm py-0 px-1"
+        style="font-size: 0.7rem; color: #6b7280; background: none; border: none;"
+        @click="filterBySession = false"
+      >Mostrar todas</button>
+    </div>
+
+    <div v-else class="d-flex flex-grow-1" style="min-height: 0;">
+      <div class="left-panel d-flex flex-column flex-shrink-0 overflow-y-auto px-2 py-1">
+        <button
+          v-for="p in filteredProcesses"
+          :key="p.name"
+          class="process-btn d-flex align-items-center gap-1 w-100 text-start px-2 py-1 mb-1"
+          :class="{ selected: selectedProcess === p.name }"
+          @click="toggleProcess(p.name)"
+        >
+          <span class="status-dot" :class="p.status"></span>
+          <span class="small fw-semibold" :class="p.status === 'running' ? 'text-light' : 'text-muted'">{{ p.name }}</span>
+          <span v-if="p.detectedPort" class="small text-info ms-1" style="font-size: 0.65rem;">:{{ p.detectedPort }}</span>
+          <span v-if="p.sessionId && filterBySession" class="badge bg-info-subtle text-info ms-1" style="font-size: 0.55rem;">{{ String(p.sessionId).slice(0, 6) }}…</span>
+          <span class="badge ms-auto" :class="p.status === 'running' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'" style="font-size: 0.6rem;">{{ typeLabel(p.type) }}</span>
+        </button>
+
+        <div v-if="devResolution" class="mt-auto pt-1 small text-secondary px-2" style="font-size: 0.65rem;">
+          🖥️ {{ devResolution.id }} — {{ devResolution.width }}x{{ devResolution.height }}
+        </div>
+      </div>
+
+      <div class="right-panel d-flex flex-column flex-grow-1 overflow-hidden border-start border-secondary">
+        <div class="log-header d-flex align-items-center px-2 py-1 small text-secondary">
+          <span v-if="selectedProcess">[{{ selectedProcess }}]</span>
+          <span v-else>[todos los procesos]</span>
+          <span class="ms-auto text-muted" style="font-size: 0.6rem;">{{ displayedLines }} líneas</span>
+        </div>
+        <pre ref="logContainerRef" class="log-output flex-grow-1 mb-0 p-2">{{ displayText }}</pre>
+      </div>
+    </div>
+
+    <div class="port-killer d-flex align-items-center px-2 py-1 border-top border-secondary flex-shrink-0" style="gap: 6px;">
+      <input
+        v-model="portsInput"
+        type="text"
+        class="form-control form-control-sm"
+        placeholder="Puertos a cerrar (ej: 5173, 3000, 3001)"
+        style="background: #0d1117; border-color: #374151; color: #e0e0e0; font-size: 0.7rem; max-width: 280px;"
+        @keyup.enter="cerrarPuertosAction"
+      />
+      <button
+        class="btn btn-sm py-0 px-2"
+        style="font-size: 0.7rem; border-color: #dc3545; color: #dc3545;"
+        :disabled="!portsInput.trim() || cerrandoPuertosRef"
+        @click="cerrarPuertosAction"
+      >
+        {{ cerrandoPuertosRef ? 'Cerrando…' : '✕ Cerrar Puertos' }}
+      </button>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useChatStore } from '../../../stores/chat.js'
+import { useDevInstanceStore } from '../../../stores/devInstance.js'
+import { useCommandRegistry } from '../../../composables/useCommandRegistry.js'
+import { useCommandStore } from '../../../stores/command.js'
+import { useProjectStore } from '../../../stores/project.js'
+import { useProjectVariablesStore } from '../../../stores/projectVariables.js'
+
+export default {
+  setup() {
+    const devStore = useDevInstanceStore()
+    const {
+      processes: devProcesses,
+      resolution: devResolution,
+      logsMap: devLogsMap,
+      hasProcesses,
+      starting: startingInstancia,
+      deteniendo,
+      errorMsg,
+    } = storeToRefs(devStore)
+    const devFetchStatus = devStore.fetchStatus
+    const devDetener = devStore.detener
+    const devCerrarPuertos = devStore.cerrarPuertos
+
+    const selectedProcess = ref(null)
+    const logContainerRef = ref(null)
+    const portsInput = ref('')
+    const cerrandoPuertosRef = ref(false)
+    const filterBySession = ref(false)
+
+    const chatStore = useChatStore()
+    const cmdStore = useCommandStore()
+    const projectVarsStore = useProjectVariablesStore()
+    const projectStore = useProjectStore()
+    const { pinnedProjectId } = storeToRefs(projectStore)
+    const { find } = useCommandRegistry()
+
+    const activeSessionId = computed(() => chatStore.activeSessionId)
+
+    const filteredProcesses = computed(() => {
+      if (!filterBySession.value || !activeSessionId.value) return devProcesses.value
+      return devProcesses.value.filter(p => p.sessionId === activeSessionId.value)
+    })
+
+    const displayText = computed(() => {
+      const names = devStore.processNames
+      if (names.length === 0) return ''
+
+      if (selectedProcess.value) {
+        const lines = devLogsMap.value[selectedProcess.value]
+        return lines ? lines.join('\n') : ''
+      }
+
+      const combined = []
+      for (const name of names) {
+        const lines = devLogsMap.value[name]
+        if (lines && lines.length) {
+          combined.push(`── ${name} ──`)
+          combined.push(...lines)
+        }
+      }
+      return combined.join('\n')
+    })
+
+    const displayedLines = computed(() => {
+      if (!displayText.value) return 0
+      return displayText.value.split('\n').length
+    })
+
+    function typeLabel(type) {
+      return type === 'backend' ? 'nodemon' : 'npm run dev'
+    }
+
+    function toggleProcess(name) {
+      selectedProcess.value = selectedProcess.value === name ? null : name
+    }
+
+    async function iniciarInstancia() {
+      if (!activeSessionId.value) return
+      startingInstancia.value = true
+      try {
+        const cmd = find('/despliegue_iniciar_instancia')
+        await chatStore.runCommand('/despliegue_iniciar_instancia', async (loadingIdx, sid) => {
+          if (cmd) {
+            return cmd.execute([], { cmdStore, chatStore, loadingIdx, sessionId: sid })
+          }
+          const res = await fetch('/api/command/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: '/despliegue_iniciar_instancia' }),
+          })
+          const data = await res.json()
+          if (data.success) return data.result
+          throw new Error(data.result || 'Error al ejecutar comando')
+        })
+        await devFetchStatus()
+      } catch (err) {
+        console.error('[InstanciasTab] Error al iniciar instancia:', err)
+      } finally {
+        startingInstancia.value = false
+      }
+    }
+
+    async function refrescar() {
+      await devFetchStatus()
+    }
+
+    async function cerrarPuertosAction() {
+      if (!portsInput.value.trim()) return
+      const ports = portsInput.value
+        .split(',')
+        .map(p => p.trim())
+        .filter(p => p.length > 0 && !isNaN(parseInt(p, 10)))
+        .map(p => parseInt(p, 10))
+      if (ports.length === 0) return
+      cerrandoPuertosRef.value = true
+      try {
+        await devCerrarPuertos(ports)
+        const portsStr = ports.join(', ')
+        if (pinnedProjectId.value) {
+          try {
+            await projectVarsStore.saveVariable(pinnedProjectId.value, 'ports_to_close', portsStr)
+          } catch (err) {
+            console.error('[InstanciasTab] Error al guardar puertos en variable del proyecto:', err)
+          }
+        }
+        localStorage.setItem('dev_ports_to_close_default', portsStr)
+        portsInput.value = portsStr
+      } catch (err) {
+        console.error('[InstanciasTab] Error al cerrar puertos:', err)
+      } finally {
+        cerrandoPuertosRef.value = false
+      }
+    }
+
+    watch(pinnedProjectId, async (newId) => {
+      if (newId) {
+        await projectVarsStore.loadVariables(newId)
+        const vars = projectVarsStore.variablesByProject[newId] || []
+        const portsVar = vars.find(v => v.key === 'ports_to_close')
+        portsInput.value = portsVar ? portsVar.value : (localStorage.getItem('dev_ports_to_close_default') || '')
+      } else {
+        portsInput.value = localStorage.getItem('dev_ports_to_close_default') || ''
+      }
+    }, { immediate: true })
+
+    watch(displayText, async () => {
+      await nextTick()
+      if (logContainerRef.value) {
+        logContainerRef.value.scrollTop = logContainerRef.value.scrollHeight
+      }
+    })
+
+    onMounted(() => {
+      devStore.startPolling()
+    })
+
+    onBeforeUnmount(() => {
+      devStore.stopPolling()
+    })
+
+    return {
+      devResolution,
+      hasProcesses,
+      startingInstancia,
+      deteniendo,
+      errorMsg,
+      selectedProcess,
+      logContainerRef,
+      portsInput,
+      cerrandoPuertosRef,
+      filterBySession,
+      activeSessionId,
+      filteredProcesses,
+      displayText,
+      displayedLines,
+      typeLabel,
+      toggleProcess,
+      iniciarInstancia,
+      refrescar,
+      cerrarPuertosAction,
+      detener: devDetener,
+    }
+  },
+}
+</script>
+
+<style scoped>
+.left-panel {
+  width: auto;
+  min-width: 120px;
+  max-width: 200px;
+  background: #16213e;
+}
+.process-btn {
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  transition: background 0.15s;
+}
+.process-btn:hover {
+  background: rgba(117, 170, 219, 0.1);
+}
+.process-btn.selected {
+  background: rgba(117, 170, 219, 0.18);
+  color: #75AADB;
+}
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.status-dot.running {
+  background: #22c55e;
+  box-shadow: 0 0 3px #22c55e;
+}
+.status-dot.error {
+  background: #ef4444;
+  box-shadow: 0 0 3px #ef4444;
+}
+.status-dot.stopped {
+  background: #6b7280;
+}
+.right-panel {
+  background: #0d1117;
+}
+.log-header {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  font-size: 0.7rem;
+}
+.log-output {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: #e6edf3;
+  background: transparent;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+</style>

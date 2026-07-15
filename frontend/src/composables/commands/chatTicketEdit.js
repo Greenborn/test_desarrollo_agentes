@@ -2,7 +2,7 @@ import { useCommandRegistry } from '../useCommandRegistry.js'
 import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
-const ALL_FLAGS = ['--mode=']
+const MODE_VALUES = ['descripcion']
 
 register({
   name: '/chat_edit_ticket',
@@ -11,14 +11,17 @@ register({
   usage: '/chat_edit_ticket [--mode=descripcion]',
   async autocomplete(args, cmdStore) {
     const usedFlags = getUsedFlags(args)
-    const suggestions = ALL_FLAGS.filter(f => {
-      const base = f.split('=')[0]
-      return !usedFlags.includes(f) && !usedFlags.includes(base)
-    })
-    if (suggestions.length > 0) {
-      cmdStore.showAutocomplete(suggestions)
+    if (usedFlags.includes('--mode=')) {
+      const modeArg = args.find(a => a.startsWith('--mode='))
+      const val = modeArg.slice('--mode='.length)
+      if (val && MODE_VALUES.includes(val)) {
+        cmdStore.hideAutocomplete()
+      } else {
+        const filtered = MODE_VALUES.filter(v => v.startsWith(val))
+        cmdStore.showAutocomplete(filtered.map(v => ({ display: v, value: `--mode=${v}` })))
+      }
     } else {
-      cmdStore.hideAutocomplete()
+      cmdStore.showAutocomplete(['--mode='])
     }
   },
   async execute(args, { chatStore, sessionId }) {
