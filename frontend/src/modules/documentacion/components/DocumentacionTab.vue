@@ -115,7 +115,7 @@ export default {
     const { sessions, activeSessionId } = storeToRefs(chat)
 
     const activeSession = computed(() => {
-      return sessions.value.find(s => s.id === activeSessionId.value) || null
+      return sessions.value.find(s => Number(s.id) === Number(activeSessionId.value)) || null
     })
     const proyectoId = computed(() => activeSession.value?.proyecto_id || null)
     const ticketId = computed(() => activeSession.value?.id_ticket_redmine || null)
@@ -401,25 +401,23 @@ export default {
       }
     }
 
-    watch(proyectoId, (newId) => {
+    watch([proyectoId, activeSessionId], () => {
       selectedNota.value = null
       editValor.value = ''
       store.currentClave = null
       store.currentValor = ''
-      if (newId) {
-        store.loadNotas(newId)
+      const pid = proyectoId.value
+      if (pid) {
+        store.loadNotas(pid)
       } else {
         store.clearNotas()
       }
-    })
+    }, { immediate: true })
 
     onMounted(() => {
       loadListWidth()
       loadToolsWidth()
       loadAgentSystemPrompt()
-      if (proyectoId.value) {
-        store.loadNotas(proyectoId.value)
-      }
     })
 
     return {

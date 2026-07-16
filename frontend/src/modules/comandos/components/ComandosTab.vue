@@ -72,7 +72,7 @@ export default {
     const { activeSessionId, sessions } = storeToRefs(chat)
 
     const activeSession = computed(() => {
-      return sessions.value.find(s => s.id === activeSessionId.value) || null
+      return sessions.value.find(s => Number(s.id) === Number(activeSessionId.value)) || null
     })
 
     const proyectoId = computed(() => activeSession.value?.proyecto_id || null)
@@ -373,14 +373,15 @@ export default {
       }
     }
 
-    watch(proyectoId, (newId) => {
-      if (!newId) {
+    watch([proyectoId, activeSessionId], () => {
+      const pid = proyectoId.value
+      if (!pid) {
         comandosStore.clearCommands()
         packageScripts.value = []
         return
       }
-      comandosStore.loadCommands(newId)
-    })
+      comandosStore.loadCommands(pid)
+    }, { immediate: true })
 
     watch(activeSessionId, () => {
       if (activeSessionId.value) {

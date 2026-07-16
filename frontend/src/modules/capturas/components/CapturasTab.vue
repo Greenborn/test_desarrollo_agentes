@@ -82,7 +82,7 @@ export default {
     const isFullWidth = computed(() => centralPanelCollapsed.value && sidebarCollapsed.value)
 
     const activeSession = computed(() => {
-      return sessions.value.find(s => s.id === activeSessionId.value) || null
+      return sessions.value.find(s => Number(s.id) === Number(activeSessionId.value)) || null
     })
 
     const proyectoId = computed(() => activeSession.value?.proyecto_id || null)
@@ -243,7 +243,7 @@ export default {
         return
       }
       loadCapturas(newId)
-    })
+    }, { immediate: true })
 
     watch(filtrarPorSesion, () => {
       if (proyectoId.value) {

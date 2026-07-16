@@ -41,7 +41,7 @@ export default {
     const { activeSessionId, sessions } = storeToRefs(chat)
 
     const activeSession = computed(() => {
-      return sessions.value.find(s => s.id === activeSessionId.value) || null
+      return sessions.value.find(s => Number(s.id) === Number(activeSessionId.value)) || null
     })
 
     const activeTicketId = computed(() => activeSession.value?.id_ticket_redmine || null)

@@ -94,6 +94,9 @@ export default {
     }
 
     watch(proyectoId, (newId) => {
+      if (newId) {
+        selectTab('variables')
+      }
       if (!newId) {
         docNotasStore.clearNotas()
         return

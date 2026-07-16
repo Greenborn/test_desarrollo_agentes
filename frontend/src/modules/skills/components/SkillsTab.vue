@@ -130,7 +130,7 @@ export default {
     const { sessions, activeSessionId } = storeToRefs(chat)
 
     const activeSession = computed(() => {
-      return sessions.value.find(s => s.id === activeSessionId.value) || null
+      return sessions.value.find(s => Number(s.id) === Number(activeSessionId.value)) || null
     })
 
     const cwd = computed(() => activeSession.value?.cwd || null)
