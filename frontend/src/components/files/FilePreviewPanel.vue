@@ -206,7 +206,14 @@ export default {
 
     const isCodeFile = computed(() => {
       if (!props.filePath || isMarkdown.value) return false
+      if (isEnv.value) return true
       return codeExtensions.value.includes(fileExtension.value)
+    })
+
+    const isEnv = computed(() => {
+      if (!props.filePath) return false
+      const name = props.filePath.split('/').pop() || props.filePath
+      return /^\.env$|^\.env\.[a-zA-Z0-9_-]{1,8}$/.test(name)
     })
 
     const isCsv = computed(() => {
@@ -214,6 +221,7 @@ export default {
     })
 
     const detectedLanguage = computed(() => {
+      if (isEnv.value) return 'plaintext'
       const ext = fileExtension.value
       return EXT_TO_LANG[ext] || null
     })

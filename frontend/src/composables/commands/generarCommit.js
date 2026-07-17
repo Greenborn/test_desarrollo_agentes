@@ -107,8 +107,8 @@ register({
       `## Git diff de los cambios realizados\n\n\`\`\`diff\n${truncatedDiff}\n\`\`\``
 
     const systemPrompt = ticketContext
-      ? 'Eres un asistente experto en generar mensajes de commit. Recibes el contexto de un ticket de Redmine y los cambios realizados (git diff). Debés generar un mensaje de commit final claro, descriptivo y profesional que refleje los cambios realizados en relación al ticket. El mensaje debe ser conciso (máximo 300 caracteres). Devolvé ÚNICAMENTE el mensaje de commit, sin explicaciones ni formato adicional.'
-      : 'Eres un asistente experto en generar mensajes de commit. Recibes los cambios realizados (git diff). Debés generar un mensaje de commit claro, descriptivo y profesional que refleje los cambios realizados. El mensaje debe ser conciso (máximo 256 caracteres). Devolvé ÚNICAMENTE el mensaje de commit, sin explicaciones ni formato adicional.'
+      ? 'Eres un asistente experto en generar mensajes de commit. Regla 75/25: el 75% del mensaje debe describir los cambios PUNTUALES del diff (archivos, funciones, lógica modificada). Solo el 25% restante puede usar el contexto del ticket para redondear el propósito general. Priorizá siempre los cambios concretos del diff sobre la descripción del ticket. Máximo 512 caracteres. Devolvé ÚNICAMENTE el mensaje de commit.'
+      : 'Eres un asistente experto en generar mensajes de commit. Basate en los cambios del git diff para describir los cambios PUNTUALES (archivos, funciones, lógica modificada) y el IMPACTO de esos cambios en el proyecto. Máximo 512 caracteres. Devolvé ÚNICAMENTE el mensaje de commit.'
 
     const { deepseekStreamCommit } = useOpencodeStreaming()
     await deepseekStreamCommit(sessionId, prompt, systemPrompt)

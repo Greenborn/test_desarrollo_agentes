@@ -147,7 +147,7 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 
 ---
 
-## 6. `command_history`
+## 8. `command_history`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -159,7 +159,7 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 
 ---
 
-## 7. `funcionalidades`
+## 9. `funcionalidades`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -174,7 +174,7 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 
 ---
 
-## 8. `proyectos`
+## 10. `proyectos`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -193,7 +193,7 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 
 ---
 
-## 9. `gastos_tokens_usados`
+## 11. `gastos_tokens_usados`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -206,7 +206,7 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 
 ---
 
-## 10. `templates`
+## 12. `templates`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -222,7 +222,7 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 
 ---
 
-## 11. `redmine_comentarios`
+## 13. `redmine_comentarios`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -238,7 +238,7 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 
 ---
 
-## 12. `project_variables`
+## 14. `project_variables`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -265,7 +265,7 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 
 ---
 
-## 13. `tickets`
+## 15. `tickets`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -292,7 +292,7 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 
 ---
 
-## 14. `workspace_environments`
+## 16. `workspace_environments`
 
 | Columna | Tipo | Restricciones |
 |---------|------|---------------|
@@ -315,7 +315,7 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 
 ---
 
-## 15. `playwright_network_logs`
+## 17. `playwright_network_logs`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -337,7 +337,7 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 
 ---
 
-## 16. `playwright_events`
+## 18. `playwright_events`
 
 | Columna | Tipo | Restricciones |
 |---------|------|---------------|
@@ -369,7 +369,7 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 
 ---
 
-## 17. `playwright_event_recordings`
+## 19. `playwright_event_recordings`
 
 | Columna | Tipo | Restricciones |
 |---------|------|---------------|
@@ -382,7 +382,7 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 
 ---
 
-## 18. `documentacion_escaneo`
+## 20. `documentacion_escaneo`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -393,7 +393,7 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 | `total_archivos` | INTEGER | nullable |
 | `archivos_procesados` | INTEGER | nullable |
 
-## 19. `documentacion_archivo`
+## 21. `documentacion_archivo`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -408,7 +408,7 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 
 ---
 
-## 20. `comandos_personalizados_proyectos`
+## 22. `comandos_personalizados_proyectos`
 
 | Columna | Tipo | Restricciones |
 |---------|------|---------------|
@@ -422,7 +422,7 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 
 ---
 
-## 21. `archivos`
+## 23. `archivos`
 
 | Columna | Tipo | Restricciones |
 |---------|------|---------------|
@@ -437,7 +437,7 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 
 ---
 
-## 22. `capturas_metadata`
+## 24. `capturas_metadata`
 
 | Columna | Tipo | Restricciones |
 |---------|------|---------------|
@@ -459,7 +459,7 @@ El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos
 
 ---
 
-## 24. `documentacion_notas`
+## 25. `documentacion_notas`
 
 | Columna | Tipo | Restricciones |
 |---------|------|---------------|
@@ -477,7 +477,7 @@ El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos
 
 ---
 
-## 25. `playwright_console_logs`
+## 26. `playwright_console_logs`
 
 | Columna | Tipo | Restricciones |
 |---|---|---|

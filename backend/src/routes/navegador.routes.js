@@ -93,6 +93,26 @@ router.post('/command', async (req, res) => {
 
     const pwParametros = comando === 'start' ? { ...parametros, chat_session_id: sessionId } : parametros;
 
+    // Cargar configuración anti-detección desde DB y pasarla a Playwright
+    if (comando === 'start') {
+      try {
+        const wsIds = req.session.workspaceIds || [1];
+        const wsId = wsIds[0] || 1;
+        const stealthRow = await db('settings').where({ workspace_id: wsId, setting_key: 'browser_stealth_enabled' }).first();
+        if (stealthRow && (stealthRow.setting_value === '1' || stealthRow.setting_value === 'true')) {
+          pwParametros.stealth = true;
+        }
+        const navegadorParam = parametros?.navegador || 'chrome';
+        const uaKey = navegadorParam === 'firefox' ? 'browser_user_agent_firefox' : 'browser_user_agent_chrome';
+        const uaRow = await db('settings').where({ workspace_id: wsId, setting_key: uaKey }).first();
+        if (uaRow && uaRow.setting_value) {
+          pwParametros.user_agent = uaRow.setting_value;
+        }
+      } catch (err) {
+        console.log('[navegador] Error al cargar config anti-detección:', err.message);
+      }
+    }
+
     await playwrightManager.ensureRunning();
     playwrightManager.startKeepAlive();
 

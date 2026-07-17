@@ -1654,7 +1654,7 @@ export function useControlHandlers(api) {
       ? `## Git diff de los cambios realizados\n\n\`\`\`diff\n${gitDiff.slice(0, 15000)}\n\`\`\``
       : '(No se pudo obtener el diff de git)'
 
-    const systemPrompt = 'Eres un asistente experto en generar mensajes de commit. Recibes los cambios realizados (git diff). Debés generar un mensaje de commit claro, descriptivo y profesional que refleje los cambios realizados. El mensaje debe ser conciso (máximo 256 caracteres). Devolvé ÚNICAMENTE el mensaje de commit, sin explicaciones ni formato adicional.'
+    const systemPrompt = 'Eres un asistente experto en generar mensajes de commit. Basate en los cambios del git diff para describir los cambios PUNTUALES (archivos, funciones, lógica modificada) y el IMPACTO de esos cambios en el proyecto. Máximo 512 caracteres. Devolvé ÚNICAMENTE el mensaje de commit.'
 
     await deepseekStreamCommit(sessionId, prompt, systemPrompt)
   }
@@ -1686,7 +1686,6 @@ export function useControlHandlers(api) {
 
       const cleanMsg = message.replace(/^\[#\d+\]\s*/g, '').trim()
       const commitMsg = idTicket ? '[#' + idTicket + '] ' + cleanMsg : cleanMsg
-      const escapedMessage = commitMsg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 
       const addRes = await fetch('/api/command/git', {
         method: 'POST',
@@ -1711,7 +1710,7 @@ export function useControlHandlers(api) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ command: 'commit -m "' + escapedMessage + '"', sessionId }),
+        body: JSON.stringify({ command: 'commit', commitMessage: commitMsg, sessionId }),
       })
       const commitData_ = await commitRes.json()
 

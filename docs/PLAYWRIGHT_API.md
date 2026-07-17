@@ -101,11 +101,17 @@ Inicia una nueva sesión de navegador. Lanza el navegador especificado, crea un 
 #### Parámetros
 
 | Campo | Tipo | Requerido | Descripción |
-|---|---|---|---|---|
+|---|---|---|---|
 | `navegador` | `string` | Sí | Identificador del navegador: `"chrome"` o `"firefox"` |
+| `headless` | `boolean` | No | Si es `true`, ejecuta el navegador en modo headless (sin interfaz gráfica). Si se omite, usa el valor global configurado vía `set_headless` (por defecto `false`) |
+| `url` | `string` | No | URL a navegar inmediatamente después de iniciar la sesión |
+| `resolution` | `object` | No | Resolución de ventana: `{ width: 1920, height: 1080 }`. Para chrome usa `--window-size`, para firefox usa `--width` y `--height` |
 | `chat_session_id` | `integer` | No | ID de la sesión de chat asociada. Se usa para relacionar los logs de red y console.log almacenados en BD con la sesión de chat que inició el navegador |
+| `instance_name` | `string` | No | Nombre de instancia (para identificación en logs de red) |
+| `stealth` | `boolean` | No | Si es `true`, aplica técnicas anti-detección: desactiva `navigator.webdriver`, inyecta plugins y lenguajes, establece locale argentino, zona horaria, geolocalización, y desactiva `AutomationControlled` en Chrome |
+| `user_agent` | `string` | No | User-Agent personalizado para el contexto del navegador. Si se omite, usa el User-Agent por defecto de Playwright |
 
-#### Ejemplo
+#### Ejemplos
 
 ```bash
 curl -X POST http://localhost:4098/api/command \
@@ -113,11 +119,26 @@ curl -X POST http://localhost:4098/api/command \
   -d '{"comando":"start","parametros":{"navegador":"chrome"}}'
 ```
 
+Con stealth y user-agent personalizado:
+
+```bash
+curl -X POST http://localhost:4098/api/command \
+  -H 'Content-Type: application/json' \
+  -d '{"comando":"start","parametros":{"navegador":"chrome","stealth":true,"user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}}'
+```
+
 #### Respuesta
 
 ```json
 {
-  "id_session": "550e8400-e29b-41d4-a716-446655440000"
+  "id_session": "550e8400-e29b-41d4-a716-446655440000",
+  "headless": false,
+  "url": null,
+  "resolution": null,
+  "chat_session_id": null,
+  "instance_name": null,
+  "user_agent": null,
+  "stealth": true
 }
 ```
 
@@ -581,6 +602,67 @@ playwright/
 
 ---
 
+## 9. Anti-detección (Stealth Mode)
+
+El servicio incluye un modo sigiloso que aplica múltiples técnicas para evitar que el navegador sea detectado como automatizado por sistemas anti-bot (Cloudflare, reCAPTCHA, etc.).
+
+### 9.1 Activación
+
+Por parámetro directo en el comando `start`:
+
+```json
+{
+  "comando": "start",
+  "parametros": {
+    "navegador": "chrome",
+    "stealth": true,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  }
+}
+```
+
+O desde la configuración del workspace (Settings → Anti-detección del Navegador), que se aplica automáticamente al usar `/navegador_iniciar` desde el chat.
+
+### 9.2 Técnicas aplicadas
+
+| Técnica | Alcance | Descripción |
+|---|---|---|
+| `navigator.webdriver` | Page init script | Forzado a `false` (propiedad que Playwright deja en `true`) |
+| `navigator.plugins` | Page init script | Poblado con 3 plugins realistas (Chrome PDF Plugin, Chrome PDF Viewer, Native Client) |
+| `navigator.languages` | Page init script | Forzado a `['es-ES', 'es']` |
+| `navigator.pdfViewerEnabled` | Page init script | Forzado a `true` |
+| `window.chrome` | Page init script | Objeto `chrome` con runtime para simular Chrome real |
+| `HTMLCanvasElement.getContext` | Page init script | Añade noise al canvas fingerprint (1 bit por pixel) |
+| `--disable-blink-features=AutomationControlled` | Launch arg (Chrome) | Elimina flag `AutomationControlled` de Blink |
+| `locale` | Context | Forzado a `'es-ES'` |
+| `timezoneId` | Context | Forzado a `'America/Argentina/Buenos_Aires'` |
+| `geolocation` | Context | Forzado a `{ latitude: -34.6037, longitude: -58.3816 }` (Buenos Aires) |
+| `permissions` | Context | Permiso `geolocation` concedido automáticamente |
+| User-Agent | Context | Personalizable por navegador (Chrome/Firefox) |
+
+### 9.3 User-Agent personalizado
+
+Se puede definir un User-Agent distinto para cada tipo de navegador desde la configuración del workspace:
+
+| Clave | Descripción |
+|---|---|
+| `browser_user_agent_chrome` | User-Agent para sesiones Chrome |
+| `browser_user_agent_firefox` | User-Agent para sesiones Firefox |
+
+Si no se define, se usa el User-Agent por defecto de Playwright para ese navegador.
+
+### 9.4 Almacenamiento en BD
+
+Los valores de configuración se guardan en la tabla `settings` por workspace:
+
+| setting_key | Tipo | Descripción |
+|---|---|---|
+| `browser_stealth_enabled` | `'0'` / `'1'` | Activa/desactiva stealth mode |
+| `browser_user_agent_chrome` | `string` | User-Agent para Chrome |
+| `browser_user_agent_firefox` | `string` | User-Agent para Firefox |
+
+---
+
 ## 10. Referencia rápida para agentes IA
 
 ```
@@ -599,7 +681,7 @@ COMANDOS DISPONIBLES:
 - simulate_event           → simula un evento DOM arbitrario en un elemento
 
 USO:
-  { "comando": "start",                    "parametros": { "navegador": "chrome"|"firefox", "headless": true|false, "chat_session_id": 123 } }
+  { "comando": "start",                    "parametros": { "navegador": "chrome"|"firefox", "headless": true|false, "stealth": true|false, "user_agent": "string", "chat_session_id": 123 } }
   { "comando": "go_to_url",                "parametros": { "id_session": "uuid", "url": "https://..." } }
   { "comando": "set_headless",             "parametros": { "headless": "0"|"1" } }
   { "comando": "close",                    "parametros": { "id_session": "uuid" } }

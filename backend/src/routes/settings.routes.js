@@ -68,6 +68,12 @@ router.get('/', async (req, res) => {
         keys.replay_interval_ms = row.setting_value;
       } else if (row.setting_key === 'request_response_max_size_kb') {
         keys.request_response_max_size_kb = row.setting_value;
+      } else if (row.setting_key === 'browser_stealth_enabled') {
+        keys.browser_stealth_enabled = row.setting_value;
+      } else if (row.setting_key === 'browser_user_agent_chrome') {
+        keys.browser_user_agent_chrome = row.setting_value;
+      } else if (row.setting_key === 'browser_user_agent_firefox') {
+        keys.browser_user_agent_firefox = row.setting_value;
       }
     }
     const defaults = {
@@ -90,6 +96,9 @@ router.get('/', async (req, res) => {
       priority_color_immediate: '#ef4444',
       replay_interval_ms: '1000',
       request_response_max_size_kb: '100',
+      browser_stealth_enabled: '0',
+      browser_user_agent_chrome: '',
+      browser_user_agent_firefox: '',
       screen_resolutions: [
         { id: 'fullhd', width: 1920, height: 1080 },
         { id: 'hd', width: 1366, height: 768 },

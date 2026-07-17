@@ -727,7 +727,63 @@ function setupPageListeners(page, sessionId, chatSessionId, instanceName) {
   });
 }
 
-async function startSession(navegador, headless, resolution, chatSessionId, instanceName) {
+function applyStealth(page, navegador) {
+  page.addInitScript((browserType) => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+
+    Object.defineProperty(navigator, 'plugins', {
+      get: () => [
+        { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+        { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+        { name: 'Native Client', filename: 'internal-nacl-plugin' },
+      ],
+    });
+
+    Object.defineProperty(navigator, 'languages', { get: () => ['es-ES', 'es'] });
+
+    Object.defineProperty(navigator, 'pdfViewerEnabled', { get: () => true });
+
+    if (browserType === 'chrome') {
+      const originalQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = (parameters) => (
+        parameters.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : originalQuery(parameters)
+      );
+    }
+
+    const getChrome = () => {
+      const c = { loadTimes: () => {}, csi: () => {}, app: {} };
+      if (browserType === 'chrome') {
+        c.runtime = { id: undefined };
+      }
+      return c;
+    };
+    Object.defineProperty(window, 'chrome', { get: getChrome });
+
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (...args) {
+      const ctx = originalGetContext.apply(this, args);
+      if (ctx && args[0] === '2d') {
+        const originalGetImageData = ctx.getImageData;
+        let addedNoise = false;
+        ctx.getImageData = function (...args2) {
+          const imageData = originalGetImageData.apply(this, args2);
+          if (!addedNoise) {
+            for (let i = 0; i < imageData.data.length; i += 4) {
+              imageData.data[i] = imageData.data[i] ^ 1;
+            }
+            addedNoise = true;
+          }
+          return imageData;
+        };
+      }
+      return ctx;
+    };
+  }, navegador);
+}
+
+async function startSession(navegador, headless, resolution, chatSessionId, instanceName, userAgent, stealth) {
   if (!navegador) {
     throw new Error('Parámetro "navegador" es requerido');
   }
@@ -749,6 +805,10 @@ async function startSession(navegador, headless, resolution, chatSessionId, inst
     }
   }
 
+  if (stealth && navegador === 'chrome') {
+    launchArgs.push('--disable-blink-features=AutomationControlled');
+  }
+
   let browser;
   try {
     browser = await browserType.launch({
@@ -760,19 +820,36 @@ async function startSession(navegador, headless, resolution, chatSessionId, inst
     throw new Error(`No se pudo iniciar ${navegador}: ${err.message}`);
   }
 
-  const context = await browser.newContext({ viewport: null });
+  const contextOptions = { viewport: null };
+  if (userAgent) {
+    contextOptions.userAgent = userAgent;
+  }
+  if (stealth) {
+    contextOptions.locale = 'es-ES';
+    contextOptions.timezoneId = 'America/Argentina/Buenos_Aires';
+    contextOptions.geolocation = { latitude: -34.6037, longitude: -58.3816 };
+    contextOptions.permissions = ['geolocation'];
+  }
+
+  const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
+
+  if (stealth) {
+    applyStealth(page, navegador);
+  }
 
   const id = generateId();
   const safeChatSessionId = chatSessionId || null;
   const safeInstanceName = instanceName || null;
-  sessions.set(id, { browser, context, page, navegador, headless: headlessMode, resolution: resolution || null, chatSessionId: safeChatSessionId, instanceName: safeInstanceName });
+  sessions.set(id, { browser, context, page, navegador, headless: headlessMode, resolution: resolution || null, chatSessionId: safeChatSessionId, instanceName: safeInstanceName, userAgent: userAgent || null, stealth: !!stealth });
 
   setupPageListeners(page, id, safeChatSessionId, safeInstanceName);
 
   const resInfo = resolution ? `, resolución: ${resolution.width}x${resolution.height}` : '';
   const chatInfo = safeChatSessionId ? `, chat_session: ${safeChatSessionId}` : '';
-  console.log(`Sesión ${id} iniciada con ${navegador} (headless: ${headlessMode}${resInfo}${chatInfo})`);
+  const stealthInfo = stealth ? ', stealth: on' : '';
+  const uaInfo = userAgent ? `, user-agent: ${userAgent.substring(0, 50)}...` : '';
+  console.log(`Sesión ${id} iniciada con ${navegador} (headless: ${headlessMode}${resInfo}${chatInfo}${stealthInfo}${uaInfo})`);
   return id;
 }
 

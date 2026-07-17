@@ -250,6 +250,8 @@ DB_PASSWORD=agent_orchestrator
 DB_NAME=agent_orchestrator
 
 ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+PROCESOS_CONSOLA_API_KEY=sk-procesos-...
 ```
 
 ### `frontend/.env`

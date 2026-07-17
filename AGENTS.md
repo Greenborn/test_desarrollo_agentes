@@ -47,10 +47,13 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 │   └── src/
 │       ├── index.js       # Express (puerto 4000)
 │       ├── config/db.js   # Conexión Knex
-│       ├── routes/        # auth.routes.js, chat.routes.js, settings.routes.js, workspaces.routes.js
-│       ├── services/      # crypto.js, deepseek.js, redmine.js
-│       ├── middlewares/   # memoriaSession.js
-│       └── services/      # memoriaClient.js
+│       ├── routes/        # 25 rutas (auth, chat, settings, workspaces, command, opencode, navegador,
+│       │                  #   funcionalidad, proyecto, documentacion, gastos, redmine, tickets, despliegue,
+│       │                  #   templates, environments, playwrightLogs, state, gestor, comandosPersonalizados,
+│       │                  #   proxy, archivos, db, procesos, playwright)
+│       ├── services/      # crypto, deepseek, devInstanceManager, frontendWsServer, gestorClient,
+│       │                  #   memoriaClient, opencode, playwrightManager, portDetector, redmine
+│       └── middlewares/   # memoriaSession.js
 ├── frontend/              # Vue 3 + Vite + Bootstrap
 │   └── src/
 │       ├── main.js

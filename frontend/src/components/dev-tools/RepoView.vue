@@ -87,7 +87,7 @@
 </template>
 
 <script>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../stores/chat.js'
 import { useGitStore } from '../../stores/git.js'
@@ -109,6 +109,12 @@ export default {
     function refresh() {
       gitStore.fetchRepoData(activeSessionId.value)
     }
+
+    watch(activeSessionId, (newVal) => {
+      if (newVal) {
+        gitStore.fetchRepoData(newVal)
+      }
+    })
 
     onMounted(() => {
       refresh()

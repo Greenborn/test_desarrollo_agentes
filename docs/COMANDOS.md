@@ -53,7 +53,7 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/navegador_iniciar` | Abre un navegador (chrome/firefox). Usa Tab para autocompletar cada flag | `/navegador_iniciar [--navegador=chrome\|firefox] [--resolution=ID] [--url=URL]` |
+| `/navegador_iniciar` | Abre un navegador (chrome/firefox). Usa Tab para autocompletar cada flag. Si el modo sigiloso (stealth) está activado en Settings, se aplica automáticamente. | `/navegador_iniciar [--navegador=chrome\|firefox] [--resolution=ID] [--url=URL]` |
 | `/navegador_ir_url` | Navega a una URL en la sesión de navegador activa | `/navegador_ir_url --url=<url>` |
 | `/navegador_configurar_headless` | Cambia el modo headless (0 = visible, 1 = headless). Si hay sesión activa, la reinicia | `/navegador_configurar_headless --mode=<0\|1>` |
 | `/navegador_finalizar` | Finaliza la sesión de navegador activa | `/navegador_finalizar` |

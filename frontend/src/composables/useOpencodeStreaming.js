@@ -696,8 +696,8 @@ export function useOpencodeStreaming() {
             : opencodeResponse
 
           const systemPrompt = ticketContext
-            ? 'Eres un asistente experto en generar mensajes de commit. Recibes el contexto de un ticket de Redmine y una propuesta de commit generada por un agente. Debés generar un mensaje de commit final claro, descriptivo y profesional que refleje los cambios realizados en relación al ticket. El mensaje debe ser conciso (máximo 300 caracteres). Devolvé ÚNICAMENTE el mensaje de commit, sin explicaciones ni formato adicional.'
-            : 'Eres un asistente que reduce mensajes de commit. Recibes un mensaje de commit y debes acortarlo a un máximo de 256 caracteres manteniendo el significado y la claridad. Devuelve ÚNICAMENTE el mensaje reducido, sin explicaciones ni formato adicional.'
+            ? 'Eres un asistente experto en generar mensajes de commit. Regla 75/25: el 75% del mensaje debe describir los cambios PUNTUALES listados en la propuesta del agente (archivos, funciones, lógica modificada). Solo el 25% restante puede usar el contexto del ticket para redondear el propósito general. Priorizá siempre los cambios concretos sobre la descripción del ticket. Máximo 512 caracteres. Devolvé ÚNICAMENTE el mensaje de commit.'
+            : 'Eres un asistente que reduce mensajes de commit. Acortá el mensaje a un máximo de 512 caracteres manteniendo los cambios PUNTUALES (archivos, funciones, lógica modificada) y el impacto. Devuelve ÚNICAMENTE el mensaje reducido.'
 
           const res = await fetch('/api/chat/refine', {
             method: 'POST',

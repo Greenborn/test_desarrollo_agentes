@@ -302,7 +302,12 @@ router.post('/git', async (req, res) => {
     let success = false;
 
     try {
-      stdout = execSync(`git ${command}`, { cwd, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
+      const commitMessage = req.body.commitMessage
+      if (commitMessage && command.startsWith('commit')) {
+        stdout = execSync(`git ${command} -F -`, { cwd, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024, input: commitMessage })
+      } else {
+        stdout = execSync(`git ${command}`, { cwd, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 })
+      }
       success = true;
     } catch (err) {
       stdout = err.stdout || '';
@@ -324,13 +329,13 @@ router.post('/git-verify', async (req, res) => {
     let cwd = process.cwd();
     if (sessionId) {
       const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
-      if (session && session.cwd) cwd = session.cwd;
+      if (session && session.cwd) cwd = session.cwd.trim();
     }
     try {
       const rootPath = execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf-8' }).trim();
       res.json({ isRepo: true, rootPath, error: null });
     } catch (err) {
-      console.log(`[git-verify] cwd="${cwd}" error:`, err.message, '| stderr:', (err.stderr || '').toString().trim(), '| code:', err.status);
+      console.log(`[git-verify] cwd=${JSON.stringify(cwd)} error:`, err.message, '| stderr:', (err.stderr || '').toString().trim(), '| code:', err.status);
       res.json({ isRepo: false, rootPath: null, error: 'El directorio no es un repositorio Git.' });
     }
   } catch (err) {

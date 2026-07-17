@@ -128,11 +128,34 @@ export default {
       }, 250)
     }
 
-    function openFile(path) {
+    function isEnvFile(name) {
+      return /^\.env$|^\.env\.[a-zA-Z0-9_-]{1,8}$/.test(name)
+    }
+
+    async function isSmallJsonFile(path) {
+      try {
+        const res = await fetch(`/api/command/read-file?path=${encodeURIComponent(path)}`, {
+          credentials: 'include',
+        })
+        const data = await res.json()
+        if (data.success) {
+          return data.content.length < 1048576
+        }
+      } catch (err) {
+        console.error('Error al verificar tamaño de JSON:', err)
+      }
+      return false
+    }
+
+    async function openFile(path) {
       const name = path.split('/').pop() || path
       selectedFile.value = path
       if (name.toLowerCase().endsWith('.csv')) {
         modal.open(CsvViewerModal, { filePath: path }, { title: `CSV: ${name}`, wide: true })
+      } else if (name.toLowerCase().endsWith('.json')) {
+        const readonly = await isSmallJsonFile(path)
+        const title = readonly ? `Previsualizar: ${name}` : `Editar: ${name}`
+        modal.open(FileEditorModal, { filePath: path, sessionId: props.sessionId, readonly }, { title, wide: true })
       } else {
         modal.open(FileEditorModal, { filePath: path, sessionId: props.sessionId }, { title: `Editar: ${name}`, wide: true })
       }
@@ -140,6 +163,8 @@ export default {
 
     function getFileIcon(node) {
       if (node.type === 'directory') return '\u{1F4C1}'
+      const name = node.name.toLowerCase()
+      if (name === '.env' || /^\.env\.[a-zA-Z0-9_-]{1,8}$/.test(name)) return '\u{1F511}'
       const ext = node.name.includes('.') ? node.name.split('.').pop().toLowerCase() : ''
       return FILE_ICONS[ext] || '\u{1F4C4}'
     }

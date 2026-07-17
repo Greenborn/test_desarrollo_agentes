@@ -29,6 +29,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const screenResolutions = ref([])
   const replayIntervalMs = ref(1000)
   const requestResponseMaxSizeKb = ref(100)
+  const browserStealthEnabled = ref(false)
+  const browserUserAgentChrome = ref('')
+  const browserUserAgentFirefox = ref('')
   const saveError = ref('')
   const saveSuccess = ref('')
 
@@ -72,6 +75,9 @@ export const useSettingsStore = defineStore('settings', () => {
       screenResolutions.value = keys.screen_resolutions || []
       replayIntervalMs.value = keys.replay_interval_ms ? parseInt(keys.replay_interval_ms, 10) : 1000
       requestResponseMaxSizeKb.value = keys.request_response_max_size_kb ? parseInt(keys.request_response_max_size_kb, 10) : 100
+      browserStealthEnabled.value = keys.browser_stealth_enabled === '1' || keys.browser_stealth_enabled === 'true'
+      browserUserAgentChrome.value = keys.browser_user_agent_chrome || ''
+      browserUserAgentFirefox.value = keys.browser_user_agent_firefox || ''
       applyPriorityColors()
     } catch (err) {
       console.error('Error al cargar settings:', err)
@@ -130,6 +136,9 @@ export const useSettingsStore = defineStore('settings', () => {
         break
       case 'replay_interval_ms': replayIntervalMs.value = parseInt(value, 10) || 1000; break
       case 'request_response_max_size_kb': requestResponseMaxSizeKb.value = parseInt(value, 10) || 100; break
+      case 'browser_stealth_enabled': browserStealthEnabled.value = value === '1' || value === 'true'; break
+      case 'browser_user_agent_chrome': browserUserAgentChrome.value = value; break
+      case 'browser_user_agent_firefox': browserUserAgentFirefox.value = value; break
     }
   }
 
@@ -146,5 +155,5 @@ export const useSettingsStore = defineStore('settings', () => {
            deteccionFuncionalidadesPrompt, codeFileExtensions, codeFileMaxSizeKb,
            priorityColorLow, priorityColorNormal, priorityColorHigh, priorityColorUrgent, priorityColorImmediate,
             saveError, saveSuccess, clearFeedback, load, save, applyPriorityColors,
-            requestResponseMaxSizeKb }
+            requestResponseMaxSizeKb, browserStealthEnabled, browserUserAgentChrome, browserUserAgentFirefox }
 })

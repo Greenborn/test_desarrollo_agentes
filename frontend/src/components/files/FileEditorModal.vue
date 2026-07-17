@@ -11,26 +11,33 @@
       <div v-else class="d-flex flex-column flex-grow-1" style="min-height: 0;">
         <div class="file-path text-muted small px-3 py-1 flex-shrink-0 d-flex align-items-center justify-content-between">
           <span class="text-truncate">{{ filePath }}</span>
-          <button v-if="isMarkdown" class="btn btn-sm" :class="editMode ? 'btn-outline-primary' : 'btn-outline-info'" @click="toggleMode">
+          <button v-if="isMarkdown && !readonly" class="btn btn-sm" :class="editMode ? 'btn-outline-primary' : 'btn-outline-info'" @click="toggleMode">
             {{ editMode ? 'Vista previa' : 'Editar' }}
           </button>
         </div>
-        <div v-if="isMarkdown && !editMode" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
-          <ChatFormatter :text="content" />
+        <div v-if="readonly" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
+          <pre class="code-pre m-0"><code>{{ content }}</code></pre>
         </div>
-        <textarea v-show="!isMarkdown || editMode"
-          class="file-editor form-control flex-grow-1 border-0 rounded-0"
-          v-model="content"
-          :disabled="saving"
-          spellcheck="false"
-        ></textarea>
+        <template v-else>
+          <div v-if="isMarkdown && !editMode" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
+            <ChatFormatter :text="content" />
+          </div>
+          <textarea v-show="!isMarkdown || editMode"
+            class="file-editor form-control flex-grow-1 border-0 rounded-0"
+            v-model="content"
+            :disabled="saving"
+            spellcheck="false"
+          ></textarea>
+        </template>
         <div class="d-flex align-items-center gap-2 px-3 py-2 flex-shrink-0" style="background: #1a1a2e;">
-          <span v-if="saving" class="text-muted small">Guardando...</span>
-          <span v-if="saved" class="text-success small">✓ Guardado</span>
-          <button class="btn btn-sm btn-argentina ms-auto" @click="save" :disabled="saving || !dirty">
-            {{ saving ? 'Guardando...' : 'Guardar' }}
-          </button>
-          <button class="btn btn-sm btn-outline-secondary" @click="$emit('close')" :disabled="saving">Cancelar</button>
+          <template v-if="!readonly">
+            <span v-if="saving" class="text-muted small">Guardando...</span>
+            <span v-if="saved" class="text-success small">✓ Guardado</span>
+            <button class="btn btn-sm btn-argentina ms-auto" @click="save" :disabled="saving || !dirty">
+              {{ saving ? 'Guardando...' : 'Guardar' }}
+            </button>
+          </template>
+          <button class="btn btn-sm btn-outline-secondary" :class="{ 'ms-auto': readonly }" @click="$emit('close')" :disabled="saving">Cerrar</button>
         </div>
       </div>
     </div>
@@ -58,6 +65,7 @@ export default {
   props: {
     filePath: { type: String, required: true },
     sessionId: { type: [Number, String], default: null },
+    readonly: { type: Boolean, default: false },
   },
   emits: ['close'],
   setup(props) {
@@ -209,6 +217,12 @@ export default {
   color: #c9d1d9;
   font-size: 0.8rem;
   line-height: 1.5;
+}
+.code-pre {
+  font-size: 0.7rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 .file-editor {
   background: #0d1117 !important;

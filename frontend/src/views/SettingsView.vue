@@ -375,6 +375,46 @@
         </div>
       </div>
 
+      <div class="col" v-if="cardHasVisible(['anti deteccion navegador stealth modo sigiloso user agent chrome firefox'])" key="browser">
+        <div class="card bg-dark border-secondary h-100">
+          <div class="card-header bg-dark border-secondary py-2 px-3">
+            <h6 class="mb-0 fw-semibold">Anti-detección del Navegador</h6>
+          </div>
+          <div class="card-body d-flex flex-column gap-3">
+            <div v-if="matches('stealth modo sigiloso')">
+              <div class="d-flex align-items-center gap-2">
+                <input type="checkbox" id="stealthToggle" class="form-check-input bg-dark border-secondary" v-model="browserStealthInput" />
+                <label for="stealthToggle" class="form-label small mb-0">Modo sigiloso (stealth) — evita detección como bot</label>
+              </div>
+              <div class="small text-muted mt-1">Aplica fingerprinting, user-agent personalizado, locale argentino y desactiva AutomationControlled.</div>
+              <button class="btn btn-sm mt-2 btn-argentina" @click="saveBrowserStealth">Guardar</button>
+            </div>
+
+            <div v-if="matches('user agent chrome')">
+              <label class="form-label small mb-1">User-Agent para Chrome</label>
+              <input
+                type="text"
+                class="form-control form-control-sm bg-dark text-light border-secondary font-monospace"
+                v-model="browserUserAgentChromeInput"
+                placeholder="Mozilla/5.0 (Windows NT 10.0; Win64; x64)..."
+              />
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveBrowserUaChrome">Guardar</button>
+            </div>
+
+            <div v-if="matches('user agent firefox')">
+              <label class="form-label small mb-1">User-Agent para Firefox</label>
+              <input
+                type="text"
+                class="form-control form-control-sm bg-dark text-light border-secondary font-monospace"
+                v-model="browserUserAgentFirefoxInput"
+                placeholder="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0)..."
+              />
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveBrowserUaFirefox">Guardar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="col" v-if="cardHasVisible(['ambientes entorno dev tst prd'])">
         <div class="card bg-dark border-secondary h-100">
           <div class="card-header bg-dark border-secondary py-2 px-3">
@@ -467,6 +507,9 @@ export default {
     const newResHeight = ref(1080)
     const replayIntervalInput = ref(1000)
     const requestResponseMaxSizeInput = ref(100)
+    const browserStealthInput = ref(false)
+    const browserUserAgentChromeInput = ref('')
+    const browserUserAgentFirefoxInput = ref('')
     const newEnvName = ref('')
     const newEnvBranch = ref('')
     const newEnvDescription = ref('')
@@ -556,6 +599,18 @@ export default {
 
     watch(() => settings.requestResponseMaxSizeKb, (val) => {
       requestResponseMaxSizeInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.browserStealthEnabled, (val) => {
+      browserStealthInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.browserUserAgentChrome, (val) => {
+      browserUserAgentChromeInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.browserUserAgentFirefox, (val) => {
+      browserUserAgentFirefoxInput.value = val
     }, { immediate: true })
 
     watch(() => settings.ticketDescripcionPrompt, (val) => {
@@ -759,6 +814,21 @@ export default {
       settings.save('request_response_max_size_kb', String(requestResponseMaxSizeInput.value), selectedWId.value)
     }
 
+    function saveBrowserStealth() {
+      settings.clearFeedback()
+      settings.save('browser_stealth_enabled', browserStealthInput.value ? '1' : '0', selectedWId.value)
+    }
+
+    function saveBrowserUaChrome() {
+      settings.clearFeedback()
+      settings.save('browser_user_agent_chrome', browserUserAgentChromeInput.value, selectedWId.value)
+    }
+
+    function saveBrowserUaFirefox() {
+      settings.clearFeedback()
+      settings.save('browser_user_agent_firefox', browserUserAgentFirefoxInput.value, selectedWId.value)
+    }
+
     function savePriorityColor(key) {
       settings.clearFeedback()
       const inputMap = {
@@ -941,6 +1011,8 @@ export default {
       saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
       saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveDeteccionPrompt, saveCodeConfig, saveRepoAcronimo,
       saveLocale, savePriorityColor, saveReplayInterval, saveRequestResponseMaxSize,
+      saveBrowserStealth, saveBrowserUaChrome, saveBrowserUaFirefox,
+      browserStealthInput, browserUserAgentChromeInput, browserUserAgentFirefoxInput,
       addResolution, removeResolution, resetResolutions, saveResolutions, matches, cardHasVisible,
       envStore, wsMessage,
       onWorkspaceChange, openCreateModal, openEditModal, openDeleteConfirm, cancelDelete, executeDelete, deleteConfirmWs, deleting,

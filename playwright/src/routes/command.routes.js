@@ -42,11 +42,13 @@ router.post('/command', async (req, res) => {
         const resolution = parametros?.resolution;
         const chatSessionId = parametros?.chat_session_id;
         const instanceName = parametros?.instance_name;
-        const idSession = await browserManager.startSession(navegador, headless, resolution, chatSessionId, instanceName);
+        const userAgent = parametros?.user_agent;
+        const stealth = parametros?.stealth === true || parametros?.stealth === '1' || parametros?.stealth === 1;
+        const idSession = await browserManager.startSession(navegador, headless, resolution, chatSessionId, instanceName, userAgent, stealth);
         if (url) {
           await browserManager.goToUrl(idSession, url);
         }
-        return res.json({ id_session: idSession, headless: !!headless, url: url || null, resolution: resolution || null, chat_session_id: chatSessionId || null, instance_name: instanceName || null });
+        return res.json({ id_session: idSession, headless: !!headless, url: url || null, resolution: resolution || null, chat_session_id: chatSessionId || null, instance_name: instanceName || null, user_agent: userAgent || null, stealth });
       } catch (err) {
         return res.status(500).json({ error: err.message });
       }

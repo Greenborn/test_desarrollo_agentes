@@ -16,12 +16,15 @@ Plataforma de orquestación de agentes de IA con interfaz de chat, integración 
 ## Estructura
 
 ```
-├── backend/          # API REST principal (puerto 4000)
-├── frontend/         # SPA Vue 3 (puerto 5173)
-├── playwright/       # Microservicio Playwright (puerto 4098)
-├── api_gastos/       # Registro de gastos de tokens (puerto 4100)
-├── api_documental/   # Gestión documental (puerto ?)
-└── docs/             # Documentación técnica
+├── api_gestor_servicios/  # Orquestador de servicios (puerto 4250)
+├── backend/               # API REST principal (puerto 4000)
+├── frontend/              # SPA Vue 3 (puerto 5173)
+├── playwright/            # Microservicio Playwright (puerto 4098)
+├── api_memoria/           # Servicio de memoria caché (puerto 4101)
+├── api_gastos/            # Registro de gastos de tokens (puerto 4100)
+├── api_documental/        # Gestión documental (puerto 4099)
+├── api_procesos_consola/  # Gestión de terminales/procesos (puerto 3575)
+└── docs/                  # Documentación técnica
 ```
 
 ## Requisitos
@@ -54,11 +57,15 @@ Cada componente también puede iniciarse individualmente desde su directorio con
 ## Componentes individuales
 
 | Componente | Directorio | Comando dev | Puerto |
-|---|---|---|---|
+|---|---|---|---|---|
+| Gestor Servicios | `api_gestor_servicios/` | `npm run dev` | 4250 |
 | Backend | `backend/` | `npm run dev` | 4000 |
 | Frontend | `frontend/` | `npm run dev` | 5173 |
 | Playwright | `playwright/` | `npm run setup && npm run dev` | 4098 |
+| Memoria | `api_memoria/` | `npm run dev` | 4101 |
 | Gastos | `api_gastos/` | `npm run dev` | 4100 |
+| Documental | `api_documental/` | `npm run dev` | 4099 |
+| Procesos Consola | `api_procesos_consola/` | `npm run dev` | 3575 |
 
 ## Comandos de chat
 
