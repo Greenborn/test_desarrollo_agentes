@@ -97,5 +97,14 @@ export const useTicketFormStore = defineStore('ticketForm', () => {
     allowedStatuses.value = []
   }
 
-  return { options, allowedStatuses, loading, loadOptions, loadTicketOptions, loadProjectUsers, clear }
+  function reset() {
+    options.statuses = []
+    options.priorities = []
+    options.trackers = []
+    options.users = []
+    allowedStatuses.value = []
+    loading.value = false
+  }
+
+  return { options, allowedStatuses, loading, loadOptions, loadTicketOptions, loadProjectUsers, clear, reset }
 })

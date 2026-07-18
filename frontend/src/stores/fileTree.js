@@ -144,9 +144,18 @@ export const useFileTreeStore = defineStore('fileTree', () => {
     }
   }
 
+  function reset() {
+    trees.value = {}
+    loadingMap.value = {}
+    errorMap.value = {}
+    expandedPathsMap.value = {}
+    loadedPaths.value = {}
+    loadingChildrenMap.value = {}
+  }
+
   return {
     getTree, getLoading, getError, getExpandedPaths,
     isExpanded, isChildrenLoaded, isLoadingChildren,
-    getFlatTree, fetchTree, toggleDirectory, fetchChildren,
+    getFlatTree, fetchTree, toggleDirectory, fetchChildren, reset,
   }
 })

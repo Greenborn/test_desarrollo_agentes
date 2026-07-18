@@ -101,6 +101,13 @@ export const useDocumentacionNotasStore = defineStore('documentacionNotas', () =
     currentValor.value = ''
   }
 
+  function reset() {
+    notasByProject.value = {}
+    loadingByProject.value = {}
+    currentClave.value = null
+    currentValor.value = ''
+  }
+
   return {
     notasByProject,
     loadingByProject,
@@ -112,5 +119,6 @@ export const useDocumentacionNotasStore = defineStore('documentacionNotas', () =
     updateNota,
     deleteNota,
     clearNotas,
+    reset,
   }
 })

@@ -3,7 +3,8 @@
     <div class="alert-modal-message flex-grow-1" style="white-space: pre-wrap;">
       {{ message }}
     </div>
-    <div class="d-flex justify-content-end mt-3">
+    <div class="d-flex justify-content-end mt-3 gap-2">
+      <button v-if="confirm" class="btn btn-outline-secondary btn-sm" @click="$emit('cancel')">Cancelar</button>
       <button class="btn btn-argentina btn-sm" @click="$emit('close')">OK</button>
     </div>
   </div>
@@ -13,7 +14,8 @@
 export default {
   props: {
     message: { type: String, required: true },
+    confirm: { type: Boolean, default: false },
   },
-  emits: ['close'],
+  emits: ['close', 'cancel'],
 }
 </script>

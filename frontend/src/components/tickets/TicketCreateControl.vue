@@ -24,7 +24,11 @@
       </div>
     </div>
 
-    <div class="ticket-field mb-2">
+    <div v-if="workspaceError" class="ticket-field mb-2">
+      <span class="error-msg">{{ workspaceError }}</span>
+    </div>
+
+    <div v-else class="ticket-field mb-2">
       <span class="field-label">Proyecto:</span>
       <select v-model="form.project_id" class="ticket-select" @change="onProjectChange">
         <option value="">Selecciona proyecto...</option>
@@ -93,7 +97,7 @@
     </div>
 
     <div class="d-flex gap-2 mt-3">
-      <button class="btn btn-sm btn-argentina" @click="save" :disabled="saving">
+      <button class="btn btn-sm btn-argentina" @click="save" :disabled="saving || !!workspaceError">
         {{ saving ? 'Creando...' : 'Crear Ticket' }}
       </button>
       <button class="btn btn-sm btn-outline-argentina" @click="cancel" :disabled="saving">
@@ -106,19 +110,24 @@
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useTicketFormStore } from '../../stores/ticketForm.js'
+import { useChatStore } from '../../stores/chat.js'
 
 export default {
   props: {
     projectId: { type: String, default: '' },
+    sessionId: { type: String, default: '' },
   },
   emits: ['confirm'],
   setup(props, { emit }) {
     const ticketFormStore = useTicketFormStore()
+    const chatStore = useChatStore()
     const saving = ref(false)
     const errors = reactive({ subject: '', project_id: '' })
     const autoAssign = ref(true)
     const createBranch = ref(true)
     const allProjects = ref([])
+    const workspaceError = ref('')
+    const sessionWsId = ref(null)
     const options = ticketFormStore.options
     const selectedIds = reactive({
       status_id: null,
@@ -138,8 +147,13 @@ export default {
       done_ratio: 0,
     })
 
+    const sessionProjects = computed(() => {
+      if (!sessionWsId.value) return []
+      return allProjects.value.filter(p => Number(p.workspace_id) === Number(sessionWsId.value))
+    })
+
     const projectTree = computed(() => {
-      const withRedmine = allProjects.value.filter(p => p.redmine_id != null)
+      const withRedmine = sessionProjects.value.filter(p => p.redmine_id != null)
       const map = {}
       const roots = []
       for (const p of withRedmine) {
@@ -271,9 +285,20 @@ export default {
     }
 
     onMounted(async () => {
+      const session = chatStore.sessions.find(s => Number(s.id) === Number(props.sessionId))
+      if (!session || !session.workspace_id) {
+        workspaceError.value = 'La sesión de chat no tiene un espacio de trabajo asignado. Selecciona un workspace antes de crear un ticket.'
+        return
+      }
+      sessionWsId.value = session.workspace_id
+
       await loadProjects()
       await loadOptions()
-      if (props.projectId) {
+
+      const sessionProyectoId = session.proyecto_id || null
+      if (sessionProyectoId) {
+        form.project_id = sessionProyectoId
+      } else if (props.projectId) {
         form.project_id = props.projectId
       }
       if (form.project_id) {
@@ -282,7 +307,7 @@ export default {
     })
 
     return {
-      form, options, allProjects, flattenedProjects, errors, saving, selectedIds, autoAssign, createBranch,
+      form, options, allProjects, flattenedProjects, errors, saving, selectedIds, autoAssign, createBranch, workspaceError,
       save, cancel, onProjectChange, onPriorityChange, onStatusChange, onTrackerChange, onUserChange, loadProjectUsers,
     }
   },

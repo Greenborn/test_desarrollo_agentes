@@ -13,6 +13,16 @@ function authGuard(req, res) {
   return true;
 }
 
+function slugify(text, id) {
+  const base = text
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, '')
+    .replace(/ /g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+  return base + '_' + id;
+}
+
 router.get('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
@@ -34,6 +44,8 @@ router.post('/', async (req, res) => {
 
     const hex = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#75AADB';
     const [insertId] = await db('workspaces').insert({ name, color: hex });
+    const slug = slugify(name, insertId);
+    await db('workspaces').where({ id: insertId }).update({ slug });
 
     const defaultSettings = await db('settings').where({ workspace_id: 1 });
     if (defaultSettings.length > 0) {
@@ -79,6 +91,9 @@ router.put('/:id', async (req, res) => {
     }
 
     const updates = { name };
+    if (ws.name !== name) {
+      updates.slug = slugify(name, ws.id);
+    }
     if (color !== undefined) {
       if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
         return res.status(400).json({ error: 'Color inválido. Use formato #RRGGBB' });

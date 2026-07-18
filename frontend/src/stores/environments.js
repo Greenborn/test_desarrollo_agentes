@@ -80,8 +80,6 @@ export const useEnvironmentsStore = defineStore('environments', () => {
   async function remove(index) {
     const env = list.value[index]
     if (!env.id) return
-    const confirmed = confirm(`¿Eliminar ambiente "${env.name}"?`)
-    if (!confirmed) return
     try {
       const res = await fetch(`${API}/environments/${env.id}`, {
         method: 'DELETE',
@@ -105,5 +103,11 @@ export const useEnvironmentsStore = defineStore('environments', () => {
     message.value = ''
   }
 
-  return { list, loading, message, load, save, add, remove, clearMessage }
+  function reset() {
+    list.value = []
+    loading.value = false
+    message.value = ''
+  }
+
+  return { list, loading, message, load, save, add, remove, clearMessage, reset }
 })

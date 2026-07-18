@@ -1,6 +1,13 @@
 import { Router } from 'express';
+import { execSync } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 import db from '../config/db.js';
 import { encrypt, decrypt } from '../services/crypto.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = Router();
 
@@ -74,6 +81,8 @@ router.get('/', async (req, res) => {
         keys.browser_user_agent_chrome = row.setting_value;
       } else if (row.setting_key === 'browser_user_agent_firefox') {
         keys.browser_user_agent_firefox = row.setting_value;
+      } else if (row.setting_key === 'skill_repository_url') {
+        keys.skill_repository_url = row.setting_value;
       }
     }
     const defaults = {
@@ -320,6 +329,56 @@ router.post('/import-all', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.log('Error al importar settings:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+const OPENCODE_DEV_DIR = path.resolve(__dirname, '../../../opencode_dev');
+
+router.post('/clone-skill-repo', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { workspace_id } = req.body;
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = workspace_id && wsIds.includes(workspace_id) ? workspace_id : wsIds[0] || 1;
+
+    const ws = await db('workspaces').where({ id: wsId }).first();
+    if (!ws) {
+      return res.status(404).json({ error: 'Workspace no encontrado' });
+    }
+
+    const setting = await db('settings')
+      .where({ workspace_id: wsId, setting_key: 'skill_repository_url' })
+      .first();
+
+    if (!setting || !setting.setting_value) {
+      return res.status(400).json({ error: 'No hay URL de repositorio configurada para este workspace' });
+    }
+
+    const repoUrl = setting.setting_value.trim();
+    const targetDir = path.join(OPENCODE_DEV_DIR, ws.slug);
+
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    const isEmpty = fs.readdirSync(targetDir).length === 0;
+
+    if (isEmpty) {
+      execSync(`git clone "${repoUrl}" "${targetDir}"`, {
+        stdio: 'pipe',
+        timeout: 120000,
+      });
+    } else {
+      execSync(`git -C "${targetDir}" pull`, {
+        stdio: 'pipe',
+        timeout: 120000,
+      });
+    }
+
+    res.json({ success: true, slug: ws.slug, path: targetDir });
+  } catch (err) {
+    console.log('Error al clonar repositorio de skills:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });

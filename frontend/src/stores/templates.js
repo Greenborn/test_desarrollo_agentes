@@ -114,5 +114,12 @@ export const useTemplatesStore = defineStore('templates', () => {
     error.value = ''
   }
 
-  return { list, current, loading, error, fetchAll, fetchBySlug, create, update, remove, clearError }
+  function reset() {
+    list.value = []
+    current.value = null
+    loading.value = false
+    error.value = ''
+  }
+
+  return { list, current, loading, error, fetchAll, fetchBySlug, create, update, remove, clearError, reset }
 })

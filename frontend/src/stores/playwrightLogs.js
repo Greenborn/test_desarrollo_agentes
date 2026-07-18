@@ -204,6 +204,17 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
     }
   }
 
+  function reset() {
+    networkLogs.value = []
+    consoleLogs.value = []
+    events.value = []
+    recordings.value = []
+    recordingEvents.value = []
+    uncategorizedCount.value = 0
+    eventRecordingName.value = ''
+    loading.value = { network: false, console: false, events: false, recordings: false, recordingEvents: false }
+  }
+
   return {
     networkLogs,
     consoleLogs,
@@ -225,5 +236,6 @@ export const usePlaywrightLogsStore = defineStore('playwrightLogs', () => {
     updateRecording,
     cloneRecording,
     deleteRecording,
+    reset,
   }
 })

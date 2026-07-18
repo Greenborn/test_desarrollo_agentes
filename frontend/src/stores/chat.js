@@ -93,7 +93,7 @@ export const useChatStore = defineStore('chat', () => {
           fetch(`/api/procesos/terminal/${oldest.terminalId}`, {
             method: 'DELETE',
             credentials: 'include',
-          }).catch(() => {})
+          }).catch(err => console.error('Error al eliminar terminal antiguo:', err.message))
         }
       }
       const entry = { _key: _genTerminalKey(), terminalId: null, cwd: '', initCommand: '', label: 'terminal' }
@@ -147,7 +147,7 @@ export const useChatStore = defineStore('chat', () => {
         fetch(`/api/procesos/terminal/${oldest.terminalId}`, {
           method: 'DELETE',
           credentials: 'include',
-        }).catch(() => {})
+        }).catch(err => console.error('Error al eliminar terminal por límite:', err.message))
       }
     }
 
@@ -207,7 +207,7 @@ export const useChatStore = defineStore('chat', () => {
     return sid ? (_sessionCmdCount.value[sid] || 0) > 0 : false
   })
 
-  async function loadSessions() {
+  async function loadSessions(reloadMessages = true) {
     try {
       const res = await fetch(`${API}/chat/sessions`, { credentials: 'include' })
       const data = await res.json()
@@ -219,14 +219,15 @@ export const useChatStore = defineStore('chat', () => {
       }
       sessions.value = data.sessions
 
-      // Restore active session from sessionStorage
-      const savedId = sessionStorage.getItem(SESSION_KEY)
-      if (savedId) {
-        const exists = data.sessions.some(s => Number(s.id) === Number(savedId))
-        if (exists) {
-          loadMessages(Number(savedId))
-        } else {
-          sessionStorage.removeItem(SESSION_KEY)
+      if (reloadMessages) {
+        const savedId = sessionStorage.getItem(SESSION_KEY)
+        if (savedId) {
+          const exists = data.sessions.some(s => Number(s.id) === Number(savedId))
+          if (exists) {
+            loadMessages(Number(savedId))
+          } else {
+            sessionStorage.removeItem(SESSION_KEY)
+          }
         }
       }
     } catch (err) {
@@ -312,7 +313,11 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const toSave = [{ role: 'command', content: cmdRaw }]
       if (cmdResult !== undefined && cmdResult !== null) {
-        toSave.push({ role: 'result', content: String(cmdResult) })
+        if (typeof cmdResult === 'object' && cmdResult.role) {
+          if (cmdResult.role === 'opencode_control') return
+        } else {
+          toSave.push({ role: 'result', content: String(cmdResult) })
+        }
       }
       await fetch(`${API}/chat/sessions/${sid}/save-messages`, {
         method: 'POST',
@@ -491,6 +496,11 @@ export const useChatStore = defineStore('chat', () => {
     loadingMore.value = false
     hasMoreMessages.value = true
     oldestMessageId.value = null
+    if (!_streamingSessions.value[sessionId]) {
+      delete _sessionStreamCache.value[sessionId]
+      delete _ocSessionStreamCache.value[sessionId]
+      delete _cmdSessionStreamCache.value[sessionId]
+    }
     const cache = _sessionStreamCache.value[sessionId]
     if (cache && _streamingSessions.value[sessionId]) {
       currentChunk.value = cache.chunk || ''

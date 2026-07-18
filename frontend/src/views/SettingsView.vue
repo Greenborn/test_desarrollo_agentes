@@ -428,13 +428,46 @@
                 <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 85px;" placeholder="rama" v-model="envStore.list[i].branch" />
                 <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" style="flex: 1;" placeholder="descripción" v-model="envStore.list[i].description" />
                 <button class="btn btn-sm btn-outline-argentina py-0 px-1" @click="envStore.save(i, selectedWId)" title="Guardar">✓</button>
-                <button class="btn btn-sm btn-outline-danger py-0 px-1" @click="envStore.remove(i)" title="Eliminar" v-if="envStore.list[i].id">✕</button>
+                <button class="btn btn-sm btn-outline-danger py-0 px-1" @click="removeEnvironment(i)" title="Eliminar" v-if="envStore.list[i].id && deleteEnvIndex !== i">✕</button>
+                <span v-if="deleteEnvIndex === i" class="small text-warning ms-1">¿Eliminar?</span>
+                <button v-if="deleteEnvIndex === i" class="btn btn-sm btn-outline-danger py-0 px-1" @click="executeDeleteEnv(i)">Sí</button>
+                <button v-if="deleteEnvIndex === i" class="btn btn-sm btn-outline-secondary py-0 px-1" @click="cancelDeleteEnv()">No</button>
               </div>
               <div class="d-flex gap-1 mt-1 align-items-center">
                 <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 70px;" placeholder="nombre" v-model="newEnvName" />
                 <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary font-monospace" style="width: 85px;" placeholder="rama" v-model="newEnvBranch" />
                 <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" style="flex: 1;" placeholder="descripción" v-model="newEnvDescription" />
                 <button class="btn btn-sm btn-outline-argentina py-0 px-1" @click="addEnvironment">+ Agregar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col" v-if="cardHasVisible(['repositorio skills opencode config'])">
+        <div class="card bg-dark border-secondary h-100">
+          <div class="card-header bg-dark border-secondary py-2 px-3">
+            <h6 class="mb-0 fw-semibold">Repositorio de Skills</h6>
+          </div>
+          <div class="card-body d-flex flex-column gap-3">
+            <div v-if="matches('repositorio skills opencode config')">
+              <div class="small text-muted mb-1">URL del repositorio Git con skills y configuraciones de OpenCode</div>
+              <input
+                type="text"
+                class="form-control form-control-sm bg-dark text-light border-secondary font-monospace"
+                v-model="skillRepoUrlInput"
+                placeholder="https://github.com/usuario/repo-skills.git"
+              />
+              <div class="d-flex gap-2 mt-2">
+                <button class="btn btn-sm btn-argentina" @click="saveSkillRepoUrl" :disabled="cloningRepo">
+                  {{ cloningRepo ? 'Clonando...' : 'Guardar URL' }}
+                </button>
+                <button class="btn btn-sm btn-outline-argentina" @click="saveAndCloneSkillRepo" :disabled="cloningRepo">
+                  {{ cloningRepo ? 'Clonando...' : 'Guardar y Clonar' }}
+                </button>
+              </div>
+              <div v-if="repoCloneMessage" class="small mt-1" :class="repoCloneError ? 'text-danger' : 'text-success'">
+                {{ repoCloneMessage }}
               </div>
             </div>
           </div>
@@ -462,6 +495,7 @@ import { useAuthStore } from '../stores/auth.js'
 import { useModalStore } from '../stores/modal.js'
 import { useEnvironmentsStore } from '../stores/environments.js'
 import WorkspaceFormModal from '../components/modals/WorkspaceFormModal.vue'
+import AlertModal from '../components/modals/AlertModal.vue'
 
 export default {
   setup() {
@@ -516,6 +550,10 @@ export default {
     const selectedWId = ref(1)
     const wsMessage = ref('')
     const importInput = ref(null)
+    const skillRepoUrlInput = ref('')
+    const cloningRepo = ref(false)
+    const repoCloneMessage = ref('')
+    const repoCloneError = ref(false)
 
     function matches(label) {
       if (!searchTerm.value) return true
@@ -639,6 +677,10 @@ export default {
       }, { immediate: true })
     }
 
+    watch(() => settings.skillRepositoryUrl, (val) => {
+      skillRepoUrlInput.value = val
+    }, { immediate: true })
+
     async function reloadSettings() {
       settings.clearFeedback()
       await settings.load(selectedWId.value)
@@ -649,6 +691,41 @@ export default {
       const newId = selectedWId.value
       await settings.load(newId)
       await envStore.load(newId)
+    }
+
+    async function saveSkillRepoUrl() {
+      settings.clearFeedback()
+      await settings.save('skill_repository_url', skillRepoUrlInput.value, selectedWId.value)
+    }
+
+    async function saveAndCloneSkillRepo() {
+      settings.clearFeedback()
+      repoCloneMessage.value = ''
+      repoCloneError.value = false
+      await settings.save('skill_repository_url', skillRepoUrlInput.value, selectedWId.value)
+      cloningRepo.value = true
+      repoCloneMessage.value = 'Clonando repositorio...'
+      try {
+        const res = await fetch('/api/settings/clone-skill-repo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ workspace_id: selectedWId.value }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          repoCloneMessage.value = 'Repositorio clonado en opencode_dev/' + data.slug + '/'
+          repoCloneError.value = false
+        } else {
+          repoCloneMessage.value = data.error || 'Error al clonar'
+          repoCloneError.value = true
+        }
+      } catch (err) {
+        repoCloneMessage.value = 'Error de conexión al clonar'
+        repoCloneError.value = true
+      } finally {
+        cloningRepo.value = false
+      }
     }
 
     const deleteConfirmWs = ref(null)
@@ -880,6 +957,21 @@ export default {
       settings.save('screen_resolutions', JSON.stringify(valid), selectedWId.value)
     }
 
+    const deleteEnvIndex = ref(-1)
+
+    function removeEnvironment(index) {
+      deleteEnvIndex.value = index
+    }
+
+    function cancelDeleteEnv() {
+      deleteEnvIndex.value = -1
+    }
+
+    async function executeDeleteEnv(index) {
+      await envStore.remove(index)
+      deleteEnvIndex.value = -1
+    }
+
     async function addEnvironment() {
       await envStore.add({
         name: newEnvName.value.trim(),
@@ -1015,7 +1107,10 @@ export default {
       browserStealthInput, browserUserAgentChromeInput, browserUserAgentFirefoxInput,
       addResolution, removeResolution, resetResolutions, saveResolutions, matches, cardHasVisible,
       envStore, wsMessage,
-      onWorkspaceChange, openCreateModal, openEditModal, openDeleteConfirm, cancelDelete, executeDelete, deleteConfirmWs, deleting,
+      onWorkspaceChange,
+      skillRepoUrlInput, cloningRepo, repoCloneMessage, repoCloneError,
+      saveSkillRepoUrl, saveAndCloneSkillRepo,
+      openCreateModal, openEditModal, openDeleteConfirm, cancelDelete, executeDelete, deleteConfirmWs, deleting,
       exportAllConfig, handleImport, triggerImport, importInput,
       exportFullState, handleImportState, triggerImportState, importStateInput,
     }

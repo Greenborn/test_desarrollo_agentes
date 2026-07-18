@@ -12,7 +12,7 @@
           type="checkbox"
           role="switch"
           id="projectFilterSwitch"
-          v-model="projectFilterEnabled"
+          v-model="ui.projectFilterEnabled"
           :disabled="!sessionProjectId"
         />
         <label class="form-check-label small" for="projectFilterSwitch">Proyecto</label>
@@ -61,7 +61,6 @@ export default {
     const { pinnedProjectId } = storeToRefs(projectStore)
 
     const localFilter = ref('')
-    const projectFilterEnabled = ref(false)
 
     const sessionProjectId = computed(() => {
       const session = chatStore.sessions.find(s => s.id === chatStore.activeSessionId)
@@ -129,7 +128,7 @@ export default {
         })
       }
 
-      if (projectFilterEnabled.value && sessionProjectId.value) {
+      if (ui.projectFilterEnabled && sessionProjectId.value) {
         list = list.filter(t => t.proyecto_id === sessionProjectId.value)
       }
 
@@ -144,7 +143,7 @@ export default {
       priorityName,
       ticketPriorityClass,
       priorityTextClass,
-      projectFilterEnabled,
+      ui,
       sessionProjectId,
     }
   },

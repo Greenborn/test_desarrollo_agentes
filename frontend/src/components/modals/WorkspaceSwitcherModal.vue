@@ -17,6 +17,21 @@
     <div v-if="workspaces.length === 0" class="text-muted text-center small py-3">
       No hay espacios de trabajo adicionales.
     </div>
+
+    <div v-if="showConfirm" class="border border-warning rounded p-2 mt-1">
+      <div class="small text-warning mb-2">
+        Se detendrán todos los procesos en ejecución. ¿Desea cambiar los espacios de trabajo?
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-warning flex-grow-1" @click="confirmChange" :disabled="saving">
+          Sí, cambiar
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" @click="cancelChange">
+          Cancelar
+        </button>
+      </div>
+    </div>
+
     <div class="d-flex gap-2 mt-2">
       <button class="btn btn-argentina flex-grow-1" :disabled="saving" @click="applySelection">
         {{ saving ? 'Guardando...' : 'Aplicar' }}
@@ -46,6 +61,8 @@ export default {
     const chatStore = useChatStore()
     const { workspaces } = storeToRefs(wsStore)
     const saving = ref(false)
+    const showConfirm = ref(false)
+    const pendingIds = ref([])
 
     const selected = ref([...auth.getWorkspaceIds()])
 
@@ -63,7 +80,7 @@ export default {
     }
 
     async function applySelection() {
-      let ids = [...selected.value]
+      const ids = [...selected.value]
       if (ids.length === 0) {
         modal.open(AlertModal, { message: 'Debe seleccionar al menos un espacio de trabajo.' }, { title: 'Aviso' })
         return
@@ -71,10 +88,26 @@ export default {
 
       const hasProcesses = chatStore.executing || chatStore.streaming
       if (hasProcesses && ids.length !== auth.getWorkspaceIds().length) {
-        const confirmed = confirm('Se detendrán todos los procesos en ejecución. ¿Desea cambiar los espacios de trabajo?')
-        if (!confirmed) return
+        pendingIds.value = ids
+        showConfirm.value = true
+        return
       }
 
+      await doApply(ids)
+    }
+
+    async function confirmChange() {
+      showConfirm.value = false
+      await doApply(pendingIds.value)
+      pendingIds.value = []
+    }
+
+    function cancelChange() {
+      showConfirm.value = false
+      pendingIds.value = []
+    }
+
+    async function doApply(ids) {
       saving.value = true
       const result = await wsStore.selectWorkspaces(ids)
       if (result.success) {
@@ -86,7 +119,7 @@ export default {
       saving.value = false
     }
 
-    return { workspaces, selected, saving, isSelected, toggleWorkspace, applySelection }
+    return { workspaces, selected, saving, isSelected, toggleWorkspace, applySelection, showConfirm, confirmChange, cancelChange }
   },
 }
 </script>

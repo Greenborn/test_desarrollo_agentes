@@ -19,13 +19,15 @@ export default {
 
     onMounted(() => {
       if (auth.user) {
-        settings.load()
+        const wsId = auth.getPrimaryWorkspaceId()
+        settings.load(wsId)
       }
     })
 
     watch(() => auth.user, (user) => {
       if (user) {
-        settings.load()
+        const wsId = auth.getPrimaryWorkspaceId()
+        settings.load(wsId)
       }
     })
   },

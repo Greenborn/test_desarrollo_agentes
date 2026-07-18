@@ -27,5 +27,10 @@ export const useTicketStore = defineStore('ticket', () => {
     selectedTicket.value = null
   }
 
-  return { tickets, selectedTicket, loadTickets, selectTicket, clearSelection }
+  function reset() {
+    tickets.value = []
+    selectedTicket.value = null
+  }
+
+  return { tickets, selectedTicket, loadTickets, selectTicket, clearSelection, reset }
 })

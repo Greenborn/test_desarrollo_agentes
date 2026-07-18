@@ -1,7 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { useTicketStore } from './ticket.js'
-import { useProjectStore } from './project.js'
 import wsClient from '../services/wsClient.js'
 
 const API = '/api'
@@ -41,14 +39,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   const activeWorkspaceId = computed(() => {
     if (!user.value) return 1
-    const ticketStore = useTicketStore()
-    if (ticketStore.selectedTicket?.workspace_id) {
-      return ticketStore.selectedTicket.workspace_id
-    }
-    const projectStore = useProjectStore()
-    if (projectStore.selectedProject?.workspace_id) {
-      return projectStore.selectedProject.workspace_id
-    }
     return getPrimaryWorkspaceId()
   })
 
@@ -107,6 +97,9 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     loading.value = false
     document.cookie = 'session_token=; path=/; max-age=0; SameSite=Lax'
+    sessionStorage.removeItem('oc_active_session_id')
+    const { resetAllStores } = await import('../composables/useResetAllStores.js')
+    await resetAllStores()
   }
 
   return { user, loading, error, getSessionToken, getWorkspaceIds, getPrimaryWorkspaceId, activeWorkspaceId, forceLogout, setWorkspaceIds, login, logout, checkSession }

@@ -76,5 +76,13 @@ export const useServiciosStore = defineStore('servicios', () => {
     }
   }
 
-  return { services, loading, restarting, restartingAll, fetchServices, restartService, restartAllServices, startPolling, stopPolling }
+  function reset() {
+    stopPolling()
+    services.value = []
+    loading.value = false
+    restarting.value = null
+    restartingAll.value = false
+  }
+
+  return { services, loading, restarting, restartingAll, fetchServices, restartService, restartAllServices, startPolling, stopPolling, reset }
 })

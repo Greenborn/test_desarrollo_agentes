@@ -119,9 +119,15 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
+  function reset() {
+    workspaces.value = []
+    selectedIds.value = [1]
+    loading.value = false
+  }
+
   return {
     workspaces, selectedIds, loading,
     loadWorkspaces, selectWorkspaces, getPrimaryWorkspaceId, createWorkspace,
-    updateWorkspace, deleteWorkspace, stopAllProcesses,
+    updateWorkspace, deleteWorkspace, stopAllProcesses, reset,
   }
 })

@@ -1,9 +1,17 @@
 import { Router } from 'express';
 import { EventEmitter } from 'events';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { fileURLToPath } from 'url';
 import zlib from 'zlib';
 import db from '../config/db.js';
 import opencode from '../services/opencode.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const OPENCODE_DEV_DIR = path.resolve(__dirname, '../../../opencode_dev');
 const router = Router();
 const controlEmitter = new EventEmitter();
 controlEmitter.setMaxListeners(100);
@@ -58,6 +66,138 @@ async function saveLongMessage(sessionId, role, content, extraFields = {}) {
   await db('chat_messages').insert(inserts);
 }
 
+function getRepoSkillPaths(repoDir) {
+  const configPath = path.join(repoDir, '.opencode', 'opencode.json')
+  const defaultPaths = ['.opencode/skills', '.agents/skills']
+  try {
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+      if (Array.isArray(config.skills?.paths) && config.skills.paths.length > 0) {
+        return config.skills.paths
+      }
+    }
+  } catch (e) {
+    console.log('[opencode] Error reading repo opencode config:', e.message)
+  }
+  return defaultPaths
+}
+
+async function mergeWorkspaceSkillPaths(cwd, workspaceIds) {
+  if (!workspaceIds || workspaceIds.length === 0) return
+
+  const projectRoot = path.resolve(__dirname, '../../..')
+
+  const targets = new Set()
+  targets.add(cwd)
+  targets.add(projectRoot)
+
+  for (const target of targets) {
+    const configDir = path.join(target, '.opencode')
+    const configPath = path.join(configDir, 'opencode.json')
+
+    let config = { skills: { paths: [] } }
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+      } catch (e) {
+        console.log('[opencode] Error reading opencode config for merge:', e.message)
+      }
+    }
+
+    if (!config.skills) config.skills = {}
+    if (!Array.isArray(config.skills.paths)) config.skills.paths = []
+
+    const existingPaths = new Set(config.skills.paths)
+    let changed = false
+
+    for (const wsId of workspaceIds) {
+      const ws = await db('workspaces').where({ id: wsId }).select('slug').first()
+      if (!ws || !ws.slug) continue
+
+      const repoDir = path.join(OPENCODE_DEV_DIR, ws.slug)
+      if (!fs.existsSync(repoDir)) continue
+
+      const paths = getRepoSkillPaths(repoDir)
+      for (const relPath of paths) {
+        const absPath = path.resolve(repoDir, relPath)
+        if (fs.existsSync(absPath)) {
+          if (!existingPaths.has(absPath)) {
+            config.skills.paths.push(absPath)
+            existingPaths.add(absPath)
+            changed = true
+          }
+        }
+      }
+    }
+
+    // También inyectar los paths de skills del proyecto raíz (ej: .agents/skills)
+    // para que estén disponibles para agentes spawneados desde workspaces
+    const rootPaths = getRepoSkillPaths(projectRoot)
+    for (const relPath of rootPaths) {
+      const absPath = path.resolve(projectRoot, relPath)
+      if (fs.existsSync(absPath) && !existingPaths.has(absPath)) {
+        config.skills.paths.push(absPath)
+        existingPaths.add(absPath)
+        changed = true
+      }
+    }
+
+    if (changed) {
+      if (!fs.existsSync(configDir)) {
+        fs.mkdirSync(configDir, { recursive: true })
+      }
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
+      console.log(`[opencode] Workspace skill paths merged into ${target}/.opencode/opencode.json`)
+    }
+  }
+}
+
+const MAX_SKILL_CHARS = 4000
+
+async function loadWorkspaceSkillContents(workspaceId) {
+  if (!workspaceId) return []
+  const result = []
+
+  const ws = await db('workspaces').where({ id: workspaceId }).select('slug').first()
+  if (!ws || !ws.slug) return result
+
+  const repoDir = path.join(OPENCODE_DEV_DIR, ws.slug)
+  if (!fs.existsSync(repoDir)) return result
+
+  const paths = getRepoSkillPaths(repoDir)
+  const scanned = new Set()
+
+  for (const relPath of paths) {
+    const dir = path.resolve(repoDir, relPath)
+    if (!fs.existsSync(dir)) continue
+
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
+    for (const entry of entries) {
+      let skillPath = null
+      let skillName = null
+
+      if (entry.isDirectory()) {
+        skillPath = path.join(dir, entry.name, 'SKILL.md')
+        skillName = entry.name
+      } else if (entry.isFile() && entry.name.endsWith('.md') && entry.name !== 'SKILL.md') {
+        skillPath = path.join(dir, entry.name)
+        skillName = entry.name.slice(0, -3)
+      }
+
+      if (skillPath && fs.existsSync(skillPath) && !scanned.has(skillName)) {
+        scanned.add(skillName)
+        let content = fs.readFileSync(skillPath, 'utf-8')
+        if (content.length > MAX_SKILL_CHARS) {
+          content = content.slice(0, MAX_SKILL_CHARS) + '\n\n[...truncado...]'
+        }
+        result.push(`[SKILL DE AMBIENTE: ${skillName}]\n${content}\n[/SKILL]`)
+      }
+    }
+  }
+
+  return result
+}
+
 router.get('/start', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
@@ -71,6 +211,7 @@ router.get('/start', async (req, res) => {
     const wsId = wsIds[0] || 1;
     const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
+    await mergeWorkspaceSkillPaths(cwd, req.session.workspaceIds);
     const providerData = await opencode.getModels(cwd, sessionId || null, locale);
     let savedProvider = await getUserSetting(req.session.userId, 'opencode_last_provider');
     let savedModel = await getUserSetting(req.session.userId, 'opencode_last_model');
@@ -151,6 +292,7 @@ router.post('/send', async (req, res) => {
     const wsId = wsIds[0] || 1;
     const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
+    await mergeWorkspaceSkillPaths(cwd, req.session.workspaceIds);
     const server = await opencode.getOrStartServer(cwd, sessionId, locale);
 
     const agentName = mode === 'Plan' ? 'plan' : 'build';
@@ -273,6 +415,17 @@ router.post('/send', async (req, res) => {
       { type: 'text', text: dirInstruction },
       { type: 'text', text: finalInstruction },
     ];
+
+    // Inject workspace skill contents as instructions for the session's workspace
+    let sessionWsId = null
+    if (sessionId) {
+      const sess = await db('chat_sessions').where({ id: sessionId }).select('workspace_id').first()
+      if (sess && sess.workspace_id) sessionWsId = sess.workspace_id
+    }
+    const wsSkillParts = await loadWorkspaceSkillContents(sessionWsId)
+    for (const sp of wsSkillParts) {
+      parts.push({ type: 'text', text: sp })
+    }
 
     parts.push({ type: 'text', text: prompt });
 
@@ -483,6 +636,7 @@ router.post('/editor-start', async (req, res) => {
     const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
 
+    await mergeWorkspaceSkillPaths(cwd, req.session.workspaceIds);
     const serverKey = `editor_${cwd}`;
     const providerData = await opencode.getModels(cwd, null, locale, serverKey);
 
@@ -508,6 +662,7 @@ router.post('/editor-send', async (req, res) => {
     const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
 
+    await mergeWorkspaceSkillPaths(cwd, req.session.workspaceIds);
     const serverKey = `editor_${cwd}`;
     const server = await opencode.getOrStartServer(cwd, null, locale, serverKey);
 
@@ -570,6 +725,13 @@ router.post('/editor-send', async (req, res) => {
       { type: 'text', text: dirInstruction },
       { type: 'text', text: finalInstruction },
     ];
+
+    // Inject workspace skills for editor (use first session workspaceId as fallback)
+    const editorWsId = req.session?.workspaceIds?.[0] || null
+    const editorSkillParts = await loadWorkspaceSkillContents(editorWsId)
+    for (const sp of editorSkillParts) {
+      parts.push({ type: 'text', text: sp })
+    }
 
     parts.push({ type: 'text', text: prompt });
 
@@ -782,6 +944,104 @@ router.get('/test-image', async (req, res) => {
     console.log('Error en opencode/test-image:', err.message);
     if (!res.headersSent) res.status(500).json({ error: err.message });
     else res.end();
+  }
+});
+
+router.post('/register-skills-global', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { slug } = req.body;
+
+  try {
+    const globalConfigDir = path.join(os.homedir(), '.config', 'opencode');
+    const globalConfigPath = path.join(globalConfigDir, 'opencode.json');
+
+    let config = {};
+    if (fs.existsSync(globalConfigPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(globalConfigPath, 'utf-8'));
+      } catch (parseErr) {
+        console.log('[opencode] Error parseando config global, se sobrescribirá:', parseErr.message);
+      }
+    }
+    if (!config.skills) config.skills = {};
+    if (!Array.isArray(config.skills.paths)) config.skills.paths = [];
+
+    const existingPaths = new Set(config.skills.paths);
+    const projectRoot = path.resolve(__dirname, '../../..');
+    let changed = false;
+
+    let workspaces;
+    if (slug) {
+      const ws = await db('workspaces').where({ slug }).first();
+      if (!ws) {
+        return res.status(404).json({ error: `Workspace con slug "${slug}" no encontrado` });
+      }
+      workspaces = [ws];
+    } else {
+      workspaces = await db('workspaces').select('*');
+    }
+
+    for (const ws of workspaces) {
+      const repoDir = path.join(OPENCODE_DEV_DIR, ws.slug);
+      if (!fs.existsSync(repoDir)) {
+        console.log(`[opencode] Workspace ${ws.slug}: repo dir no encontrado en ${repoDir}`);
+        continue;
+      }
+
+      const skillPaths = getRepoSkillPaths(repoDir);
+      for (const relPath of skillPaths) {
+        const absPath = path.resolve(repoDir, relPath);
+        if (fs.existsSync(absPath) && !existingPaths.has(absPath)) {
+          config.skills.paths.push(absPath);
+          existingPaths.add(absPath);
+          changed = true;
+        }
+      }
+    }
+
+    // También registrar paths de skills del proyecto raíz
+    const rootPaths = getRepoSkillPaths(projectRoot);
+    for (const relPath of rootPaths) {
+      const absPath = path.resolve(projectRoot, relPath);
+      if (fs.existsSync(absPath) && !existingPaths.has(absPath)) {
+        config.skills.paths.push(absPath);
+        existingPaths.add(absPath);
+        changed = true;
+      }
+    }
+
+    // Siempre incluir .agents/skills explícitamente
+    const agentsSkillsPath = path.resolve(projectRoot, '.agents', 'skills');
+    if (fs.existsSync(agentsSkillsPath) && !existingPaths.has(agentsSkillsPath)) {
+      config.skills.paths.push(agentsSkillsPath);
+      existingPaths.add(agentsSkillsPath);
+      changed = true;
+    }
+
+    if (!changed) {
+      return res.json({
+        success: true,
+        message: 'Todos los paths de skills ya estaban registrados en la configuración global.',
+        config,
+      });
+    }
+
+    if (!fs.existsSync(globalConfigDir)) {
+      fs.mkdirSync(globalConfigDir, { recursive: true });
+    }
+    config.$schema = 'https://opencode.ai/config.json';
+    fs.writeFileSync(globalConfigPath, JSON.stringify(config, null, 2), 'utf-8');
+
+    console.log(`[opencode] Skills globales actualizados en ${globalConfigPath}`);
+    res.json({
+      success: true,
+      message: `Skills registrados en la configuración global de OpenCode.`,
+      config,
+    });
+  } catch (err) {
+    console.log('Error en opencode/register-skills-global:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -25,7 +25,12 @@ router.beforeEach(async (to, from, next) => {
         if (userData && userData.id) {
           auth.user = userData
           auth.loading = false
-          wsClient.connect().catch(() => {})
+          try {
+            await wsClient.connect()
+            await auth.checkSession()
+          } catch (wsErr) {
+            console.error('Error conectando WebSocket:', wsErr.message)
+          }
         } else {
           auth.loading = false
           return next('/')

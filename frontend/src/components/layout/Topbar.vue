@@ -40,7 +40,6 @@ import wsClient from '../../services/wsClient.js'
 import TicketInfoBar from '../chat/TicketInfoBar.vue'
 import LayoutControls from './LayoutControls.vue'
 import HelpContent from '../help/HelpModal.vue'
-import CrearProyectoModal from '../projects/CrearProyectoModal.vue'
 import WorkspaceSwitcherModal from '../modals/WorkspaceSwitcherModal.vue'
 import SettingsView from '../../views/SettingsView.vue'
 
@@ -351,7 +350,7 @@ export default {
     register({
       name: '/chat_set_proyecto',
       category: 'Proyecto',
-      description: 'Asigna un proyecto a la sesión actual, o crea uno nuevo si se invoca sin parámetros.',
+      description: 'Asigna un proyecto a la sesión actual. Sin --id muestra un selector de proyectos del workspace de la sesión.',
       usage: '/chat_set_proyecto [--id=&lt;id_proyecto&gt;]',
         async autocomplete(args, cmdStore) {
           const usedFlags = getUsedFlags(args)
@@ -392,7 +391,38 @@ export default {
         const { params } = parseCommandArgs(args, { id: { required: false } })
         const proyectoId = params.id
         if (!proyectoId) {
-          modal.open(CrearProyectoModal, {}, { title: 'Nuevo Proyecto' })
+          const session = chatStore.sessions.find(s => Number(s.id) === Number(sessionId))
+          if (!session || !session.workspace_id) {
+            return 'Error: La sesión no tiene un espacio de trabajo asignado. Seleccioná un workspace primero con el selector de la sesión o con /chat_set_workspace.'
+          }
+          try {
+            const res = await fetch('/api/proyecto', { credentials: 'include' })
+            const data = await res.json()
+            let proyectos = data.proyectos || []
+            proyectos = proyectos.filter(p => Number(p.workspace_id) === Number(session.workspace_id))
+            if (proyectos.length === 0) {
+              return 'No hay proyectos disponibles en este espacio de trabajo. Podés crear uno con /redmine_crear_proyecto o importarlos con /redmine_importar_proyectos.'
+            }
+            const options = proyectos.map(p => ({
+              label: `${p.id} — ${p.descripcion || ''}`,
+              value: p.id,
+            }))
+            chatStore.pushMessage({
+              role: 'opencode_control',
+              controlData: {
+                controlId: 'chsetproj-' + Date.now(),
+                controlType: 'select',
+                stepType: 'chat_set_proyecto',
+                question: 'Selecciona un proyecto:',
+                options,
+                placeholder: 'Selecciona proyecto...',
+              },
+              _key: 'ctrl-chsetproj-' + Date.now(),
+            })
+          } catch (err) {
+            console.error('Error al obtener proyectos:', err)
+            return 'Error al obtener proyectos.'
+          }
           return
         }
         try {

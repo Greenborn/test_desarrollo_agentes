@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { settingSet, settingGet } from '../services/settingService.js'
 
 export const useUiStore = defineStore('ui', () => {
@@ -18,6 +18,7 @@ export const useUiStore = defineStore('ui', () => {
   const sidebarRightTab = ref('comentarios')
   const devPanelTab = ref('instancias')
   const ocMaximized = ref(false)
+  const projectFilterEnabled = ref(true)
 
   function toggleSidebar() {
     sidebarCollapsed.value = !sidebarCollapsed.value
@@ -78,6 +79,7 @@ export const useUiStore = defineStore('ui', () => {
         settingSet('sidebar_right_tab', sidebarRightTab.value),
         settingSet('dev_panel_tab', devPanelTab.value),
         settingSet('oc_maximized', String(ocMaximized.value)),
+        settingSet('project_filter_enabled', String(projectFilterEnabled.value)),
       ])
     } catch (err) {
       console.error('Error saving layout preferences:', err)
@@ -86,7 +88,7 @@ export const useUiStore = defineStore('ui', () => {
 
   async function loadLayoutPrefs() {
     try {
-      const [sidebarData, widthData, panelData, heightData, rightCollapsedData, rightWidthData, recordingListData, centralPanelData, sidebarWidthPctData, sidebarChatTabData, sidebarRightTabData, devPanelTabData, ocMaximizedData] = await Promise.all([
+      const [sidebarData, widthData, panelData, heightData, rightCollapsedData, rightWidthData, recordingListData, centralPanelData, sidebarWidthPctData, sidebarChatTabData, sidebarRightTabData, devPanelTabData, ocMaximizedData, projectFilterData] = await Promise.all([
         settingGet('sidebar_collapsed'),
         settingGet('sidebar_width'),
         settingGet('panel_collapsed'),
@@ -100,6 +102,7 @@ export const useUiStore = defineStore('ui', () => {
         settingGet('sidebar_right_tab'),
         settingGet('dev_panel_tab'),
         settingGet('oc_maximized'),
+        settingGet('project_filter_enabled'),
       ])
       if (sidebarData.value !== null) {
         sidebarCollapsed.value = sidebarData.value === 'true'
@@ -161,10 +164,35 @@ export const useUiStore = defineStore('ui', () => {
       if (ocMaximizedData.value !== null) {
         ocMaximized.value = ocMaximizedData.value === 'true'
       }
+      if (projectFilterData.value !== null) {
+        projectFilterEnabled.value = projectFilterData.value === 'true'
+      }
     } catch (err) {
       console.error('Error loading layout preferences:', err)
     }
   }
 
-  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, omnifilter, rightPanelCollapsed, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarWidthPct, sidebarChatTab, sidebarRightTab, devPanelTab, ocMaximized, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setSidebarWidthPct, setOmnifilter, toggleOcMaximized, saveLayoutPrefs, loadLayoutPrefs }
+  watch(projectFilterEnabled, () => {
+    saveLayoutPrefs()
+  })
+
+  function reset() {
+    sidebarCollapsed.value = false
+    sidebarWidth.value = 220
+    panelCollapsed.value = false
+    panelHeight.value = 250
+    rightPanelCollapsed.value = true
+    rightPanelWidth.value = 220
+    recordingListWidth.value = 220
+    centralPanelCollapsed.value = false
+    sidebarWidthPct.value = 50
+    omnifilter.value = ''
+    sidebarChatTab.value = 'chats'
+    sidebarRightTab.value = 'comentarios'
+    devPanelTab.value = 'instancias'
+    ocMaximized.value = false
+    projectFilterEnabled.value = true
+  }
+
+  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, omnifilter, rightPanelCollapsed, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarWidthPct, sidebarChatTab, sidebarRightTab, devPanelTab, ocMaximized, projectFilterEnabled, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setSidebarWidthPct, setOmnifilter, toggleOcMaximized, saveLayoutPrefs, loadLayoutPrefs, reset }
 })

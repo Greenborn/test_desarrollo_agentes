@@ -6,7 +6,10 @@
     <template v-else>
       <div class="skills-header d-flex align-items-center px-2 py-1 flex-shrink-0 gap-2" style="border-bottom: 1px solid #374151;">
         <span class="small text-light fw-semibold">Skills</span>
-        <button class="btn btn-sm btn-outline-argentina ms-auto py-0 px-2" style="font-size: 0.65rem;" @click="crearSkill">+ Nuevo</button>
+        <div class="ms-auto d-flex gap-1">
+          <button class="btn btn-sm btn-outline-argentina py-0 px-2" style="font-size: 0.65rem;" @click="crearSkill('project')">+ Nuevo</button>
+          <button v-if="hasWorkspaceRepo" class="btn btn-sm btn-outline-info py-0 px-2" style="font-size: 0.65rem;" @click="crearSkill('workspace')">+ Ambiente</button>
+        </div>
       </div>
       <div class="d-flex flex-grow-1 overflow-hidden" style="min-height: 0;">
         <div class="skills-list flex-shrink-0 overflow-y-auto" style="width: 120px; border-right: 1px solid #374151; background: #16213e;">
@@ -16,10 +19,11 @@
           <div v-else-if="skills.length === 0" class="d-flex align-items-center justify-content-center text-secondary small px-2 py-4 text-center">
             <span>Sin skills</span>
           </div>
-          <div v-for="s in skills" :key="s.name" class="skill-item d-flex align-items-center px-2 py-1 small"
+          <div v-for="s in skills" :key="s.name" class="skill-item d-flex align-items-center px-2 py-1 small gap-1"
             :class="{ selected: selectedSkill?.name === s.name }"
             @click="selectSkill(s)" role="button">
-            <span class="text-truncate">{{ s.name }}</span>
+            <span class="text-truncate flex-shrink-1">{{ s.name }}</span>
+            <span v-if="s.source === 'workspace'" class="badge flex-shrink-0" style="font-size:0.5rem; background:#1a5fb4; color:#fff; line-height:1.2;">Ambiente</span>
           </div>
         </div>
         <div class="skills-editor-agent d-flex flex-grow-1 overflow-hidden">
@@ -114,6 +118,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useModalStore } from '../../../stores/modal.js'
+import { useWorkspaceStore } from '../../../stores/workspace.js'
 import { settingSet, settingGet } from '../../../services/settingService.js'
 import ChatFormatter from '../../../components/chat/ChatFormatter.vue'
 import AlertModal from '../../../components/modals/AlertModal.vue'
@@ -127,6 +132,7 @@ export default {
   setup() {
     const chat = useChatStore()
     const modal = useModalStore()
+    const wsStore = useWorkspaceStore()
     const { sessions, activeSessionId } = storeToRefs(chat)
 
     const activeSession = computed(() => {
@@ -134,6 +140,7 @@ export default {
     })
 
     const cwd = computed(() => activeSession.value?.cwd || null)
+    const workspaceIds = computed(() => wsStore.selectedIds)
 
 const skills = ref([])
 const loadingSkills = ref(false)
@@ -282,6 +289,8 @@ function resetAgentState() {
       document.body.style.userSelect = 'none'
     }
 
+    const hasWorkspaceRepo = ref(false)
+
     async function cargarSkills() {
       if (!cwd.value) {
         skills.value = []
@@ -289,11 +298,10 @@ function resetAgentState() {
       }
       loadingSkills.value = true
       try {
-        const res = await fetch(`/api/skills/list?cwd=${encodeURIComponent(cwd.value)}`, {
-          credentials: 'include',
-        })
+        const res = await fetch(`/api/skills/list?cwd=${encodeURIComponent(cwd.value)}`, { credentials: 'include' })
         const data = await res.json()
         skills.value = data.skills || []
+        hasWorkspaceRepo.value = data.hasWorkspaceRepo || false
       } catch (err) {
         console.error('Error al cargar skills:', err)
         skills.value = []
@@ -347,16 +355,21 @@ function resetAgentState() {
       }
     }
 
-    async function crearSkill() {
+    async function crearSkill(target) {
       if (!cwd.value) return
-      const name = prompt('Nombre del nuevo skill:')
+      const label = target === 'workspace' ? 'del ambiente' : 'del proyecto'
+      const name = prompt(`Nombre del nuevo skill ${label}:`)
       if (!name || !name.trim()) return
       try {
+        const body = { name: name.trim(), cwd: cwd.value, target }
+        if (target === 'workspace' && workspaceIds.value.length > 0) {
+          body.workspace_id = workspaceIds.value[0]
+        }
         const res = await fetch('/api/skills/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ name: name.trim(), cwd: cwd.value }),
+          body: JSON.stringify(body),
         })
         const data = await res.json()
         if (data.success) {
@@ -632,6 +645,7 @@ ${text}`
       agentWidth, skillsEditorMinWidth,
       agentReady, agentStarting, agentMessages, agentPrompt,
       agentStreaming, agentStreamText, agentThinkingText, thinkingExpanded,
+      hasWorkspaceRepo,
       selectSkill, guardarSkill, crearSkill,
       iniciarAgente, enviarAgente, detenerAgente, finalizarAgente,
       onAgentSplitStart, renderMsg,

@@ -173,6 +173,9 @@ export function useControlHandlers(api) {
     } else if (stepType === 'new_session_ticket') {
       await handleNewSessionTicket(controlId, value, controlMsg)
       return
+    } else if (stepType === 'chat_set_proyecto') {
+      await handleChatSetProyecto(controlId, value, controlMsg)
+      return
     } else if (controlType === 'descripcion_result') {
       if (value === null) {
         const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
@@ -523,12 +526,16 @@ export function useControlHandlers(api) {
             }
             const projectStore = (await import('../stores/project.js')).useProjectStore()
             projectStore.loadProjects()
-            await chat.loadSessions()
+            const resultContent = '✓ Proyecto "' + data.proyecto.id + '" creado correctamente en Redmine (#' + data.proyecto.redmine_id + ').'
             chat.messages[idx] = {
               role: 'result',
-              content: '✓ Proyecto "' + data.proyecto.id + '" creado correctamente en Redmine (#' + data.proyecto.redmine_id + ').',
+              content: resultContent,
               _key: 'result-' + Date.now(),
             }
+            if (chat.activeSessionId) {
+              chat._saveMessageToDb(chat.activeSessionId, { role: 'result', content: resultContent })
+            }
+            await chat.loadSessions(false)
           } else {
             chat.messages[idx] = {
               role: 'result',
@@ -2164,18 +2171,26 @@ export function useControlHandlers(api) {
           label: `${p.id} — ${p.descripcion || ''}`,
           value: p.id,
         }))
-        chat.pushMessage({
-          role: 'opencode_control',
-          controlData: {
-            controlId: 'setup-proj-' + Date.now(),
-            controlType: 'select',
-            stepType: 'new_session_project',
-            question: '2. Selecciona un proyecto:',
-            options: projOptions,
-            placeholder: 'Selecciona proyecto...',
-          },
-          _key: 'ctrl-setup-proj-' + Date.now(),
-        })
+        if (projOptions.length > 0) {
+          chat.pushMessage({
+            role: 'opencode_control',
+            controlData: {
+              controlId: 'setup-proj-' + Date.now(),
+              controlType: 'select',
+              stepType: 'new_session_project',
+              question: '2. Selecciona un proyecto:',
+              options: projOptions,
+              placeholder: 'Selecciona proyecto...',
+            },
+            _key: 'ctrl-setup-proj-' + Date.now(),
+          })
+        } else {
+          chat.pushMessage({
+            role: 'opencode_info',
+            content: JSON.stringify({ type: 'info', message: 'No hay proyectos en este espacio de trabajo. Podés usar /chat_set_proyecto o /redmine_importar_proyectos para crear o importar uno.' }),
+            _key: 'info-noproj-' + Date.now(),
+          })
+        }
       }
     } catch (err) {
       console.error('Error al asignar workspace en setup:', err)
@@ -2264,6 +2279,37 @@ export function useControlHandlers(api) {
       const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
       if (idx >= 0) {
         chat.messages[idx] = { role: 'result', content: 'Error al asignar ticket: ' + err.message, _key: 'err-' + Date.now() }
+      }
+    }
+  }
+
+  async function handleChatSetProyecto(controlId, value, controlMsg) {
+    try {
+      const res = await fetch('/api/proyecto/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ sessionId: chat.activeSessionId, proyectoId: value }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        if (data.workspaceIds) {
+          const workspaceStore = useWorkspaceStore()
+          const auth = useAuthStore()
+          workspaceStore.selectedIds = data.workspaceIds
+          auth.setWorkspaceIds(data.workspaceIds)
+        }
+        await chat.loadSessions()
+        const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
+        if (idx >= 0) {
+          chat.messages[idx] = { role: 'opencode_confirmed', content: `Proyecto "${value}" seleccionado.`, _key: 'confirmed-' + Date.now() }
+        }
+      }
+    } catch (err) {
+      console.error('Error al asignar proyecto:', err)
+      const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
+      if (idx >= 0) {
+        chat.messages[idx] = { role: 'result', content: 'Error al asignar proyecto: ' + err.message, _key: 'err-' + Date.now() }
       }
     }
   }

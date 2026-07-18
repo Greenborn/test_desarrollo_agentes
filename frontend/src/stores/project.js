@@ -81,5 +81,11 @@ export const useProjectStore = defineStore('project', () => {
     return list
   }
 
-  return { projects, selectedProject, pinnedProjectId, loadProjects, togglePin, selectProject, clearSelection, updateProjectColor }
+  function reset() {
+    projects.value = []
+    selectedProject.value = null
+    pinnedProjectId.value = null
+  }
+
+  return { projects, selectedProject, pinnedProjectId, loadProjects, togglePin, selectProject, clearSelection, updateProjectColor, reset }
 })

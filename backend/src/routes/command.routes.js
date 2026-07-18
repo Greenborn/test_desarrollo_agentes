@@ -303,10 +303,17 @@ router.post('/git', async (req, res) => {
 
     try {
       const commitMessage = req.body.commitMessage
+      const execOptions = {
+        cwd,
+        encoding: 'utf-8',
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 30000,
+        env: { ...process.env, GIT_PAGER: 'cat', PAGER: 'cat' },
+      }
       if (commitMessage && command.startsWith('commit')) {
-        stdout = execSync(`git ${command} -F -`, { cwd, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024, input: commitMessage })
+        stdout = execSync(`git ${command} -F -`, { ...execOptions, input: commitMessage })
       } else {
-        stdout = execSync(`git ${command}`, { cwd, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 })
+        stdout = execSync(`git ${command}`, execOptions)
       }
       success = true;
     } catch (err) {

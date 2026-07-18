@@ -29,5 +29,10 @@ export const useAttachmentsStore = defineStore('attachments', () => {
     items.value = []
   }
 
-  return { items, loading, fetchByTicket, clear }
+  function reset() {
+    items.value = []
+    loading.value = false
+  }
+
+  return { items, loading, fetchByTicket, clear, reset }
 })

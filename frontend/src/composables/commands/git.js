@@ -24,7 +24,14 @@ register({
         credentials: 'include',
         body: JSON.stringify({ command, sessionId }),
       });
-      const data = await res.json();
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Respuesta vacía o inválida del servidor (status ${res.status}): "${text.slice(0, 200)}". El comando git puede haber tardado demasiado o requerido entrada interactiva.`);
+      }
 
       if (data.success) {
         return data.stdout || '(sin salida)';

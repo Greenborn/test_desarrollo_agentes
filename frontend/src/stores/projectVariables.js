@@ -85,5 +85,10 @@ export const useProjectVariablesStore = defineStore('projectVariables', () => {
     if (idx !== -1) list.splice(idx, 1)
   }
 
-  return { variablesByProject, loadingByProject, loadVariables, clearVariables, saveVariable, deleteVariable }
+  function reset() {
+    variablesByProject.value = {}
+    loadingByProject.value = {}
+  }
+
+  return { variablesByProject, loadingByProject, loadVariables, clearVariables, saveVariable, deleteVariable, reset }
 })

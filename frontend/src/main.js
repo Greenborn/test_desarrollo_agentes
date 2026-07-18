@@ -68,29 +68,42 @@ import './composables/commands/navegadorSimularEvento.js'
 import './composables/commands/terminalToggle.js'
 import './composables/commands/terminalCerrar.js'
 import './composables/commands/dbExport.js'
+import './composables/commands/ambientesSkillsRegistrar.js'
 
 const app = createApp(App)
 const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 
+let authStore = null
+
+function getAuth() {
+  if (!authStore) {
+    try { authStore = useAuthStore() } catch { return null }
+  }
+  return authStore
+}
+
 const originalFetch = window.fetch.bind(window)
 window.fetch = async function (url, options = {}) {
-  const auth = useAuthStore()
-  const token = auth.getSessionToken()
-  if (token) {
-    options = { ...options }
-    options.headers = options.headers ? { ...options.headers } : {}
-    options.headers['X-Session-Token'] = token
+  const auth = getAuth()
+  if (auth) {
+    if (auth.loading) {
+      return originalFetch(url, options)
+    }
+    const token = auth.getSessionToken()
+    if (token) {
+      options = { ...options }
+      options.headers = options.headers ? { ...options.headers } : {}
+      options.headers['X-Session-Token'] = token
+    }
   }
   const res = await originalFetch(url, options)
-  if (res.status === 401) {
+  if (res.status === 401 && auth) {
     const urlStr = (typeof url === 'string' ? url : url.url) || ''
-    if (!urlStr.includes('/api/auth/')) {
-      if (auth.user) {
-        auth.forceLogout()
-        router.push('/')
-      }
+    if (!urlStr.includes('/api/auth/') && auth.user) {
+      auth.forceLogout()
+      router.push('/')
     }
   }
   return res

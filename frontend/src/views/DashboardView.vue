@@ -42,6 +42,8 @@ import { useOpencodeStore } from '../stores/opencode.js'
 import { useProjectStore } from '../stores/project.js'
 import { useTicketStore } from '../stores/ticket.js'
 import { useUiStore } from '../stores/ui.js'
+import { useWorkspaceStore } from '../stores/workspace.js'
+import { resetAllStores } from '../composables/useResetAllStores.js'
 
 export default {
   components: { Topbar, GlobalCommandBar, SidebarChat, SidebarRight, ChatWindow, ProjectDetail, TicketDetail, DevInstancePanel },
@@ -81,6 +83,7 @@ export default {
     }
 
     const ocStore = useOpencodeStore()
+    let mountedLoaded = false
 
     async function load() {
       if (auth.user) {
@@ -88,20 +91,33 @@ export default {
         projectStore.loadProjects()
         ticketStore.loadTickets()
         ocStore.restoreFromSession()
+        const wsStore = useWorkspaceStore()
+        await wsStore.loadWorkspaces()
       }
     }
 
-    watch(() => JSON.stringify(auth.getWorkspaceIds()), (newVal, oldVal) => {
+    watch(() => JSON.stringify(auth.getWorkspaceIds()), async (newVal, oldVal) => {
       if (newVal && newVal !== oldVal) {
-        projectStore.clearSelection()
-        ticketStore.clearSelection()
+        await resetAllStores()
         chat.stopAllExecutions()
         load()
       }
     })
 
-    watch(() => auth.user, load)
-    onMounted(load)
+    let loadGuard = false
+    watch(() => auth.user, async () => {
+      if (loadGuard) return
+      loadGuard = true
+      await load()
+      loadGuard = false
+    })
+
+    onMounted(async () => {
+      if (!mountedLoaded) {
+        mountedLoaded = true
+        await load()
+      }
+    })
 
     watch(panelCollapsed, () => {
       if (transitionTimer) clearTimeout(transitionTimer)

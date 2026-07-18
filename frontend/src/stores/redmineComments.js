@@ -78,5 +78,10 @@ export const useRedmineCommentsStore = defineStore('redmineComments', () => {
     return data
   }
 
-  return { commentsByTicket, loadingByTicket, loadComments, refreshComments, queueComment, deleteComment, deleteSentComments, clearComments }
+  function reset() {
+    commentsByTicket.value = {}
+    loadingByTicket.value = {}
+  }
+
+  return { commentsByTicket, loadingByTicket, loadComments, refreshComments, queueComment, deleteComment, deleteSentComments, clearComments, reset }
 })

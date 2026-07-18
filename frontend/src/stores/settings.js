@@ -32,6 +32,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const browserStealthEnabled = ref(false)
   const browserUserAgentChrome = ref('')
   const browserUserAgentFirefox = ref('')
+  const skillRepositoryUrl = ref('')
   const saveError = ref('')
   const saveSuccess = ref('')
 
@@ -78,6 +79,7 @@ export const useSettingsStore = defineStore('settings', () => {
       browserStealthEnabled.value = keys.browser_stealth_enabled === '1' || keys.browser_stealth_enabled === 'true'
       browserUserAgentChrome.value = keys.browser_user_agent_chrome || ''
       browserUserAgentFirefox.value = keys.browser_user_agent_firefox || ''
+      skillRepositoryUrl.value = keys.skill_repository_url || ''
       applyPriorityColors()
     } catch (err) {
       console.error('Error al cargar settings:', err)
@@ -139,12 +141,47 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'browser_stealth_enabled': browserStealthEnabled.value = value === '1' || value === 'true'; break
       case 'browser_user_agent_chrome': browserUserAgentChrome.value = value; break
       case 'browser_user_agent_firefox': browserUserAgentFirefox.value = value; break
+      case 'skill_repository_url': skillRepositoryUrl.value = value; break
     }
   }
 
   function clearFeedback() {
     saveSuccess.value = ''
     saveError.value = ''
+  }
+
+  function reset() {
+    deepseekKey.value = ''
+    redmineToken.value = ''
+    redmineUrl.value = ''
+    systemPrompt.value = ''
+    documentacionPromptBaseDatos.value = ''
+    documentacionPromptSubproyectos.value = ''
+    documentacionPromptEndpoints.value = ''
+    documentacionPromptWebSockets.value = ''
+    documentacionPromptFuncionalidades.value = ''
+    ticketDescripcionPrompt.value = ''
+    ticketRefinarPrompt.value = ''
+    deteccionFuncionalidadesPrompt.value = ''
+    codeFileExtensions.value = '.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql'
+    codeFileMaxSizeKb.value = 100
+    omnifilterDebounceMs.value = 2000
+    repoAcronimo.value = 'TKT'
+    locale.value = 'es_ES.UTF-8'
+    priorityColorLow.value = '#6b7280'
+    priorityColorNormal.value = '#3b82f6'
+    priorityColorHigh.value = '#eab308'
+    priorityColorUrgent.value = '#ef4444'
+    priorityColorImmediate.value = '#ef4444'
+    screenResolutions.value = []
+    replayIntervalMs.value = 1000
+    requestResponseMaxSizeKb.value = 100
+    browserStealthEnabled.value = false
+    browserUserAgentChrome.value = ''
+    browserUserAgentFirefox.value = ''
+    skillRepositoryUrl.value = ''
+    saveError.value = ''
+    saveSuccess.value = ''
   }
 
   return { deepseekKey, redmineToken, redmineUrl, systemPrompt, omnifilterDebounceMs, repoAcronimo,
@@ -154,6 +191,7 @@ export const useSettingsStore = defineStore('settings', () => {
            documentacionPromptFuncionalidades, ticketDescripcionPrompt, ticketRefinarPrompt,
            deteccionFuncionalidadesPrompt, codeFileExtensions, codeFileMaxSizeKb,
            priorityColorLow, priorityColorNormal, priorityColorHigh, priorityColorUrgent, priorityColorImmediate,
-            saveError, saveSuccess, clearFeedback, load, save, applyPriorityColors,
+            skillRepositoryUrl,
+            saveError, saveSuccess, clearFeedback, load, save, applyPriorityColors, reset,
             requestResponseMaxSizeKb, browserStealthEnabled, browserUserAgentChrome, browserUserAgentFirefox }
 })

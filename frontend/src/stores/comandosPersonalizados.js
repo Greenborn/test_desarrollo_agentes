@@ -79,6 +79,11 @@ export const useComandosPersonalizadosStore = defineStore('comandosPersonalizado
     loadingByProject.value = {}
   }
 
+  function reset() {
+    commandsByProject.value = {}
+    loadingByProject.value = {}
+  }
+
   return {
     commandsByProject,
     loadingByProject,
@@ -88,5 +93,6 @@ export const useComandosPersonalizadosStore = defineStore('comandosPersonalizado
     updateCommand,
     deleteCommand,
     clearCommands,
+    reset,
   }
 })

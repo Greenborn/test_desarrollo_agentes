@@ -178,11 +178,24 @@ export const useGitStore = defineStore('git', () => {
     cwd.value = path
   }
 
+  function reset() {
+    isGitRepo.value = false
+    repoPath.value = ''
+    cwd.value = ''
+    branchBySession.value = {}
+    branches.value = []
+    tags.value = []
+    structuredCommits.value = []
+    gitZoom.value = 100
+    chatZoom.value = 100
+    loading.value = false
+  }
+
   return {
     isGitRepo, repoPath, cwd, branchBySession, branches, tags,
     structuredCommits, gitZoom, chatZoom, loading,
     getCurrentBranch,
     fetchRepoData, fetchGitBranch, runGitCommand, fetchBranches,
-    loadZoom, saveZoom, zoomIn, zoomOut, resetZoom, setCwd,
+    loadZoom, saveZoom, zoomIn, zoomOut, resetZoom, setCwd, reset,
   }
 })

@@ -81,11 +81,21 @@ export const useCommandStore = defineStore('command', () => {
     if (sessionHistory.value.length > 100) sessionHistory.value.pop()
   }
 
+  function reset() {
+    currentDir.value = ''
+    helpVisible.value = false
+    sessionHistory.value = []
+    dbHistory.value = []
+    autocompleteOptions.value = []
+    autocompleteVisible.value = false
+    arrowIndex.value = -1
+  }
+
   return {
     currentDir, helpVisible, sessionHistory, dbHistory,
     autocompleteOptions, autocompleteVisible, arrowIndex,
     loadLastDirectory, setDirectory,
     fetchAutocomplete, showAutocomplete, hideAutocomplete,
-    loadHistory, pushHistory, resetArrowIndex,
+    loadHistory, pushHistory, resetArrowIndex, reset,
   }
 })
