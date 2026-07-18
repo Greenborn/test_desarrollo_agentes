@@ -283,6 +283,7 @@
     ></div>
     <div
       v-if="contextMenu.show"
+      ref="menuRef"
       class="context-menu"
       :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
       @click.stop
@@ -306,6 +307,7 @@ import { useUiStore } from '../../stores/ui.js'
 import { useModalStore } from '../../stores/modal.js'
 import { storeToRefs } from 'pinia'
 import { useComponentContextMenu } from '../../composables/useComponentContextMenu.js'
+import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
 import AlertModal from '../modals/AlertModal.vue'
 
 export default {
@@ -327,6 +329,7 @@ export default {
     const clearing = ref(false)
     const newNameInputRef = ref(null)
     const contextMenu = ref({ show: false, x: 0, y: 0, event: null })
+    const menuRef = ref(null)
     const deletingEventId = ref(null)
 
     const recordError = ref('')
@@ -388,6 +391,13 @@ export default {
 
     function showContextMenu(e, evt) {
       contextMenu.value = { show: true, x: e.clientX, y: e.clientY, event: evt, target: e.target }
+      nextTick(() => {
+        if (menuRef.value) {
+          const adjusted = adjustContextMenuPosition(menuRef.value, contextMenu.value.x, contextMenu.value.y)
+          contextMenu.value.x = adjusted.x
+          contextMenu.value.y = adjusted.y
+        }
+      })
     }
 
     function closeContextMenu() {
@@ -1086,6 +1096,7 @@ export default {
       confirmNewRecording,
       cancelNewRecording,
       contextMenu,
+      menuRef,
       showContextMenu,
       closeContextMenu,
       deleteContextEvent,

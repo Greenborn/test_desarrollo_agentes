@@ -40,7 +40,7 @@
     </div>
 
     <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu"></div>
-    <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
+    <div v-if="ctxMenu.show" ref="menuRef" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
       <div class="context-menu-item" @click="copyRelativePath">📋 Copiar ruta relativa</div>
       <div class="context-menu-item" @click="copyFullPath">📋 Copiar ruta completa</div>
       <div class="context-menu-item" @click="copyComponentRef">📋 Copiar referencia</div>
@@ -56,10 +56,11 @@
 </template>
 
 <script>
-import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useModalStore } from '../../stores/modal.js'
 import { useFileTreeStore } from '../../stores/fileTree.js'
 import { useComponentContextMenu } from '../../composables/useComponentContextMenu.js'
+import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
 import FileEditorModal from './FileEditorModal.vue'
 import CsvViewerModal from './CsvViewerModal.vue'
 import AlertModal from '../modals/AlertModal.vue'
@@ -181,6 +182,8 @@ export default {
       return props.sessionId ? fileTreeStore.isExpanded(props.sessionId, path) : false
     }
 
+    const menuRef = ref(null)
+
     function onContextMenu(event, item) {
       ctxMenu.value = {
         show: true,
@@ -191,6 +194,13 @@ export default {
         type: item.node.type,
         target: event.target,
       }
+      nextTick(() => {
+        if (menuRef.value) {
+          const adjusted = adjustContextMenuPosition(menuRef.value, ctxMenu.value.x, ctxMenu.value.y)
+          ctxMenu.value.x = adjusted.x
+          ctxMenu.value.y = adjusted.y
+        }
+      })
     }
 
     function closeCtxMenu() {
@@ -316,7 +326,7 @@ export default {
       tree, loading, error, flatTree, selectedFile, ctxMenu, fileTreeStore,
       getFileIcon, reloadTree, handleToggleDirectory, handleIsExpanded,
       handleSelectFile, handleFileClick, openFile,
-      onContextMenu, closeCtxMenu, copyRelativePath, copyFullPath, copyComponentRef, copyName, copyFileContent,
+      menuRef, onContextMenu, closeCtxMenu, copyRelativePath, copyFullPath, copyComponentRef, copyName, copyFileContent,
       openInExplorer, confirmDeleteFile, deleteFile,
     }
   },

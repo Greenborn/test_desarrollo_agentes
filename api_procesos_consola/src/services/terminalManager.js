@@ -147,7 +147,19 @@ export async function closeTerminal(terminalId) {
     record.ws = null;
   }
   if (record.pty) {
-    try { record.pty.kill(); } catch (err) { console.log('[procesos_consola] Error al matar PTY:', err.message); }
+    try { record.pty.kill('SIGTERM'); } catch (err) { console.log('[procesos_consola] Error al matar PTY:', err.message); }
+    const pid = record.pid;
+    if (pid) {
+      setTimeout(() => {
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch (err) {
+          if (err.code !== 'ESRCH') {
+            console.log(`[procesos_consola] Error al enviar SIGKILL al pid ${pid}:`, err.message);
+          }
+        }
+      }, 3000);
+    }
     record.pty = null;
   }
 

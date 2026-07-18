@@ -53,12 +53,12 @@ export function handleConnection(ws, req, terminalId) {
   });
 
   ws.on('close', () => {
-    terminalManager.detachWebSocket(terminalId, ws);
+    terminalManager.closeTerminal(terminalId);
   });
 
   ws.on('error', (err) => {
     console.log(`[procesos_consola] terminal ${terminalId}: error en conexión:`, err.message);
-    terminalManager.detachWebSocket(terminalId, ws);
+    terminalManager.closeTerminal(terminalId);
   });
 
   try { ws.send(JSON.stringify({ type: 'created', terminalId })); } catch (err) {

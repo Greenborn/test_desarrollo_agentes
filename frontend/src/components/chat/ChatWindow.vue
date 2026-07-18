@@ -26,7 +26,7 @@
     <OpenCodeAgentTerminal v-if="showAgentTerminal && ocStore.chatSessionId && activeSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId)" :content="terminalContent" @close="showAgentTerminal = false" @clear="clearAgentTerminal" />
 
     <DeepSeekChatFab v-show="!(ocMaximized && isOcSessionActive) && activeSessionId && !isOcSessionActive" :active-session-id="activeSessionId" @send="handleFabSend" />
-    <ContextMenuChat :ctx-menu="ctxMenu" :raw-msg-keys="rawMsgKeys" :msg-key="msgKey" @toggle-raw="toggleRawView" @copy-plain="copyPlainText" @delete="deleteMessage" @close="closeCtxMenu" />
+    <ContextMenuChat :ctx-menu="ctxMenu" :raw-msg-keys="rawMsgKeys" :msg-key="msgKey" @toggle-raw="toggleRawView" @copy-plain="copyPlainText" @delete="deleteMessage" @close="closeCtxMenu" @adjust-position="({ x, y }) => { ctxMenu.x = x; ctxMenu.y = y }" />
   </div>
 </template>
 

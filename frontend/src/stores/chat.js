@@ -1018,6 +1018,8 @@ export const useChatStore = defineStore('chat', () => {
     saveUiState()
   })
 
+  loadMaxTerminalsConfig()
+
   return {
     sessions, archivedSessions, activeSessionId, messages,
     streaming, creating, executing, sessionStatus, currentChunk, currentThinking,

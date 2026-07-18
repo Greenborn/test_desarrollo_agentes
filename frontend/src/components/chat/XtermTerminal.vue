@@ -10,7 +10,7 @@
       </div>
     </div>
     <div ref="containerRef" class="xterm-container" @contextmenu.prevent="onContextMenu"></div>
-    <div v-if="ctxMenu.show" class="xterm-ctx-menu" :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }" @click.stop>
+    <div v-if="ctxMenu.show" ref="menuRef" class="xterm-ctx-menu" :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }" @click.stop>
       <button class="xterm-ctx-btn" @click="copySelection" :disabled="!hasSelection">📋 Copiar</button>
     </div>
   </div>
@@ -22,6 +22,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { useChatStore } from '../../stores/chat.js'
+import { adjustContextMenuPositionRelative } from '../../utils/contextMenu.js'
 
 const PROCESOS_API = '/api/procesos'
 const WS_PORT = import.meta.env.VITE_PROCESOS_CONSOLA_PORT || '3575'
@@ -43,6 +44,7 @@ export default {
     const wrapperRef = ref(null)
     const fullscreen = ref(false)
     const ctxMenu = ref({ show: false, x: 0, y: 0 })
+    const menuRef = ref(null)
     const hasSelection = ref(false)
     let terminal = null
     let fitAddon = null
@@ -262,6 +264,14 @@ export default {
           x: e.clientX - rect.left,
           y: e.clientY - rect.top,
         }
+        nextTick(() => {
+          if (menuRef.value && wrapperRef.value) {
+            const pr = wrapperRef.value.getBoundingClientRect()
+            const adjusted = adjustContextMenuPositionRelative(menuRef.value, ctxMenu.value.x, ctxMenu.value.y, pr)
+            ctxMenu.value.x = adjusted.x
+            ctxMenu.value.y = adjusted.y
+          }
+        })
       } else {
         ctxMenu.value = { show: true, x: e.clientX, y: e.clientY }
       }
@@ -368,7 +378,7 @@ export default {
       }
     })
 
-    return { containerRef, wrapperRef, fullscreen, ctxMenu, hasSelection, toggleFullscreen, disconnect, onContextMenu, copySelection }
+    return { containerRef, wrapperRef, fullscreen, ctxMenu, menuRef, hasSelection, toggleFullscreen, disconnect, onContextMenu, copySelection }
   },
 }
 </script>

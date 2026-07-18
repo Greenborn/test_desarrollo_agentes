@@ -136,8 +136,8 @@
       </div>
     </button>
   </div>
-  <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeSessionCtxMenu" @contextmenu.prevent="closeSessionCtxMenu"></div>
-  <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
+    <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeSessionCtxMenu" @contextmenu.prevent="closeSessionCtxMenu"></div>
+    <div v-if="ctxMenu.show" ref="menuRef" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
     <div v-if="tab === 'chats'" class="context-menu-item" @click="archiveFromCtxMenu">&#128451; Archivar</div>
     <div v-if="tab === 'archived'" class="context-menu-item" @click="unarchiveFromCtxMenu">&#128194; Desarchivar</div>
     <div class="context-menu-item" @click="cloneFromCtxMenu">&#128203; Clonar sesión</div>
@@ -147,7 +147,7 @@
 </template>
 
 <script>
-import { computed, watch, ref, reactive, onMounted } from 'vue'
+import { computed, watch, ref, reactive, onMounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../stores/chat.js'
 import { useCommandStore } from '../../stores/command.js'
@@ -157,6 +157,7 @@ import { useWorkspaceStore } from '../../stores/workspace.js'
 import { contrastTextColor } from '../../utils/color.js'
 import ServiciosPanel from '../services/ServiciosPanel.vue'
 import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
+import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
 
 export default {
   components: { ServiciosPanel },
@@ -212,12 +213,20 @@ export default {
     })
 
     const ctxMenu = reactive({ show: false, x: 0, y: 0, session: null })
+    const menuRef = ref(null)
 
     function onSessionContextMenu(e, session) {
       ctxMenu.show = true
       ctxMenu.x = e.clientX
       ctxMenu.y = e.clientY
       ctxMenu.session = session
+      nextTick(() => {
+        if (menuRef.value) {
+          const adjusted = adjustContextMenuPosition(menuRef.value, ctxMenu.x, ctxMenu.y)
+          ctxMenu.x = adjusted.x
+          ctxMenu.y = adjusted.y
+        }
+      })
     }
 
     function closeSessionCtxMenu() {
@@ -444,6 +453,7 @@ export default {
       archiveSession,
       unarchiveSession,
       ctxMenu,
+      menuRef,
       onSessionContextMenu,
       closeSessionCtxMenu,
       sessionNavEnabled,

@@ -94,9 +94,19 @@ class OpenCodeServer {
       this._abortController = null;
     }
     if (this.process) {
-      this.process.kill();
+      const proc = this.process;
       this.process = null;
       this.ready = false;
+      proc.kill('SIGTERM');
+      setTimeout(() => {
+        try {
+          proc.kill('SIGKILL');
+        } catch (err) {
+          if (err.code !== 'ESRCH') {
+            console.log(`[opencode ${this.port}] error al enviar SIGKILL:`, err.message);
+          }
+        }
+      }, 3000);
     }
   }
 
@@ -280,8 +290,9 @@ function stopEditorServer(directory) {
 }
 
 function stopAllServers() {
-  for (const entry of Object.values(servers)) {
-    entry.server.stop();
+  for (const key of Object.keys(servers)) {
+    servers[key].server.stop();
+    delete servers[key];
   }
 }
 

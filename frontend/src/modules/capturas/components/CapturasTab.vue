@@ -5,13 +5,16 @@
   <div v-else-if="!proyectoId" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
     <span>Sin proyecto asignado a esta sesión</span>
   </div>
+  <div v-else-if="!hasBrowserSession" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
+    <span>No hay sesión de navegador Playwright activa.<br>Use <code>/navegador_iniciar</code> primero.</span>
+  </div>
   <div v-else class="d-flex flex-column flex-grow-1 overflow-hidden" style="min-height: 0;">
     <div class="capturas-filter d-flex align-items-center px-2 py-1 flex-shrink-0 gap-2" style="border-bottom: 1px solid #374151;">
       <label class="d-flex align-items-center gap-2 small" style="cursor: pointer; font-size: 0.7rem; color: #cbd5e1;">
         <input type="checkbox" v-model="filtrarPorSesion" class="form-check-input m-0" style="cursor: pointer; width: 14px; height: 14px;" />
         Solo sesión actual
       </label>
-      <button class="btn btn-sm btn-outline-argentina ms-auto py-0 px-2" style="font-size: 0.65rem;" @click="tomarCaptura" :disabled="!activeSession || !proyectoId">📷 Capturar</button>
+      <button class="btn btn-sm btn-outline-argentina ms-auto py-0 px-2" style="font-size: 0.65rem;" @click="tomarCaptura" :disabled="!activeSession || !proyectoId || !hasBrowserSession">📷 Capturar</button>
     </div>
     <div v-if="loadingCapturas" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small">
       <span>Cargando capturas…</span>
@@ -66,6 +69,7 @@ import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useUiStore } from '../../../stores/ui.js'
 import { useModalStore } from '../../../stores/modal.js'
+import { useBrowserStore } from '../../../stores/browser.js'
 import { useCommandRegistry } from '../../../composables/useCommandRegistry.js'
 import { settingSet, settingGet } from '../../../services/settingService.js'
 import CapturaDetailModal from '../../../components/modals/CapturaDetailModal.vue'
@@ -75,9 +79,11 @@ export default {
     const ui = useUiStore()
     const chat = useChatStore()
     const modal = useModalStore()
+    const browser = useBrowserStore()
     const { find } = useCommandRegistry()
     const { activeSessionId, sessions } = storeToRefs(chat)
     const { centralPanelCollapsed, sidebarCollapsed } = storeToRefs(ui)
+    const { hasBrowserSession } = storeToRefs(browser)
 
     const isFullWidth = computed(() => centralPanelCollapsed.value && sidebarCollapsed.value)
 
@@ -259,11 +265,13 @@ export default {
 
     onMounted(() => {
       loadCapturasListWidth()
+      browser.fetchStatus()
     })
 
     return {
       activeSession,
       proyectoId,
+      hasBrowserSession,
       capturas,
       loadingCapturas,
       capturaSeleccionada,

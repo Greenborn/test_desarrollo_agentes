@@ -1,6 +1,6 @@
 <template>
   <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="close" @contextmenu.prevent="close"></div>
-  <div v-if="ctxMenu.show" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
+  <div v-if="ctxMenu.show" ref="menuRef" class="context-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
     <div class="context-menu-item" @click="toggleRaw(ctxMenu.msg)">{{ isRaw ? '🎨 Vista formateada' : '📄 Vista texto plano' }}</div>
     <div class="context-menu-item" @click="copyPlain(ctxMenu.msg)">📋 Copiar texto plano</div>
     <div class="context-menu-item" @click="copyRef">📋 Copiar referencia</div>
@@ -11,6 +11,7 @@
 
 <script>
 import { useComponentContextMenu } from '../../composables/useComponentContextMenu.js'
+import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
 
 export default {
   props: {
@@ -18,7 +19,7 @@ export default {
     rawMsgKeys: { type: Set, default: () => new Set() },
     msgKey: { type: Function, default: (msg) => msg.id || msg._key },
   },
-  emits: ['toggleRaw', 'copyPlain', 'delete', 'close'],
+  emits: ['toggleRaw', 'copyPlain', 'delete', 'close', 'adjustPosition'],
   computed: {
     isRaw() {
       if (!this.ctxMenu.msg) return false
@@ -37,6 +38,19 @@ export default {
         navigator.clipboard.writeText(ref).catch(err => console.error('Error al copiar referencia:', err))
       }
       this.$emit('close')
+    },
+  },
+  watch: {
+    'ctxMenu.show'(val) {
+      if (val) {
+        this.$nextTick(() => {
+          const el = this.$refs.menuRef
+          if (el) {
+            const adjusted = adjustContextMenuPosition(el, this.ctxMenu.x, this.ctxMenu.y)
+            this.$emit('adjustPosition', adjusted)
+          }
+        })
+      }
     },
   },
 }

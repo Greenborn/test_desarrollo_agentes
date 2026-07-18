@@ -1,3 +1,5 @@
+import { adjustContextMenuPosition } from '../utils/contextMenu.js'
+
 let initialized = false
 let backdropEl = null
 let menuEl = null
@@ -89,6 +91,10 @@ export function useComponentContextMenu() {
     menuEl.appendChild(item)
     document.body.appendChild(backdropEl)
     document.body.appendChild(menuEl)
+
+    const adjusted = adjustContextMenuPosition(menuEl, x, y)
+    menuEl.style.left = adjusted.x + 'px'
+    menuEl.style.top = adjusted.y + 'px'
   }
 
   function hideMenu() {
