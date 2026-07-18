@@ -41,11 +41,23 @@ export const useProjectStore = defineStore('project', () => {
     }
   }
 
-  function updateProjectColor(projectId, color) {
+  async function updateProjectColor(projectId, color) {
     const p = projects.value.find(p => p.id === projectId)
     if (p) p.color = color
     if (selectedProject.value?.id === projectId) {
       selectedProject.value.color = color
+    }
+    try {
+      const { useChatStore } = await import('./chat.js')
+      const chatStore = useChatStore()
+      for (const s of chatStore.sessions) {
+        if (s.proyecto_id === projectId) s.proyecto_color = color
+      }
+      for (const s of chatStore.archivedSessions) {
+        if (s.proyecto_id === projectId) s.proyecto_color = color
+      }
+    } catch (err) {
+      console.error('Error al actualizar color en sesiones:', err)
     }
   }
 

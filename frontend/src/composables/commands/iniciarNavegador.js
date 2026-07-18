@@ -39,10 +39,6 @@ function parseArgs(args) {
       if (val === 'chrome' || val === 'firefox') navegador = val;
     } else if (arg.startsWith('--url=')) {
       url = arg.slice('--url='.length);
-    } else if (arg === 'chrome' || arg === 'firefox') {
-      navegador = arg;
-    } else if (!arg.startsWith('--')) {
-      url = arg;
     }
   }
 

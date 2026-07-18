@@ -65,14 +65,15 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/navegador_grabacion_listar` | Lista todas las grabaciones de eventos. Opcionalmente filtrar por proyecto. Si no se especifica proyecto, usa el asignado a la sesión de chat actual | `/navegador_grabacion_listar [--project_id=<id>]` |
 | `/navegador_grabacion_acciones` | Genera un arreglo JSON de acciones a partir de los eventos de una grabación, ordenado del más antiguo al más reciente. Convierte clicks, inputs, changes, submits, keydowns y scrolls en acciones tipo `click`, `fill`, `select`, `submit`, `press` y `scroll` | `/navegador_grabacion_acciones --id=<id>` |
 | `/navegador_grabacion_reproducir` | Reproduce una grabación de eventos en la instancia de navegador activa. Cada acción se ejecuta con un intervalo configurable (por defecto 1000ms). Muestra el progreso paso a paso en el chat | `/navegador_grabacion_reproducir --id=<id> [--intervalo=<ms>]` |
-| `replay_interval_ms` | Setting de workspace que define el intervalo entre acciones al reproducir una grabación desde el panel Eventos del Navegador (botón ▶ Reproducir). Se configura en Settings → Intervalo de Reproducción del Navegador. Por defecto: 1000ms | `Configuración → Intervalo de Reproducción` |
 | `/resoluciones_get_all` | Muestra las resoluciones de pantalla configuradas | `/resoluciones_get_all` |
 | `/resolucion_get_default` | Muestra la resolución de pantalla por defecto configurada | `/resolucion_get_default` |
 | `/resolucion_set_default` | Establece la resolución de pantalla por defecto. Usa Tab para autocompletar el ID de resolución | `/resolucion_set_default --resolucion=<ID>` |
 | `/navegador_capturar_pantalla` | Toma una captura de pantalla del navegador activo y la guarda en el proyecto vinculado a la sesión actual. Requiere sesión de navegador activa y proyecto asignado a la sesión de chat | `/navegador_capturar_pantalla [--fullpage=true]` |
-| `/capturas_listar` | Lista las capturas de pantalla del proyecto vinculado a la sesión de chat actual, o de un proyecto específico si se pasa como argumento. Muestra cada imagen inline con sus comentarios (`quick_notes`) | `/capturas_listar [proyecto_id]` |
-| `/navegador_evaluar_selector` | Evalúa un selector CSS en la página activa del navegador y devuelve el valor: valor de input, texto, HTML, atributo, checked, existencia o cantidad. El resultado se muestra en el chat. También disponible desde el panel de grabaciones (botón 🔍 Consultar) | `/navegador_evaluar_selector <selector> [tipo] [nombre_atributo]` |
-| `/navegador_simular_evento` | Simula un evento DOM en un elemento de la página activa del navegador. Útil para pruebas automatizadas. El tipo de evento puede ser click, mouseenter, focus, blur, change, etc. | `/navegador_simular_evento <selector> <tipo_evento> [opciones_json]` |
+| `/capturas_listar` | Lista las capturas de pantalla del proyecto vinculado a la sesión de chat actual, o de un proyecto específico. Muestra cada imagen inline con sus comentarios (`quick_notes`) | `/capturas_listar [--proyecto_id=<id>]` |
+| `/navegador_evaluar_selector` | Evalúa un selector CSS en la página activa del navegador y devuelve el valor: valor de input, texto, HTML, atributo, checked, existencia o cantidad. El resultado se muestra en el chat. También disponible desde el panel de grabaciones (botón 🔍 Consultar) | `/navegador_evaluar_selector --selector=<css> [--tipo=<value|text|html|attribute|checked|exists|count>] [--atributo=<nombre>]` |
+| `/navegador_simular_evento` | Simula un evento DOM en un elemento de la página activa del navegador. Útil para pruebas automatizadas. El tipo de evento puede ser click, mouseenter, focus, blur, change, etc. | `/navegador_simular_evento --selector=<css> [--tipo=<click|mouseenter|focus|blur|change|...>] [--opciones=<json>]` |
+
+> **Nota:** `replay_interval_ms` no es un comando sino una configuración de workspace (Settings → Intervalo de Reproducción del Navegador). Define el intervalo entre acciones al reproducir una grabación desde el panel Eventos del Navegador. Valor por defecto: 1000ms.
 
 ---
 
@@ -135,6 +136,7 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 | `/dev_git_ir_rama_ticket` | Cambia a la rama Git asociada al ticket de la sesión actual. Valida que no haya cambios sin comitear, que la sesión tenga ticket asignado y que la rama exista | `/dev_git_ir_rama_ticket` |
 | `/dev_redmine_comentarios_listar` | Lista todos los comentarios de Redmine pendientes de envío | `/dev_redmine_comentarios_listar` |
 | `/dev_redmine_comentarios_enviar` | Agrupa los comentarios pendientes, muestra vista previa editable y permite enviarlos a Redmine | `/dev_redmine_comentarios_enviar` |
+| `/dev_terminal_test_image` | Prueba de renderizado de imagen inline en la terminal vía Sixel/IIP. Genera un PNG de 200x100 directamente en xterm.js | `/dev_terminal_test_image` |
 
 ---
 
@@ -232,10 +234,20 @@ Cada comando se guarda en la tabla `comandos_personalizados_proyectos` y se ejec
 
 ---
 
+## Skills
+
+| Comando | Descripción | Uso |
+|---------|-------------|-----|
+| `/skill_editar` | Crea o edita un skill usando OpenCode. Si no existe, lo crea automáticamente. Toma el cwd de la sesión de chat | `/skill_editar <nombre_skill> <prompt...>` |
+
+Los skills se almacenan en `.agents/skills/<nombre>/SKILL.md` y son instrucciones especializadas que el asistente puede cargar para tareas específicas.
+
+---
+
 ## Notas
 
 - Los comandos se definen mediante `register({ name, category, description, usage, execute })` desde `useCommandRegistry.js`
-- **Todos los parámetros deben usar el formato `--nombre=valor`** (ver `docs/CRITERIOS_COMANDOS.md`). Excepción: `/git` usa argumentos posicionales por ser un comando _passthrough_ hacia una herramienta externa con sintaxis propia.
-- El archivo `frontend/src/components/Topbar.vue` contiene registros inline
+- **Todos los parámetros deben usar el formato `--nombre=valor`** (ver `docs/CRITERIOS_COMANDOS.md`). Excepción: `/git` usa argumentos posicionales por ser un comando _passthrough_ hacia una herramienta externa con sintaxis propia, y `/skill_editar` usa argumentos posicionales porque el prompt es texto libre sin estructura predefinida.
+- El archivo `frontend/src/components/layout/Topbar.vue` contiene registros inline
 - Cada comando recibe `(args, { cmdStore, chatStore })` en su `execute()`
 - Para parsear argumentos usar `parseCommandArgs(args, schema)` desde `frontend/src/composables/parseCommandArgs.js`

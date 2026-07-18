@@ -6,7 +6,7 @@ const ALL_FLAGS = ['--id=']
 
 register({
   name: '/archivos_listar',
-  category: 'Archivos',
+  category: 'Proyecto',
   description: 'Lista los archivos del proyecto vinculado a la sesión actual.',
   usage: '/archivos_listar [--id=proyecto]',
   async autocomplete(args, cmdStore) {

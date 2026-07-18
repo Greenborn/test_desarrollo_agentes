@@ -6,7 +6,7 @@ const ALL_FLAGS = ['--id=']
 
 register({
   name: '/archivos_eliminar',
-  category: 'Archivos',
+  category: 'Proyecto',
   description: 'Elimina un archivo del proyecto. Requiere sesión vinculada a un proyecto.',
   usage: '/archivos_eliminar --id=<id_archivo>',
   async autocomplete(args, cmdStore) {

@@ -18,7 +18,8 @@ description: Crear o modificar componentes de mensajes de chat (controles, rende
    - Agregar un `v-else-if` en el template para el `controlType` correspondiente
 4. **Manejo de errores:** Todo `catch` debe registrar el error con `console.error`. Prohibido `catch {}` vacío o silencioso.
 5. **Prohibido parámetros `||` como fallback.** Validar explícitamente cada argumento requerido y devolver error si falta.
-6. **Estado global ≠ estado compartido entre sesiones.** Cualquier `ref` o `reactive` global (stores, módulos, composables) que controle visibilidad de un componente debe estar keyeado por `sessionId` o debe verificarse contra la sesión activa antes de renderizar.
+6. **Todos los parámetros de comandos deben usar `--nombre=valor`.** No se permiten argumentos posicionales. Usar `parseCommandArgs(args, schema)` de `parseCommandArgs.js` y `getUsedFlags` para autocomplete. Las únicas excepciones documentadas son `/git` (passthrough) y `/skill_editar` (prompt libre).
+7. **Estado global ≠ estado compartido entre sesiones.** Cualquier `ref` o `reactive` global (stores, módulos, composables) que controle visibilidad de un componente debe estar keyeado por `sessionId` o debe verificarse contra la sesión activa antes de renderizar.
 
 ## Roles de mensaje existentes
 

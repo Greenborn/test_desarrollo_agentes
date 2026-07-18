@@ -193,8 +193,9 @@ export default {
     }
 
     async function handleTab() {
-      if (autocompleteVisible.value && arrowIndex.value >= 0 && arrowIndex.value < autocompleteOptions.value.length) {
-        pickAutocomplete(autocompleteOptions.value[arrowIndex.value])
+      if (autocompleteVisible.value && autocompleteOptions.value.length > 0) {
+        const idx = arrowIndex.value >= 0 ? arrowIndex.value : 0
+        pickAutocomplete(autocompleteOptions.value[idx])
         return
       }
 
@@ -231,6 +232,8 @@ export default {
       const isCommand = value.startsWith('/') && parts.length === 1
       if (isCommand) {
         buffer.value = value + ' '
+      } else if (value.startsWith('--') && parts.length === 1 && parts[0].startsWith('/')) {
+        buffer.value = parts[0] + ' ' + value + ' '
       } else {
         parts[parts.length - 1] = value
         buffer.value = parts.join(' ') + ' '

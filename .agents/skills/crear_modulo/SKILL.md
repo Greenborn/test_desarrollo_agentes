@@ -56,12 +56,27 @@ export default {
   name: '/mi_comando',
   category: 'MiCategoria',
   description: 'Qué hace este comando.',
-  usage: '/mi_comando <arg1>',
+  usage: '/mi_comando --flag1=<valor> [--flag2=<valor>]',
+  async autocomplete(args, cmdStore) {
+    // Usar getUsedFlags(args) y cmdStore.showAutocomplete()
+  },
   async execute(args, { chatStore, loadingIdx, sessionId }) {
+    const { params, errors } = parseCommandArgs(args, {
+      flag1: { required: true },
+      flag2: { required: false },
+    })
+    if (errors.length > 0) throw new Error(errors.join('. '))
     // Lógica aquí — usar fetch() con credentials: 'include'
   },
 }
 ```
+
+**Reglas para comandos en módulos:**
+- **Todos los parámetros deben usar `--nombre=valor`.** Prohibido argumentos posicionales (excepciones: `/git` y `/skill_editar`).
+- **Usar `parseCommandArgs(args, schema)`** para parsear, importado de `parseCommandArgs.js`.
+- **Usar `getUsedFlags(args)`** para implementar autocomplete.
+- **Autocomplete siempre con `cmdStore.showAutocomplete()`** — no existe `setAutocomplete`.
+- La categoría debe coincidir con la sección en `docs/COMANDOS.md`.
 
 No usar `import { useCommandRegistry } ... register(...)` dentro del archivo. El module registry lo registra automáticamente al cargar el módulo.
 
@@ -152,13 +167,17 @@ export default {
 
 `frontend/src/modules/notas/commands/notas.js`:
 ```js
+import { parseCommandArgs } from '../../../composables/parseCommandArgs.js'
+
 export default {
   name: '/notas_listar',
   category: 'Notas',
   description: 'Lista las notas rápidas.',
-  usage: '/notas_listar',
+  usage: '/notas_listar [--limite=<n>]',
   async execute(args, { chatStore, sessionId }) {
-    const res = await fetch('/api/notas/list', { credentials: 'include' })
+    const { params } = parseCommandArgs(args, { limite: { required: false } })
+    const query = params.limite ? `?limite=${params.limite}` : ''
+    const res = await fetch(`/api/notas/list${query}`, { credentials: 'include' })
     const data = await res.json()
     return (data.notas || []).map(n => `- ${n.texto}`).join('\n') || '(sin notas)'
   },

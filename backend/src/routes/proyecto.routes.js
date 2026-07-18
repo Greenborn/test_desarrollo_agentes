@@ -57,7 +57,7 @@ router.post('/proyecto', async (req, res) => {
 router.post('/proyecto/crear-en-redmine', async (req, res) => {
   if (!authGuard(req, res)) return;
 
-  const { nombre, identificador, descripcion, workspace_id, tracker_ids, asignar_a_sesion } = req.body;
+  const { nombre, identificador, descripcion, workspace_id, tracker_ids, is_public, asignar_a_sesion } = req.body;
 
   if (!nombre || !nombre.trim()) {
     return res.status(400).json({ error: 'El nombre del proyecto es requerido.' });
@@ -87,7 +87,7 @@ router.post('/proyecto/crear-en-redmine', async (req, res) => {
       .replace(/_+/g, '_')
       .replace(/^_|_$/g, '');
 
-    const redminePayload = { name: nombre.trim(), identifier: slug };
+    const redminePayload = { name: nombre.trim(), identifier: slug, is_public: !!is_public };
     if (descripcion) redminePayload.description = descripcion;
     if (tracker_ids && tracker_ids.length > 0) {
       redminePayload.tracker_ids = tracker_ids;

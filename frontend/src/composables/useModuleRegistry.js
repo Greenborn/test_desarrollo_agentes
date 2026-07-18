@@ -1,10 +1,10 @@
-import { reactive } from 'vue'
+import { shallowReactive } from 'vue'
 import { useCommandRegistry } from './useCommandRegistry.js'
 
-const modules = reactive([])
-const sidebarRightTabs = reactive([])
-const sidebarChatTabs = reactive([])
-const devPanelTabs = reactive([])
+const modules = shallowReactive([])
+const sidebarRightTabs = shallowReactive([])
+const sidebarChatTabs = shallowReactive([])
+const devPanelTabs = shallowReactive([])
 
 export function useModuleRegistry() {
   function registerModule(mod) {

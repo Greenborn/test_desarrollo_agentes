@@ -8,7 +8,7 @@ const { register } = useCommandRegistry()
 
 register({
   name: '/chat_set_workspace',
-  category: 'Workspace',
+  category: 'Desarrollo',
   description: 'Asigna un espacio de trabajo a la sesión actual.',
   usage: '/chat_set_workspace --id=<workspace_id>',
   async autocomplete(args, cmdStore) {

@@ -63,6 +63,17 @@
       </div>
     </div>
 
+    <div class="form-check form-switch mb-2">
+      <input
+        class="form-check-input"
+        type="checkbox"
+        role="switch"
+        id="publicSwitch"
+        v-model="form.is_public"
+      />
+      <label class="form-check-label small" for="publicSwitch">Proyecto público</label>
+    </div>
+
     <div class="form-check form-switch mb-3">
       <input
         class="form-check-input"
@@ -118,6 +129,7 @@ export default {
       identificador: '',
       descripcion: props.prefill.descripcion || '',
       tracker_ids: [],
+      is_public: false,
     })
 
     function onNombreChange() {
@@ -210,6 +222,7 @@ export default {
           descripcion: form.descripcion,
           workspace_id: form.workspace_id,
           tracker_ids: form.tracker_ids,
+          is_public: form.is_public,
           asignar_a_sesion: asignarASesion.value,
         }
         emit('confirm', payload)

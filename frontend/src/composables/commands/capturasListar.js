@@ -1,14 +1,14 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
-import { getUsedFlags } from '../parseCommandArgs.js';
+import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
 
 const { register } = useCommandRegistry();
 const ALL_FLAGS = ['--proyecto_id=']
 
 register({
   name: '/capturas_listar',
-  category: 'Capturas',
+  category: 'Navegador',
   description: 'Lista las capturas de pantalla del proyecto vinculado a la sesión o de un proyecto específico.',
-  usage: '/capturas_listar [proyecto_id]',
+  usage: '/capturas_listar [--proyecto_id=<id>]',
   async autocomplete(args, cmdStore) {
     const usedFlags = getUsedFlags(args)
     const suggestions = ALL_FLAGS.filter(f => {
@@ -26,12 +26,13 @@ register({
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
 
-    let proyectoId = args[0]
+    const { params } = parseCommandArgs(args, { proyecto_id: { required: false } })
+    let proyectoId = params.proyecto_id
     if (!proyectoId) {
       const session = (chatStore.sessions || []).find(s => Number(s.id) === Number(sessionId))
       proyectoId = session?.proyecto_id
       if (!proyectoId) {
-        throw new Error('No hay un proyecto vinculado a esta sesión. Especifique un proyecto_id como argumento.')
+        throw new Error('No hay un proyecto vinculado a esta sesión. Especifique --proyecto_id=<id>.')
       }
     }
 

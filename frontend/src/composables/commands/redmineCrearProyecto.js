@@ -16,7 +16,7 @@ register({
         const res = await fetch('/api/workspaces', { credentials: 'include' })
         const data = await res.json()
         if (data.workspaces) {
-          cmdStore.setAutocomplete(data.workspaces.map(w => `--workspace=${w.id}`))
+          cmdStore.showAutocomplete(data.workspaces.map(w => `--workspace=${w.id}`))
           return
         }
       } catch (err) {
