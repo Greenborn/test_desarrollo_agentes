@@ -511,6 +511,14 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 - **Body:** `{ id: string, descripcion: string }`
 - **Respuesta:** `{ success: true }`
 
+### `POST /api/proyecto/crear-en-redmine`
+- **Auth:** Requerida
+- **Body:** `{ nombre: string, identificador?: string, descripcion?: string, workspace_id?: number, tracker_ids?: number[], asignar_a_sesion?: boolean, sessionId?: number }`
+- **Descripción:** Crea un proyecto en Redmine (`POST /projects.json`) y lo guarda en la tabla `proyectos` local con el `redmine_id` devuelto. Si `asignar_a_sesion` y `sessionId` se proveen, asigna el proyecto a la sesión. `tracker_ids` permite especificar qué trackers habilitar en el proyecto Redmine. Si no se provee `identificador`, se genera automáticamente desde el nombre (slug).
+- **Respuesta 200:** `{ success: true, proyecto: { id, workspace_id, descripcion, redmine_id, ... } }`
+- **Respuesta 400:** `{ error: "..." }` (nombre requerido, workspace no encontrado, Redmine no configurado, duplicado)
+- **Respuesta 500:** `{ error: "..." }` (error al crear en Redmine o al insertar local)
+
 ### `GET /api/proyecto/session/:sessionId`
 - **Auth:** Requerida
 - **Respuesta:** `{ proyectoId: string|null }`
@@ -691,6 +699,12 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Lee `redmine_token` y `redmine_url` de la configuración, hace una petición GET a `${redmine_url}/projects.json` con autenticación Bearer, y devuelve si la conexión fue exitosa o no.
 - **Respuesta 200:** `{ success: true, message: "Conexión exitosa a Redmine." }`
 - **Respuesta 200 (error):** `{ success: false, message: "Error: ..." }`
+
+### `GET /api/redmine/proyectos/options`
+- **Auth:** Requerida
+- **Query:** `workspace_id` (number, opcional — usa el primero de la sesión si no se provee)
+- **Descripción:** Obtiene los trackers, prioridades y estados disponibles desde la instancia Redmine configurada para el espacio de trabajo especificado. Consulta `/trackers.json`, `/enumerations/issue_priorities.json` y `/issue_statuses.json`.
+- **Respuesta 200:** `{ trackers: [{ id, name }], priorities: [{ id, name }], statuses: [{ id, name }] }`
 
 ### `GET /api/redmine/proyectos`
 - **Auth:** Requerida

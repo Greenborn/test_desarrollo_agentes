@@ -42,6 +42,8 @@ register({
         const res = await fetch('/api/redmine/proyectos/import-all', {
           method: 'POST',
           credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId }),
         })
         const data = await res.json()
 
@@ -107,6 +109,7 @@ register({
           created_on: match.created_on,
           updated_on: match.updated_on,
           parent: match.parent,
+          sessionId,
         }),
       })
       const importData = await importRes.json()

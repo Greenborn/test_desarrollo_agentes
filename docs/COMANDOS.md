@@ -45,6 +45,7 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/redmine_listar_tickets` | Obtiene la lista de tickets de Redmine para un proyecto importado. Usa Tab para autocompletar con los proyectos disponibles | `/redmine_listar_tickets --id=<id_proyecto>` |
 | `/redmine_importar_tickets` | Importa todos los tickets de Redmine de un proyecto o de todos los proyectos a la base de datos local. Usa Tab para autocompletar | `/redmine_importar_tickets [--id=<id_proyecto> \| --all]` |
 | `/redmine_crear_ticket` | Abre un formulario inline para crear un nuevo ticket en Redmine: seleccionar proyecto, asunto, descripción, estado, prioridad, asignado y % de avance | `/redmine_crear_ticket` |
+| `/redmine_crear_proyecto` | Crea un nuevo proyecto en la base de datos local y en Redmine. Solicita espacio de trabajo (determina la instancia Redmine), nombre, identificador, descripción y trackers a habilitar (cargados dinámicamente desde Redmine). Los parámetros opcionales pre-rellenan el formulario | `/redmine_crear_proyecto [--nombre=<nombre>] [--descripcion=<texto>] [--workspace=<id>]` |
 | `/peticion` | Abre un formulario inline tipo Postman para simular una petición HTTP. Permite elegir método, URL, headers (clave/valor dinámicos) y body. La respuesta se muestra en el chat con código de estado, headers y body. Si el body excede el límite configurado (`request_response_max_size_kb`, default 100KB), se trunca — nunca se rechaza. | `/peticion` |
 
 ---

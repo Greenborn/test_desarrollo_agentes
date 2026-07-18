@@ -33,6 +33,7 @@
       <TicketCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_comment'" :ticketId="parsedControl.ticketId" :sessionId="String(parsedControl.sessionId ?? '')" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DeployConfigForm v-else-if="parsedControl && parsedControl.controlType === 'deploy_config_form'" :initialSubprojects="parsedControl.initialSubprojects || []" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <NavegadorIniciarForm v-else-if="parsedControl && parsedControl.controlType === 'navegador_iniciar'" :session-id="String(parsedControl.sessionId ?? '')" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <CrearProyectoRedmineControl v-else-if="parsedControl && parsedControl.controlType === 'redmine_crear_proyecto'" :prefill="parsedControl.prefill || {}" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <ChatCdSelector v-else-if="parsedControl && parsedControl.controlType === 'cd_selector'" :current-dir="parsedControl.currentDir || '/' " @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <PeticionFormControl v-else-if="parsedControl && parsedControl.controlType === 'peticion'" :sending="parsedControl.sending || false" :progressText="parsedControl.progressText || ''" :initialData="parsedControl.initialData || null" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <PeticionResultDisplay v-else-if="parsedControl && parsedControl.controlType === 'peticion_result'" :payload="parsedControl.payload || {}" />
@@ -145,11 +146,12 @@ import TicketCommentControl from '../tickets/TicketCommentControl.vue'
 import PeticionFormControl from '../peticiones/PeticionFormControl.vue'
 import PeticionResultDisplay from '../peticiones/PeticionResultDisplay.vue'
 import NavegadorIniciarForm from '../chat-controls/NavegadorIniciarForm.vue'
+import CrearProyectoRedmineControl from '../projects/CrearProyectoRedmineControl.vue'
 
 let counter = 0
 
 export default {
-  components: { ControlSelect, ControlTextarea, ChatCdSelector, DeployConfigForm, ChatControlFollowup, ChatOpencodeForm, ChatGenerarCommitForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, TicketCreateControl, DescripcionEditControl, DescripcionInputControl, DescripcionResultControl, CommitResultControl, ChatControlButtons, ResolutionSelectControl, RedmineCommentsSendControl, AmbientesDiffCommentControl, TicketCommentControl, ChatComandoEditControl, PeticionFormControl, PeticionResultDisplay, NavegadorIniciarForm },
+  components: { ControlSelect, ControlTextarea, ChatCdSelector, DeployConfigForm, ChatControlFollowup, ChatOpencodeForm, ChatGenerarCommitForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, TicketCreateControl, DescripcionEditControl, DescripcionInputControl, DescripcionResultControl, CommitResultControl, ChatControlButtons, ResolutionSelectControl, RedmineCommentsSendControl, AmbientesDiffCommentControl, TicketCommentControl, ChatComandoEditControl, PeticionFormControl, PeticionResultDisplay, NavegadorIniciarForm, CrearProyectoRedmineControl },
   props: {
     msg: { type: Object, required: true },
     rawMsgKeys: { type: Set, default: () => new Set() },

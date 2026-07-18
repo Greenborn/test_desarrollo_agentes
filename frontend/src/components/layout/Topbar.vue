@@ -353,31 +353,37 @@ export default {
       category: 'Proyecto',
       description: 'Asigna un proyecto a la sesión actual, o crea uno nuevo si se invoca sin parámetros.',
       usage: '/chat_set_proyecto [--id=&lt;id_proyecto&gt;]',
-      async autocomplete(args, cmdStore) {
-        const usedFlags = getUsedFlags(args)
-        const idInUse = usedFlags.includes('--id=') || usedFlags.includes('--id')
-        if (idInUse) {
-          const idArg = args.find(a => a.startsWith('--id='))
-          const val = idArg ? idArg.slice('--id='.length) : ''
-          try {
-            const res = await fetch('/api/proyecto', { credentials: 'include' })
-            const data = await res.json()
-            if (data.proyectos) {
-              const prefix = val.toLowerCase()
-              const filtered = data.proyectos.filter(p => p.id.toLowerCase().includes(prefix))
-              if (val && filtered.length === 1 && filtered[0].id === val) {
-                cmdStore.hideAutocomplete()
-              } else {
-                cmdStore.showAutocomplete(filtered.map(p => ({ display: p.id, value: `--id=${p.id}` })))
+        async autocomplete(args, cmdStore) {
+          const usedFlags = getUsedFlags(args)
+          const idInUse = usedFlags.includes('--id=') || usedFlags.includes('--id')
+          if (idInUse) {
+            const idArg = args.find(a => a.startsWith('--id='))
+            const val = idArg ? idArg.slice('--id='.length) : ''
+            try {
+              const res = await fetch('/api/proyecto', { credentials: 'include' })
+              const data = await res.json()
+              if (data.proyectos) {
+                let filtered = data.proyectos
+                const activeSession = chatStore.sessions.find(s => Number(s.id) === Number(chatStore.activeSessionId))
+                const sessionWsId = activeSession?.workspace_id
+                if (sessionWsId) {
+                  filtered = filtered.filter(p => Number(p.workspace_id) === Number(sessionWsId))
+                }
+                const prefix = val.toLowerCase()
+                filtered = filtered.filter(p => p.id.toLowerCase().includes(prefix))
+                if (val && filtered.length === 1 && filtered[0].id === val) {
+                  cmdStore.hideAutocomplete()
+                } else {
+                  cmdStore.showAutocomplete(filtered.map(p => ({ display: p.id, value: `--id=${p.id}` })))
+                }
               }
+            } catch (err) {
+              console.error('Error en autocomplete de /chat_set_proyecto:', err)
             }
-          } catch (err) {
-            console.error('Error en autocomplete de /chat_set_proyecto:', err)
+          } else {
+            cmdStore.showAutocomplete(['--id='])
           }
-        } else {
-          cmdStore.showAutocomplete(['--id='])
-        }
-      },
+        },
       async execute(args, { cmdStore, chatStore, sessionId }) {
         if (!sessionId) {
           console.error('Error en /chat_set_proyecto: no hay sesión de chat activa')

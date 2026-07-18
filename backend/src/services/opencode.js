@@ -14,7 +14,7 @@ class OpenCodeServer {
   constructor(directory, port, locale) {
     this.directory = directory;
     this.port = port;
-    this.locale = locale || 'es_ES.UTF-8';
+    this.locale = locale || 'es_AR.UTF-8';
     this.process = null;
     this.ready = false;
     this._abortController = null;
@@ -26,6 +26,7 @@ class OpenCodeServer {
 
   start() {
     return new Promise((resolve, reject) => {
+      let settled = false;
       this.process = spawn('opencode', ['serve', '--port', String(this.port)], {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: { ...process.env, LANG: this.locale, LC_ALL: this.locale },
@@ -33,13 +34,15 @@ class OpenCodeServer {
       });
 
       const timeout = setTimeout(() => {
+        settled = true;
         reject(new Error(`Timeout esperando que opencode sirva en ${this.directory}`));
       }, 15000);
 
       const onData = (data) => {
         const text = data.toString();
         console.log(`[opencode ${this.port}]`, text.trim());
-        if (text.includes('listening') || text.includes('Server')) {
+        if (text.includes('listening on') && !settled) {
+          settled = true;
           this.ready = true;
           clearTimeout(timeout);
           resolve();
@@ -54,6 +57,10 @@ class OpenCodeServer {
         this.process = null;
         this.ready = false;
         clearTimeout(timeout);
+        if (!settled) {
+          settled = true;
+          reject(new Error(`OpenCode process exited with code ${code} before becoming ready`));
+        }
       });
 
       this.process.on('error', (err) => {
@@ -61,7 +68,10 @@ class OpenCodeServer {
         this.process = null;
         this.ready = false;
         clearTimeout(timeout);
-        reject(err);
+        if (!settled) {
+          settled = true;
+          reject(err);
+        }
       });
     });
   }
@@ -97,7 +107,13 @@ class OpenCodeServer {
       const proc = this.process;
       this.process = null;
       this.ready = false;
-      proc.kill('SIGTERM');
+      try {
+        proc.kill('SIGTERM');
+      } catch (err) {
+        if (err.code !== 'ESRCH') {
+          console.log(`[opencode ${this.port}] error al enviar SIGTERM:`, err.message);
+        }
+      }
       setTimeout(() => {
         try {
           proc.kill('SIGKILL');
@@ -291,7 +307,11 @@ function stopEditorServer(directory) {
 
 function stopAllServers() {
   for (const key of Object.keys(servers)) {
-    servers[key].server.stop();
+    try {
+      servers[key].server.stop();
+    } catch (err) {
+      console.log(`[opencode] error al detener servidor ${key}:`, err.message);
+    }
     delete servers[key];
   }
 }

@@ -479,6 +479,76 @@ export function useControlHandlers(api) {
         }
       }
       return
+    } else if (controlType === 'redmine_crear_proyecto') {
+      if (value === null) {
+        const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+        if (idx >= 0) {
+          chat.messages[idx] = {
+            role: 'result',
+            content: 'Creación cancelada.',
+            _key: 'result-' + Date.now(),
+          }
+        }
+        return
+      }
+      try {
+        const res = await fetch('/api/proyecto/crear-en-redmine', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ ...value, sessionId: chat.activeSessionId }),
+        })
+        const data = await res.json()
+        const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+        if (idx >= 0) {
+          if (data.success) {
+            if (value.asignar_a_sesion && chat.activeSessionId) {
+              try {
+                const pr = await fetch('/api/proyecto/session', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ sessionId: chat.activeSessionId, proyectoId: data.proyecto.id, cwd: '' }),
+                })
+                const pd = await pr.json()
+                if (pd.workspaceIds) {
+                  const ws = useWorkspaceStore()
+                  const au = useAuthStore()
+                  ws.selectedIds = pd.workspaceIds
+                  au.setWorkspaceIds(pd.workspaceIds)
+                }
+              } catch (err) {
+                console.error('Error al asignar proyecto a sesión:', err)
+              }
+            }
+            const projectStore = (await import('../stores/project.js')).useProjectStore()
+            projectStore.loadProjects()
+            await chat.loadSessions()
+            chat.messages[idx] = {
+              role: 'result',
+              content: '✓ Proyecto "' + data.proyecto.id + '" creado correctamente en Redmine (#' + data.proyecto.redmine_id + ').',
+              _key: 'result-' + Date.now(),
+            }
+          } else {
+            chat.messages[idx] = {
+              role: 'result',
+              content: 'Error: ' + (data.error || 'Error al crear proyecto'),
+              _key: 'err-' + Date.now(),
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error al crear proyecto:', err)
+        const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+        if (idx >= 0) {
+          chat.messages[idx] = {
+            role: 'result',
+            content: 'Error de conexión al crear el proyecto.',
+            _key: 'err-' + Date.now(),
+          }
+        }
+      }
+      return
     } else if (controlType === 'redmine_comments_send') {
       if (value === null) {
         const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)

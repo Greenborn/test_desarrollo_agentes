@@ -93,8 +93,9 @@ export default {
     })
 
     function handleEnter() {
-      if (autocompleteVisible.value && arrowIndex.value >= 0 && arrowIndex.value < autocompleteOptions.value.length) {
-        pickAutocomplete(autocompleteOptions.value[arrowIndex.value])
+      if (autocompleteVisible.value && autocompleteOptions.value.length > 0) {
+        const idx = arrowIndex.value >= 0 ? arrowIndex.value : 0
+        pickAutocomplete(autocompleteOptions.value[idx])
         return
       }
       submit()
@@ -192,6 +193,11 @@ export default {
     }
 
     async function handleTab() {
+      if (autocompleteVisible.value && arrowIndex.value >= 0 && arrowIndex.value < autocompleteOptions.value.length) {
+        pickAutocomplete(autocompleteOptions.value[arrowIndex.value])
+        return
+      }
+
       cmdStore.hideAutocomplete()
 
       const trimmed = buffer.value.trim()

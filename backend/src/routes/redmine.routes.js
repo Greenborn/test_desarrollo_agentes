@@ -69,6 +69,50 @@ router.post('/test', async (req, res) => {
   }
 });
 
+router.get('/proyectos/options', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const workspaceId = parseInt(req.query.workspace_id) || req.session.workspaceIds?.[0] || 1;
+
+  try {
+    const token = await getRedmineToken(workspaceId);
+    const url = await getRedmineUrl(workspaceId);
+
+    if (!token || !url) {
+      return res.json({ trackers: [], priorities: [], statuses: [] });
+    }
+
+    const baseUrl = url.replace(/\/+$/, '');
+
+    const [trackersRes, prioritiesRes, statusesRes] = await Promise.all([
+      fetch(baseUrl + '/trackers.json', {
+        headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+      }),
+      fetch(baseUrl + '/enumerations/issue_priorities.json', {
+        headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+      }),
+      fetch(baseUrl + '/issue_statuses.json', {
+        headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+      }),
+    ]);
+
+    const [trackersData, prioritiesData, statusesData] = await Promise.all([
+      trackersRes.json(),
+      prioritiesRes.json(),
+      statusesRes.json(),
+    ]);
+
+    res.json({
+      trackers: (trackersData.trackers || []).map(t => ({ id: t.id, name: t.name })),
+      priorities: (prioritiesData.issue_priorities || []).map(p => ({ id: p.id, name: p.name })),
+      statuses: (statusesData.issue_statuses || []).map(s => ({ id: s.id, name: s.name })),
+    });
+  } catch (err) {
+    console.log('Error al obtener opciones Redmine para proyecto:', err.message);
+    res.json({ trackers: [], priorities: [], statuses: [] });
+  }
+});
+
 router.get('/proyectos', async (req, res) => {
   if (!authGuard(req, res)) return;
 
@@ -124,12 +168,21 @@ router.get('/proyectos', async (req, res) => {
   }
 });
 
+function _getWsId(req) {
+  const { sessionId } = req.body;
+  if (sessionId) {
+    return db('chat_sessions').where({ id: sessionId, user_id: req.session.userId }).select('workspace_id').first();
+  }
+  return Promise.resolve(null);
+}
+
 router.post('/proyectos/import-all', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const wsId = wsIds[0] || 1;
+    const session = await _getWsId(req);
+    const wsId = session?.workspace_id || wsIds[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
 
@@ -184,12 +237,10 @@ router.post('/proyectos/import-all', async (req, res) => {
           continue;
         }
 
-        const existing = await db('proyectos').where({ redmine_id: p.id }).first();
-        const wsIds = req.session.workspaceIds || [1];
-        const wsId = wsIds[0] || 1;
+        const existing = await db('proyectos').where({ redmine_id: p.id, workspace_id: wsId }).first();
 
         if (existing) {
-          await db('proyectos').where({ redmine_id: p.id }).update({
+          await db('proyectos').where({ redmine_id: p.id, workspace_id: wsId }).update({
             descripcion: p.description || '',
             redmine_status: p.status || null,
             redmine_updated_on: toDateTime(p.updated_on),
@@ -256,9 +307,10 @@ router.post('/proyectos/import', async (req, res) => {
 
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const wsId = wsIds[0] || 1;
+    const session = await _getWsId(req);
+    const wsId = session?.workspace_id || wsIds[0] || 1;
 
-    const existing = await db('proyectos').where({ redmine_id: id }).first();
+    const existing = await db('proyectos').where({ redmine_id: id, workspace_id: wsId }).first();
 
     const data = {
       descripcion: description || '',
@@ -272,7 +324,7 @@ router.post('/proyectos/import', async (req, res) => {
     };
 
     if (existing) {
-      await db('proyectos').where({ redmine_id: id }).update(data);
+      await db('proyectos').where({ redmine_id: id, workspace_id: wsId }).update(data);
       res.json({ success: true, proyectoId: existing.id, action: 'updated' });
     } else {
       data.id = proyectoId;

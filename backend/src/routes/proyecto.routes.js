@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db from '../config/db.js';
 import memoriaClient from '../services/memoriaClient.js';
+import { getRedmineToken, getRedmineUrl } from '../services/redmine.js';
 
 const router = Router();
 
@@ -49,6 +50,97 @@ router.post('/proyecto', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.log('Error al crear proyecto:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/proyecto/crear-en-redmine', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  const { nombre, identificador, descripcion, workspace_id, tracker_ids, asignar_a_sesion } = req.body;
+
+  if (!nombre || !nombre.trim()) {
+    return res.status(400).json({ error: 'El nombre del proyecto es requerido.' });
+  }
+
+  const wsId = workspace_id || req.session.workspaceIds?.[0] || 1;
+
+  try {
+    const workspace = await db('workspaces').where({ id: wsId }).first();
+    if (!workspace) {
+      return res.status(400).json({ error: 'Espacio de trabajo no encontrado.' });
+    }
+
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
+
+    if (!token || !url) {
+      return res.status(400).json({ error: 'Redmine no configurado para este espacio de trabajo.' });
+    }
+
+    const baseUrl = url.replace(/\/+$/, '');
+
+    const slug = identificador || nombre.trim().toLowerCase()
+      .replace(/[^a-z0-9\s_-]/g, '')
+      .replace(/[\s]+/g, '_')
+      .replace(/-+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+
+    const redminePayload = { name: nombre.trim(), identifier: slug };
+    if (descripcion) redminePayload.description = descripcion;
+    if (tracker_ids && tracker_ids.length > 0) {
+      redminePayload.tracker_ids = tracker_ids;
+    }
+
+    const redmineRes = await fetch(baseUrl + '/projects.json', {
+      method: 'POST',
+      headers: {
+        'X-Redmine-API-Key': token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ project: redminePayload }),
+    });
+
+    if (!redmineRes.ok) {
+      const errText = await redmineRes.text();
+      console.log('Error al crear proyecto en Redmine:', errText);
+      return res.status(500).json({ error: 'Error al crear proyecto en Redmine: ' + (errText.slice(0, 300)) });
+    }
+
+    const redmineData = await redmineRes.json();
+    const redmineProject = redmineData.project;
+
+    const insertData = {
+      id: slug,
+      workspace_id: wsId,
+      descripcion: descripcion || nombre.trim(),
+      redmine_id: redmineProject.id,
+      redmine_status: redmineProject.status || null,
+      redmine_created_on: redmineProject.created_on ? redmineProject.created_on.replace('Z', '').replace('T', ' ').split('.')[0] : null,
+      redmine_updated_on: redmineProject.updated_on ? redmineProject.updated_on.replace('Z', '').replace('T', ' ').split('.')[0] : null,
+      redmine_parent_id: redmineProject.parent?.id ? String(redmineProject.parent.id) : null,
+      redmine_parent_name: redmineProject.parent?.name || null,
+    };
+
+    await db('proyectos').insert(insertData);
+
+    const created = await db('proyectos').where({ id: slug }).first();
+
+    if (asignar_a_sesion && req.body.sessionId) {
+      await db('chat_sessions')
+        .where({ id: req.body.sessionId, user_id: req.session.userId })
+        .update({ proyecto_id: slug, workspace_id: wsId, updated_at: db.fn.now() });
+    }
+
+    res.json({ success: true, proyecto: created });
+  } catch (err) {
+    console.log('Error al crear proyecto en Redmine:', err.message);
+
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'Ya existe un proyecto con ese identificador en la base local.' });
+    }
+
     res.status(500).json({ error: err.message });
   }
 });

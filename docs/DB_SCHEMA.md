@@ -181,7 +181,7 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 | `id` | VARCHAR(255) | PK (string, no auto-increment) — slug del nombre Redmine |
 | `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` — FK lógica → `workspaces(id)` |
 | `descripcion` | TEXT | NOT NULL — descripción completa desde Redmine |
-| `redmine_id` | INTEGER | NOT NULL — ID numérico del proyecto en Redmine |
+| `redmine_id` | INTEGER | NOT NULL — ID numérico del proyecto en Redmine. Unique compuesto con `workspace_id` |
 | `redmine_status` | INTEGER | nullable — 1=activo, 5=archivado, 9=cerrado |
 | `redmine_created_on` | DATETIME | nullable — fecha creación en Redmine |
 | `redmine_updated_on` | DATETIME | nullable — fecha actualización en Redmine |

@@ -14,7 +14,7 @@
             — Todos los mensajes cargados —
           </div>
           <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
-          <template v-for="ts in terminalSessions" :key="ts.sid + '-' + (ts.terminalId || ts._idx)">
+          <template v-for="ts in terminalSessions" :key="ts.sid + '-' + ts._key">
             <XtermTerminal v-show="ts.isActive" :label="ts.label" :cwd="ts.cwd" :init-command="ts.initCommand" :session-id="ts.sid" :terminal-id="ts.terminalId" @close="onTerminalClose" @terminal-ready="onTerminalReady" @exit="onTerminalExit" />
           </template>
         </div>
@@ -93,10 +93,10 @@ export default {
       const result = []
       for (const [sid, terminals] of Object.entries(ts)) {
         if (!Array.isArray(terminals)) continue
-        terminals.forEach((t, idx) => {
+        terminals.forEach((t) => {
           result.push({
             sid,
-            _idx: idx,
+            _key: t._key,
             terminalId: t.terminalId,
             label: t.label,
             cwd: t.cwd,

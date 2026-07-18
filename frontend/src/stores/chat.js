@@ -34,9 +34,15 @@ export const useChatStore = defineStore('chat', () => {
   const _cmdPendingSave = ref({})
   const _terminalSessions = ref({})
   const maxTerminalsLimit = ref(2)
+  let _nextTerminalKey = 1
+
+  function _genTerminalKey() {
+    return _nextTerminalKey++
+  }
 
   function _getSessionTerminals(sid) {
-    return sid ? _terminalSessions.value[sid] : null
+    if (!sid || !_terminalSessions.value[sid]) return []
+    return _terminalSessions.value[sid]
   }
 
   function _getSessionTerminal(sid) {
@@ -90,7 +96,8 @@ export const useChatStore = defineStore('chat', () => {
           }).catch(() => {})
         }
       }
-      terminals.push({ terminalId: null, cwd: '', initCommand: '', label: 'terminal' })
+      const entry = { _key: _genTerminalKey(), terminalId: null, cwd: '', initCommand: '', label: 'terminal' }
+      terminals.push(entry)
       flashLed(sid)
       return
     }
@@ -127,6 +134,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const newTerminal = {
+      _key: _genTerminalKey(),
       terminalId: config.terminalId || null,
       cwd: config.cwd || '',
       initCommand: config.initCommand || '',
