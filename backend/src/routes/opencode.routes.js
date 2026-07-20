@@ -955,8 +955,16 @@ router.post('/sync-skills-project', async (req, res) => {
     return res.status(400).json({ error: 'No hay espacios de trabajo seleccionados en la sesión.' })
   }
 
+  const { sessionId } = req.body
+
   try {
-    const projectRoot = path.resolve(__dirname, '../../..')
+    let projectRoot = path.resolve(__dirname, '../../..')
+    if (sessionId) {
+      const chatSession = await db('chat_sessions').where({ id: sessionId }).select('cwd').first()
+      if (chatSession && chatSession.cwd) {
+        projectRoot = chatSession.cwd
+      }
+    }
     const configDir = path.join(projectRoot, '.opencode')
     const configPath = path.join(configDir, 'opencode.json')
 

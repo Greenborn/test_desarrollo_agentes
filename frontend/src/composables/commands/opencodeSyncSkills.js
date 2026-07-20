@@ -11,7 +11,16 @@ register({
   async autocomplete(args, cmdStore) {
     cmdStore.hideAutocomplete()
   },
-  async execute(args, { chatStore }) {
+  async execute(args, { chatStore, sessionId }) {
+    if (!sessionId) {
+      chatStore.messages.push({
+        role: 'result',
+        content: 'Primero debe iniciar una sesión de chat.',
+        _key: 'sync-err-' + Date.now(),
+      })
+      return
+    }
+
     const { errors } = parseCommandArgs(args, {})
     if (errors.length > 0) {
       chatStore.messages.push({
@@ -27,6 +36,7 @@ register({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ sessionId }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al sincronizar skills')
