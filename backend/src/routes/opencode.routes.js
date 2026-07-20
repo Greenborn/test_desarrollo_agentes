@@ -979,8 +979,16 @@ router.post('/sync-skills-project', async (req, res) => {
     if (!config.skills) config.skills = {}
     if (!Array.isArray(config.skills.paths)) config.skills.paths = []
 
-    const existingPaths = new Set(config.skills.paths)
-    let changed = false
+    // Limpiar paths existentes: resolver relativos contra configRoot (projectRoot)
+    // y descartar los que no existan, para que OpenCode funcione desde cualquier cwd
+    const configRoot = projectRoot
+    const resolvedPaths = new Set()
+    for (const p of config.skills.paths) {
+      const abs = path.isAbsolute(p) ? p : path.resolve(configRoot, p)
+      if (fs.existsSync(abs)) {
+        resolvedPaths.add(abs)
+      }
+    }
 
     for (const wsId of workspaceIds) {
       const ws = await db('workspaces').where({ id: wsId }).select('slug').first()
@@ -995,10 +1003,8 @@ router.post('/sync-skills-project', async (req, res) => {
       const skillPaths = getRepoSkillPaths(repoDir)
       for (const relPath of skillPaths) {
         const absPath = path.resolve(repoDir, relPath)
-        if (fs.existsSync(absPath) && !existingPaths.has(absPath)) {
-          config.skills.paths.push(absPath)
-          existingPaths.add(absPath)
-          changed = true
+        if (fs.existsSync(absPath)) {
+          resolvedPaths.add(absPath)
         }
       }
     }
@@ -1007,20 +1013,23 @@ router.post('/sync-skills-project', async (req, res) => {
     const rootPaths = getRepoSkillPaths(projectRoot)
     for (const relPath of rootPaths) {
       const absPath = path.resolve(projectRoot, relPath)
-      if (fs.existsSync(absPath) && !existingPaths.has(absPath)) {
-        config.skills.paths.push(absPath)
-        existingPaths.add(absPath)
-        changed = true
+      if (fs.existsSync(absPath)) {
+        resolvedPaths.add(absPath)
       }
     }
+
+    const newPaths = Array.from(resolvedPaths).sort()
+    const changed = JSON.stringify(config.skills.paths) !== JSON.stringify(newPaths)
 
     if (!changed) {
       return res.json({
         success: true,
         message: 'Todos los paths de skills de los espacios de trabajo ya estaban sincronizados en la configuración del proyecto.',
-        config,
+        config: { ...config, skills: { paths: newPaths } },
       })
     }
+
+    config.skills.paths = newPaths
 
     if (!fs.existsSync(configDir)) {
       fs.mkdirSync(configDir, { recursive: true })
