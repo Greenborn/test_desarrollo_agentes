@@ -947,6 +947,91 @@ router.get('/test-image', async (req, res) => {
   }
 });
 
+router.post('/sync-skills-project', async (req, res) => {
+  if (!authGuard(req, res)) return
+
+  const workspaceIds = req.session.workspaceIds
+  if (!workspaceIds || workspaceIds.length === 0) {
+    return res.status(400).json({ error: 'No hay espacios de trabajo seleccionados en la sesión.' })
+  }
+
+  try {
+    const projectRoot = path.resolve(__dirname, '../../..')
+    const configDir = path.join(projectRoot, '.opencode')
+    const configPath = path.join(configDir, 'opencode.json')
+
+    let config = { $schema: 'https://opencode.ai/config.json', skills: { paths: [] } }
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+      } catch (parseErr) {
+        console.log('[opencode] Error parseando config del proyecto, se sobrescribirá:', parseErr.message)
+      }
+    }
+    if (!config.skills) config.skills = {}
+    if (!Array.isArray(config.skills.paths)) config.skills.paths = []
+
+    const existingPaths = new Set(config.skills.paths)
+    let changed = false
+
+    for (const wsId of workspaceIds) {
+      const ws = await db('workspaces').where({ id: wsId }).select('slug').first()
+      if (!ws || !ws.slug) continue
+
+      const repoDir = path.join(OPENCODE_DEV_DIR, ws.slug)
+      if (!fs.existsSync(repoDir)) {
+        console.log(`[opencode] Workspace ${ws.slug}: repo dir no encontrado en ${repoDir}`)
+        continue
+      }
+
+      const skillPaths = getRepoSkillPaths(repoDir)
+      for (const relPath of skillPaths) {
+        const absPath = path.resolve(repoDir, relPath)
+        if (fs.existsSync(absPath) && !existingPaths.has(absPath)) {
+          config.skills.paths.push(absPath)
+          existingPaths.add(absPath)
+          changed = true
+        }
+      }
+    }
+
+    // También registrar paths de skills del proyecto raíz
+    const rootPaths = getRepoSkillPaths(projectRoot)
+    for (const relPath of rootPaths) {
+      const absPath = path.resolve(projectRoot, relPath)
+      if (fs.existsSync(absPath) && !existingPaths.has(absPath)) {
+        config.skills.paths.push(absPath)
+        existingPaths.add(absPath)
+        changed = true
+      }
+    }
+
+    if (!changed) {
+      return res.json({
+        success: true,
+        message: 'Todos los paths de skills de los espacios de trabajo ya estaban sincronizados en la configuración del proyecto.',
+        config,
+      })
+    }
+
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true })
+    }
+    config.$schema = 'https://opencode.ai/config.json'
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
+
+    console.log(`[opencode] Skills del proyecto sincronizados en ${configPath}`)
+    res.json({
+      success: true,
+      message: `Skills de los espacios de trabajo sincronizados en la configuración de OpenCode del proyecto.`,
+      config,
+    })
+  } catch (err) {
+    console.log('Error en opencode/sync-skills-project:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 router.post('/register-skills-global', async (req, res) => {
   if (!authGuard(req, res)) return;
 

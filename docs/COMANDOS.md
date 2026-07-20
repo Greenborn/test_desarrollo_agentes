@@ -240,6 +240,7 @@ Cada comando se guarda en la tabla `comandos_personalizados_proyectos` y se ejec
 |---------|-------------|-----|
 | `/skill_editar` | Crea o edita un skill usando OpenCode. Si no existe, lo crea automáticamente. Toma el cwd de la sesión de chat | `/skill_editar <nombre_skill> <prompt...>` |
 | `/ambientes_skills_registrar` | Registra las rutas absolutas de skills de ambientes de trabajo en la configuración global de OpenCode (`~/.config/opencode/opencode.json`). Sin `--slug` registra skills de todos los workspaces. Usa Tab para autocompletar `--slug=` | `/ambientes_skills_registrar [--slug=<workspace_slug>]` |
+| `/opencode_sync_skills` | Sincroniza los paths de skills de los espacios de trabajo seleccionados en la configuración de OpenCode del proyecto (`.opencode/opencode.json`). Toma los workspaces de la sesión actual de chat | `/opencode_sync_skills` |
 
 Los skills se almacenan en `.agents/skills/<nombre>/SKILL.md` y son instrucciones especializadas que el asistente puede cargar para tareas específicas.
 

@@ -69,6 +69,7 @@ import './composables/commands/terminalToggle.js'
 import './composables/commands/terminalCerrar.js'
 import './composables/commands/dbExport.js'
 import './composables/commands/ambientesSkillsRegistrar.js'
+import './composables/commands/opencodeSyncSkills.js'
 
 const app = createApp(App)
 const pinia = createPinia()
