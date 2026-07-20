@@ -89,6 +89,19 @@ export const useTicketFormStore = defineStore('ticketForm', () => {
     }
   }
 
+  async function loadProjectTrackers(projectId) {
+    if (!projectId) return
+    try {
+      const res = await fetch(`${API}/tickets/project-trackers/${projectId}`, { credentials: 'include' })
+      const data = await res.json()
+      if (data.trackers && data.trackers.length > 0) {
+        options.trackers = data.trackers
+      }
+    } catch (err) {
+      console.error('Error al cargar trackers del proyecto:', err)
+    }
+  }
+
   function clear() {
     options.statuses = []
     options.priorities = []
@@ -106,5 +119,5 @@ export const useTicketFormStore = defineStore('ticketForm', () => {
     loading.value = false
   }
 
-  return { options, allowedStatuses, loading, loadOptions, loadTicketOptions, loadProjectUsers, clear, reset }
+  return { options, allowedStatuses, loading, loadOptions, loadTicketOptions, loadProjectUsers, loadProjectTrackers, clear, reset }
 })

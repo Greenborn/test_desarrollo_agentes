@@ -5,7 +5,9 @@
       ".opencode/skills",
       ".agents",
       "opencode_dev/greenborn_1/.opencode/skills",
-      "/media/debian/Datos_EX4/Trabajo/Greenborn/test_desarrollo_agentes/opencode_dev/greenborn_1/.opencode/skills"
+      "/media/debian/Datos_EX4/Trabajo/Greenborn/test_desarrollo_agentes/opencode_dev/greenborn_1/.opencode/skills",
+      "/media/debian/Datos_EX4/Trabajo/Greenborn/test_desarrollo_agentes/.opencode/skills",
+      "/media/debian/Datos_EX4/Trabajo/Greenborn/test_desarrollo_agentes/.agents"
     ]
   }
 }

@@ -205,13 +205,20 @@ export default {
       const project = allProjects.value.find(p => p.id === form.project_id)
       if (!project) return
       form.project_id = project.id
+      form.tracker_name = ''
       form.assigned_to_name = ''
+      selectedIds.tracker_id = null
       selectedIds.assigned_to_id = null
       loadProjectUsers(project.id)
+      loadProjectTrackers(project.id)
     }
 
     async function loadProjectUsers(projectId) {
       await ticketFormStore.loadProjectUsers(projectId)
+    }
+
+    async function loadProjectTrackers(projectId) {
+      await ticketFormStore.loadProjectTrackers(projectId)
     }
 
     function onPriorityChange() {
@@ -303,12 +310,13 @@ export default {
       }
       if (form.project_id) {
         await loadProjectUsers(form.project_id)
+        await loadProjectTrackers(form.project_id)
       }
     })
 
     return {
       form, options, allProjects, flattenedProjects, errors, saving, selectedIds, autoAssign, createBranch, workspaceError,
-      save, cancel, onProjectChange, onPriorityChange, onStatusChange, onTrackerChange, onUserChange, loadProjectUsers,
+      save, cancel, onProjectChange, onPriorityChange, onStatusChange, onTrackerChange, onUserChange, loadProjectUsers, loadProjectTrackers,
     }
   },
 }

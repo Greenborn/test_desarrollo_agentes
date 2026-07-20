@@ -16,8 +16,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const ticketDescripcionPrompt = ref('')
   const ticketRefinarPrompt = ref('')
   const deteccionFuncionalidadesPrompt = ref('')
-  const codeFileExtensions = ref('.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql')
-  const codeFileMaxSizeKb = ref(100)
+  const codeFileExtensions = ref('.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql,.json')
+  const codeFileMaxSizeKb = ref(1024)
   const omnifilterDebounceMs = ref(2000)
   const repoAcronimo = ref('TKT')
   const locale = ref('es_ES.UTF-8')
@@ -63,8 +63,8 @@ export const useSettingsStore = defineStore('settings', () => {
       ticketDescripcionPrompt.value = keys.ticket_descripcion_prompt || ''
       ticketRefinarPrompt.value = keys.ticket_refinar_prompt || ''
       deteccionFuncionalidadesPrompt.value = keys.deteccion_funcionalidades_prompt || ''
-      codeFileExtensions.value = keys.code_file_extensions || '.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql'
-      codeFileMaxSizeKb.value = parseInt(keys.code_file_max_size_kb, 10) || 100
+      codeFileExtensions.value = keys.code_file_extensions || '.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql,.json'
+      codeFileMaxSizeKb.value = parseInt(keys.code_file_max_size_kb, 10) || 1024
       omnifilterDebounceMs.value = keys.omnifilter_debounce_ms ? parseInt(keys.omnifilter_debounce_ms, 10) : 2000
       repoAcronimo.value = keys.repo_acronimo || 'TKT'
       locale.value = keys.locale || 'es_ES.UTF-8'
@@ -163,8 +163,8 @@ export const useSettingsStore = defineStore('settings', () => {
     ticketDescripcionPrompt.value = ''
     ticketRefinarPrompt.value = ''
     deteccionFuncionalidadesPrompt.value = ''
-    codeFileExtensions.value = '.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql'
-    codeFileMaxSizeKb.value = 100
+    codeFileExtensions.value = '.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql,.json'
+    codeFileMaxSizeKb.value = 1024
     omnifilterDebounceMs.value = 2000
     repoAcronimo.value = 'TKT'
     locale.value = 'es_ES.UTF-8'

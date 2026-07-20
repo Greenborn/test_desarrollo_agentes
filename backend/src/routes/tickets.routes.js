@@ -408,6 +408,48 @@ router.get('/project-members/:projectId', async (req, res) => {
   }
 });
 
+router.get('/project-trackers/:projectId', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const wsIds = req.session.workspaceIds || [1];
+    const proyecto = await db('proyectos')
+      .select('redmine_id', 'workspace_id')
+      .where({ id: req.params.projectId })
+      .whereIn('workspace_id', wsIds)
+      .first();
+
+    if (!proyecto || !proyecto.redmine_id) {
+      return res.json({ trackers: [] });
+    }
+
+    const wsId = (proyecto && proyecto.workspace_id) || wsIds[0] || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
+    if (!token || !url) {
+      return res.json({ trackers: [] });
+    }
+
+    const baseUrl = url.replace(/\/+$/, '');
+    const projRes = await fetch(`${baseUrl}/projects/${proyecto.redmine_id}.json?include=trackers`, {
+      headers: { 'X-Redmine-API-Key': token, 'Content-Type': 'application/json' },
+    });
+
+    if (!projRes.ok) {
+      console.log(`Error HTTP ${projRes.status} al obtener trackers del proyecto ${req.params.projectId}`);
+      return res.json({ trackers: [] });
+    }
+
+    const projData = await projRes.json();
+    const trackers = (projData.project?.trackers || []).map(t => ({ id: t.id, name: t.name }));
+
+    res.json({ trackers });
+  } catch (err) {
+    console.log('Error al obtener trackers del proyecto:', err.message);
+    res.json({ trackers: [] });
+  }
+});
+
 router.post('/create', async (req, res) => {
   if (!authGuard(req, res)) return;
 
