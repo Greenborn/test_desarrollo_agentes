@@ -33,6 +33,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const browserUserAgentChrome = ref('')
   const browserUserAgentFirefox = ref('')
   const skillRepositoryUrl = ref('')
+  const terminalMaxTerminals = ref(5)
   const saveError = ref('')
   const saveSuccess = ref('')
 
@@ -80,6 +81,7 @@ export const useSettingsStore = defineStore('settings', () => {
       browserUserAgentChrome.value = keys.browser_user_agent_chrome || ''
       browserUserAgentFirefox.value = keys.browser_user_agent_firefox || ''
       skillRepositoryUrl.value = keys.skill_repository_url || ''
+      terminalMaxTerminals.value = parseInt(keys.terminal_max_terminals, 10) || 5
       applyPriorityColors()
     } catch (err) {
       console.error('Error al cargar settings:', err)
@@ -142,6 +144,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'browser_user_agent_chrome': browserUserAgentChrome.value = value; break
       case 'browser_user_agent_firefox': browserUserAgentFirefox.value = value; break
       case 'skill_repository_url': skillRepositoryUrl.value = value; break
+      case 'terminal_max_terminals': terminalMaxTerminals.value = parseInt(value, 10) || 5; break
     }
   }
 
@@ -180,6 +183,7 @@ export const useSettingsStore = defineStore('settings', () => {
     browserUserAgentChrome.value = ''
     browserUserAgentFirefox.value = ''
     skillRepositoryUrl.value = ''
+    terminalMaxTerminals.value = 5
     saveError.value = ''
     saveSuccess.value = ''
   }
@@ -191,7 +195,7 @@ export const useSettingsStore = defineStore('settings', () => {
            documentacionPromptFuncionalidades, ticketDescripcionPrompt, ticketRefinarPrompt,
            deteccionFuncionalidadesPrompt, codeFileExtensions, codeFileMaxSizeKb,
            priorityColorLow, priorityColorNormal, priorityColorHigh, priorityColorUrgent, priorityColorImmediate,
-            skillRepositoryUrl,
-            saveError, saveSuccess, clearFeedback, load, save, applyPriorityColors, reset,
+            skillRepositoryUrl, terminalMaxTerminals,
+             saveError, saveSuccess, clearFeedback, load, save, applyPriorityColors, reset,
             requestResponseMaxSizeKb, browserStealthEnabled, browserUserAgentChrome, browserUserAgentFirefox }
 })

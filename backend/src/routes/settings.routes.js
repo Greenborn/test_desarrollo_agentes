@@ -83,6 +83,8 @@ router.get('/', async (req, res) => {
         keys.browser_user_agent_firefox = row.setting_value;
       } else if (row.setting_key === 'skill_repository_url') {
         keys.skill_repository_url = row.setting_value;
+      } else if (row.setting_key === 'terminal_max_terminals') {
+        keys.terminal_max_terminals = row.setting_value;
       }
     }
     const defaults = {
@@ -108,6 +110,7 @@ router.get('/', async (req, res) => {
       browser_stealth_enabled: '0',
       browser_user_agent_chrome: '',
       browser_user_agent_firefox: '',
+      terminal_max_terminals: '5',
       screen_resolutions: [
         { id: 'fullhd', width: 1920, height: 1080 },
         { id: 'hd', width: 1366, height: 768 },

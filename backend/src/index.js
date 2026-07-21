@@ -76,7 +76,7 @@ async function start() {
     await db.migrate.latest();
     console.log('[migrate] Migraciones ejecutadas correctamente.');
   } catch (err) {
-    console.log('[migrate] Error al ejecutar migraciones:', err.message);
+    console.log('[migrate] Error al ejecutar migraciones:', err.message, '\n', err.stack);
     process.exit(1);
   }
 
@@ -92,6 +92,14 @@ async function start() {
 }
 
 start();
+
+process.on('uncaughtException', (err, origin) => {
+  console.log('[backend] UNCAUGHT EXCEPTION:', err.message, '\n', err.stack, '\norigin:', origin);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.log('[backend] UNHANDLED REJECTION:', reason instanceof Error ? reason.message : reason, '\n', reason instanceof Error ? reason.stack : '');
+});
 
 process.on('exit', () => {
   stopComandosPersonalizados();

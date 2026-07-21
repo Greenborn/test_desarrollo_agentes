@@ -10,7 +10,7 @@ const router = express.Router();
 
 router.post('/upd-config', async (req, res) => {
   try {
-    const { sessionId } = req.body;
+    const { sessionId, dir } = req.body;
 
     if (!sessionId) {
       return res.status(400).json({ success: false, error: 'Se requiere sessionId.' });
@@ -28,7 +28,10 @@ router.post('/upd-config', async (req, res) => {
       });
     }
 
-    const projectDir = session.cwd || process.cwd();
+    const projectDir = dir || session.cwd;
+    if (!projectDir) {
+      return res.status(400).json({ success: false, error: 'No se pudo determinar el directorio del proyecto. Use --dir=<ruta> o /cd para establecer el directorio de trabajo.' });
+    }
     const deployPath = path.resolve(projectDir, 'deploy.json');
 
     if (!fs.existsSync(deployPath)) {
@@ -150,7 +153,7 @@ router.post('/crear-config', async (req, res) => {
 
 router.post('/save-config', async (req, res) => {
   try {
-    const { sessionId, subprojects } = req.body;
+    const { sessionId, subprojects, dir } = req.body;
 
     if (!sessionId) {
       return res.status(400).json({ success: false, error: 'Se requiere sessionId.' });
@@ -181,7 +184,10 @@ router.post('/save-config', async (req, res) => {
       });
     }
 
-    const projectDir = session.cwd || process.cwd();
+    const projectDir = dir || session.cwd;
+    if (!projectDir) {
+      return res.status(400).json({ success: false, error: 'No se pudo determinar el directorio del proyecto. Use --dir=<ruta> o /cd para establecer el directorio de trabajo.' });
+    }
 
     const deployConfig = {
       install: subprojects.map(sp => ({ cwd: sp.cwd })),

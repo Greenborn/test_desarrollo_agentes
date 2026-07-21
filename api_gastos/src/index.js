@@ -29,6 +29,14 @@ function killPort(port) {
 }
 killPort(PORT);
 
+process.on('uncaughtException', (err, origin) => {
+  console.log('[gastos] UNCAUGHT EXCEPTION:', err.message, '\n', err.stack, '\norigin:', origin);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.log('[gastos] UNHANDLED REJECTION:', reason instanceof Error ? reason.message : reason, '\n', reason instanceof Error ? reason.stack : '');
+});
+
 const server = app.listen(PORT, (err) => {
   if (err) {
     console.log('Error al iniciar servidor gastos:', err.message);

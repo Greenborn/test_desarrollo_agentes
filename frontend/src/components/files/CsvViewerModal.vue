@@ -8,54 +8,77 @@
       <button class="btn btn-sm btn-outline-secondary mt-2" @click="loadFile">Reintentar</button>
     </div>
     <template v-else>
-      <div class="csv-controls d-flex flex-wrap align-items-center gap-2 px-3 py-2 flex-shrink-0" style="background: #1a1a2e; border-bottom: 1px solid #374151;">
-        <div class="d-flex align-items-center gap-1">
-          <label class="small text-muted" style="white-space: nowrap;">Delimitador:</label>
-          <select class="form-select form-select-sm" v-model="delimiter" style="width: 100px;" @change="parseCsv">
-            <option value=",">Coma (,)</option>
-            <option value=";">Punto y coma (;)</option>
-            <option value="	">Tabulador</option>
-            <option value="|">Pipe (|)</option>
-          </select>
+      <div v-if="editMode" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
+        <div class="d-flex align-items-center gap-2 px-3 py-2 flex-shrink-0" style="background: #1a1a2e; border-bottom: 1px solid #374151;">
+          <span class="text-muted small">Editando CSV como texto plano</span>
+          <button class="btn btn-sm btn-outline-info ms-auto" @click="toggleEditMode">Vista tabla</button>
         </div>
-        <div class="d-flex align-items-center gap-1">
-          <label class="small text-muted" style="white-space: nowrap;">Calificador:</label>
-          <select class="form-select form-select-sm" v-model="quoteChar" style="width: 90px;" @change="parseCsv">
-            <option value='"'>Comillas ("")</option>
-            <option value="'">Comilla simple ('')</option>
-          </select>
+        <textarea
+          class="csv-editor form-control flex-grow-1 border-0 rounded-0"
+          v-model="rawContent"
+          :disabled="saving"
+          spellcheck="false"
+        ></textarea>
+        <div class="d-flex align-items-center gap-2 px-3 py-2 flex-shrink-0" style="background: #1a1a2e; border-top: 1px solid #374151;">
+          <span v-if="saving" class="text-muted small">Guardando...</span>
+          <span v-if="saved" class="text-success small">✓ Guardado</span>
+          <button class="btn btn-sm btn-argentina ms-auto" @click="save" :disabled="saving || !dirty">
+            {{ saving ? 'Guardando...' : 'Guardar' }}
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" @click="$emit('close')" :disabled="saving">Cerrar</button>
         </div>
-        <div class="form-check form-check-inline mb-0">
-          <input class="form-check-input" type="checkbox" id="hasHeader" v-model="hasHeader" @change="parseCsv">
-          <label class="form-check-label small text-muted" for="hasHeader">Primera fila como encabezado</label>
-        </div>
-        <span class="text-muted small ms-auto">Filas: {{ parsedRows.length }} | Columnas: {{ columnCount }}</span>
       </div>
+      <template v-else>
+        <div class="csv-controls d-flex flex-wrap align-items-center gap-2 px-3 py-2 flex-shrink-0" style="background: #1a1a2e; border-bottom: 1px solid #374151;">
+          <div class="d-flex align-items-center gap-1">
+            <label class="small text-muted" style="white-space: nowrap;">Delimitador:</label>
+            <select class="form-select form-select-sm" v-model="delimiter" style="width: 100px;" @change="parseCsv">
+              <option value=",">Coma (,)</option>
+              <option value=";">Punto y coma (;)</option>
+              <option value="	">Tabulador</option>
+              <option value="|">Pipe (|)</option>
+            </select>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <label class="small text-muted" style="white-space: nowrap;">Calificador:</label>
+            <select class="form-select form-select-sm" v-model="quoteChar" style="width: 90px;" @change="parseCsv">
+              <option value='"'>Comillas ("")</option>
+              <option value="'">Comilla simple ('')</option>
+            </select>
+          </div>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="checkbox" id="hasHeader" v-model="hasHeader" @change="parseCsv">
+            <label class="form-check-label small text-muted" for="hasHeader">Primera fila como encabezado</label>
+          </div>
+          <span class="text-muted small ms-auto">Filas: {{ parsedRows.length }} | Columnas: {{ columnCount }}</span>
+        </div>
 
-      <div class="csv-table-wrapper overflow-auto flex-grow-1" style="min-height: 0;">
-        <table class="table table-sm table-dark table-bordered mb-0" style="font-size: 0.75rem;">
-          <thead v-if="columns.length > 0">
-            <tr>
-              <th class="text-center" style="width: 32px; color: #6b7280;">#</th>
-              <th v-for="(col, ci) in columns" :key="ci" class="text-nowrap" style="color: #75AADB;">{{ col }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, ri) in parsedRows" :key="ri">
-              <td class="text-center text-muted">{{ ri + 1 }}</td>
-              <td v-for="(cell, ci) in row" :key="ci" class="text-nowrap">{{ cell }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-if="parsedRows.length === 0 && !loading" class="text-muted small text-center p-4">
-          No se pudieron parsear filas. Revise los parámetros de parseo.
+        <div class="csv-table-wrapper overflow-auto flex-grow-1" style="min-height: 0;">
+          <table class="table table-sm table-dark table-bordered mb-0" style="font-size: 0.75rem;">
+            <thead v-if="columns.length > 0">
+              <tr>
+                <th class="text-center" style="width: 32px; color: #6b7280;">#</th>
+                <th v-for="(col, ci) in columns" :key="ci" class="text-nowrap" style="color: #75AADB;">{{ col }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, ri) in parsedRows" :key="ri">
+                <td class="text-center text-muted">{{ ri + 1 }}</td>
+                <td v-for="(cell, ci) in row" :key="ci" class="text-nowrap">{{ cell }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="parsedRows.length === 0 && !loading" class="text-muted small text-center p-4">
+            No se pudieron parsear filas. Revise los parámetros de parseo.
+          </div>
         </div>
-      </div>
 
-      <div class="d-flex align-items-center gap-2 px-3 py-2 flex-shrink-0" style="background: #1a1a2e; border-top: 1px solid #374151;">
-        <span class="text-muted small text-truncate" :title="filePath">{{ filePath }}</span>
-        <button class="btn btn-sm btn-outline-secondary ms-auto" @click="$emit('close')">Cerrar</button>
-      </div>
+        <div class="d-flex align-items-center gap-2 px-3 py-2 flex-shrink-0" style="background: #1a1a2e; border-top: 1px solid #374151;">
+          <span class="text-muted small text-truncate" :title="filePath">{{ filePath }}</span>
+          <button class="btn btn-sm btn-outline-info ms-auto" @click="toggleEditMode">Editar</button>
+          <button class="btn btn-sm btn-outline-secondary" @click="$emit('close')">Cerrar</button>
+        </div>
+      </template>
     </template>
   </div>
 </template>
@@ -75,20 +98,29 @@ export default {
     const { parseCsv: parse } = useCsvParser()
 
     const rawContent = ref('')
+    const originalContent = ref('')
     const loading = ref(false)
+    const saving = ref(false)
+    const saved = ref(false)
     const error = ref(null)
     const delimiter = ref(',')
     const quoteChar = ref('"')
     const hasHeader = ref(true)
     const columns = ref([])
     const parsedRows = ref([])
+    const editMode = ref(false)
 
     const columnCount = computed(() => columns.value.length)
+    const dirty = computed(() => rawContent.value !== originalContent.value)
 
     function parseCsv() {
       const result = parse(rawContent.value, delimiter.value, quoteChar.value, hasHeader.value)
       columns.value = result.columns
       parsedRows.value = result.rows
+    }
+
+    function toggleEditMode() {
+      editMode.value = !editMode.value
     }
 
     async function loadFile() {
@@ -101,6 +133,7 @@ export default {
         const data = await res.json()
         if (data.success) {
           rawContent.value = data.content
+          originalContent.value = data.content
           parseCsv()
         } else {
           error.value = data.error || 'Error al leer el archivo'
@@ -112,14 +145,41 @@ export default {
       }
     }
 
+    async function save() {
+      saving.value = true
+      saved.value = false
+      error.value = null
+      try {
+        const res = await fetch(`${API}/command/write-file`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ path: props.filePath, content: rawContent.value }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          originalContent.value = rawContent.value
+          saved.value = true
+          parseCsv()
+          setTimeout(() => { saved.value = false }, 2000)
+        } else {
+          error.value = data.error || 'Error al guardar el archivo'
+        }
+      } catch (err) {
+        error.value = err.message || 'Error de conexión'
+      } finally {
+        saving.value = false
+      }
+    }
+
     onMounted(() => {
       loadFile()
     })
 
     return {
-      loading, error, delimiter, quoteChar, hasHeader,
-      columns, parsedRows, columnCount,
-      loadFile, parseCsv, filePath: props.filePath,
+      loading, saving, saved, error, delimiter, quoteChar, hasHeader,
+      columns, parsedRows, columnCount, dirty, editMode,
+      loadFile, parseCsv, toggleEditMode, save, filePath: props.filePath, rawContent,
     }
   },
 }
@@ -178,5 +238,34 @@ export default {
   color: #e0e0e0;
   border-color: #75AADB;
   background: rgba(117, 170, 219, 0.1);
+}
+.csv-editor {
+  background: #0d1117 !important;
+  color: #c9d1d9 !important;
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace !important;
+  font-size: 0.8rem !important;
+  line-height: 1.5 !important;
+  tab-size: 2;
+  resize: none;
+  padding: 12px !important;
+}
+.csv-editor:focus {
+  box-shadow: none !important;
+  outline: none !important;
+}
+.csv-editor::placeholder {
+  color: #484f58;
+}
+.btn-argentina {
+  background-color: #75AADB;
+  color: #fff;
+  border: 1px solid #75AADB;
+}
+.btn-argentina:hover {
+  background-color: #5a8fc0;
+  color: #fff;
+}
+.btn-argentina:disabled {
+  opacity: 0.6;
 }
 </style>

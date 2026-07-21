@@ -124,7 +124,6 @@ export default {
       cmdStore.hideAutocomplete()
 
       if (raw.startsWith('/')) {
-        uiStore.setOmnifilter('')
         execute(raw)
         cmdStore.loadHistory(chatStore.activeSessionId)
       } else {
@@ -261,7 +260,6 @@ export default {
 
       const text = buffer.value.trim()
       if (text.startsWith('/')) {
-        uiStore.setOmnifilter('')
         return
       }
 

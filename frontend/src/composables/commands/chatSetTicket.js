@@ -84,6 +84,7 @@ register({
           workspaceStore.selectedIds = data.workspaceIds
           auth.setWorkspaceIds(data.workspaceIds)
         }
+        chatStore.clearSessionTicket(sessionId)
         await chatStore.loadSessions()
         return `Ticket #${idTicketRedmine} asignado a la sesión actual.`
       }

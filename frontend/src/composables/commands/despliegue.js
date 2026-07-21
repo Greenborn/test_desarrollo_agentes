@@ -34,17 +34,35 @@ register({
   name: '/despliegue_actualizar_config',
   category: 'Despliegue',
   description: 'Lee deploy.json del directorio del proyecto y guarda la configuración de despliegue. Si no existe deploy.json, muestra un formulario para crearlo.',
-  usage: '/despliegue_actualizar_config',
+  usage: '/despliegue_actualizar_config [--dir=<ruta>]',
+  async autocomplete(args, cmdStore) {
+    const usedFlags = getUsedFlags(args)
+    if (!usedFlags.includes('--dir=')) {
+      cmdStore.showAutocomplete(['--dir=']);
+      return;
+    }
+    cmdStore.hideAutocomplete();
+  },
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.');
     }
 
+    let dir = null;
+    for (const arg of args) {
+      if (arg.startsWith('--dir=')) {
+        dir = arg.slice('--dir='.length);
+      }
+    }
+
+    const body = { sessionId };
+    if (dir) body.dir = dir;
+
     const res = await fetch('/api/despliegue/upd-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ sessionId }),
+      body: JSON.stringify(body),
     });
 
     const data = await res.json();
@@ -60,6 +78,7 @@ register({
           controlId: 'deploy-config-' + Date.now(),
           initialSubprojects: [],
           sessionId,
+          dir,
         },
       };
     }

@@ -11,8 +11,10 @@
       <button class="btn btn-sm btn-outline-argentina px-2" @click="crearTicket" title="Crear ticket">🎫</button>
       <button v-if="!devInstanceRunning" class="btn btn-sm btn-outline-argentina px-2" @click="iniciarInstanciaDev" title="Iniciar instancia desarrollo">▶️</button>
       <button v-else class="btn btn-sm btn-outline-danger px-2" @click="detenerInstanciaDev" title="Detener instancia desarrollo">⏹️</button>
+      <button class="btn btn-sm btn-outline-argentina px-2" @click="configurarDespliegue" title="Configurar despliegue (deploy.json)">📋</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="generarCommit" title="Generar commit">💾</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="iniciarOpencode" title="Iniciar OpenCode">🚀</button>
+      <button class="btn btn-sm btn-outline-argentina px-2" @click="syncSkills" title="Sincronizar configuración de skills del proyecto">⚙️</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="iniciarTerminal" title="Abrir terminal">💻</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="abrirNavegador" title="Abrir navegador Playwright">🌐</button>
       <button class="btn btn-sm btn-outline-danger px-2" @click="clearChat" title="Limpiar chat">🗑️</button>
@@ -177,6 +179,16 @@ export default {
       await executeCommand('/terminal')
     }
 
+    async function syncSkills() {
+      if (!activeSessionId.value) return
+      await executeCommand('/opencode_sync_skills')
+    }
+
+    async function configurarDespliegue() {
+      if (!activeSessionId.value) return
+      await executeCommand('/despliegue_actualizar_config')
+    }
+
     async function clearChat() {
       if (!activeSessionId.value) return
       await chatStore.clearMessages(activeSessionId.value)
@@ -199,8 +211,8 @@ export default {
       gitStore, ticketInfo, activeSessionId, currentBranchDisplay,
       branchMismatch, truncatedSubject, priorityClass, devInstanceRunning,
       zoomIn, zoomOut,
-      generarCommit, iniciarInstanciaDev, detenerInstanciaDev,
-      crearTicket, iniciarOpencode, iniciarTerminal, clearChat, abrirNavegador,
+      generarCommit, configurarDespliegue, iniciarInstanciaDev, detenerInstanciaDev,
+      crearTicket, iniciarOpencode, syncSkills, iniciarTerminal, clearChat, abrirNavegador,
     }
   },
 }

@@ -301,7 +301,7 @@
         </div>
       </div>
 
-      <div class="col" v-if="cardHasVisible(['codigo extensiones archivos code_file', 'intervalo reproduccion navegador', 'limite respuesta peticion http', 'resoluciones pantalla resolucion'])">
+      <div class="col" v-if="cardHasVisible(['codigo extensiones archivos code_file', 'intervalo reproduccion navegador', 'limite respuesta peticion http', 'limite terminales', 'resoluciones pantalla resolucion'])">
         <div class="card bg-dark border-secondary h-100">
           <div class="card-header bg-dark border-secondary py-2 px-3">
             <h6 class="mb-0 fw-semibold">Opciones Técnicas</h6>
@@ -349,6 +349,24 @@
                 style="max-width: 160px;"
               />
               <button class="btn btn-sm mt-1 btn-argentina" @click="saveRequestResponseMaxSize">Guardar</button>
+            </div>
+
+            <div v-if="matches('limite terminales')">
+              <label class="form-label small mb-1">Límite de terminales por sesión de chat</label>
+              <div class="small text-muted mb-1">Máximo de terminales abiertas simultáneamente. Aplica también a agentes OpenCode.</div>
+              <div class="d-flex gap-2 align-items-center">
+                <input
+                  type="number"
+                  class="form-control form-control-sm bg-dark text-light border-secondary"
+                  v-model.number="terminalMaxTerminalsInput"
+                  min="1"
+                  max="50"
+                  step="1"
+                  placeholder="5"
+                  style="max-width: 100px;"
+                />
+                <button class="btn btn-sm btn-argentina" @click="saveTerminalMaxTerminals">Guardar</button>
+              </div>
             </div>
 
             <div v-if="matches('resoluciones pantalla resolucion')">
@@ -544,6 +562,7 @@ export default {
     const browserStealthInput = ref(false)
     const browserUserAgentChromeInput = ref('')
     const browserUserAgentFirefoxInput = ref('')
+    const terminalMaxTerminalsInput = ref(5)
     const newEnvName = ref('')
     const newEnvBranch = ref('')
     const newEnvDescription = ref('')
@@ -679,6 +698,10 @@ export default {
 
     watch(() => settings.skillRepositoryUrl, (val) => {
       skillRepoUrlInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.terminalMaxTerminals, (val) => {
+      terminalMaxTerminalsInput.value = val
     }, { immediate: true })
 
     async function reloadSettings() {
@@ -906,6 +929,11 @@ export default {
       settings.save('browser_user_agent_firefox', browserUserAgentFirefoxInput.value, selectedWId.value)
     }
 
+    function saveTerminalMaxTerminals() {
+      settings.clearFeedback()
+      settings.save('terminal_max_terminals', String(terminalMaxTerminalsInput.value), selectedWId.value)
+    }
+
     function savePriorityColor(key) {
       settings.clearFeedback()
       const inputMap = {
@@ -1105,6 +1133,7 @@ export default {
       saveLocale, savePriorityColor, saveReplayInterval, saveRequestResponseMaxSize,
       saveBrowserStealth, saveBrowserUaChrome, saveBrowserUaFirefox,
       browserStealthInput, browserUserAgentChromeInput, browserUserAgentFirefoxInput,
+      terminalMaxTerminalsInput, saveTerminalMaxTerminals,
       addResolution, removeResolution, resetResolutions, saveResolutions, matches, cardHasVisible,
       envStore, wsMessage,
       onWorkspaceChange,

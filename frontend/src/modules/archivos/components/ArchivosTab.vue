@@ -64,8 +64,8 @@ export default {
       }
     }
 
-    function onFileSelected({ path, name }) {
-      selectedFilePath.value = path
+    function onFileSelected(payload) {
+      selectedFilePath.value = payload?.path ?? null
     }
 
     function onArchivosSplitStart(e) {

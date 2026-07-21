@@ -90,6 +90,7 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `documentacion_prompt_*` | *(default interno)* | Prompts de documentación por tipo |
 | `screen_resolutions` | `[{ id, width, height }, ...]` | Array JSON de resoluciones de pantalla para Playwright. Configurable desde Settings. Default: 14 resoluciones comunes (desktop + mobile) |
 | `request_response_max_size_kb` | `'100'` | Límite en KB del body de respuesta del comando `/peticion`. Si se excede, la respuesta se trunca (nunca se rechaza). Configurable desde Settings → Límite de respuesta — Peticiones HTTP |
+| `terminal_max_terminals` | `'5'` | Máximo de terminales abiertas simultáneamente por sesión de chat. Aplica también a agentes OpenCode. Configurable desde Settings → Opciones Técnicas |
 
 ---
 

@@ -965,30 +965,12 @@ router.post('/sync-skills-project', async (req, res) => {
         projectRoot = chatSession.cwd
       }
     }
-    const configDir = path.join(projectRoot, '.opencode')
-    const configPath = path.join(configDir, 'opencode.json')
 
-    let config = { $schema: 'https://opencode.ai/config.json', skills: { paths: [] } }
-    if (fs.existsSync(configPath)) {
-      try {
-        config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-      } catch (parseErr) {
-        console.log('[opencode] Error parseando config del proyecto, se sobrescribirá:', parseErr.message)
-      }
-    }
-    if (!config.skills) config.skills = {}
-    if (!Array.isArray(config.skills.paths)) config.skills.paths = []
+    const targetSkillsDir = path.join(projectRoot, '.opencode', 'skills')
 
-    // Limpiar paths existentes: resolver relativos contra configRoot (projectRoot)
-    // y descartar los que no existan, para que OpenCode funcione desde cualquier cwd
-    const configRoot = projectRoot
-    const resolvedPaths = new Set()
-    for (const p of config.skills.paths) {
-      const abs = path.isAbsolute(p) ? p : path.resolve(configRoot, p)
-      if (fs.existsSync(abs)) {
-        resolvedPaths.add(abs)
-      }
-    }
+    let copiedCount = 0
+    let skippedCount = 0
+    let errorsCount = 0
 
     for (const wsId of workspaceIds) {
       const ws = await db('workspaces').where({ id: wsId }).select('slug').first()
@@ -1002,45 +984,100 @@ router.post('/sync-skills-project', async (req, res) => {
 
       const skillPaths = getRepoSkillPaths(repoDir)
       for (const relPath of skillPaths) {
-        const absPath = path.resolve(repoDir, relPath)
-        if (fs.existsSync(absPath)) {
-          resolvedPaths.add(absPath)
+        const skillsDir = path.resolve(repoDir, relPath)
+        if (!fs.existsSync(skillsDir)) continue
+
+        const entries = fs.readdirSync(skillsDir, { withFileTypes: true })
+        for (const entry of entries) {
+          try {
+            let skillName = null
+            let sourcePath = null
+
+            if (entry.isDirectory()) {
+              sourcePath = path.join(skillsDir, entry.name, 'SKILL.md')
+              skillName = entry.name
+            } else if (entry.isFile() && entry.name.endsWith('.md') && entry.name !== 'SKILL.md') {
+              sourcePath = path.join(skillsDir, entry.name)
+              skillName = entry.name.slice(0, -3)
+            }
+
+            if (!skillName || !sourcePath || !fs.existsSync(sourcePath)) continue
+
+            const targetDir = path.join(targetSkillsDir, skillName)
+            const targetPath = path.join(targetDir, 'SKILL.md')
+
+            if (fs.existsSync(targetPath)) {
+              const sourceContent = fs.readFileSync(sourcePath, 'utf-8')
+              const targetContent = fs.readFileSync(targetPath, 'utf-8')
+              if (sourceContent === targetContent) {
+                skippedCount++
+                continue
+              }
+            }
+
+            fs.mkdirSync(targetDir, { recursive: true })
+            fs.copyFileSync(sourcePath, targetPath)
+            copiedCount++
+          } catch (err) {
+            console.log(`[opencode] Error copiando skill '${entry.name}':`, err.message)
+            errorsCount++
+          }
         }
       }
     }
 
-    // También registrar paths de skills del proyecto raíz
-    const rootPaths = getRepoSkillPaths(projectRoot)
-    for (const relPath of rootPaths) {
+    // Actualizar .opencode/opencode.json para que OpenCode detecte los skills copiados
+    const configDir = path.join(projectRoot, '.opencode')
+    const configPath = path.join(configDir, 'opencode.json')
+    let config = { $schema: 'https://opencode.ai/config.json', skills: { paths: [] } }
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+      } catch (parseErr) {
+        console.log('[opencode] Error parseando config, se sobrescribirá:', parseErr.message)
+      }
+    }
+    if (!config.skills) config.skills = {}
+    if (!Array.isArray(config.skills.paths)) config.skills.paths = []
+
+    const desiredPaths = ['.opencode/skills']
+    const existingPaths = new Set(config.skills.paths.map(p => path.resolve(projectRoot, p)))
+    let configChanged = false
+
+    for (const relPath of desiredPaths) {
       const absPath = path.resolve(projectRoot, relPath)
-      if (fs.existsSync(absPath)) {
-        resolvedPaths.add(absPath)
+      if (fs.existsSync(absPath) && !existingPaths.has(absPath)) {
+        config.skills.paths.push(relPath)
+        existingPaths.add(absPath)
+        configChanged = true
       }
     }
 
-    const newPaths = Array.from(resolvedPaths).sort()
-    const changed = JSON.stringify(config.skills.paths) !== JSON.stringify(newPaths)
-
-    if (!changed) {
-      return res.json({
-        success: true,
-        message: 'Todos los paths de skills de los espacios de trabajo ya estaban sincronizados en la configuración del proyecto.',
-        config: { ...config, skills: { paths: newPaths } },
-      })
+    if (configChanged) {
+      if (!fs.existsSync(configDir)) {
+        fs.mkdirSync(configDir, { recursive: true })
+      }
+      config.$schema = 'https://opencode.ai/config.json'
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
+      console.log(`[opencode] Config actualizada en ${configPath}`)
     }
 
-    config.skills.paths = newPaths
+    const parts = []
+    if (copiedCount > 0) parts.push(`${copiedCount} skill(s) copiados`)
+    if (skippedCount > 0) parts.push(`${skippedCount} sin cambios`)
+    if (errorsCount > 0) parts.push(`${errorsCount} con errores`)
+    if (configChanged) parts.push('config actualizada')
+    const message = parts.length > 0
+      ? `Skills de los espacios de trabajo sincronizados: ${parts.join(', ')}.`
+      : 'No se encontraron skills para copiar de los espacios de trabajo seleccionados.'
 
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true })
-    }
-    config.$schema = 'https://opencode.ai/config.json'
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
-
-    console.log(`[opencode] Skills del proyecto sincronizados en ${configPath}`)
+    console.log(`[opencode] Skills copiados a ${targetSkillsDir}: ${copiedCount} copiados, ${skippedCount} omitidos, ${errorsCount} errores`)
     res.json({
       success: true,
-      message: `Skills de los espacios de trabajo sincronizados en la configuración de OpenCode del proyecto.`,
+      message,
+      copied: copiedCount,
+      skipped: skippedCount,
+      errors: errorsCount,
       config,
     })
   } catch (err) {

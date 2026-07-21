@@ -37,6 +37,14 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/api/memoria' });
 setupWebSocket(wss);
 
+process.on('uncaughtException', (err, origin) => {
+  console.log('[memoria] UNCAUGHT EXCEPTION:', err.message, '\n', err.stack, '\norigin:', origin);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.log('[memoria] UNHANDLED REJECTION:', reason instanceof Error ? reason.message : reason, '\n', reason instanceof Error ? reason.stack : '');
+});
+
 server.listen(PORT, (err) => {
   if (err) {
     console.log('Error al iniciar servidor memoria:', err.message);

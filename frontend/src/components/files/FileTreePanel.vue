@@ -33,7 +33,14 @@
             <span v-else>{{ handleIsExpanded(item.node.path) ? '▾' : '▸' }}</span>
           </span>
           <span v-else class="tree-toggle-placeholder flex-shrink-0"></span>
-          <span class="tree-icon flex-shrink-0">{{ getFileIcon(item.node) }}</span>
+          <span class="tree-icon flex-shrink-0 d-flex align-items-center justify-content-center">
+            <template v-if="item.node.type === 'directory'">{{ getFileIcon(item.node) }}</template>
+            <template v-else-if="isImageFile(item.node.name)">
+              <img v-if="imagePreviews[item.node.path]" :src="imagePreviews[item.node.path]" class="tree-image-thumb" alt="" />
+              <span v-else class="tree-image-loading">{{ getFileIcon(item.node) }}</span>
+            </template>
+            <template v-else>{{ getFileIcon(item.node) }}</template>
+          </span>
           <span class="tree-name text-truncate small">{{ item.node.name }}</span>
         </div>
       </div>
@@ -50,20 +57,24 @@
       <div v-if="ctxMenu.type === 'directory'" class="context-menu-item" @click="openInExplorer">📂 Abrir carpeta</div>
       <div v-else class="context-menu-item" @click="openInExplorer">📂 Abrir carpeta contenedora</div>
       <div class="context-menu-divider"></div>
-      <div class="context-menu-item text-danger" @click="confirmDeleteFile">🗑️ Eliminar</div>
+      <div v-if="ctxMenu.type === 'directory'" class="context-menu-item text-danger" @click="confirmDeleteDirectory">🗑️ Eliminar directorio</div>
+      <div v-else class="context-menu-item text-danger" @click="confirmDeleteFile">🗑️ Eliminar archivo</div>
     </div>
   </div>
 </template>
 
 <script>
-import { computed, ref, watch, onBeforeUnmount, nextTick } from 'vue'
+import { computed, ref, reactive, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useModalStore } from '../../stores/modal.js'
 import { useFileTreeStore } from '../../stores/fileTree.js'
 import { useComponentContextMenu } from '../../composables/useComponentContextMenu.js'
 import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
 import FileEditorModal from './FileEditorModal.vue'
 import CsvViewerModal from './CsvViewerModal.vue'
+import ImageViewerModal from './ImageViewerModal.vue'
 import AlertModal from '../modals/AlertModal.vue'
+
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'bmp'])
 
 const FILE_ICONS = {
   js: '\u{1F4D1}',
@@ -111,6 +122,23 @@ export default {
     const error = computed(() => props.sessionId ? fileTreeStore.getError(props.sessionId) : null)
     const flatTree = computed(() => props.sessionId ? fileTreeStore.getFlatTree(props.sessionId) : [])
 
+    const imagePreviews = reactive({})
+
+    async function loadImagePreview(path) {
+      if (imagePreviews[path]) return
+      try {
+        const res = await fetch(`/api/command/read-file-base64?path=${encodeURIComponent(path)}`, {
+          credentials: 'include',
+        })
+        const data = await res.json()
+        if (data.success) {
+          imagePreviews[path] = `data:${data.mime};base64,${data.base64}`
+        }
+      } catch (err) {
+        console.error('Error al cargar preview de imagen:', err.message)
+      }
+    }
+
     function handleSelectFile(path, name) {
       selectedFile.value = path
       emit('file-selected', { path, name })
@@ -133,19 +161,9 @@ export default {
       return /^\.env$|^\.env\.[a-zA-Z0-9_-]{1,8}$/.test(name)
     }
 
-    async function isSmallJsonFile(path) {
-      try {
-        const res = await fetch(`/api/command/read-file?path=${encodeURIComponent(path)}`, {
-          credentials: 'include',
-        })
-        const data = await res.json()
-        if (data.success) {
-          return data.content.length < 1048576
-        }
-      } catch (err) {
-        console.error('Error al verificar tamaño de JSON:', err)
-      }
-      return false
+    function isImageFile(name) {
+      const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : ''
+      return IMAGE_EXTENSIONS.has(ext)
     }
 
     async function openFile(path) {
@@ -153,10 +171,8 @@ export default {
       selectedFile.value = path
       if (name.toLowerCase().endsWith('.csv')) {
         modal.open(CsvViewerModal, { filePath: path }, { title: `CSV: ${name}`, wide: true })
-      } else if (name.toLowerCase().endsWith('.json')) {
-        const readonly = await isSmallJsonFile(path)
-        const title = readonly ? `Previsualizar: ${name}` : `Editar: ${name}`
-        modal.open(FileEditorModal, { filePath: path, sessionId: props.sessionId, readonly }, { title, wide: true })
+      } else if (isImageFile(name)) {
+        modal.open(ImageViewerModal, { filePath: path }, { title: `Imagen: ${name}`, wide: true })
       } else {
         modal.open(FileEditorModal, { filePath: path, sessionId: props.sessionId }, { title: `Editar: ${name}`, wide: true })
       }
@@ -290,6 +306,40 @@ export default {
       closeCtxMenu()
     }
 
+    function confirmDeleteDirectory() {
+      const dirPath = ctxMenu.value.path
+      const dirName = dirPath.split('/').pop() || dirPath
+      const confirmed = confirm(`¿Eliminar directorio "${dirName}" y todo su contenido?\n\nRuta: ${dirPath}\n\nEsta acción no se puede deshacer.`)
+      if (confirmed) {
+        deleteDirectory(dirPath)
+      }
+      closeCtxMenu()
+    }
+
+    async function deleteDirectory(dirPath) {
+      try {
+        const res = await fetch('/api/command/delete-directory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ path: dirPath }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          if (props.sessionId) {
+            selectedFile.value = null
+            emit('file-selected', null)
+            fileTreeStore.fetchTree(props.sessionId)
+          }
+        } else {
+          modal.open(AlertModal, { message: `Error al eliminar directorio: ${data.error}` }, { title: 'Error' })
+        }
+      } catch (err) {
+        console.error('Error al eliminar directorio:', err)
+        modal.open(AlertModal, { message: `Error al eliminar directorio: ${err.message}` }, { title: 'Error' })
+      }
+    }
+
     async function deleteFile(filePath) {
       try {
         const res = await fetch('/api/command/delete-file', {
@@ -322,12 +372,22 @@ export default {
       if (newId) fileTreeStore.fetchTree(newId)
     }, { immediate: true })
 
+    watch(flatTree, (items) => {
+      if (!items) return
+      for (const item of items) {
+        if (item.node.type === 'file' && isImageFile(item.node.name)) {
+          loadImagePreview(item.node.path)
+        }
+      }
+    }, { immediate: true, deep: false })
+
     return {
       tree, loading, error, flatTree, selectedFile, ctxMenu, fileTreeStore,
+      imagePreviews, isImageFile,
       getFileIcon, reloadTree, handleToggleDirectory, handleIsExpanded,
       handleSelectFile, handleFileClick, openFile,
       menuRef, onContextMenu, closeCtxMenu, copyRelativePath, copyFullPath, copyComponentRef, copyName, copyFileContent,
-      openInExplorer, confirmDeleteFile, deleteFile,
+      openInExplorer, confirmDeleteFile, confirmDeleteDirectory, deleteDirectory, deleteFile,
     }
   },
 }
@@ -376,6 +436,15 @@ export default {
 }
 .tree-name {
   color: #d1d5db;
+}
+.tree-image-thumb {
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 2px;
+}
+.tree-image-loading {
+  font-size: 0.8rem;
 }
 .context-menu-backdrop {
   position: fixed;

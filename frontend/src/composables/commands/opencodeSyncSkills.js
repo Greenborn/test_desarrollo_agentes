@@ -6,7 +6,7 @@ const { register } = useCommandRegistry()
 register({
   name: '/opencode_sync_skills',
   category: 'Skills',
-  description: 'Sincroniza los paths de skills de los espacios de trabajo seleccionados en la configuración de OpenCode del proyecto (.opencode/opencode.json).',
+  description: 'Copia los skills de los espacios de trabajo seleccionados a .opencode/skills/ del proyecto.',
   usage: '/opencode_sync_skills',
   async autocomplete(args, cmdStore) {
     cmdStore.hideAutocomplete()
@@ -44,7 +44,7 @@ register({
       const lines = [data.message]
       if (data.config?.skills?.paths?.length) {
         lines.push('')
-        lines.push('**Paths en la configuración del proyecto:**')
+        lines.push('**Paths en la configuración:**')
         for (const p of data.config.skills.paths) {
           lines.push(`- \`${p}\``)
         }

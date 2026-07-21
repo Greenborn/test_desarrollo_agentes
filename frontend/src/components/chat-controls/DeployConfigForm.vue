@@ -4,6 +4,19 @@
       No se encontró <code>deploy.json</code> en el directorio del proyecto.
     </div>
     <div class="mb-3" style="color: #9ca3af; font-size: 0.8rem;">
+      <div class="mb-1">Directorio raíz del proyecto:</div>
+      <input
+        v-model="rootDir"
+        type="text"
+        class="form-control form-control-sm"
+        style="background: #0d1b2a; border: 1px solid #374151; color: #e0e0e0; font-family: monospace;"
+        placeholder="/ruta/al/proyecto"
+      />
+      <div class="mt-1" style="color: #6b7280; font-size: 0.75rem;">
+        El <code>deploy.json</code> se creará en este directorio. Se puede predefinir con <code>--dir=&lt;ruta&gt;</code>.
+      </div>
+    </div>
+    <div class="mb-2" style="color: #9ca3af; font-size: 0.8rem;">
       Define los subproyectos que forman parte del despliegue:
     </div>
 
@@ -74,6 +87,7 @@ import { ref } from 'vue'
 export default {
   props: {
     initialSubprojects: { type: Array, default: () => [] },
+    projectDir: { type: String, default: '' },
   },
   emits: ['confirm'],
   setup(props, { emit }) {
@@ -82,6 +96,7 @@ export default {
         ? props.initialSubprojects.map(s => ({ cwd: s.cwd || '', type: s.type || 'backend' }))
         : [{ cwd: '', type: 'backend' }]
     )
+    const rootDir = ref(props.projectDir || '')
     const error = ref('')
 
     function add() {
@@ -111,14 +126,20 @@ export default {
         error.value = err
         return
       }
-      emit('confirm', subprojects.value.map(sp => ({ cwd: sp.cwd.trim(), type: sp.type })))
+      const result = {
+        subprojects: subprojects.value.map(sp => ({ cwd: sp.cwd.trim(), type: sp.type })),
+      }
+      if (rootDir.value.trim()) {
+        result.dir = rootDir.value.trim()
+      }
+      emit('confirm', result)
     }
 
     function cancel() {
       emit('confirm', null)
     }
 
-    return { subprojects, error, add, remove, confirm, cancel }
+    return { subprojects, rootDir, error, add, remove, confirm, cancel }
   },
 }
 </script>

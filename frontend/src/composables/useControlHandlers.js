@@ -743,6 +743,46 @@ export function useControlHandlers(api) {
         }
       }
       return
+    } else if (controlType === 'deploy_config_form') {
+      try {
+        const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+        if (value === null) {
+          if (idx >= 0) {
+            chat.messages[idx] = { role: 'result', content: 'Configuración de despliegue cancelada.', _key: 'result-' + Date.now() }
+          }
+          return
+        }
+
+        const sessionId = chat.activeSessionId
+        const subprojects = value.subprojects || value
+        const dir = value.dir || controlMsg?.controlData?.dir || null
+
+        const body = { sessionId, subprojects }
+        if (dir) body.dir = dir
+
+        const res = await fetch('/api/despliegue/save-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        })
+        const data = await res.json()
+
+        if (idx >= 0) {
+          if (data.success) {
+            chat.messages[idx] = { role: 'result', content: data.message || 'Configuración de despliegue creada y guardada correctamente.', _key: 'result-' + Date.now() }
+          } else {
+            chat.messages[idx] = { role: 'result', content: 'Error: ' + (data.error || 'Error al guardar configuración de despliegue.'), _key: 'err-' + Date.now() }
+          }
+        }
+      } catch (err) {
+        console.error('Error al confirmar configuración de despliegue:', err.message)
+        const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+        if (idx >= 0) {
+          chat.messages[idx] = { role: 'result', content: 'Error de conexión: ' + err.message, _key: 'err-' + Date.now() }
+        }
+      }
+      return
     } else if (controlType === 'cd_selector') {
       try {
         const res = await fetch('/api/command/execute', {

@@ -873,6 +873,41 @@ router.get('/read-file', async (req, res) => {
   }
 });
 
+router.get('/read-file-base64', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const filePath = req.query.path;
+    if (!filePath) {
+      return res.status(400).json({ success: false, error: 'El parámetro path es requerido' });
+    }
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: `El archivo '${filePath}' no existe` });
+    }
+    if (!fs.statSync(filePath).isFile()) {
+      return res.status(400).json({ success: false, error: `'${filePath}' no es un archivo` });
+    }
+    const ext = filePath.split('.').pop().toLowerCase();
+    const mimeTypes = {
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      ico: 'image/x-icon',
+      svg: 'image/svg+xml',
+      webp: 'image/webp',
+      bmp: 'image/bmp',
+    };
+    const mime = mimeTypes[ext] || 'application/octet-stream';
+    const stat = fs.statSync(filePath);
+    const buffer = fs.readFileSync(filePath);
+    const base64 = buffer.toString('base64');
+    res.json({ success: true, base64, mime, path: filePath, size: stat.size });
+  } catch (err) {
+    console.log('Error en read-file-base64:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/write-file', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
@@ -894,10 +929,10 @@ router.post('/write-file', async (req, res) => {
 router.post('/delete-file', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const { path: filePath } = req.body;
-    if (!filePath) {
+    if (!req.body || !req.body.path) {
       return res.status(400).json({ success: false, error: 'El campo path es requerido' });
     }
+    const filePath = req.body.path;
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, error: `El archivo '${filePath}' no existe` });
     }
@@ -908,6 +943,27 @@ router.post('/delete-file', async (req, res) => {
     res.json({ success: true, path: filePath });
   } catch (err) {
     console.log('Error en delete-file:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/delete-directory', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    if (!req.body || !req.body.path) {
+      return res.status(400).json({ success: false, error: 'El campo path es requerido' });
+    }
+    const dirPath = req.body.path;
+    if (!fs.existsSync(dirPath)) {
+      return res.status(404).json({ success: false, error: `El directorio '${dirPath}' no existe` });
+    }
+    if (!fs.statSync(dirPath).isDirectory()) {
+      return res.status(400).json({ success: false, error: `'${dirPath}' no es un directorio` });
+    }
+    fs.rmSync(dirPath, { recursive: true, force: true });
+    res.json({ success: true, path: dirPath });
+  } catch (err) {
+    console.log('Error en delete-directory:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });

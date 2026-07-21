@@ -272,7 +272,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - **Auth:** Requerida
 - **Body:** `{ key: string, value: string, workspace_id?: number }` — si no se envía `workspace_id`, usa el primary
 - Si `key === "deepseek_key"` se encripta con AES-256-CBC antes de almacenar
-- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `omnifilter_debounce_ms`, `screen_resolutions`, `request_response_max_size_kb`
+- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `omnifilter_debounce_ms`, `screen_resolutions`, `request_response_max_size_kb`, `terminal_max_terminals`
 - **Respuesta:** `{ success: true }`
 
 ### `GET /api/settings/global`
@@ -970,8 +970,8 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ### `POST /api/despliegue/upd-config`
 - **Auth:** Requerida
-- **Body:** `{ sessionId: number }`
-- **Descripción:** Lee el archivo `deploy.json` del directorio de trabajo de la sesión (campo `cwd` de `chat_sessions`) y guarda su contenido como JSON en la columna `despliegue_config` de la tabla `proyectos` para el proyecto vinculado a la sesión.
+- **Body:** `{ sessionId: number, dir?: string }`
+- **Descripción:** Lee el archivo `deploy.json` del directorio de trabajo de la sesión (campo `cwd` de `chat_sessions` o `dir` si se especifica) y guarda su contenido como JSON en la columna `despliegue_config` de la tabla `proyectos` para el proyecto vinculado a la sesión.
 - **Respuesta 200:** `{ success: true, message: "Configuración de despliegue guardada correctamente." }`
 - **Respuesta 400:** `{ success: false, error: "La sesión de chat no está vinculada a un proyecto. Use /chat_set_proyecto para seleccionar un proyecto." }`
 - **Respuesta (cuando no existe deploy.json):** `{ success: false, code: "MISSING_DEPLOY_JSON", cwd: "<ruta>", error: "No se pudo obtener configuración de despliegue: falta el archivo \"deploy.json\". Se esperaba en: <ruta>" }`
@@ -985,8 +985,8 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ### `POST /api/despliegue/save-config`
 - **Auth:** Requerida
-- **Body:** `{ sessionId: number, subprojects: [{ cwd: string, type: "backend"|"frontend" }] }`
-- **Descripción:** Crea el archivo `deploy.json` en el directorio de trabajo de la sesión a partir de los subproyectos definidos en el formulario. Construye la estructura `{ install: [{cwd}], pm2: [{cwd}…], build: [{cwd}…] }` según el tipo de cada subproyecto y guarda la configuración en la columna `despliegue_config` del proyecto vinculado.
+- **Body:** `{ sessionId: number, subprojects: [{ cwd: string, type: "backend"|"frontend" }], dir?: string }`
+- **Descripción:** Crea el archivo `deploy.json` en el directorio de trabajo de la sesión (o en `dir` si se especifica) a partir de los subproyectos definidos en el formulario. Construye la estructura `{ install: [{cwd}], pm2: [{cwd}…], build: [{cwd}…] }` según el tipo de cada subproyecto y guarda la configuración en la columna `despliegue_config` del proyecto vinculado.
 - **Respuesta 200:** `{ success: true, message: "Configuración de despliegue creada y guardada correctamente." }`
 - **Respuesta 400:** `{ success: false, error: "..." }` (sin sesión, sin subproyectos, subproyecto inválido, sin proyecto vinculado)
 

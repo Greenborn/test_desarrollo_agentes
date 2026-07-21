@@ -160,7 +160,7 @@ function cleanup() {
   }
   try {
     execSync(`sleep 2`, { stdio: 'ignore', timeout: 5000 });
-  } catch (e) {}
+  } catch (e) { console.log('[gestor] Error en pausa durante cleanup:', e.message); }
   for (const proc of targets) {
     try {
       proc.kill('SIGKILL');
@@ -200,6 +200,14 @@ function start() {
 }
 
 start();
+
+process.on('uncaughtException', (err, origin) => {
+  console.log('[gestor] UNCAUGHT EXCEPTION:', err.message, '\n', err.stack, '\norigin:', origin);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.log('[gestor] UNHANDLED REJECTION:', reason instanceof Error ? reason.message : reason, '\n', reason instanceof Error ? reason.stack : '');
+});
 
 process.on('exit', cleanup);
 process.on('SIGTERM', () => {

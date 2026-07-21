@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useAuthStore } from './auth.js'
 import { useWorkspaceStore } from './workspace.js'
+import { useSettingsStore } from './settings.js'
 import wsClient from '../services/wsClient.js'
 
 const API = '/api'
@@ -33,7 +34,14 @@ export const useChatStore = defineStore('chat', () => {
   const _cmdSessionStreamCache = ref({})
   const _cmdPendingSave = ref({})
   const _terminalSessions = ref({})
-  const maxTerminalsLimit = ref(2)
+  const maxTerminalsLimit = computed(() => {
+    try {
+      const s = useSettingsStore()
+      return s.terminalMaxTerminals || 5
+    } catch {
+      return 5
+    }
+  })
   let _nextTerminalKey = 1
 
   function _genTerminalKey() {
@@ -172,29 +180,6 @@ export const useChatStore = defineStore('chat', () => {
 
     if (_terminalSessions.value[sid].length === 0) {
       delete _terminalSessions.value[sid]
-    }
-  }
-
-  async function loadMaxTerminalsConfig() {
-    try {
-      const { settingGet } = await import('../services/settingService.js')
-      const res = await settingGet('terminal_max_terminals')
-      if (res && res.value) {
-        maxTerminalsLimit.value = Math.max(1, parseInt(res.value, 10) || 2)
-      }
-    } catch (err) {
-      console.error('Error loading maxTerminals config:', err)
-    }
-  }
-
-  async function setMaxTerminalsConfig(val) {
-    const num = Math.max(1, parseInt(val, 10) || 2)
-    maxTerminalsLimit.value = num
-    try {
-      const { settingSet } = await import('../services/settingService.js')
-      await settingSet('terminal_max_terminals', String(num))
-    } catch (err) {
-      console.error('Error saving maxTerminals config:', err)
     }
   }
 
@@ -1036,8 +1021,6 @@ export const useChatStore = defineStore('chat', () => {
     saveUiState()
   })
 
-  loadMaxTerminalsConfig()
-
   return {
     sessions, archivedSessions, activeSessionId, messages,
     streaming, creating, executing, sessionStatus, currentChunk, currentThinking,
@@ -1054,7 +1037,7 @@ export const useChatStore = defineStore('chat', () => {
     _saveMessageToDb, clearPendingNotification, ledFlash, flashLed, showTerminal,
     _terminalSessions, _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel, terminalId,
     _hasTerminal, openTerminal, closeTerminal, getTerminalCount, getTerminals,
-    maxTerminalsLimit, loadMaxTerminalsConfig, setMaxTerminalsConfig,
+    maxTerminalsLimit,
     saveUiState,
   }
 })

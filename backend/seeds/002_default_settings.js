@@ -51,5 +51,10 @@ export async function seed(knex) {
       setting_value: '#ef4444',
       encrypted: false,
     },
+    {
+      setting_key: 'terminal_max_terminals',
+      setting_value: '5',
+      encrypted: false,
+    },
   ]);
 }

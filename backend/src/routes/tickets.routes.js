@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db from '../config/db.js';
-import { getRedmineToken, getRedmineUrl } from '../services/redmine.js';
+import { getRedmineToken, getRedmineUrl, syncRedmineTicket } from '../services/redmine.js';
 
 const router = Router();
 
@@ -193,15 +193,18 @@ router.post('/session', async (req, res) => {
     const updateData = { id_ticket_redmine: idTicketRedmine || null, updated_at: db.fn.now() };
 
     if (idTicketRedmine) {
-      let targetWsId = null;
+      // 1. Determinar wsId y proyectoId
+      let wsId = null;
+      let proyectoId = null;
 
-      const ticket = await db('tickets')
+      const existingTicket = await db('tickets')
         .where({ redmine_id: idTicketRedmine })
-        .select('workspace_id', 'proyecto_id')
+        .select('*')
         .first();
 
-      if (ticket?.workspace_id) {
-        targetWsId = ticket.workspace_id;
+      if (existingTicket) {
+        wsId = existingTicket.workspace_id;
+        proyectoId = existingTicket.proyecto_id;
       } else {
         const session = await db('chat_sessions')
           .where({ id: sessionId, user_id: req.session.userId })
@@ -209,17 +212,37 @@ router.post('/session', async (req, res) => {
           .first();
 
         if (session?.proyecto_id) {
+          proyectoId = session.proyecto_id;
           const proyecto = await db('proyectos')
             .where({ id: session.proyecto_id })
             .select('workspace_id')
             .first();
-
-          if (proyecto?.workspace_id) {
-            targetWsId = proyecto.workspace_id;
-          }
+          wsId = proyecto?.workspace_id || null;
         }
       }
 
+      if (!wsId) {
+        wsId = (req.session.workspaceIds || [1])[0] || 1;
+      }
+
+      // 2. Verificar existencia en Redmine y reimportar
+      const syncResult = await syncRedmineTicket(idTicketRedmine, wsId, proyectoId);
+      if (!syncResult.found) {
+        return res.status(400).json({ error: syncResult.error });
+      }
+
+      // 3. Obtener datos frescos del ticket (sync pudo resolver proyectoId)
+      const ticket = await db('tickets')
+        .where({ redmine_id: idTicketRedmine })
+        .select('*')
+        .first();
+
+      if (!ticket) {
+        return res.status(500).json({ error: 'Error interno: ticket no encontrado tras sincronización' });
+      }
+
+      // 4. Añadir workspace a la sesión si es necesario
+      const targetWsId = ticket.workspace_id || wsId;
       if (targetWsId) {
         updateData.workspace_id = targetWsId;
 
@@ -237,6 +260,7 @@ router.post('/session', async (req, res) => {
       }
     }
 
+    // 5. Actualizar chat_sessions
     await db('chat_sessions')
       .where({ id: sessionId, user_id: req.session.userId })
       .update(updateData);

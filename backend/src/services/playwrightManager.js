@@ -93,7 +93,7 @@ function stop() {
     proc.kill('SIGTERM');
     try {
       execSync(`sleep 2`, { stdio: 'ignore', timeout: 5000 });
-    } catch (e) {}
+    } catch (e) { console.log('[playwright] Error en pausa después de SIGTERM:', e.message); }
     try {
       proc.kill('SIGKILL');
     } catch (err) {
