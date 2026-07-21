@@ -20,17 +20,17 @@
       <FuncionalidadListControl v-else-if="parsedControl && parsedControl.controlType === 'funcionalidad_list'" :items="parsedControl.items || []" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <ResolutionSelectControl v-else-if="parsedControl && parsedControl.controlType === 'resolution_select'" :options="parsedControl.options || []" :preselect="parsedControl.preselect || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <RedmineProjectList v-else-if="parsedControl && parsedControl.controlType === 'redmine_projects'" :projects="parsedControl.projects || []" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
-      <TicketEditControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_edit'" :ticket="parsedControl.ticket" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <TicketEditControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_edit'" :ticket="parsedControl.ticket" :workspace-id="parsedControl.workspaceId" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <TicketCreateControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_create'" :project-id="parsedControl.projectId" :session-id="String(parsedControl.sessionId ?? '')" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
-      <DescripcionEditControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_edit'" :initial-description="parsedControl.description || ''" :ticket-subject="parsedControl.ticketSubject || ''" :ticket-id="parsedControl.ticketId || ''" :session-id="String(parsedControl.sessionId ?? '')" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <DescripcionEditControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_edit'" :initial-description="parsedControl.description || ''" :ticket-subject="parsedControl.ticketSubject || ''" :ticket-id="parsedControl.ticketId || ''" :session-id="String(parsedControl.sessionId ?? '')" :workspace-id="parsedControl.workspaceId" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DescripcionInputControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_input'" :placeholder="parsedControl.placeholder || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DescripcionResultControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_result'" :description="parsedControl.description || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DescripcionResultControl v-else-if="parsedControl && parsedControl.controlType === 'refinar_result'" :description="parsedControl.description || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
-      <CommitResultControl v-else-if="parsedControl && parsedControl.controlType === 'commit_result'" :message="parsedControl.message || ''" :loading="parsedControl.loading || false" :modoEnvioInicial="parsedControl.modo_envio || 'encolar'" :repoUrl="parsedControl.repoUrl || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <CommitResultControl v-else-if="parsedControl && parsedControl.controlType === 'commit_result'" :message="parsedControl.message || ''" :loading="parsedControl.loading || false" :modoEnvioInicial="parsedControl.modo_envio || settings.defaultCommentModeCommit || 'encolar'" :repoUrl="parsedControl.repoUrl || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <ChatComandoEditControl v-else-if="parsedControl && parsedControl.controlType === 'comando_edit'" :mode="parsedControl.mode || 'create'" :label="parsedControl.label || ''" :descripcion="parsedControl.descripcion || ''" :comando="parsedControl.comando || ''" :ocultarEjecucion="parsedControl.ocultar_ejecucion === true" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <RedmineCommentsSendControl v-else-if="parsedControl && parsedControl.controlType === 'redmine_comments_send'" :comentarios_ids="parsedControl.comentarios_ids || []" :ticket_redmine_id="parsedControl.ticket_redmine_id || 0" :mensaje="parsedControl.mensaje || ''" :cantidad="parsedControl.cantidad || 0" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
-      <AmbientesDiffCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ambientes_diff_comment'" :message="parsedControl.message || ''" :sourceEnv="parsedControl.sourceEnv || ''" :targetEnv="parsedControl.targetEnv || ''" :modoEnvioInicial="parsedControl.modo_envio || 'encolar'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
-      <TicketCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_comment'" :ticketId="parsedControl.ticketId" :sessionId="String(parsedControl.sessionId ?? '')" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <AmbientesDiffCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ambientes_diff_comment'" :message="parsedControl.message || ''" :sourceEnv="parsedControl.sourceEnv || ''" :targetEnv="parsedControl.targetEnv || ''" :modoEnvioInicial="parsedControl.modo_envio || settings.defaultCommentModeDiff || 'encolar'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <TicketCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_comment'" :ticketId="parsedControl.ticketId" :sessionId="String(parsedControl.sessionId ?? '')" :modoEnvioInicial="parsedControl.modo_envio || settings.defaultCommentModeTicket || 'encolar'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DeployConfigForm v-else-if="parsedControl && parsedControl.controlType === 'deploy_config_form'" :initialSubprojects="parsedControl.initialSubprojects || []" :projectDir="parsedControl.dir || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <NavegadorIniciarForm v-else-if="parsedControl && parsedControl.controlType === 'navegador_iniciar'" :session-id="String(parsedControl.sessionId ?? '')" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <CrearProyectoRedmineControl v-else-if="parsedControl && parsedControl.controlType === 'redmine_crear_proyecto'" :prefill="parsedControl.prefill || {}" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
@@ -147,6 +147,7 @@ import PeticionFormControl from '../peticiones/PeticionFormControl.vue'
 import PeticionResultDisplay from '../peticiones/PeticionResultDisplay.vue'
 import NavegadorIniciarForm from '../chat-controls/NavegadorIniciarForm.vue'
 import CrearProyectoRedmineControl from '../projects/CrearProyectoRedmineControl.vue'
+import { useSettingsStore } from '../../stores/settings.js'
 
 let counter = 0
 
@@ -158,6 +159,9 @@ export default {
   },
   emits: ['control-confirm', 'contextmenu'],
   computed: {
+    settings() {
+      return useSettingsStore()
+    },
     msgKey() {
       return this.msg.id || this.msg._key
     },

@@ -5,6 +5,7 @@ import { useCommandStore } from '../stores/command.js'
 import { useModalStore } from '../stores/modal.js'
 import { useWorkspaceStore } from '../stores/workspace.js'
 import { useAuthStore } from '../stores/auth.js'
+import { useSettingsStore } from '../stores/settings.js'
 import { useComandosPersonalizadosStore } from '../stores/comandosPersonalizados.js'
 import { useRedmineCommentsStore } from '../stores/redmineComments.js'
 import { useProjectVariablesStore } from '../stores/projectVariables.js'
@@ -125,12 +126,15 @@ export function useControlHandlers(api) {
         }
         return
       }
+      const wsId = controlMsg?.controlData?.workspaceId
+      const descPayload = { description: value.description }
+      if (wsId) descPayload.workspace_id = Number(wsId)
       try {
         const res = await fetch(`/api/tickets/session/${chat.activeSessionId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ description: value.description }),
+          body: JSON.stringify(descPayload),
         })
         const data = await res.json()
         const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
@@ -319,12 +323,15 @@ export function useControlHandlers(api) {
         }
         return
       }
+      const wsId = controlMsg?.controlData?.workspaceId
+      const payload = { ...value }
+      if (wsId) payload.workspace_id = Number(wsId)
       try {
         const res = await fetch(`/api/tickets/session/${chat.activeSessionId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify(value),
+          body: JSON.stringify(payload),
         })
         const data = await res.json()
         if (data.success) {
@@ -1929,6 +1936,8 @@ export function useControlHandlers(api) {
 
       if (addComment && idTicket) {
         const modoEnvio = modo_envio || 'encolar'
+        const settings = useSettingsStore()
+        settings.save('default_comment_mode_commit', modoEnvio, auth.getPrimaryWorkspaceId())
         const notesBody = commitUrl ? cleanMsg + '\n\n' + commitUrl : cleanMsg
         if (modoEnvio === 'enviar') {
           try {
@@ -2005,6 +2014,9 @@ export function useControlHandlers(api) {
       }
 
       const notesBody = message.trim()
+
+      const settingsAmb = useSettingsStore()
+      settingsAmb.save('default_comment_mode_diff', modo_envio || 'encolar', auth.getPrimaryWorkspaceId())
 
       if (modo_envio === 'enviar') {
         try {
@@ -2115,6 +2127,9 @@ export function useControlHandlers(api) {
 
       const notesBody = message.trim()
 
+      const settingsTkt = useSettingsStore()
+      settingsTkt.save('default_comment_mode_ticket', modo_envio || 'encolar', auth.getPrimaryWorkspaceId())
+
       if (modo_envio === 'enviar') {
         try {
           const ticketRes = await fetch('/api/tickets/session/' + sessionId, {
@@ -2125,14 +2140,16 @@ export function useControlHandlers(api) {
           })
           const ticketData = await ticketRes.json()
 
-          if (idx >= 0) {
-            if (ticketData.success) {
+          if (ticketData.success) {
+            if (idx >= 0) {
               chat.messages[idx] = {
                 role: 'result',
                 content: '✓ Comentario enviado al ticket #' + idTicket + '.',
                 _key: 'result-' + Date.now(),
               }
-            } else {
+            }
+          } else {
+            if (idx >= 0) {
               chat.messages[idx] = {
                 role: 'result',
                 content: '✗ Error al enviar comentario: ' + (ticketData.error || 'Error desconocido'),

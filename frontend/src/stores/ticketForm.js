@@ -13,10 +13,12 @@ export const useTicketFormStore = defineStore('ticketForm', () => {
   const allowedStatuses = ref([])
   const loading = ref(false)
 
-  async function loadOptions() {
+  async function loadOptions(workspaceId) {
     loading.value = true
     try {
-      const res = await fetch(`${API}/tickets/options`, { credentials: 'include' })
+      let url = `${API}/tickets/options`
+      if (workspaceId) url += `?wsId=${workspaceId}`
+      const res = await fetch(url, { credentials: 'include' })
       const data = await res.json()
       options.statuses = data.statuses || []
       options.priorities = data.priorities || []
@@ -57,10 +59,12 @@ export const useTicketFormStore = defineStore('ticketForm', () => {
     }
   }
 
-  async function loadTicketOptions(redmineId) {
+  async function loadTicketOptions(redmineId, workspaceId) {
     if (!redmineId) return
     try {
-      const res = await fetch(`${API}/tickets/ticket-options/${redmineId}`, { credentials: 'include' })
+      let url = `${API}/tickets/ticket-options/${redmineId}`
+      if (workspaceId) url += `?wsId=${workspaceId}`
+      const res = await fetch(url, { credentials: 'include' })
       const data = await res.json()
       if (data.statuses && data.statuses.length > 0) {
         allowedStatuses.value = data.statuses
@@ -73,6 +77,26 @@ export const useTicketFormStore = defineStore('ticketForm', () => {
       }
     } catch (err) {
       console.error('Error al cargar opciones del ticket:', err)
+    }
+
+    if (allowedStatuses.value.length === 0) {
+      allowedStatuses.value = [
+        { id: null, name: 'Nuevo' },
+        { id: null, name: 'En Progreso' },
+        { id: null, name: 'Resuelto' },
+        { id: null, name: 'Feedback' },
+        { id: null, name: 'Cerrado' },
+        { id: null, name: 'Rechazado' },
+      ]
+    }
+    if (options.priorities.length === 0) {
+      options.priorities = [
+        { id: null, name: 'Baja' },
+        { id: null, name: 'Normal' },
+        { id: null, name: 'Alta' },
+        { id: null, name: 'Urgente' },
+        { id: null, name: 'Inmediata' },
+      ]
     }
   }
 

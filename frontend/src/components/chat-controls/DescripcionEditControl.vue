@@ -49,6 +49,7 @@ export default {
     ticketId: { type: [String, Number], default: '' },
     sessionId: { type: [String, Number], required: true },
     rows: { type: Number, default: 8 },
+    workspaceId: { type: [Number, String], default: null },
   },
   emits: ['confirm'],
   setup(props, { emit }) {

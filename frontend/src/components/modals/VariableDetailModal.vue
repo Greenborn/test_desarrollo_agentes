@@ -14,8 +14,12 @@
         <div v-if="variable.created_at">Creada: {{ formatDate(variable.created_at) }}</div>
         <div v-if="variable.updated_at">Actualizada: {{ formatDate(variable.updated_at) }}</div>
       </div>
-      <div class="mb-1 text-secondary small text-uppercase">Valor</div>
-      <pre class="variable-value-box p-3 rounded mb-0"><code>{{ formattedValue }}</code></pre>
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <span class="text-secondary small text-uppercase">Valor</span>
+        <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size: 0.65rem; line-height: 1.4;" @click="copiarValor" title="Copiar valor">📋</button>
+      </div>
+      <pre v-if="!isJson" class="variable-value-box p-3 rounded mb-0"><code>{{ formattedValue }}</code></pre>
+      <JsonTreeView v-else :data="parsedValue" :depth="0" class="variable-value-box p-3 rounded mb-0" />
     </div>
 
     <div v-else>
@@ -56,8 +60,10 @@
 import { ref } from 'vue'
 import { useProjectVariablesStore } from '../../stores/projectVariables.js'
 import { useModalStore } from '../../stores/modal.js'
+import JsonTreeView from '../utils/JsonTreeView.vue'
 
 export default {
+  components: { JsonTreeView },
   props: {
     variable: { type: Object, required: true },
     proyectoId: { type: Number, default: null },
@@ -117,12 +123,38 @@ export default {
       }
     }
 
+    function copiarValor() {
+      const raw = typeof props.variable.value === 'string' ? props.variable.value : JSON.stringify(props.variable.value, null, 2)
+      navigator.clipboard.writeText(raw).catch(err => {
+        console.error('Error al copiar valor:', err)
+      })
+    }
+
     return {
       editMode, editKey, editValue, editType, saving, errorMsg,
-      enterEditMode, cancelarEdit, guardar, eliminar,
+      enterEditMode, cancelarEdit, guardar, eliminar, copiarValor,
     }
   },
   computed: {
+    isJson() {
+      const v = this.variable.value
+      if (!v) return false
+      try {
+        const parsed = typeof v === 'string' ? JSON.parse(v) : v
+        return parsed !== null && typeof parsed === 'object'
+      } catch {
+        return false
+      }
+    },
+    parsedValue() {
+      const v = this.variable.value
+      if (!v) return null
+      try {
+        return typeof v === 'string' ? JSON.parse(v) : v
+      } catch {
+        return null
+      }
+    },
     formattedValue() {
       const v = this.variable.value
       if (!v) return '(vacío)'

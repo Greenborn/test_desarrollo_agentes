@@ -85,6 +85,12 @@ router.get('/', async (req, res) => {
         keys.skill_repository_url = row.setting_value;
       } else if (row.setting_key === 'terminal_max_terminals') {
         keys.terminal_max_terminals = row.setting_value;
+      } else if (row.setting_key === 'default_comment_mode_commit') {
+        keys.default_comment_mode_commit = row.setting_value;
+      } else if (row.setting_key === 'default_comment_mode_ticket') {
+        keys.default_comment_mode_ticket = row.setting_value;
+      } else if (row.setting_key === 'default_comment_mode_diff') {
+        keys.default_comment_mode_diff = row.setting_value;
       }
     }
     const defaults = {
@@ -111,6 +117,9 @@ router.get('/', async (req, res) => {
       browser_user_agent_chrome: '',
       browser_user_agent_firefox: '',
       terminal_max_terminals: '5',
+      default_comment_mode_commit: 'encolar',
+      default_comment_mode_ticket: 'encolar',
+      default_comment_mode_diff: 'encolar',
       screen_resolutions: [
         { id: 'fullhd', width: 1920, height: 1080 },
         { id: 'hd', width: 1366, height: 768 },

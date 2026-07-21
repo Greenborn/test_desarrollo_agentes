@@ -86,6 +86,7 @@ import { useTicketFormStore } from '../../stores/ticketForm.js'
 export default {
   props: {
     ticket: { type: Object, required: true },
+    workspaceId: { type: [Number, String], default: null },
   },
   emits: ['confirm'],
   setup(props, { emit }) {
@@ -127,8 +128,8 @@ export default {
     })
 
     async function loadTicketOptions() {
-      await ticketFormStore.loadOptions()
-      await ticketFormStore.loadTicketOptions(props.ticket?.redmine_id)
+      const wsId = props.workspaceId ? Number(props.workspaceId) : undefined
+      await ticketFormStore.loadTicketOptions(props.ticket?.redmine_id, wsId)
     }
 
     function onStatusChange() {

@@ -1,6 +1,7 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
 import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js'
 import { useOpencodeStore } from '../../stores/opencode.js'
+import { useSettingsStore } from '../../stores/settings.js'
 
 const { register } = useCommandRegistry()
 
@@ -111,6 +112,8 @@ register({
     }
 
     try {
+      const settings = useSettingsStore()
+
       const res = await fetch('/api/command/git-diff-branches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -197,7 +200,7 @@ register({
           message: commentBody,
           sourceEnv: data.sourceEnv,
           targetEnv: data.targetEnv,
-          modo_envio: 'encolar',
+          modo_envio: settings.defaultCommentModeDiff || 'encolar',
         },
         _key: 'control-' + Date.now(),
       }, sessionId)

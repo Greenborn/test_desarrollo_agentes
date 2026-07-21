@@ -91,6 +91,9 @@ Motor: **MariaDB** vía **Knex** (query builder).
 | `screen_resolutions` | `[{ id, width, height }, ...]` | Array JSON de resoluciones de pantalla para Playwright. Configurable desde Settings. Default: 14 resoluciones comunes (desktop + mobile) |
 | `request_response_max_size_kb` | `'100'` | Límite en KB del body de respuesta del comando `/peticion`. Si se excede, la respuesta se trunca (nunca se rechaza). Configurable desde Settings → Límite de respuesta — Peticiones HTTP |
 | `terminal_max_terminals` | `'5'` | Máximo de terminales abiertas simultáneamente por sesión de chat. Aplica también a agentes OpenCode. Configurable desde Settings → Opciones Técnicas |
+| `default_comment_mode_commit` | `'encolar'` | Modo de envío predeterminado para commits (`'encolar'` o `'enviar'`). Se configura desde Settings → Preferencias o se auto-guarda al confirmar un commit. |
+| `default_comment_mode_ticket` | `'encolar'` | Modo de envío predeterminado para comentarios de ticket (`'encolar'` o `'enviar'`). Se configura desde Settings → Preferencias o se auto-guarda al confirmar un comentario. |
+| `default_comment_mode_diff` | `'encolar'` | Modo de envío predeterminado para comentarios de diff entre ambientes (`'encolar'` o `'enviar'`). Se configura desde Settings → Preferencias o se auto-guarda al confirmar. |
 
 ---
 

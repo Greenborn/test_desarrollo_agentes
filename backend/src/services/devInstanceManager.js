@@ -23,6 +23,7 @@ function getSubprojects(deployConfig) {
   const installEntries = deployConfig.install || [];
   const pm2Entries = deployConfig.pm2 || [];
   const buildEntries = deployConfig.build || [];
+  const customEntries = deployConfig.custom || [];
 
   const seen = new Set();
   const subprojects = [];
@@ -35,7 +36,12 @@ function getSubprojects(deployConfig) {
     if (pm2Entries.some(p => p.cwd === entry.cwd)) type = 'backend';
     else if (buildEntries.some(b => b.cwd === entry.cwd)) type = 'frontend';
 
-    if (type) subprojects.push({ cwd: entry.cwd, type });
+    if (type) {
+      const custom = customEntries.find(c => c.cwd === entry.cwd);
+      const sub = { cwd: entry.cwd, type };
+      if (custom && custom.command) sub.command = custom.command;
+      subprojects.push(sub);
+    }
   }
 
   return subprojects;
@@ -110,7 +116,18 @@ export async function startDevInstance(projectRoot, deployConfig, sessionId = nu
     }
 
     let proc;
-    if (sub.type === 'backend') {
+    if (sub.command) {
+      const parts = sub.command.split(/\s+/);
+      const cmd = parts[0];
+      const args = parts.slice(1);
+      console.log(`[dev] Ejecutando comando personalizado para ${sub.cwd}: ${sub.command}`);
+      proc = spawn(cmd, args, {
+        cwd: fullPath,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env },
+        detached: true,
+      });
+    } else if (sub.type === 'backend') {
       proc = spawn('npx', ['nodemon'], {
         cwd: fullPath,
         stdio: ['ignore', 'pipe', 'pipe'],

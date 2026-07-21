@@ -88,7 +88,7 @@
         </div>
       </div>
 
-      <div class="col" v-if="cardHasVisible(['acronimo rama repositorio git', 'locale idioma', 'debounce omnifiltro', 'colores prioridad'])">
+      <div class="col" v-if="cardHasVisible(['acronimo rama repositorio git', 'locale idioma', 'debounce omnifiltro', 'modo envio comentarios predeterminado', 'colores prioridad'])">
         <div class="card bg-dark border-secondary h-100">
           <div class="card-header bg-dark border-secondary py-2 px-3">
             <h6 class="mb-0 fw-semibold">Preferencias</h6>
@@ -127,6 +127,34 @@
                 placeholder="2000"
               />
               <button class="btn btn-sm mt-1 btn-argentina" @click="saveOmnifilterDebounce">Guardar</button>
+            </div>
+
+            <div v-if="matches('modo envio comentarios predeterminado')">
+              <label class="form-label small mb-1 fw-semibold">Modo de envío predeterminado para comentarios</label>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="small text-nowrap" style="width: 120px;">Commit</span>
+                <select class="form-select form-select-sm bg-dark text-light border-secondary" style="width: auto;" v-model="defaultCommentModeCommitInput">
+                  <option value="encolar">Encolar</option>
+                  <option value="enviar">Enviar</option>
+                </select>
+                <button class="btn btn-sm btn-argentina" @click="saveDefaultCommentMode('commit')">Guardar</button>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="small text-nowrap" style="width: 120px;">Comentario Ticket</span>
+                <select class="form-select form-select-sm bg-dark text-light border-secondary" style="width: auto;" v-model="defaultCommentModeTicketInput">
+                  <option value="encolar">Encolar</option>
+                  <option value="enviar">Enviar</option>
+                </select>
+                <button class="btn btn-sm btn-argentina" @click="saveDefaultCommentMode('ticket')">Guardar</button>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="small text-nowrap" style="width: 120px;">Diff Ambientes</span>
+                <select class="form-select form-select-sm bg-dark text-light border-secondary" style="width: auto;" v-model="defaultCommentModeDiffInput">
+                  <option value="encolar">Encolar</option>
+                  <option value="enviar">Enviar</option>
+                </select>
+                <button class="btn btn-sm btn-argentina" @click="saveDefaultCommentMode('diff')">Guardar</button>
+              </div>
             </div>
 
             <div v-if="matches('colores prioridad')">
@@ -563,6 +591,9 @@ export default {
     const browserUserAgentChromeInput = ref('')
     const browserUserAgentFirefoxInput = ref('')
     const terminalMaxTerminalsInput = ref(5)
+    const defaultCommentModeCommitInput = ref('encolar')
+    const defaultCommentModeTicketInput = ref('encolar')
+    const defaultCommentModeDiffInput = ref('encolar')
     const newEnvName = ref('')
     const newEnvBranch = ref('')
     const newEnvDescription = ref('')
@@ -702,6 +733,18 @@ export default {
 
     watch(() => settings.terminalMaxTerminals, (val) => {
       terminalMaxTerminalsInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.defaultCommentModeCommit, (val) => {
+      defaultCommentModeCommitInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.defaultCommentModeTicket, (val) => {
+      defaultCommentModeTicketInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.defaultCommentModeDiff, (val) => {
+      defaultCommentModeDiffInput.value = val
     }, { immediate: true })
 
     async function reloadSettings() {
@@ -932,6 +975,17 @@ export default {
     function saveTerminalMaxTerminals() {
       settings.clearFeedback()
       settings.save('terminal_max_terminals', String(terminalMaxTerminalsInput.value), selectedWId.value)
+    }
+
+    function saveDefaultCommentMode(type) {
+      settings.clearFeedback()
+      const inputMap = {
+        commit: { key: 'default_comment_mode_commit', ref: defaultCommentModeCommitInput },
+        ticket: { key: 'default_comment_mode_ticket', ref: defaultCommentModeTicketInput },
+        diff: { key: 'default_comment_mode_diff', ref: defaultCommentModeDiffInput },
+      }
+      const cfg = inputMap[type]
+      if (cfg) settings.save(cfg.key, cfg.ref.value, selectedWId.value)
     }
 
     function savePriorityColor(key) {

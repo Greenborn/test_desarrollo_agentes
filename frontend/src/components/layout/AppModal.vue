@@ -9,6 +9,7 @@
       :class="{ 'modal-wide': modal.wide }"
       :style="getWindowStyle(modal)"
       @mousedown="bringToFront(modal.id)"
+      @keydown.escape="hideModalContextMenu"
     >
       <div
         class="modal-window-header"
@@ -20,7 +21,7 @@
           <button class="modal-btn-close" @click.stop="close(modal.id)" title="Cerrar">✕</button>
         </div>
       </div>
-      <div class="modal-window-body">
+      <div class="modal-window-body" @contextmenu.prevent="showModalContextMenu">
         <component :is="modal.component" v-bind="modal.props" @close="close(modal.id)" @cancel="close(modal.id)" />
       </div>
     </div>
@@ -51,6 +52,8 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useModalStore } from '../../stores/modal.js'
+import { useComponentContextMenu } from '../../composables/useComponentContextMenu.js'
+import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
 
 export default {
   setup() {
@@ -130,6 +133,59 @@ export default {
       modal.bringToFront(id)
     }
 
+    const { buildComponentRef } = useComponentContextMenu()
+    const ctxMenuRef = ref(null)
+    const ctxMenuBackdrop = ref(null)
+
+    function showModalContextMenu(e) {
+      const ref = buildComponentRef(e.target)
+      if (!ref) return
+      hideModalContextMenu()
+
+      const bd = document.createElement('div')
+      bd.className = 'modal-context-backdrop'
+      bd.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:2000;'
+      bd.addEventListener('click', hideModalContextMenu)
+      bd.addEventListener('contextmenu', (ev) => { ev.preventDefault(); hideModalContextMenu() })
+
+      const menu = document.createElement('div')
+      menu.className = 'modal-context-menu'
+      menu.style.cssText = 'position:fixed;z-index:2001;background:#1a2744;border:1px solid #75AADB;border-radius:6px;padding:4px 0;min-width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.4);left:' + e.clientX + 'px;top:' + e.clientY + 'px;'
+
+      const item = document.createElement('div')
+      item.className = 'modal-context-item'
+      item.textContent = '📋 Copiar referencia'
+      item.style.cssText = 'padding:8px 16px;cursor:pointer;font-size:0.875rem;color:#e0e0e0;user-select:none;'
+      item.addEventListener('mouseenter', () => { item.style.background = '#1a2a4e' })
+      item.addEventListener('mouseleave', () => { item.style.background = '' })
+      item.addEventListener('click', () => {
+        navigator.clipboard.writeText(ref).catch(err => console.error('Error al copiar referencia:', err))
+        hideModalContextMenu()
+      })
+
+      menu.appendChild(item)
+      document.body.appendChild(bd)
+      document.body.appendChild(menu)
+
+      const adjusted = adjustContextMenuPosition(menu, e.clientX, e.clientY)
+      menu.style.left = adjusted.x + 'px'
+      menu.style.top = adjusted.y + 'px'
+
+      ctxMenuRef.value = menu
+      ctxMenuBackdrop.value = bd
+    }
+
+    function hideModalContextMenu() {
+      if (ctxMenuBackdrop.value && ctxMenuBackdrop.value.parentNode) {
+        ctxMenuBackdrop.value.parentNode.removeChild(ctxMenuBackdrop.value)
+      }
+      if (ctxMenuRef.value && ctxMenuRef.value.parentNode) {
+        ctxMenuRef.value.parentNode.removeChild(ctxMenuRef.value)
+      }
+      ctxMenuRef.value = null
+      ctxMenuBackdrop.value = null
+    }
+
     function onDragStart(e, m) {
       const el = e.currentTarget.parentElement
       const rect = el.getBoundingClientRect()
@@ -155,7 +211,7 @@ export default {
       document.body.style.userSelect = 'none'
     }
 
-    return { stack, activeModals, minimizedModals, showTaskbar, getWindowStyle, close, toggleMinimize, bringToFront, onDragStart, onTaskbarEnter, onTaskbarLeave }
+    return { stack, activeModals, minimizedModals, showTaskbar, getWindowStyle, close, toggleMinimize, bringToFront, onDragStart, onTaskbarEnter, onTaskbarLeave, showModalContextMenu, hideModalContextMenu }
   },
 }
 </script>

@@ -4,6 +4,7 @@ import path from 'path';
 import db from '../config/db.js';
 import * as devInstanceManager from '../services/devInstanceManager.js';
 import playwrightManager from '../services/playwrightManager.js';
+import memoriaClient from '../services/memoriaClient.js';
 
 const PW_PORT = process.env.SERVICIO_PLAYWRIGHT_PORT || 4098;
 const router = express.Router();
@@ -194,6 +195,10 @@ router.post('/save-config', async (req, res) => {
       pm2: subprojects.filter(sp => sp.type === 'backend').map(sp => ({ cwd: sp.cwd })),
       build: subprojects.filter(sp => sp.type === 'frontend').map(sp => ({ cwd: sp.cwd })),
     };
+    const customCmds = subprojects.filter(sp => sp.command && sp.command.trim());
+    if (customCmds.length > 0) {
+      deployConfig.custom = customCmds.map(sp => ({ cwd: sp.cwd, command: sp.command.trim() }));
+    }
 
     const deployPath = path.resolve(projectDir, 'deploy.json');
     fs.writeFileSync(deployPath, JSON.stringify(deployConfig, null, 2), 'utf-8');
@@ -318,6 +323,16 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
 
     if (frontendPorts.length > 0) {
       try {
+        const projectNamespace = `proyecto:${session.proyecto_id}`;
+        const memoryKeys = ['NAVEGADOR_CONSOLE_LOGS', 'NAVEGADOR_CONSOLE_WARNS', 'NAVEGADOR_CONSOLE_ERRORS', 'NAVEGADOR_NETWORK_ERRORS'];
+        for (const key of memoryKeys) {
+          try {
+            await memoriaClient.del(projectNamespace, key);
+          } catch (delErr) {
+            console.log(`[despliegue] Error al limpiar memoria key ${key}:`, delErr.message);
+          }
+        }
+
         await playwrightManager.ensureRunning();
 
         if (customResolution && customResolution.width && customResolution.height) {

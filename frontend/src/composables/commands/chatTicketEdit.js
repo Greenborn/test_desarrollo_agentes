@@ -8,7 +8,7 @@ register({
   name: '/chat_edit_ticket',
   category: 'Proyecto',
   description: 'Abre un editor inline para modificar los datos del ticket de Redmine asignado a la sesión actual. Con --mode=descripcion abre un textarea directo para editar la descripción.',
-  usage: '/chat_edit_ticket [--mode=descripcion]',
+  usage: '/chat_edit_ticket [--workspace=ID] [--mode=descripcion]',
   async autocomplete(args, cmdStore) {
     const usedFlags = getUsedFlags(args)
     if (usedFlags.includes('--mode=')) {
@@ -20,8 +20,10 @@ register({
         const filtered = MODE_VALUES.filter(v => v.startsWith(val))
         cmdStore.showAutocomplete(filtered.map(v => ({ display: v, value: `--mode=${v}` })))
       }
+    } else if (usedFlags.includes('--workspace=')) {
+      cmdStore.hideAutocomplete()
     } else {
-      cmdStore.showAutocomplete(['--mode='])
+      cmdStore.showAutocomplete(['--workspace=', '--mode='])
     }
   },
   async execute(args, { chatStore, sessionId }) {
@@ -29,14 +31,28 @@ register({
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
 
-    const res = await fetch(`/api/tickets/session/${sessionId}`, { credentials: 'include' })
+    const { params } = parseCommandArgs(args, { workspace: { required: false }, mode: { required: false } })
+    let wsId
+
+    if (params.workspace) {
+      wsId = parseInt(params.workspace, 10)
+    } else {
+      const { sessions } = chatStore
+      const session = sessions.find(s => Number(s.id) === Number(sessionId))
+      wsId = session?.workspace_id || null
+    }
+
+    let url = `/api/tickets/session/${sessionId}`
+    if (wsId) url += `?wsId=${wsId}`
+
+    const res = await fetch(url, { credentials: 'include' })
     const data = await res.json()
 
     if (!data.idTicketRedmine || !data.ticket) {
       throw new Error('No hay ticket asignado a esta sesión.')
     }
 
-    const { params } = parseCommandArgs(args, { mode: { required: false } })
+    const workspaceId = wsId || data.ticket.workspace_id || null
 
     if (params.mode === 'descripcion') {
       return {
@@ -48,6 +64,7 @@ register({
           ticketSubject: data.ticket.subject || '',
           ticketId: data.idTicketRedmine,
           sessionId,
+          workspaceId,
         },
       }
     }
@@ -59,6 +76,7 @@ register({
         controlId: 'ticket-edit-' + Date.now(),
         ticket: data.ticket,
         sessionId,
+        workspaceId,
       },
     }
   },

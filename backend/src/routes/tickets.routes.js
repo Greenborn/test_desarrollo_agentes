@@ -38,8 +38,7 @@ router.get('/options', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const wsIds = req.session.workspaceIds || [1];
-    const wsId = wsIds[0] || 1;
+    const wsId = req.query.wsId ? parseInt(req.query.wsId) : (req.session.workspaceIds || [1])[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
 
@@ -112,7 +111,7 @@ router.get('/session/:sessionId', async (req, res) => {
     if (idTicketRedmine) {
       try {
         const localTicket = await db('tickets').where({ redmine_id: idTicketRedmine }).select('workspace_id').first();
-        const wsId = (localTicket && localTicket.workspace_id) || (req.session.workspaceIds || [1])[0] || 1;
+        const wsId = req.query.wsId ? parseInt(req.query.wsId) : (localTicket && localTicket.workspace_id) || (req.session.workspaceIds || [1])[0] || 1;
         const token = await getRedmineToken(wsId);
         const url = await getRedmineUrl(wsId);
         if (token && url) {
@@ -145,7 +144,7 @@ router.get('/session/:sessionId', async (req, res) => {
     if (idTicketRedmine && req.query.comments === 'true') {
       try {
         const localTicket = await db('tickets').where({ redmine_id: idTicketRedmine }).select('workspace_id').first();
-        const wsId = (localTicket && localTicket.workspace_id) || (req.session.workspaceIds || [1])[0] || 1;
+        const wsId = req.query.wsId ? parseInt(req.query.wsId) : (localTicket && localTicket.workspace_id) || (req.session.workspaceIds || [1])[0] || 1;
         const token = await getRedmineToken(wsId);
         const url = await getRedmineUrl(wsId);
         if (token && url) {
@@ -183,7 +182,7 @@ router.get('/session/:sessionId', async (req, res) => {
 router.post('/session', async (req, res) => {
   if (!authGuard(req, res)) return;
 
-  const { sessionId, idTicketRedmine } = req.body;
+  const { sessionId, idTicketRedmine, workspaceId: bodyWsId } = req.body;
 
   if (!sessionId) {
     return res.status(400).json({ error: 'sessionId es requerido' });
@@ -197,27 +196,31 @@ router.post('/session', async (req, res) => {
       let wsId = null;
       let proyectoId = null;
 
-      const existingTicket = await db('tickets')
-        .where({ redmine_id: idTicketRedmine })
-        .select('*')
-        .first();
-
-      if (existingTicket) {
-        wsId = existingTicket.workspace_id;
-        proyectoId = existingTicket.proyecto_id;
+      if (bodyWsId) {
+        wsId = bodyWsId;
       } else {
-        const session = await db('chat_sessions')
-          .where({ id: sessionId, user_id: req.session.userId })
-          .select('proyecto_id')
+        const existingTicket = await db('tickets')
+          .where({ redmine_id: idTicketRedmine })
+          .select('*')
           .first();
 
-        if (session?.proyecto_id) {
-          proyectoId = session.proyecto_id;
-          const proyecto = await db('proyectos')
-            .where({ id: session.proyecto_id })
-            .select('workspace_id')
+        if (existingTicket) {
+          wsId = existingTicket.workspace_id;
+          proyectoId = existingTicket.proyecto_id;
+        } else {
+          const session = await db('chat_sessions')
+            .where({ id: sessionId, user_id: req.session.userId })
+            .select('proyecto_id')
             .first();
-          wsId = proyecto?.workspace_id || null;
+
+          if (session?.proyecto_id) {
+            proyectoId = session.proyecto_id;
+            const proyecto = await db('proyectos')
+              .where({ id: session.proyecto_id })
+              .select('workspace_id')
+              .first();
+            wsId = proyecto?.workspace_id || null;
+          }
         }
       }
 
@@ -276,8 +279,7 @@ router.get('/ticket-options/:ticketId', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const wsIds = req.session.workspaceIds || [1];
-    const wsId = wsIds[0] || 1;
+    const wsId = req.query.wsId ? parseInt(req.query.wsId) : (req.session.workspaceIds || [1])[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);
 
@@ -616,7 +618,7 @@ router.post('/create', async (req, res) => {
 router.put('/session/:sessionId', async (req, res) => {
   if (!authGuard(req, res)) return;
 
-  const { subject, description, status_name, priority_name, assigned_to_name, status_id, priority_id, assigned_to_id, notes, done_ratio } = req.body;
+  const { subject, description, status_name, priority_name, assigned_to_name, status_id, priority_id, assigned_to_id, notes, done_ratio, workspace_id } = req.body;
 
   if (subject !== undefined && subject.trim().length === 0) {
     return res.status(400).json({ error: 'El asunto no puede estar vacío.' });
@@ -661,7 +663,7 @@ router.put('/session/:sessionId', async (req, res) => {
     if (Object.keys(redmineUpdate).length > 0) {
       try {
         const localTicket = await db('tickets').where({ redmine_id: idTicketRedmine }).select('workspace_id').first();
-        const wsId = (localTicket && localTicket.workspace_id) || (req.session.workspaceIds || [1])[0] || 1;
+        const wsId = workspace_id || (localTicket && localTicket.workspace_id) || (req.session.workspaceIds || [1])[0] || 1;
         const token = await getRedmineToken(wsId);
         const url = await getRedmineUrl(wsId);
         if (token && url) {

@@ -1,4 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js'
+import { useSettingsStore } from '../../stores/settings.js'
 
 const { register } = useCommandRegistry()
 
@@ -11,6 +12,8 @@ register({
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
+
+    const settings = useSettingsStore()
 
     const res = await fetch(`/api/tickets/session/${sessionId}`, { credentials: 'include' })
     const data = await res.json()
@@ -26,6 +29,7 @@ register({
         controlType: 'ticket_comment',
         ticketId: data.ticket.redmine_id,
         sessionId,
+        modo_envio: settings.defaultCommentModeTicket || 'encolar',
       },
     }
   },

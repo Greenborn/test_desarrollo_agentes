@@ -34,6 +34,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const browserUserAgentFirefox = ref('')
   const skillRepositoryUrl = ref('')
   const terminalMaxTerminals = ref(5)
+  const defaultCommentModeCommit = ref('encolar')
+  const defaultCommentModeTicket = ref('encolar')
+  const defaultCommentModeDiff = ref('encolar')
   const saveError = ref('')
   const saveSuccess = ref('')
 
@@ -82,6 +85,9 @@ export const useSettingsStore = defineStore('settings', () => {
       browserUserAgentFirefox.value = keys.browser_user_agent_firefox || ''
       skillRepositoryUrl.value = keys.skill_repository_url || ''
       terminalMaxTerminals.value = parseInt(keys.terminal_max_terminals, 10) || 5
+      defaultCommentModeCommit.value = keys.default_comment_mode_commit || 'encolar'
+      defaultCommentModeTicket.value = keys.default_comment_mode_ticket || 'encolar'
+      defaultCommentModeDiff.value = keys.default_comment_mode_diff || 'encolar'
       applyPriorityColors()
     } catch (err) {
       console.error('Error al cargar settings:', err)
@@ -145,6 +151,9 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'browser_user_agent_firefox': browserUserAgentFirefox.value = value; break
       case 'skill_repository_url': skillRepositoryUrl.value = value; break
       case 'terminal_max_terminals': terminalMaxTerminals.value = parseInt(value, 10) || 5; break
+      case 'default_comment_mode_commit': defaultCommentModeCommit.value = value || 'encolar'; break
+      case 'default_comment_mode_ticket': defaultCommentModeTicket.value = value || 'encolar'; break
+      case 'default_comment_mode_diff': defaultCommentModeDiff.value = value || 'encolar'; break
     }
   }
 
@@ -184,6 +193,9 @@ export const useSettingsStore = defineStore('settings', () => {
     browserUserAgentFirefox.value = ''
     skillRepositoryUrl.value = ''
     terminalMaxTerminals.value = 5
+    defaultCommentModeCommit.value = 'encolar'
+    defaultCommentModeTicket.value = 'encolar'
+    defaultCommentModeDiff.value = 'encolar'
     saveError.value = ''
     saveSuccess.value = ''
   }
@@ -196,6 +208,7 @@ export const useSettingsStore = defineStore('settings', () => {
            deteccionFuncionalidadesPrompt, codeFileExtensions, codeFileMaxSizeKb,
            priorityColorLow, priorityColorNormal, priorityColorHigh, priorityColorUrgent, priorityColorImmediate,
             skillRepositoryUrl, terminalMaxTerminals,
+            defaultCommentModeCommit, defaultCommentModeTicket, defaultCommentModeDiff,
              saveError, saveSuccess, clearFeedback, load, save, applyPriorityColors, reset,
             requestResponseMaxSizeKb, browserStealthEnabled, browserUserAgentChrome, browserUserAgentFirefox }
 })

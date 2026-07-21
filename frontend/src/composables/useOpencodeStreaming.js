@@ -2,6 +2,7 @@ import { ref, watch } from 'vue'
 import { useChatStore } from '../stores/chat.js'
 import { useOpencodeStore } from '../stores/opencode.js'
 import { useGitStore } from '../stores/git.js'
+import { useSettingsStore } from '../stores/settings.js'
 import { useProjectVariables } from './useProjectVariables.js'
 
 const DOC_LABELS = {
@@ -16,6 +17,7 @@ export function useOpencodeStreaming() {
   const chat = useChatStore()
   const ocStore = useOpencodeStore()
   const gitStore = useGitStore()
+  const settings = useSettingsStore()
   const { getVariables, interpolate } = useProjectVariables()
 
   const ocStreaming = ref(false)
@@ -462,6 +464,46 @@ export function useOpencodeStreaming() {
     })
   }
 
+  async function _callRefine(sessionId, text, systemPrompt) {
+    const res = await fetch('/api/chat/refine', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ text, systemPrompt, sessionId }),
+    })
+    if (!res.ok) {
+      let errMsg = 'Error en refine'
+      try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
+      throw new Error(errMsg)
+    }
+    let result = ''
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n')
+      buf = lines.pop() || ''
+      for (const line of lines) {
+        const t = line.trim()
+        if (!t || !t.startsWith('data: ')) continue
+        try {
+          const j = JSON.parse(t.slice(6))
+          if (j.type === 'response') {
+            result += j.content
+          } else if (j.type === 'error') {
+            throw new Error(j.content)
+          }
+        } catch (e) {
+          if (e.message && e.message !== 'Unexpected end of JSON input') throw e
+        }
+      }
+    }
+    return result
+  }
+
   async function deepseekStreamCommit(sessionId, prompt, systemPrompt) {
     const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
     streamMsg._key = 'stream-' + Date.now()
@@ -470,20 +512,42 @@ export function useOpencodeStreaming() {
     chat.setOcStreaming(sessionId, true)
 
     try {
+      if (isActiveSession(sessionId)) {
+        const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+        if (idx >= 0) {
+          chat.messages[idx].content = 'Generando propuesta...'
+        }
+      }
+
+      const generatedText = await _callRefine(sessionId, prompt, systemPrompt)
+
+      if (!generatedText || generatedText.trim().length === 0) {
+        throw new Error('No se generó propuesta de commit')
+      }
+
+      if (isActiveSession(sessionId)) {
+        const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+        if (idx >= 0) {
+          chat.messages[idx].content = 'Traduciendo a español...'
+        }
+      }
+
+      const translateSystem = 'Sos un traductor especializado en commits técnicos. Traducí el siguiente mensaje de commit al español, preservando nombres de archivos, funciones, variables y términos técnicos. Devolvé ÚNICAMENTE el mensaje traducido, sin explicaciones, sin texto adicional.'
+
+      let translatedText = ''
       const res = await fetch('/api/chat/refine', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ text: prompt, systemPrompt, sessionId }),
+        body: JSON.stringify({ text: generatedText, systemPrompt: translateSystem, sessionId }),
       })
 
       if (!res.ok) {
-        let errMsg = 'Error al generar mensaje de commit'
+        let errMsg = 'Error al traducir mensaje de commit'
         try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
         throw new Error(errMsg)
       }
 
-      let refinedText = ''
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buf = ''
@@ -501,11 +565,11 @@ export function useOpencodeStreaming() {
           try {
             const j = JSON.parse(t.slice(6))
             if (j.type === 'response') {
-              refinedText += j.content
+              translatedText += j.content
               if (isActiveSession(sessionId)) {
                 const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
                 if (idx >= 0) {
-                  chat.messages[idx].content = refinedText
+                  chat.messages[idx].content = translatedText
                 }
               }
             } else if (j.type === 'error') {
@@ -563,10 +627,10 @@ export function useOpencodeStreaming() {
             controlData: {
               controlId: 'commit-result-' + Date.now(),
               controlType: 'commit_result',
-              message: refinedText || '(sin respuesta)',
+              message: translatedText || '(sin respuesta)',
               repoUrl: repoUrl,
               loading: false,
-              modo_envio: 'encolar',
+              modo_envio: settings.defaultCommentModeCommit || 'encolar',
             },
             _key: 'control-' + Date.now(),
           }
@@ -587,7 +651,7 @@ export function useOpencodeStreaming() {
               controlType: 'commit_result',
               message: '[Error al generar commit: ' + err.message + ']',
               loading: false,
-              modo_envio: 'encolar',
+              modo_envio: settings.defaultCommentModeCommit || 'encolar',
             },
             _key: 'control-' + Date.now(),
           }
@@ -812,7 +876,7 @@ export function useOpencodeStreaming() {
                   message: finalMessage,
                   repoUrl: repoUrl,
                   loading: false,
-                  modo_envio: 'encolar',
+                  modo_envio: settings.defaultCommentModeCommit || 'encolar',
                 },
                 _key: 'control-' + Date.now(),
               }
@@ -836,7 +900,7 @@ export function useOpencodeStreaming() {
                   controlType: 'commit_result',
                   message: fallbackMessage,
                   loading: false,
-                  modo_envio: 'encolar',
+                  modo_envio: settings.defaultCommentModeCommit || 'encolar',
                 },
                 _key: 'control-' + Date.now(),
               }
@@ -926,7 +990,7 @@ export function useOpencodeStreaming() {
                 message: opencodeResponse,
                 sourceEnv: origen,
                 targetEnv: destino,
-                modo_envio: 'encolar',
+                modo_envio: settings.defaultCommentModeDiff || 'encolar',
                 fromTestingNotes: true,
               },
               _key: 'control-' + Date.now(),

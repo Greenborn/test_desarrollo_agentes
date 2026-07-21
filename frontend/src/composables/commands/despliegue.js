@@ -33,7 +33,7 @@ function parseResolutionArg(args) {
 register({
   name: '/despliegue_actualizar_config',
   category: 'Despliegue',
-  description: 'Lee deploy.json del directorio del proyecto y guarda la configuración de despliegue. Si no existe deploy.json, muestra un formulario para crearlo.',
+  description: 'Muestra un formulario para crear o modificar la configuración de despliegue. La ruta se precarga del directorio de trabajo de la sesión.',
   usage: '/despliegue_actualizar_config [--dir=<ruta>]',
   async autocomplete(args, cmdStore) {
     const usedFlags = getUsedFlags(args)
@@ -55,35 +55,45 @@ register({
       }
     }
 
-    const body = { sessionId };
-    if (dir) body.dir = dir;
+    const session = chatStore.sessions.find(s => Number(s.id) === Number(sessionId));
+    const projectDir = dir || session?.cwd || '';
 
-    const res = await fetch('/api/despliegue/upd-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json();
-    if (data.success) {
-      return data.message;
+    let initialSubprojects = [];
+    try {
+      const configRes = await fetch(`/api/despliegue/config?sessionId=${sessionId}`, {
+        credentials: 'include',
+      });
+      const configData = await configRes.json();
+      if (configData.success && configData.config) {
+        const cfg = configData.config;
+        const customEntries = cfg.custom || [];
+        const seen = new Set();
+        for (const entry of cfg.install || []) {
+          if (!entry.cwd || seen.has(entry.cwd)) continue;
+          seen.add(entry.cwd);
+          let type = null;
+          if ((cfg.pm2 || []).some(p => p.cwd === entry.cwd)) type = 'backend';
+          else if ((cfg.build || []).some(b => b.cwd === entry.cwd)) type = 'frontend';
+          if (type) {
+            const custom = customEntries.find(c => c.cwd === entry.cwd);
+            initialSubprojects.push({ cwd: entry.cwd, type, command: custom ? custom.command : '' });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('No se pudo obtener configuración existente:', err.message);
     }
 
-    if (data.code === 'MISSING_DEPLOY_JSON') {
-      return {
-        role: 'opencode_control',
-        controlData: {
-          controlType: 'deploy_config_form',
-          controlId: 'deploy-config-' + Date.now(),
-          initialSubprojects: [],
-          sessionId,
-          dir,
-        },
-      };
-    }
-
-    throw new Error(data.error || 'Error al actualizar configuración de despliegue.');
+    return {
+      role: 'opencode_control',
+      controlData: {
+        controlType: 'deploy_config_form',
+        controlId: 'deploy-config-' + Date.now(),
+        initialSubprojects,
+        sessionId,
+        dir: projectDir,
+      },
+    };
   },
 });
 
