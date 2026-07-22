@@ -3,6 +3,7 @@ import { ref } from 'vue'
 
 const API = '/api'
 const SESSION_KEY = 'oc_opencode_state'
+let _agentIdCounter = 1
 
 const thinkingOptions = [
   { label: 'Low — mínimo esfuerzo de razonamiento', value: 'low' },
@@ -43,36 +44,119 @@ export const useOpencodeStore = defineStore('opencode', () => {
   const sessionsMap = ref({})
   const currentActiveChatSession = ref(null)
 
+  function _genAgentId() {
+    return 'agent-' + (_agentIdCounter++) + '-' + Date.now()
+  }
+
+  function _ensureSessionEntry(chatSid) {
+    const key = String(chatSid)
+    if (!sessionsMap.value[key]) {
+      sessionsMap.value[key] = { agents: [], activeAgentIndex: 0, ocInput: '', showTerminal: false }
+    }
+    return sessionsMap.value[key]
+  }
+
+  function getAgents(chatSid) {
+    const key = String(chatSid)
+    const entry = sessionsMap.value[key]
+    return entry ? entry.agents : []
+  }
+
+  function getActiveAgent(chatSid) {
+    const agents = getAgents(chatSid)
+    const entry = sessionsMap.value[String(chatSid)]
+    const idx = entry ? entry.activeAgentIndex : 0
+    return agents[idx] || null
+  }
+
+  function createNewAgent(chatSid) {
+    const entry = _ensureSessionEntry(chatSid)
+    const agent = {
+      id: _genAgentId(),
+      ocSessionId: null,
+      step: 'starting',
+      streaming: false,
+      streamText: '',
+      streamThinking: '',
+      terminalContent: '',
+      processing: false,
+      messageQueue: [],
+      createdAt: Date.now(),
+    }
+    entry.agents.push(agent)
+    entry.activeAgentIndex = entry.agents.length - 1
+    return agent
+  }
+
+  function removeAgent(chatSid, agentId) {
+    const key = String(chatSid)
+    const entry = sessionsMap.value[key]
+    if (!entry) return
+    const idx = entry.agents.findIndex(a => a.id === agentId)
+    if (idx === -1) return
+    entry.agents.splice(idx, 1)
+    if (entry.activeAgentIndex >= entry.agents.length) {
+      entry.activeAgentIndex = Math.max(0, entry.agents.length - 1)
+    }
+  }
+
+  function updateAgent(chatSid, agentId, updates) {
+    const key = String(chatSid)
+    const entry = sessionsMap.value[key]
+    if (!entry) return
+    const agent = entry.agents.find(a => a.id === agentId)
+    if (!agent) return
+    Object.assign(agent, updates)
+  }
+
+  function syncGlobalFromActiveAgent(chatSid) {
+    const agent = getActiveAgent(chatSid)
+    if (agent) {
+      ocSessionId.value = agent.ocSessionId
+      step.value = agent.step
+      streaming.value = agent.streaming
+      streamText.value = agent.streamText
+      streamThinking.value = agent.streamThinking
+      processing.value = agent.processing
+      messageQueue.value = [...agent.messageQueue]
+    }
+  }
+
   function getActiveSessionsCount() {
-    return Object.values(sessionsMap.value).filter((s) => s.ocSessionId).length
+    let count = 0
+    for (const key of Object.keys(sessionsMap.value)) {
+      count += sessionsMap.value[key].agents.filter(a => a.ocSessionId).length
+    }
+    return count
   }
 
   function saveCurrentToMap(chatSid, extraFields = {}) {
     if (!chatSid) return
     const key = String(chatSid)
-    sessionsMap.value[key] = {
-      ...sessionsMap.value[key],
-      step: step.value,
-      ocSessionId: ocSessionId.value,
-      chatSessionId: chatSessionId.value,
-      selectedProvider: selectedProvider.value,
-      selectedModel: selectedModel.value,
-      selectedThinking: selectedThinking.value,
-      selectedMode: selectedMode.value,
-      selectedTemperature: selectedTemperature.value,
-      messageQueue: [...messageQueue.value],
-      processing: processing.value,
-      streaming: streaming.value,
-      streamText: streamText.value,
-      streamThinking: streamThinking.value,
-      ...extraFields,
+    const entry = _ensureSessionEntry(chatSid)
+    const agent = getActiveAgent(chatSid)
+    if (agent) {
+      agent.ocSessionId = ocSessionId.value
+      agent.step = step.value
+      agent.streaming = streaming.value
+      agent.streamText = streamText.value
+      agent.streamThinking = streamThinking.value
+      agent.processing = processing.value
+      agent.messageQueue = [...messageQueue.value]
     }
+    entry.selectedProvider = selectedProvider.value
+    entry.selectedModel = selectedModel.value
+    entry.selectedThinking = selectedThinking.value
+    entry.selectedMode = selectedMode.value
+    entry.selectedTemperature = selectedTemperature.value
+    Object.assign(entry, extraFields)
+    _persist()
   }
 
   function setSessionOcInput(chatSid, text) {
     const key = String(chatSid)
-    if (!sessionsMap.value[key]) return
-    sessionsMap.value[key].ocInput = text
+    const entry = _ensureSessionEntry(chatSid)
+    entry.ocInput = text
     _persist()
   }
 
@@ -85,23 +169,36 @@ export const useOpencodeStore = defineStore('opencode', () => {
     if (!chatSid) return false
     const key = String(chatSid)
     const saved = sessionsMap.value[key]
-    if (saved) {
-      step.value = saved.step || 'idle'
-      ocSessionId.value = saved.ocSessionId || null
-      chatSessionId.value = saved.chatSessionId || null
-      selectedProvider.value = saved.selectedProvider || ''
-      selectedModel.value = saved.selectedModel || ''
-      selectedThinking.value = saved.selectedThinking || ''
-      selectedMode.value = saved.selectedMode || ''
-      selectedTemperature.value = saved.selectedTemperature || ''
-      messageQueue.value = saved.messageQueue || []
-      processing.value = saved.processing || false
-      streaming.value = saved.streaming || false
-      streamText.value = saved.streamText || ''
-      streamThinking.value = saved.streamThinking || ''
+    if (!saved) return false
+
+    selectedProvider.value = saved.selectedProvider || ''
+    selectedModel.value = saved.selectedModel || ''
+    selectedThinking.value = saved.selectedThinking || ''
+    selectedMode.value = saved.selectedMode || ''
+    selectedTemperature.value = saved.selectedTemperature || ''
+
+    const agent = getActiveAgent(chatSid)
+    if (agent) {
+      step.value = agent.step || 'idle'
+      ocSessionId.value = agent.ocSessionId || null
+      chatSessionId.value = chatSid
+      messageQueue.value = agent.messageQueue || []
+      processing.value = agent.processing || false
+      streaming.value = agent.streaming || false
+      streamText.value = agent.streamText || ''
+      streamThinking.value = agent.streamThinking || ''
       return true
     }
-    return false
+
+    step.value = 'idle'
+    ocSessionId.value = null
+    chatSessionId.value = chatSid
+    messageQueue.value = []
+    processing.value = false
+    streaming.value = false
+    streamText.value = ''
+    streamThinking.value = ''
+    return true
   }
 
   function _resetValues() {
@@ -137,6 +234,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
       streaming.value = sd.streaming
       streamText.value = sd.text
       streamThinking.value = sd.thinking
+    } else if (hasValidOcSession || loaded) {
     } else {
       streaming.value = false
       streamText.value = ''
@@ -159,8 +257,8 @@ export const useOpencodeStore = defineStore('opencode', () => {
 
   function setSessionShowTerminal(chatSid, val) {
     const key = String(chatSid)
-    if (!sessionsMap.value[key]) return
-    sessionsMap.value[key].showTerminal = val
+    const entry = _ensureSessionEntry(chatSid)
+    entry.showTerminal = val
     _persist()
   }
 
@@ -172,7 +270,9 @@ export const useOpencodeStore = defineStore('opencode', () => {
   function getSessionExtra(chatSid, field) {
     const key = String(chatSid)
     const s = sessionsMap.value[key]
-    return s ? s[field] : undefined
+    if (s && field in s) return s[field]
+    const agent = getActiveAgent(chatSid)
+    return agent ? agent[field] : undefined
   }
 
   function saveUiState() {
@@ -256,16 +356,22 @@ export const useOpencodeStore = defineStore('opencode', () => {
     }
   }
 
-  async function streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, callbacks) {
+  async function streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, callbacks, existingAgentId) {
     const sKey = String(sessionId)
     const isActiveSession = () => currentActiveChatSession.value && String(currentActiveChatSession.value) === sKey
 
     const body = { prompt, provider, model, thinking, mode, temperature, sessionId }
-    if (ocSessionId.value) body.ocSessionId = ocSessionId.value
 
     let localStreamText = ''
     let localStreamThinking = ''
     let doneReceived = false
+
+    let agentId = existingAgentId
+    if (!agentId) {
+      const agent = createNewAgent(sessionId)
+      agentId = agent.id
+    }
+    if (callbacks) callbacks._agentId = agentId
 
     if (!_sessionStreamData.value[sKey]) {
       _sessionStreamData.value[sKey] = { text: '', thinking: '', streaming: true }
@@ -293,8 +399,10 @@ export const useOpencodeStore = defineStore('opencode', () => {
         let errMsg = 'Error en conexión con OpenCode'
         try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch (e) { console.error('Error al parsear error response:', e) }
         streaming.value = false
+        updateAgent(sessionId, agentId, { streaming: false, step: 'error' })
         if (_sessionStreamData.value[sKey]) _sessionStreamData.value[sKey].streaming = false
         if (callbacks?.onError) await callbacks.onError(errMsg)
+        _persist()
         return
       }
 
@@ -319,11 +427,13 @@ export const useOpencodeStore = defineStore('opencode', () => {
             if (j.type === 'response') {
               localStreamText += j.content
               _sessionStreamData.value[sKey].text = localStreamText
+              updateAgent(sessionId, agentId, { streamText: localStreamText })
               if (isActiveSession()) streamText.value = localStreamText
               if (callbacks?.onChunk) callbacks.onChunk(j.content, localStreamText)
             } else if (j.type === 'thinking') {
               localStreamThinking += j.content
               _sessionStreamData.value[sKey].thinking = localStreamThinking
+              updateAgent(sessionId, agentId, { streamThinking: localStreamThinking })
               if (isActiveSession()) streamThinking.value = localStreamThinking
               if (callbacks?.onThinking) callbacks.onThinking(j.content, localStreamThinking)
             } else if (j.type === 'tool_call') {
@@ -333,15 +443,14 @@ export const useOpencodeStore = defineStore('opencode', () => {
             } else if (j.type === 'tool_data') {
               if (callbacks?.onToolData) callbacks.onToolData(j.content, j.partType, j.field, localStreamText)
             } else if (j.type === 'terminal') {
+              if (j.agentId && j.agentId !== agentId) continue
               if (callbacks?.onTerminalLine) callbacks.onTerminalLine(j.line, j.partType)
             } else if (j.type === 'control_request') {
               if (callbacks?.onControl) callbacks.onControl(j.control)
             } else if (j.type === 'done') {
               doneReceived = true
               const newOcSessionId = j.ocSessionId || j.hash || null
-              if (sessionsMap.value[sKey]) {
-                sessionsMap.value[sKey].ocSessionId = newOcSessionId
-              }
+              updateAgent(sessionId, agentId, { ocSessionId: newOcSessionId, step: 'idle' })
               if (isActiveSession()) {
                 ocSessionId.value = newOcSessionId
               }
@@ -351,6 +460,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
               _persist()
             } else if (j.type === 'error') {
               streaming.value = false
+              updateAgent(sessionId, agentId, { streaming: false, step: 'error' })
               if (_sessionStreamData.value[sKey]) _sessionStreamData.value[sKey].streaming = false
               if (callbacks?.onError) await callbacks.onError(j.content)
             }
@@ -362,12 +472,11 @@ export const useOpencodeStore = defineStore('opencode', () => {
         streaming.value = false
         if (_sessionStreamData.value[sKey]) _sessionStreamData.value[sKey].streaming = false
         if (callbacks?.onDone) {
-          const sKey2 = String(sessionId)
-          if (sessionsMap.value[sKey2]) {
-            sessionsMap.value[sKey2].ocSessionId = ocSessionId.value
-          }
+          const entry = sessionsMap.value[sKey]
+          const activeAgent = entry ? entry.agents.find(a => a.id === agentId) : null
+          const finalOcId = activeAgent?.ocSessionId || ocSessionId.value
           await callbacks.onDone(
-            { type: 'done', ocSessionId: ocSessionId.value, fullResponse: localStreamText, thinking: localStreamThinking },
+            { type: 'done', ocSessionId: finalOcId, fullResponse: localStreamText, thinking: localStreamThinking },
             localStreamText
           )
           _persist()
@@ -376,8 +485,41 @@ export const useOpencodeStore = defineStore('opencode', () => {
     } catch (err) {
       console.error('Error en streamPrompt:', err)
       streaming.value = false
+      updateAgent(sessionId, agentId, { streaming: false, step: 'error' })
       if (_sessionStreamData.value[sKey]) _sessionStreamData.value[sKey].streaming = false
       if (callbacks?.onError) await callbacks.onError(err.message)
+    }
+  }
+
+  async function restoreActiveAgents(chatSid) {
+    if (!chatSid) return
+    const key = String(chatSid)
+    try {
+      const res = await fetch(`${API}/opencode/sessions?sessionId=${encodeURIComponent(chatSid)}`, { credentials: 'include' })
+      if (!res.ok) return
+      const data = await res.json()
+      if (!data.sessions || !Array.isArray(data.sessions)) return
+
+      const entry = _ensureSessionEntry(chatSid)
+      for (const s of data.sessions) {
+        const exists = entry.agents.find(a => a.ocSessionId === s.id)
+        if (exists) continue
+        entry.agents.push({
+          id: _genAgentId(),
+          ocSessionId: s.id,
+          step: s.status?.type === 'idle' ? 'idle' : 'running',
+          streaming: false,
+          streamText: '',
+          streamThinking: '',
+          terminalContent: '',
+          processing: false,
+          messageQueue: [],
+          createdAt: new Date(s.createdAt || Date.now()).getTime(),
+        })
+      }
+      _persist()
+    } catch (err) {
+      console.error('Error restoring active agents:', err.message)
     }
   }
 
@@ -404,13 +546,17 @@ export const useOpencodeStore = defineStore('opencode', () => {
   function resetAllSessionsExecutionState() {
     const keys = Object.keys(sessionsMap.value)
     for (const key of keys) {
-      const s = sessionsMap.value[key]
-      s.step = 'idle'
-      s.ocSessionId = null
-      s.processing = false
-      s.streaming = false
-      s.streamText = ''
-      s.streamThinking = ''
+      const entry = sessionsMap.value[key]
+      if (entry && entry.agents) {
+        for (const agent of entry.agents) {
+          agent.step = 'idle'
+          agent.ocSessionId = null
+          agent.processing = false
+          agent.streaming = false
+          agent.streamText = ''
+          agent.streamThinking = ''
+        }
+      }
     }
     _sessionStreamData.value = {}
     currentActiveChatSession.value = null
@@ -474,5 +620,7 @@ export const useOpencodeStore = defineStore('opencode', () => {
     getAvailableProviders, getModelsForProvider, modelSupportsReasoning,
     start, select, streamPrompt, finish, restoreFromState, restoreFromSession, saveUiState,
     resetAllSessionsExecutionState,
+    getAgents, getActiveAgent, createNewAgent, removeAgent, updateAgent, syncGlobalFromActiveAgent,
+    restoreActiveAgents,
   }
 })

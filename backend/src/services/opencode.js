@@ -260,6 +260,24 @@ class OpenCodeServer {
       return [];
     }
   }
+
+  async listSessions() {
+    try {
+      return await this.api('/session');
+    } catch (err) {
+      console.log(`[opencode ${this.port}] error listing sessions:`, err.message);
+      return [];
+    }
+  }
+
+  async getSession(sessionId) {
+    try {
+      return await this.api(`/session/${sessionId}`);
+    } catch (err) {
+      console.log(`[opencode ${this.port}] error getting session ${sessionId}:`, err.message);
+      return null;
+    }
+  }
 }
 
 async function getOrStartServer(directory, chatSessionId, locale, customKey = null) {
@@ -316,6 +334,41 @@ function stopAllServers() {
   }
 }
 
+async function listSessions(key) {
+  if (!servers[key]) return [];
+  try {
+    const sessions = await servers[key].server.listSessions();
+    return Array.isArray(sessions) ? sessions : [];
+  } catch (err) {
+    console.log(`[opencode] error listing sessions for ${key}:`, err.message);
+    return [];
+  }
+}
+
+async function getSession(key, ocSessionId) {
+  if (!servers[key]) return null;
+  try {
+    return await servers[key].server.getSession(ocSessionId);
+  } catch (err) {
+    console.log(`[opencode] error getting session ${ocSessionId} for ${key}:`, err.message);
+    return null;
+  }
+}
+
+async function closeOldestSession(key) {
+  if (!servers[key]) return;
+  const sessions = await listSessions(key);
+  if (sessions.length === 0) return;
+  sessions.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+  const oldest = sessions[0];
+  try {
+    await servers[key].server.abortSession(oldest.id);
+    console.log(`[opencode] cerrada sesión más antigua ${oldest.id} en ${key}`);
+  } catch (err) {
+    console.log(`[opencode] error cerrando sesión más antigua ${oldest.id}:`, err.message);
+  }
+}
+
 async function getModels(directory, chatSessionId, locale, customKey = null) {
   const server = await getOrStartServer(directory, chatSessionId, locale, customKey);
   return server.api('/config/providers');
@@ -347,4 +400,7 @@ export default {
   getModels,
   abortSessionInDir,
   abortSession,
+  listSessions,
+  getSession,
+  closeOldestSession,
 };

@@ -1,6 +1,7 @@
 ---
 name: crear_componente_mensaje_chat
 description: Crear o modificar componentes de mensajes de chat (controles, renderizado por role). Usar cuando se pida crear un nuevo controlType, modificar ChatMessage.vue, o agregar un componente en chat-controls/.
+requires: []
 ---
 
 # crear_componente_mensaje_chat
@@ -107,6 +108,20 @@ Si el control requiere lógica adicional al confirmar, agregar un case en `front
 6. `ChatWindow` captura `@control-confirm` y llama a `onControlConfirm`
 7. `useControlHandlers.js` procesa según `controlType`/`stepType` y genera la siguiente acción
 
+## Verificación obligatoria
+
+Ejecutar los siguientes pasos y **confirmar cada resultado**:
+
+| # | Acción | Resultado esperado |
+|---|--------|-------------------|
+| 1 | Leer `ChatMessage.vue` | El nuevo `controlType` tiene su `v-else-if` en el template dentro del bloque `opencode_control` |
+| 2 | Revisar `components:` en `ChatMessage.vue` | El nuevo componente está importado y registrado |
+| 3 | Verificar `frontend/src/components/chat-controls/` | El archivo `PascalCase.vue` existe con la estructura correcta (props, emits, template) |
+| 4 | `git status` (o ls de archivos modificados) | Solo se modificaron `ChatMessage.vue` y se creó el archivo en `chat-controls/`. No hay cambios inesperados |
+| 5 | Verificar `session-scoping` | El componente tiene `v-if` contra `activeSessionId` o similar. No es visible en sesiones distintas |
+| 6 | Revisar `@confirm` emit | El componente emite `@confirm` con `{ controlId, value }` y el handler está en `ChatMessage.vue` |
+| 7 | Si aplica: revisar `useControlHandlers.js` | El `stepType` o `controlType` tiene su case correspondiente en el handler |
+
 ## Output
 
-El componente debe ser funcional y seguir el flujo establecido de eventos. El archivo debe ir en `frontend/src/components/chat-controls/` con el mismo naming (`PascalCase.vue`). Verificar con `git status` que no se modificaron archivos fuera de lo esperado.
+El componente debe ser funcional y seguir el flujo establecido de eventos. El archivo debe ir en `frontend/src/components/chat-controls/` con el mismo naming (`PascalCase.vue`).

@@ -13,6 +13,7 @@ import { useTicketStore } from '../stores/ticket.js'
 import { settingSet } from '../services/settingService.js'
 import { useCommandRegistry } from './useCommandRegistry.js'
 import FuncionalidadWizard from '../components/wizards/FuncionalidadWizard.vue'
+import GitAuthModal from '../components/modals/GitAuthModal.vue'
 
 export function useControlHandlers(api) {
   const chat = useChatStore()
@@ -21,6 +22,7 @@ export function useControlHandlers(api) {
   const modal = useModalStore()
   const redmineComments = useRedmineCommentsStore()
   const projectVarStore = useProjectVariablesStore()
+  const auth = useAuthStore()
 
   const {
     opencodeStreamPrompt, opencodeStreamPromptCommit, deepseekStreamCommit,
@@ -361,6 +363,77 @@ export function useControlHandlers(api) {
           chat.messages[idx] = {
             role: 'result',
             content: 'Error de conexión al actualizar el ticket.',
+            _key: 'err-' + Date.now(),
+          }
+        }
+      }
+      return
+    } else if (controlType === 'ticket_selector') {
+      if (value === null) {
+        const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+        if (idx >= 0) {
+          chat.messages[idx] = {
+            role: 'result',
+            content: 'Selección cancelada.',
+            _key: 'result-' + Date.now(),
+          }
+        }
+        return
+      }
+      const idTicketRedmine = value.idTicketRedmine
+      if (!idTicketRedmine) {
+        const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+        if (idx >= 0) {
+          chat.messages[idx] = {
+            role: 'result',
+            content: 'Error: Debe seleccionar un ticket.',
+            _key: 'err-' + Date.now(),
+          }
+        }
+        return
+      }
+      let workspaceId = null
+      const session = chat.sessions.find(s => Number(s.id) === Number(chat.activeSessionId))
+      if (session?.workspace_id) {
+        workspaceId = session.workspace_id
+      }
+      try {
+        const res = await fetch('/api/tickets/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ sessionId: chat.activeSessionId, idTicketRedmine, workspaceId }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          chat.clearSessionTicket(chat.activeSessionId)
+          await chat.loadSessions()
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: `✓ Ticket #${idTicketRedmine} asignado a la sesión actual.`,
+              _key: 'result-' + Date.now(),
+            }
+          }
+          chat.loadMessages(chat.activeSessionId)
+        } else {
+          const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+          if (idx >= 0) {
+            chat.messages[idx] = {
+              role: 'result',
+              content: `Error: ${data.error || 'Error al asignar ticket'}`,
+              _key: 'err-' + Date.now(),
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error al asignar ticket:', err)
+        const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+        if (idx >= 0) {
+          chat.messages[idx] = {
+            role: 'result',
+            content: 'Error de conexión al asignar el ticket.',
             _key: 'err-' + Date.now(),
           }
         }
@@ -1881,10 +1954,16 @@ export function useControlHandlers(api) {
         if (pushUpstreamData.success) {
           resultLines.push('', '✓ Push realizado correctamente (upstream configurado).')
         } else {
-          resultLines.push('', '✗ Error al hacer push: ' + (pushUpstreamData.stderr || '').trim())
+          const handled = await handlePushAuthError(pushUpstreamData, sessionId, resultLines)
+          if (!handled) {
+            resultLines.push('', '✗ Error al hacer push: ' + (pushUpstreamData.stderr || '').trim())
+          }
         }
       } else if (pushData.stderr) {
-        resultLines.push('', '⚠ Push: ' + pushData.stderr.trim())
+        const handled = await handlePushAuthError(pushData, sessionId, resultLines)
+        if (!handled) {
+          resultLines.push('', '⚠ Push: ' + pushData.stderr.trim())
+        }
       }
 
       let commitUrl = ''
@@ -1987,6 +2066,77 @@ export function useControlHandlers(api) {
     } finally {
       // No OpenCode session to close
     }
+  }
+
+  async function handlePushAuthError(pushData, sessionId, resultLines) {
+    const stderr = pushData.stderr || pushData.error || ''
+    const isAuthError = /could not read Username|could not read Password|Authentication failed|403|401|invalid username or password/i.test(stderr)
+    if (!isAuthError) return false
+
+    let remoteUrl = ''
+    try {
+      const remoteRes = await fetch('/api/command/git', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ command: 'remote get-url origin', sessionId }),
+      })
+      const remoteData = await remoteRes.json()
+      if (remoteData.success && remoteData.stdout) {
+        remoteUrl = remoteData.stdout.trim()
+      }
+    } catch (err) {
+      console.error('Error al obtener remote URL:', err.message)
+    }
+
+    const isGitHub = /github\.com/i.test(remoteUrl)
+    if (!isGitHub) return false
+
+    const credentials = await new Promise((resolve) => {
+      modal.open(GitAuthModal, {
+        remoteUrl,
+        onSubmit: (creds) => resolve(creds),
+        onCancel: () => resolve(null),
+      }, { title: 'Autenticación GitHub' })
+    })
+
+    if (!credentials) {
+      resultLines.push('', '✗ Push cancelado por el usuario.')
+      return true
+    }
+
+    let branch = 'HEAD'
+    try {
+      const branchRes = await fetch('/api/command/git', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ command: 'rev-parse --abbrev-ref HEAD', sessionId }),
+      })
+      const branchData = await branchRes.json()
+      if (branchData.success && branchData.stdout) {
+        branch = branchData.stdout.trim()
+      }
+    } catch (err) {
+      console.error('Error al obtener rama actual:', err.message)
+    }
+
+    const urlWithCreds = remoteUrl.replace(/^https:\/\//, `https://${encodeURIComponent(credentials.username)}:${encodeURIComponent(credentials.token)}@`)
+
+    const retryRes = await fetch('/api/command/git', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ command: `push ${urlWithCreds} HEAD:refs/heads/${branch}`, sessionId }),
+    })
+    const retryData = await retryRes.json()
+
+    if (retryData.success) {
+      resultLines.push('', '✓ Push realizado correctamente (autenticado).')
+    } else {
+      resultLines.push('', '✗ Error al hacer push incluso con autenticación: ' + (retryData.stderr || '').trim())
+    }
+    return true
   }
 
   async function executeAmbientesDiffComment(controlId, controlMsg, message, modo_envio) {

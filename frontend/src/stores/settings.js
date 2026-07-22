@@ -18,7 +18,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const deteccionFuncionalidadesPrompt = ref('')
   const codeFileExtensions = ref('.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql,.json')
   const codeFileMaxSizeKb = ref(1024)
-  const omnifilterDebounceMs = ref(2000)
   const repoAcronimo = ref('TKT')
   const locale = ref('es_ES.UTF-8')
   const priorityColorLow = ref('#6b7280')
@@ -69,7 +68,6 @@ export const useSettingsStore = defineStore('settings', () => {
       deteccionFuncionalidadesPrompt.value = keys.deteccion_funcionalidades_prompt || ''
       codeFileExtensions.value = keys.code_file_extensions || '.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql,.json'
       codeFileMaxSizeKb.value = parseInt(keys.code_file_max_size_kb, 10) || 1024
-      omnifilterDebounceMs.value = keys.omnifilter_debounce_ms ? parseInt(keys.omnifilter_debounce_ms, 10) : 2000
       repoAcronimo.value = keys.repo_acronimo || 'TKT'
       locale.value = keys.locale || 'es_ES.UTF-8'
       priorityColorLow.value = keys.priority_color_low || '#6b7280'
@@ -133,7 +131,6 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'deteccion_funcionalidades_prompt': deteccionFuncionalidadesPrompt.value = value; break
       case 'code_file_extensions': codeFileExtensions.value = value; break
       case 'code_file_max_size_kb': codeFileMaxSizeKb.value = parseInt(value, 10) || 100; break
-      case 'omnifilter_debounce_ms': omnifilterDebounceMs.value = parseInt(value, 10) || 2000; break
       case 'repo_acronimo': repoAcronimo.value = value; break
       case 'locale': locale.value = value; break
       case 'priority_color_low': priorityColorLow.value = value; applyPriorityColors(); break
@@ -177,7 +174,6 @@ export const useSettingsStore = defineStore('settings', () => {
     deteccionFuncionalidadesPrompt.value = ''
     codeFileExtensions.value = '.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql,.json'
     codeFileMaxSizeKb.value = 1024
-    omnifilterDebounceMs.value = 2000
     repoAcronimo.value = 'TKT'
     locale.value = 'es_ES.UTF-8'
     priorityColorLow.value = '#6b7280'
@@ -200,7 +196,7 @@ export const useSettingsStore = defineStore('settings', () => {
     saveSuccess.value = ''
   }
 
-  return { deepseekKey, redmineToken, redmineUrl, systemPrompt, omnifilterDebounceMs, repoAcronimo,
+  return { deepseekKey, redmineToken, redmineUrl, systemPrompt, repoAcronimo,
            locale, screenResolutions,
            documentacionPromptBaseDatos, documentacionPromptSubproyectos,
            documentacionPromptEndpoints, documentacionPromptWebSockets,

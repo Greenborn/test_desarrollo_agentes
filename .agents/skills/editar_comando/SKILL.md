@@ -1,6 +1,7 @@
 ---
 name: editar_comando
 description: Editar o crear comandos del chat siguiendo las convenciones del proyecto. Usar cuando se pida modificar un comando existente, crear uno nuevo, o corregir inconsistencias en el sistema de comandos.
+requires: []
 ---
 
 # editar_comando
@@ -104,11 +105,17 @@ async autocomplete(args, cmdStore) {
 }
 ```
 
-## Verificación post-edición
+## Verificación obligatoria
 
-1. El comando aparece en `/help` bajo la categoría correcta
-2. El autocompletado con Tab funciona para cada flag
-3. La documentación en `docs/COMANDOS.md` está actualizada
-4. El comando no usa argumentos posicionales
-5. `category` en el código coincide exactamente con el nombre de la sección en COMANDOS.md
-6. No hay `console.error` silenciado ni `catch {}` vacío
+Ejecutar los siguientes pasos y **confirmar cada resultado**:
+
+| # | Acción | Resultado esperado |
+|---|--------|-------------------|
+| 1 | Escribir `/help` en el chat | El comando aparece listado bajo la categoría correcta |
+| 2 | Escribir `/<comando> ` (con espacio final) y presionar Tab | Se muestran las flags de autocompletado (`--flag1=`, `--flag2=`) |
+| 3 | Escribir `/<comando> --flag1=<valor>` y Enter | El comando se ejecuta sin errores y muestra el resultado esperado |
+| 4 | Leer `docs/COMANDOS.md` | La fila/documentación del comando está presente y actualizada |
+| 5 | Verificar `category` en código vs `docs/COMANDOS.md` | Coinciden exactamente (mismo string, mayúsculas/minúsculas) |
+| 6 | Revisar el código del comando | No usa argumentos posicionales. Todos los parámetros usan `--nombre=valor` |
+| 7 | Revisar bloque `catch` | No hay `catch {}` vacío. Todo error se registra con `console.error` |
+| 8 | Revisar validación de parámetros | No hay `\|\|` como fallback. Cada requerido se valida explícitamente con `parseCommandArgs` |

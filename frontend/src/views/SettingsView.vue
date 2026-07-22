@@ -88,7 +88,7 @@
         </div>
       </div>
 
-      <div class="col" v-if="cardHasVisible(['acronimo rama repositorio git', 'locale idioma', 'debounce omnifiltro', 'modo envio comentarios predeterminado', 'colores prioridad'])">
+      <div class="col" v-if="cardHasVisible(['acronimo rama repositorio git', 'locale idioma', 'modo envio comentarios predeterminado', 'colores prioridad'])">
         <div class="card bg-dark border-secondary h-100">
           <div class="card-header bg-dark border-secondary py-2 px-3">
             <h6 class="mb-0 fw-semibold">Preferencias</h6>
@@ -114,19 +114,6 @@
                 placeholder="es_ES.UTF-8"
               />
               <button class="btn btn-sm mt-1 btn-argentina" @click="saveLocale">Guardar</button>
-            </div>
-
-            <div v-if="matches('debounce omnifiltro')">
-              <label class="form-label small mb-1">Omnifiltro — Tiempo de debounce (ms)</label>
-              <input
-                type="number"
-                class="form-control form-control-sm bg-dark text-light border-secondary"
-                v-model.number="omnifilterDebounceInput"
-                min="0"
-                step="100"
-                placeholder="2000"
-              />
-              <button class="btn btn-sm mt-1 btn-argentina" @click="saveOmnifilterDebounce">Guardar</button>
             </div>
 
             <div v-if="matches('modo envio comentarios predeterminado')">
@@ -573,7 +560,6 @@ export default {
     const ticketPlantillaDescripcionInput = ref('')
     const codeExtensionsInput = ref('.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql')
     const codeMaxSizeInput = ref(100)
-    const omnifilterDebounceInput = ref(2000)
     const repoAcronimoInput = ref('TKT')
     const localeInput = ref('es_ES.UTF-8')
     const priorityColorLowInput = ref('#6b7280')
@@ -657,10 +643,6 @@ export default {
 
     watch(() => settings.redmineUrl, (val) => {
       redmineUrlInput.value = val
-    }, { immediate: true })
-
-    watch(() => settings.omnifilterDebounceMs, (val) => {
-      omnifilterDebounceInput.value = val
     }, { immediate: true })
 
     watch(() => settings.repoAcronimo, (val) => {
@@ -865,11 +847,6 @@ export default {
     function saveDoc(tipo) {
       settings.clearFeedback()
       settings.save('documentacion_prompt_' + tipo, DOC_INPUTS[tipo].value, selectedWId.value)
-    }
-
-    function saveOmnifilterDebounce() {
-      settings.clearFeedback()
-      settings.save('omnifilter_debounce_ms', String(omnifilterDebounceInput.value), selectedWId.value)
     }
 
     function saveDescripcionPrompt() {
@@ -1173,7 +1150,7 @@ export default {
       docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput, refinarPromptInput,
       deteccionPromptInput,
       codeExtensionsInput, codeMaxSizeInput,
-      showKey, showRedmineToken, searchTerm, omnifilterDebounceInput, repoAcronimoInput,
+      showKey, showRedmineToken, searchTerm, repoAcronimoInput,
       localeInput,
       priorityColorLowInput, priorityColorNormalInput, priorityColorHighInput,
       priorityColorUrgentInput, priorityColorImmediateInput,
@@ -1183,7 +1160,7 @@ export default {
       replayIntervalInput,
       requestResponseMaxSizeInput,
       saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
-      saveOmnifilterDebounce, saveDescripcionPrompt, saveRefinarPrompt, saveDeteccionPrompt, saveCodeConfig, saveRepoAcronimo,
+      saveDescripcionPrompt, saveRefinarPrompt, saveDeteccionPrompt, saveCodeConfig, saveRepoAcronimo,
       saveLocale, savePriorityColor, saveReplayInterval, saveRequestResponseMaxSize,
       saveBrowserStealth, saveBrowserUaChrome, saveBrowserUaFirefox,
       browserStealthInput, browserUserAgentChromeInput, browserUserAgentFirefoxInput,

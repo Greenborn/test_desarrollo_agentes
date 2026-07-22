@@ -276,9 +276,11 @@ router.post('/select', async (req, res) => {
   }
 });
 
+let _agentIdCounter = 1;
+
 router.post('/send', async (req, res) => {
   if (!authGuard(req, res)) return;
-  const { prompt, provider, model, thinking, mode, sessionId, temperature, ocSessionId: existingOcSessionId } = req.body;
+  const { prompt, provider, model, thinking, mode, sessionId, temperature } = req.body;
   if (!prompt) return res.status(400).json({ error: 'prompt requerido' });
 
   try {
@@ -295,12 +297,20 @@ router.post('/send', async (req, res) => {
     await mergeWorkspaceSkillPaths(cwd, req.session.workspaceIds);
     const server = await opencode.getOrStartServer(cwd, sessionId, locale);
 
-    const agentName = mode === 'Plan' ? 'plan' : 'build';
-    let ocSessionId = existingOcSessionId;
-    if (!ocSessionId) {
-      const ocSession = await server.createSession('Agent Orchestrator - ' + (prompt.slice(0, 50)), agentName);
-      ocSessionId = ocSession.id;
+    // Enforce terminal limit: close oldest agent if at capacity
+    if (sessionId) {
+      const maxTerminalsRow = await db('settings').where({ workspace_id: wsId, setting_key: 'terminal_max_terminals' }).first();
+      const maxTerminals = maxTerminalsRow ? parseInt(maxTerminalsRow.setting_value, 10) || 5 : 5;
+      const activeSessions = await opencode.listSessions(sessionId);
+      if (activeSessions.length >= maxTerminals) {
+        await opencode.closeOldestSession(sessionId);
+      }
     }
+
+    const agentName = mode === 'Plan' ? 'plan' : 'build';
+    const agentId = 'agent-' + (_agentIdCounter++) + '-' + Date.now();
+    const ocSession = await server.createSession('Agent Orchestrator - ' + (prompt.slice(0, 50)), agentName);
+    const ocSessionId = ocSession.id;
 
     if (sessionId) {
       await db('chat_messages').insert({
@@ -368,7 +378,7 @@ router.post('/send', async (req, res) => {
         const controlId = Date.now() + Math.random();
         const controlData = { ...controlEvent, controlId };
 
-        res.write(`data: ${JSON.stringify({ type: 'control_request', control: controlData })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'control_request', control: controlData, agentId })}\n\n`);
 
         if (sessionId) {
           db('chat_messages').insert({
@@ -472,24 +482,24 @@ router.post('/send', async (req, res) => {
 
           if (partType === 'reasoning') {
             fullThinking += delta;
-            res.write(`data: ${JSON.stringify({ type: 'thinking', content: delta, sessionId })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'thinking', content: delta, sessionId, agentId })}\n\n`);
           } else if (partType === 'tool_call') {
             let toolName = delta;
             try { const p = JSON.parse(delta); if (p.name) toolName = p.name; if (p.arguments) toolName += ' ' + JSON.stringify(p.arguments); } catch (err) { console.log('[opencode] Error al parsear tool call delta:', err.message); }
             terminalLine = `\x1b[38;5;214m$ ${toolName}\x1b[0m`;
-            res.write(`data: ${JSON.stringify({ type: 'tool_call', content: delta, field, sessionId })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'tool_call', content: delta, field, sessionId, agentId })}\n\n`);
           } else if (partType === 'tool_result') {
             terminalLine = `\x1b[38;5;246m${delta}\x1b[0m`;
-            res.write(`data: ${JSON.stringify({ type: 'tool_result', content: delta, field, sessionId })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'tool_result', content: delta, field, sessionId, agentId })}\n\n`);
           } else if (field === 'text') {
             fullResponse += delta;
             terminalLine = delta;
-            res.write(`data: ${JSON.stringify({ type: 'response', content: delta, sessionId })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'response', content: delta, sessionId, agentId })}\n\n`);
           } else {
-            res.write(`data: ${JSON.stringify({ type: 'tool_data', content: delta, partType, field, sessionId })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'tool_data', content: delta, partType, field, sessionId, agentId })}\n\n`);
           }
           if (terminalLine) {
-            res.write(`data: ${JSON.stringify({ type: 'terminal', line: terminalLine, partType, sessionId })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'terminal', line: terminalLine, partType, sessionId, agentId })}\n\n`);
           }
         }
 
@@ -500,13 +510,13 @@ router.post('/send', async (req, res) => {
 
       const diff = await server.getSessionDiff(ocSessionId);
 
-      res.write(`data: ${JSON.stringify({ type: 'terminal', line: '', partType: 'separator', sessionId })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'terminal', line: '', partType: 'separator', sessionId, agentId })}\n\n`);
       if (diff && diff.length > 0) {
         for (const d of diff) {
-          res.write(`data: ${JSON.stringify({ type: 'terminal', line: `\x1b[38;5;39m📁 ${d.path} (\x1b[38;5;214m${d.type || 'modificado'}\x1b[38;5;39m)\x1b[0m`, partType: 'diff', sessionId })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: 'terminal', line: `\x1b[38;5;39m📁 ${d.path} (\x1b[38;5;214m${d.type || 'modificado'}\x1b[38;5;39m)\x1b[0m`, partType: 'diff', sessionId, agentId })}\n\n`);
         }
       }
-      res.write(`data: ${JSON.stringify({ type: 'terminal', line: '\x1b[38;5;40m✅ Hecho.\x1b[0m', partType: 'done', sessionId })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'terminal', line: '\x1b[38;5;40m✅ Hecho.\x1b[0m', partType: 'done', sessionId, agentId })}\n\n`);
 
       if (!fullResponse || fullResponse.trim().length === 0) {
         try {
@@ -536,13 +546,13 @@ router.post('/send', async (req, res) => {
 
       await registrarGastos(sessionId, ocSessionId, server, fullResponse);
 
-      res.write(`data: ${JSON.stringify({ type: 'done', ocSessionId, hash: ocSessionId, fullResponse, thinking: fullThinking, diff: diff || [] })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'done', ocSessionId, hash: ocSessionId, agentId, fullResponse, thinking: fullThinking, diff: diff || [] })}\n\n`);
       res.end();
 
     } catch (msgErr) {
       console.log('Error en opencode streamSession:', msgErr.message);
       try {
-        res.write(`data: ${JSON.stringify({ type: 'error', content: msgErr.message })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'error', content: msgErr.message, agentId })}\n\n`);
       } catch (writeErr) {
         console.log('Error al escribir error en stream SSE:', writeErr.message);
       }
@@ -617,9 +627,48 @@ router.post('/finish', async (req, res) => {
         console.log('Error al abortar sesión OpenCode en /finish:', abortErr.message);
       }
     }
-    opencode.stopServer(sessionId);
+
+    const remaining = await opencode.listSessions(sessionId);
+    if (remaining.length === 0) {
+      opencode.stopServer(sessionId);
+    }
 
     res.json({ success: true, hash: ocSessionId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/close-agent', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { ocSessionId, sessionId } = req.body;
+    if (!ocSessionId) return res.status(400).json({ error: 'ocSessionId requerido' });
+    if (!sessionId) return res.status(400).json({ error: 'sessionId requerido' });
+
+    try { await opencode.abortSessionInDir(sessionId, ocSessionId); } catch (abortErr) {
+      console.log('Error al abortar sesión OpenCode en /close-agent:', abortErr.message);
+    }
+
+    const remaining = await opencode.listSessions(sessionId);
+    if (remaining.length === 0) {
+      opencode.stopServer(sessionId);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/sessions', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { sessionId } = req.query;
+    if (!sessionId) return res.status(400).json({ error: 'sessionId requerido' });
+
+    const sessions = await opencode.listSessions(sessionId);
+    res.json({ sessions });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

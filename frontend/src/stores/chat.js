@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useAuthStore } from './auth.js'
 import { useWorkspaceStore } from './workspace.js'
 import { useSettingsStore } from './settings.js'
+import { useOpencodeStore } from './opencode.js'
 import wsClient from '../services/wsClient.js'
 
 const API = '/api'
@@ -46,6 +47,18 @@ export const useChatStore = defineStore('chat', () => {
 
   function _genTerminalKey() {
     return _nextTerminalKey++
+  }
+
+  function getTotalConcurrentSlots(sid) {
+    if (!sid) return 0
+    const bashCount = _getSessionTerminals(sid).length
+    try {
+      const ocStore = useOpencodeStore()
+      const agents = ocStore.getAgents(sid)
+      return bashCount + agents.length
+    } catch {
+      return bashCount
+    }
   }
 
   function _getSessionTerminals(sid) {
@@ -1037,7 +1050,7 @@ export const useChatStore = defineStore('chat', () => {
     _saveMessageToDb, clearPendingNotification, ledFlash, flashLed, showTerminal,
     _terminalSessions, _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel, terminalId,
     _hasTerminal, openTerminal, closeTerminal, getTerminalCount, getTerminals,
-    maxTerminalsLimit,
+    getTotalConcurrentSlots, maxTerminalsLimit,
     saveUiState,
   }
 })

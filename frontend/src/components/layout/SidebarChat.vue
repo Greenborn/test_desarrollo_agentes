@@ -168,7 +168,7 @@ export default {
     const settings = useSettingsStore()
     const ws = useWorkspaceStore()
     const { sessions, archivedSessions, activeSessionId, creating, sessionStatus, pendingNotifications } = storeToRefs(chat)
-    const { sidebarCollapsed, sidebarWidth, centralPanelCollapsed, sidebarWidthPct, rightPanelCollapsed, omnifilter, sidebarChatTab } = storeToRefs(ui)
+    const { sidebarCollapsed, sidebarWidth, centralPanelCollapsed, sidebarWidthPct, rightPanelCollapsed, sidebarChatTab } = storeToRefs(ui)
     const tab = ref('chats')
     const stopTabSync = watch(sidebarChatTab, (v) => { tab.value = v; stopTabSync() })
     const { redmineUrl } = storeToRefs(settings)
@@ -303,23 +303,9 @@ export default {
       return { width: sidebarWidth.value + 'px', minWidth: sidebarWidth.value + 'px' }
     })
 
-    const filteredSessions = computed(() => {
-      const filter = omnifilter.value.toLowerCase()
-      if (!filter) return sessions.value
-      return sessions.value.filter((s) => {
-        const fields = [s.title, s.proyecto_descripcion, s.proyecto_id, s.cwd]
-        return fields.some((f) => f && f.toLowerCase().includes(filter))
-      })
-    })
+    const filteredSessions = computed(() => sessions.value)
 
-    const filteredArchivedSessions = computed(() => {
-      const filter = omnifilter.value.toLowerCase()
-      if (!filter) return archivedSessions.value
-      return archivedSessions.value.filter((s) => {
-        const fields = [s.title, s.proyecto_descripcion, s.proyecto_id, s.cwd]
-        return fields.some((f) => f && f.toLowerCase().includes(filter))
-      })
-    })
+    const filteredArchivedSessions = computed(() => archivedSessions.value)
 
     function formatDate(dateStr) {
       if (!dateStr) return ''

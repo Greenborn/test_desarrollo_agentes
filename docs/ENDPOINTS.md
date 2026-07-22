@@ -272,7 +272,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - **Auth:** Requerida
 - **Body:** `{ key: string, value: string, workspace_id?: number }` — si no se envía `workspace_id`, usa el primary
 - Si `key === "deepseek_key"` se encripta con AES-256-CBC antes de almacenar
-- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `omnifilter_debounce_ms`, `screen_resolutions`, `request_response_max_size_kb`, `terminal_max_terminals`
+- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `screen_resolutions`, `request_response_max_size_kb`, `terminal_max_terminals`
 - **Respuesta:** `{ success: true }`
 
 ### `GET /api/settings/global`
@@ -441,13 +441,18 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 
 ### `POST /api/opencode/send`
 - **Auth:** Requerida
-- **Body:** `{ prompt, provider?, model?, thinking?, mode?, sessionId?, ocSessionId? }`
+- **Body:** `{ prompt, provider?, model?, thinking?, mode?, sessionId? }`
+- **Comportamiento:** Siempre crea UNA NUEVA sesión de agente opencode (no reusa `ocSessionId`). Antes de crear, verifica el límite de terminales (`terminal_max_terminals`) y cierra la sesión más antigua si se excede.
 - **Respuesta:** SSE stream
-  - `data: {"type":"thinking","content":"..."}`
-  - `data: {"type":"response","content":"..."}`
-  - `data: {"type":"control_request","control":{...}}`
-  - `data: {"type":"done","ocSessionId","hash","fullResponse","diff":[...]}`
-  - `data: {"type":"error","content":"..."}`
+  - `data: {"type":"thinking","content":"...","sessionId","agentId"}`
+  - `data: {"type":"response","content":"...","sessionId","agentId"}`
+  - `data: {"type":"tool_call","content":"...","field","sessionId","agentId"}`
+  - `data: {"type":"tool_result","content":"...","field","sessionId","agentId"}`
+  - `data: {"type":"tool_data","content":"...","partType","field","sessionId","agentId"}`
+  - `data: {"type":"terminal","line":"...","partType","sessionId","agentId"}`
+  - `data: {"type":"control_request","control":{...},"agentId"}`
+  - `data: {"type":"done","ocSessionId","hash","agentId","fullResponse","diff":[...]}`
+  - `data: {"type":"error","content":"...","agentId"}`
 
 ### `POST /api/opencode/control`
 - **Auth:** Requerida
@@ -456,8 +461,21 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 
 ### `POST /api/opencode/finish`
 - **Auth:** Requerida
-- **Body:** `{ ocSessionId?: string, sessionId: number }` — detiene y elimina el servidor OpenCode asociado a la sesión de chat
+- **Body:** `{ ocSessionId?: string, sessionId: number }`
+- **Comportamiento:** Aborta la sesión específica (`ocSessionId`). Si no quedan más sesiones activas, detiene el servidor OpenCode.
 - **Respuesta:** `{ success: true, hash: string|null }`
+
+### `POST /api/opencode/close-agent`
+- **Auth:** Requerida
+- **Body:** `{ ocSessionId: string, sessionId: number }`
+- **Comportamiento:** Aborta una sesión específica de agente sin detener el servidor (a menos que sea la última).
+- **Respuesta:** `{ success: true }`
+
+### `GET /api/opencode/sessions?sessionId=X`
+- **Auth:** Requerida
+- **Query:** `sessionId` (obligatorio) — ID de la sesión de chat
+- **Comportamiento:** Devuelve las sesiones de agente opencode activas para esa sesión de chat.
+- **Respuesta:** `{ sessions: [{ id, status, createdAt }, ...] }`
 
 ---
 

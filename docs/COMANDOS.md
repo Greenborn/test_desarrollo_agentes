@@ -8,7 +8,7 @@ Los comandos registrados en frontend tienen prioridad sobre los del backend.
 
 - **Los resultados de cada comando se muestran siempre en la sesión de chat que lo inició**, independientemente de la sesión actualmente seleccionada. Ver `docs/CRITERIOS_COMANDOS.md §16`.
 
-Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtra en vivo (con debounce configurable) las pestañas de chats y los proyectos del sidebar por los campos tooltip e ID respectivamente.
+El texto que no comienza con `/` se ignora al presionar Enter.
 
 **Autocompletado con Tab:** Todos los comandos con parámetros soportan autocompletado vía Tab. Al presionar Tab se sugieren los `--flag=` disponibles. Si el flag acepta valores conocidos (IDs, nombres, modos), se filtran según lo que el usuario haya escrito.
 
@@ -86,6 +86,7 @@ Si el texto ingresado **no** comienza con `/`, actúa como **omnifiltro**: filtr
 | `/chat_set_repositorio` | Asigna una URL de repositorio GitHub al proyecto actual. Usa Tab para autocompletar `--url=` | `/chat_set_repositorio --url=<url>` |
 | `/chat_get_repositorio_url` | Muestra la URL del repositorio configurada para el proyecto actual | `/chat_get_repositorio_url` |
 | `/chat_set_ticket` | Asigna un ticket de Redmine a la sesión actual. Autocompletado filtrado por el proyecto de la sesión. `--workspace_id` opcional; si se omite se toma el workspace de la sesión | `/chat_set_ticket --id=<id_ticket_redmine> [--workspace_id=<id_workspace>]` |
+| `/chat_select_ticket` | Abre un selector interactivo en el chat para buscar y asignar un ticket de Redmine a la sesión actual. Permite buscar por ID o asunto en un listado, o ingresar directamente un número de ticket | `/chat_select_ticket` |
 | `/chat_get_ticket` | Muestra el ticket de Redmine asignado a la sesión actual, incluyendo su descripción. Con `--comments` muestra también los comentarios. Los adjuntos se listan al final: las imágenes se muestran inline y los archivos se pueden descargar mediante enlace. Con `--field=<campo>` muestra solo el valor de un campo específico (subject, status_name, priority_name, assigned_to_name, description, idTicketRedmine, etc.) | `/chat_get_ticket [--comments] [--field=<campo>]` |
 | `/chat_edit_ticket` | Abre un editor inline para modificar los datos del ticket de Redmine asignado a la sesión actual (asunto, descripción, estado, prioridad, asignado, + nuevo comentario). Con `--mode=descripcion` abre un textarea directo con la descripción actual del ticket para editarla, con botón "Mejorar con IA" que abre un modal con agente DeepSeek para mejorar la descripción, y botón "Deshacer" para restaurar el valor original. | `/chat_edit_ticket [--mode=descripcion]` |
 | `/chat_ticket_comentar` | Abre un editor inline para agregar un comentario al ticket de Redmine vinculado a la sesión. El texto se pega tal cual (sin formato de commit). Se puede encolar o enviar directamente. | `/chat_ticket_comentar` |

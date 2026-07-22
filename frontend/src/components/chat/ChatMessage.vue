@@ -31,6 +31,7 @@
       <RedmineCommentsSendControl v-else-if="parsedControl && parsedControl.controlType === 'redmine_comments_send'" :comentarios_ids="parsedControl.comentarios_ids || []" :ticket_redmine_id="parsedControl.ticket_redmine_id || 0" :mensaje="parsedControl.mensaje || ''" :cantidad="parsedControl.cantidad || 0" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <AmbientesDiffCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ambientes_diff_comment'" :message="parsedControl.message || ''" :sourceEnv="parsedControl.sourceEnv || ''" :targetEnv="parsedControl.targetEnv || ''" :modoEnvioInicial="parsedControl.modo_envio || settings.defaultCommentModeDiff || 'encolar'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <TicketCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_comment'" :ticketId="parsedControl.ticketId" :sessionId="String(parsedControl.sessionId ?? '')" :modoEnvioInicial="parsedControl.modo_envio || settings.defaultCommentModeTicket || 'encolar'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <TicketSelectControl v-else-if="parsedControl && parsedControl.controlType === 'ticket_selector'" :ticket-info="parsedControl.ticketInfo || null" :session-id="String(parsedControl.sessionId ?? '')" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DeployConfigForm v-else-if="parsedControl && parsedControl.controlType === 'deploy_config_form'" :initialSubprojects="parsedControl.initialSubprojects || []" :projectDir="parsedControl.dir || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <NavegadorIniciarForm v-else-if="parsedControl && parsedControl.controlType === 'navegador_iniciar'" :session-id="String(parsedControl.sessionId ?? '')" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <CrearProyectoRedmineControl v-else-if="parsedControl && parsedControl.controlType === 'redmine_crear_proyecto'" :prefill="parsedControl.prefill || {}" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
@@ -143,6 +144,7 @@ import ResolutionSelectControl from '../chat-controls/ResolutionSelectControl.vu
 import RedmineCommentsSendControl from '../redmine/RedmineCommentsSendControl.vue'
 import AmbientesDiffCommentControl from '../redmine/AmbientesDiffCommentControl.vue'
 import TicketCommentControl from '../tickets/TicketCommentControl.vue'
+import TicketSelectControl from '../chat-controls/TicketSelectControl.vue'
 import PeticionFormControl from '../peticiones/PeticionFormControl.vue'
 import PeticionResultDisplay from '../peticiones/PeticionResultDisplay.vue'
 import NavegadorIniciarForm from '../chat-controls/NavegadorIniciarForm.vue'
@@ -152,7 +154,7 @@ import { useSettingsStore } from '../../stores/settings.js'
 let counter = 0
 
 export default {
-  components: { ControlSelect, ControlTextarea, ChatCdSelector, DeployConfigForm, ChatControlFollowup, ChatOpencodeForm, ChatGenerarCommitForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, TicketCreateControl, DescripcionEditControl, DescripcionInputControl, DescripcionResultControl, CommitResultControl, ChatControlButtons, ResolutionSelectControl, RedmineCommentsSendControl, AmbientesDiffCommentControl, TicketCommentControl, ChatComandoEditControl, PeticionFormControl, PeticionResultDisplay, NavegadorIniciarForm, CrearProyectoRedmineControl },
+  components: { ControlSelect, ControlTextarea, ChatCdSelector, DeployConfigForm, ChatControlFollowup, ChatOpencodeForm, ChatGenerarCommitForm, ChatFormatter, FuncionalidadListControl, RedmineProjectList, TicketEditControl, TicketCreateControl, DescripcionEditControl, DescripcionInputControl, DescripcionResultControl, CommitResultControl, ChatControlButtons, ResolutionSelectControl, RedmineCommentsSendControl, AmbientesDiffCommentControl, TicketCommentControl, TicketSelectControl, ChatComandoEditControl, PeticionFormControl, PeticionResultDisplay, NavegadorIniciarForm, CrearProyectoRedmineControl },
   props: {
     msg: { type: Object, required: true },
     rawMsgKeys: { type: Set, default: () => new Set() },

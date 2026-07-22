@@ -1,6 +1,7 @@
 ---
 name: crear_modulo
 description: Crear un nuevo módulo auto-registrable para el sistema de módulos. Un módulo puede agregar tabs en cualquier panel, comandos al chat, rutas al backend, funcionalidades completas auto-integradas sin tocar archivos existentes.
+requires: []
 ---
 
 # crear_modulo
@@ -193,13 +194,21 @@ export default {
 }
 ```
 
-## Verificación
+## Verificación obligatoria
 
-Después de crear el módulo, verificar:
-1. `npm run build` desde `frontend/` — debe compilar sin errores (los chunks de tabs aparecen como archivos separados en `dist/assets/`)
-2. El tab aparece en el panel correspondiente
-3. Los comandos aparecen en `/help` y en autocompletado
-4. Las rutas backend responden correctamente
+Ejecutar los siguientes comandos en orden y **confirmar que cada uno devuelva el resultado esperado**. Si algún comando falla o el output no coincide, abortar y notificar el error.
+
+| # | Comando | Resultado esperado |
+|---|---------|-------------------|
+| 1 | `npm run build` (desde `frontend/`) | `✓ built in Xs` sin errores. Los chunks de tabs aparecen como archivos separados en `dist/assets/` |
+| 2 | Inspeccionar panel correspondiente | El tab aparece renderizado con el id y label declarados en el manifest |
+| 3 | Escribir `/help` en el chat | El comando aparece listado bajo la categoría definida |
+| 4 | Escribir `/nombre_comando` en el chat | El comando se ejecuta y devuelve resultado sin errores |
+| 5 | Probar autocompletado del comando con Tab | Las sugerencias aparecen correctamente según las flags definidas |
+| 6 | `curl -s <ruta-backend>` | Las rutas backend devuelven `200 OK` o respuesta esperada |
+
+**Validación extra si el módulo tiene backend:**
+- `curl -s -o /dev/null -w '%{http_code}' http://localhost:PORT/api/ruta` debe devolver `200`, `401` (si requiere auth) o el código esperado.
 
 ## Output
 

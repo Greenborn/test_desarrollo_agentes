@@ -15,7 +15,6 @@
         @keydown.up.prevent="handleUp"
         @keydown.down.prevent="handleDown"
         @keydown.escape="hideAutocomplete"
-        @keyup="onKeyup"
         @input="onInput"
       />
     </div>
@@ -46,8 +45,6 @@ import { useCommandStore } from '../../stores/command.js'
 import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
 import { splitArgs } from '../../composables/parseCommandArgs.js'
 import { useChatStore } from '../../stores/chat.js'
-import { useUiStore } from '../../stores/ui.js'
-import { useSettingsStore } from '../../stores/settings.js'
 import { useProjectStore } from '../../stores/project.js'
 import { useGitStore } from '../../stores/git.js'
 
@@ -55,8 +52,6 @@ export default {
   setup() {
     const cmdStore = useCommandStore()
     const chatStore = useChatStore()
-    const uiStore = useUiStore()
-    const settingsStore = useSettingsStore()
     const projectStore = useProjectStore()
     const gitStore = useGitStore()
     const { find, suggest } = useCommandRegistry()
@@ -67,7 +62,6 @@ export default {
     const autocompleteList = ref(null)
     const rootEl = ref(null)
     const historyIdx = ref(-1)
-    let debounceTimer = null
 
     const fullHistory = computed(() => {
       const db = cmdStore.dbHistory || []
@@ -101,22 +95,13 @@ export default {
       submit()
     }
 
-    function clearOmnifilterDebounce() {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer)
-        debounceTimer = null
-      }
-    }
-
     function submit() {
       const raw = buffer.value.trim()
       buffer.value = ''
       historyIdx.value = -1
-      clearOmnifilterDebounce()
 
       if (!raw) {
         cmdStore.hideAutocomplete()
-        uiStore.setOmnifilter('')
         return
       }
 
@@ -126,8 +111,6 @@ export default {
       if (raw.startsWith('/')) {
         execute(raw)
         cmdStore.loadHistory(chatStore.activeSessionId)
-      } else {
-        uiStore.setOmnifilter(raw)
       }
     }
 
@@ -255,27 +238,12 @@ export default {
       cmdStore.hideAutocomplete()
     }
 
-    function onKeyup() {
-      clearOmnifilterDebounce()
-
-      const text = buffer.value.trim()
-      if (text.startsWith('/')) {
-        return
-      }
-
-      const delay = settingsStore.omnifilterDebounceMs || 2000
-      debounceTimer = setTimeout(() => {
-        uiStore.setOmnifilter(text)
-      }, delay)
-    }
-
     onMounted(() => {
       cmdStore.loadHistory(chatStore.activeSessionId)
       document.addEventListener('mousedown', onClickOutside)
     })
 
     onUnmounted(() => {
-      clearOmnifilterDebounce()
       document.removeEventListener('mousedown', onClickOutside)
     })
 
@@ -287,7 +255,7 @@ export default {
       buffer, inputEl, autocompleteList, rootEl, autocompleteOptions,
       autocompleteVisible, arrowIndex, currentDir,
       handleEnter, handleTab, handleUp, handleDown,
-      hideAutocomplete, pickAutocomplete, onInput, onKeyup,
+      hideAutocomplete, pickAutocomplete, onInput,
     }
   },
 }

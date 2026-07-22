@@ -6,9 +6,11 @@
       <span class="ticket-sep text-muted">—</span>
       <span class="ticket-subject" :title="ticketInfo.subject">{{ truncatedSubject }}</span>
     </template>
+    <button v-else class="btn btn-sm btn-outline-argentina px-2" @click="seleccionarTicket" title="Seleccionar ticket">📌 Seleccionar ticket</button>
     <span v-if="currentBranchDisplay && currentBranchDisplay !== 'Sin repo'" class="branch-name ms-2" :class="{ 'branch-mismatch': branchMismatch }">· rama: {{ currentBranchDisplay }}</span>
     <div class="ms-auto d-flex align-items-center gap-2">
       <button v-if="ticketInfo" class="btn btn-sm btn-outline-argentina px-2" @click="modificarTicket" title="Modificar ticket">✏️</button>
+      <button class="btn btn-sm btn-outline-argentina px-2" @click="seleccionarTicket" title="Seleccionar ticket">🔍</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="crearTicket" title="Crear ticket">🎫</button>
       <button v-if="!devInstanceRunning" class="btn btn-sm btn-outline-argentina px-2" @click="iniciarInstanciaDev" title="Iniciar instancia desarrollo">▶️</button>
       <button v-else class="btn btn-sm btn-outline-danger px-2" @click="detenerInstanciaDev" title="Detener instancia desarrollo">⏹️</button>
@@ -170,6 +172,11 @@ export default {
       await executeCommand('/chat_edit_ticket')
     }
 
+    async function seleccionarTicket() {
+      if (!activeSessionId.value) return
+      await executeCommand('/chat_select_ticket')
+    }
+
     async function crearTicket() {
       if (!activeSessionId.value) return
       await executeCommand('/redmine_crear_ticket')
@@ -218,7 +225,7 @@ export default {
       branchMismatch, truncatedSubject, priorityClass, devInstanceRunning,
       zoomIn, zoomOut,
       generarCommit, configurarDespliegue, iniciarInstanciaDev, detenerInstanciaDev,
-      modificarTicket, crearTicket, iniciarOpencode, syncSkills, iniciarTerminal, clearChat, abrirNavegador,
+      modificarTicket, seleccionarTicket, crearTicket, iniciarOpencode, syncSkills, iniciarTerminal, clearChat, abrirNavegador,
     }
   },
 }

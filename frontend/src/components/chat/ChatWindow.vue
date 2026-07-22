@@ -23,7 +23,15 @@
     </div>
     <OpenCodeStickyBar v-if="ocStore.chatSessionId && activeSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId)" :active-session-id="activeSessionId" v-model:oc-input="ocInput" :oc-streaming="ocStreaming" :maximized="ocMaximized" :style="ocMaximized && isOcSessionActive ? { flex: '1 1 0' } : {}" @send="sendToOpencodeFromSticky" @finish="finishOpencode" @toggle-terminal="showAgentTerminal = !showAgentTerminal" @toggle-maximize="toggleOcMaximized" />
 
-    <OpenCodeAgentTerminal v-if="showAgentTerminal && ocStore.chatSessionId && activeSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId)" :content="terminalContent" @close="showAgentTerminal = false" @clear="clearAgentTerminal" />
+    <template v-if="showAgentTerminal && activeSessionId">
+      <OpenCodeAgentTerminal
+        v-for="agent in ocAgents"
+        :key="agent.id"
+        :content="getAgentTerminalContent(agent.id)"
+        @close="closeAgent(agent)"
+        @clear="clearAgent(agent.id)"
+      />
+    </template>
 
     <DeepSeekChatFab v-show="!(ocMaximized && isOcSessionActive) && activeSessionId && !isOcSessionActive" :active-session-id="activeSessionId" @send="handleFabSend" />
     <ContextMenuChat :ctx-menu="ctxMenu" :raw-msg-keys="rawMsgKeys" :msg-key="msgKey" @toggle-raw="toggleRawView" @copy-plain="copyPlainText" @delete="deleteMessage" @close="closeCtxMenu" @adjust-position="({ x, y }) => { ctxMenu.x = x; ctxMenu.y = y }" />
@@ -79,6 +87,7 @@ export default {
       fetchGitBranch, _getProyectoId, resolveInput, addMessage, isActiveSession,
       opencodeStreamPrompt, opencodeStreamPromptCommit, opencodeStreamPromptTestingNotes,
       opencodeStreamPromptDocUpdate, opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
+      getAgentTerminalContent, clearAgentTerminalContent,
     } = streamingApi
 
     const ticketInfo = ref(null)
@@ -147,9 +156,24 @@ export default {
     const input = ref('')
     const ocInput = ref('')
     const showAgentTerminal = ref(false)
-    function clearAgentTerminal() {
-      terminalContent.value = ''
+    function clearAgent(agentId) {
+      clearAgentTerminalContent(agentId)
     }
+    function closeAgent(agent) {
+      if (agent.ocSessionId && activeSessionId.value) {
+        fetch('/api/opencode/close-agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ ocSessionId: agent.ocSessionId, sessionId: activeSessionId.value }),
+        }).catch(err => console.error('Error al cerrar agente:', err.message))
+      }
+      ocStore.removeAgent(activeSessionId.value, agent.id)
+    }
+    const ocAgents = computed(() => {
+      const sid = activeSessionId.value
+      return sid ? ocStore.getAgents(sid) : []
+    })
     const ctxMenu = reactive({ show: false, x: 0, y: 0, msg: null })
     const rawMsgKeys = reactive(new Set())
 
@@ -460,6 +484,7 @@ export default {
         if (chat._hasTerminal(newId)) {
           // terminal already tracked, XtermTerminal will reconnect via findOrCreateTerminal
         }
+        ocStore.restoreActiveAgents(newId)
       }
       loadTicketInfo()
       fetchGitBranch()
@@ -490,6 +515,9 @@ export default {
       gitStore.loadZoom('chat')
       fetchGitBranch()
       await devInstanceStore.fetchStatus()
+      if (activeSessionId.value) {
+        ocStore.restoreActiveAgents(activeSessionId.value)
+      }
     })
 
     onUnmounted(() => {
@@ -520,7 +548,7 @@ export default {
       send, handleFabSend, sendToOpencodeFromSticky, finishOpencode,
       onControlConfirm, toggleOcMaximized,
       onContextMenu, closeCtxMenu, toggleRawView, copyPlainText, deleteMessage,
-      showAgentTerminal, clearAgentTerminal,
+      showAgentTerminal, clearAgent, closeAgent, ocAgents, getAgentTerminalContent,
     }
   },
 }

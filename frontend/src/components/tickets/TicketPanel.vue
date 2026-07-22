@@ -57,7 +57,6 @@ export default {
     const ui = useUiStore()
     const projectStore = useProjectStore()
     const { tickets, selectedTicket } = storeToRefs(ticketStore)
-    const { omnifilter } = storeToRefs(ui)
     const { pinnedProjectId } = storeToRefs(projectStore)
 
     const localFilter = ref('')
@@ -102,16 +101,8 @@ export default {
     }
 
     const filteredTickets = computed(() => {
-      const globalFilter = omnifilter.value.toLowerCase()
       const local = localFilter.value.toLowerCase()
       let list = tickets.value
-
-      if (globalFilter) {
-        list = list.filter((t) => {
-          const fields = [String(t.redmine_id), t.subject, t.proyecto_id]
-          return fields.some((f) => f && f.toLowerCase().includes(globalFilter))
-        })
-      }
 
       if (local) {
         list = list.filter((t) => {

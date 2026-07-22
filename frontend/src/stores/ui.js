@@ -7,7 +7,6 @@ export const useUiStore = defineStore('ui', () => {
   const sidebarWidth = ref(220)
   const panelCollapsed = ref(false)
   const panelHeight = ref(250)
-  const omnifilter = ref('')
   const rightPanelCollapsed = ref(true)
   const rightPanelWidth = ref(220)
   const recordingListWidth = ref(220)
@@ -57,10 +56,6 @@ export const useUiStore = defineStore('ui', () => {
   function toggleOcMaximized() {
     ocMaximized.value = !ocMaximized.value
     saveLayoutPrefs()
-  }
-
-  function setOmnifilter(text) {
-    omnifilter.value = text
   }
 
   async function saveLayoutPrefs() {
@@ -186,7 +181,6 @@ export const useUiStore = defineStore('ui', () => {
     recordingListWidth.value = 220
     centralPanelCollapsed.value = false
     sidebarWidthPct.value = 50
-    omnifilter.value = ''
     sidebarChatTab.value = 'chats'
     sidebarRightTab.value = 'comentarios'
     devPanelTab.value = 'instancias'
@@ -194,5 +188,5 @@ export const useUiStore = defineStore('ui', () => {
     projectFilterEnabled.value = true
   }
 
-  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, omnifilter, rightPanelCollapsed, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarWidthPct, sidebarChatTab, sidebarRightTab, devPanelTab, ocMaximized, projectFilterEnabled, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setSidebarWidthPct, setOmnifilter, toggleOcMaximized, saveLayoutPrefs, loadLayoutPrefs, reset }
+  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, rightPanelCollapsed, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarWidthPct, sidebarChatTab, sidebarRightTab, devPanelTab, ocMaximized, projectFilterEnabled, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setSidebarWidthPct, toggleOcMaximized, saveLayoutPrefs, loadLayoutPrefs, reset }
 })

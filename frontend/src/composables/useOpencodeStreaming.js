@@ -27,6 +27,22 @@ export function useOpencodeStreaming() {
   const streamingConsole = ref(false)
   const terminalContent = ref('')
   const _ocStreamData = ref({})
+  const _agentTerminalContents = ref({})
+
+  function _getAgentTerminalContent(agentId) {
+    return _agentTerminalContents.value[agentId] || ''
+  }
+
+  function _setAgentTerminalContent(agentId, content) {
+    _agentTerminalContents.value[agentId] = content
+  }
+
+  function _appendAgentTerminalContent(agentId, line) {
+    if (!_agentTerminalContents.value[agentId]) {
+      _agentTerminalContents.value[agentId] = ''
+    }
+    _agentTerminalContents.value[agentId] += line + '\n'
+  }
 
   function _syncStreamData(sessionId) {
     const sKey = sessionId ? String(sessionId) : null
@@ -34,7 +50,8 @@ export function useOpencodeStreaming() {
       ocChunk.value = _ocStreamData.value[sKey].text || ''
       ocThinking.value = _ocStreamData.value[sKey].thinking || ''
       ocStreaming.value = _ocStreamData.value[sKey].streaming || false
-      terminalContent.value = _ocStreamData.value[sKey].terminalContent || ''
+      const activeAgent = ocStore.getActiveAgent(sessionId)
+      terminalContent.value = activeAgent ? _getAgentTerminalContent(activeAgent.id) : ''
       streamSessionId.value = sessionId
     } else {
       ocChunk.value = ''
@@ -52,7 +69,7 @@ export function useOpencodeStreaming() {
     return _ocStreamData.value[sKey]
   }
 
-  function makeStreamCallbacks(sd, sessionId, streamKey) {
+  function makeStreamCallbacks(sd, sessionId, streamKey, agentId) {
     const sKey = String(sessionId)
     function updateText() {
       _ocStreamData.value[sKey] = sd
@@ -81,24 +98,27 @@ export function useOpencodeStreaming() {
       onToolResult(content) { sd.text += `\`\`\`\n${content}\n\`\`\`\n`; updateText(); flash() },
       onToolData(content, partType) { sd.text += `\n> ${partType || 'data'}: ${content}\n`; updateText(); flash() },
       onTerminalLine(line, partType) {
-        if (!_ocStreamData.value[sKey]) {
-          _ocStreamData.value[sKey] = { text: '', thinking: '', streaming: false, terminalContent: '' }
-        }
-        _ocStreamData.value[sKey].terminalContent += line + '\n'
-        if (isActiveSession(sessionId)) {
-          terminalContent.value = _ocStreamData.value[sKey].terminalContent
+        _appendAgentTerminalContent(agentId, line)
+        const activeAgent = ocStore.getActiveAgent(sessionId)
+        if (isActiveSession(sessionId) && activeAgent && activeAgent.id === agentId) {
+          terminalContent.value = _getAgentTerminalContent(agentId)
         }
         flash()
       },
     }
   }
 
+  function getAgentTerminalContent(agentId) {
+    return _getAgentTerminalContent(agentId)
+  }
+
+  function clearAgentTerminalContent(agentId) {
+    _agentTerminalContents.value[agentId] = ''
+  }
+
   function getTerminalContentForSession(sid) {
-    const sKey = sid ? String(sid) : null
-    if (sKey && _ocStreamData.value[sKey]) {
-      return _ocStreamData.value[sKey].terminalContent || ''
-    }
-    return ''
+    const activeAgent = ocStore.getActiveAgent(sid)
+    return activeAgent ? _getAgentTerminalContent(activeAgent.id) : ''
   }
 
   function clearTerminalContentForSession(sid) {
@@ -381,6 +401,23 @@ export function useOpencodeStreaming() {
     if (sessionId) chat.setSessionStatus(sessionId, 'executing')
     chat.setOcStreaming(sessionId, true)
 
+    const totalSlots = chat.getTotalConcurrentSlots(sessionId)
+    if (totalSlots >= chat.maxTerminalsLimit.value) {
+      const agents = ocStore.getAgents(sessionId)
+      if (agents.length > 0) {
+        const oldest = agents.reduce((a, b) => a.createdAt < b.createdAt ? a : b)
+        if (oldest.ocSessionId) {
+          fetch('/api/opencode/close-agent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ ocSessionId: oldest.ocSessionId, sessionId }),
+          }).catch(err => console.error('Error al cerrar agente más antiguo:', err.message))
+        }
+        ocStore.removeAgent(sessionId, oldest.id)
+      }
+    }
+
     const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
     streamMsg._key = 'stream-' + Date.now()
 
@@ -388,7 +425,10 @@ export function useOpencodeStreaming() {
       streamingConsole.value = true
     }
 
-    const callbacks = makeStreamCallbacks(sd, sessionId, streamMsg._key)
+    const agent = ocStore.createNewAgent(sessionId)
+    const agentId = agent.id
+
+    const callbacks = makeStreamCallbacks(sd, sessionId, streamMsg._key, agentId)
 
     await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
       ...callbacks,
@@ -1131,6 +1171,7 @@ export function useOpencodeStreaming() {
     ocStreaming, ocChunk, ocThinking, streamSessionId, streamingConsole, terminalContent,
     isActiveSession, _getProyectoId, resolveInput, fetchGitBranch, addMessage,
     _syncStreamData, getTerminalContentForSession, clearTerminalContentForSession,
+    getAgentTerminalContent, clearAgentTerminalContent,
     opencodeStreamPrompt, opencodeStreamPromptCommit, deepseekStreamCommit,
     opencodeStreamPromptTestingNotes, opencodeStreamPromptDocUpdate,
     opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
