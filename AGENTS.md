@@ -111,11 +111,15 @@ npm start                 # Iniciar servidor en producción
 sudo npm run setup-db     # Crear DB y usuario (requiere sudo para mysql root)
 npm run migrate           # Ejecutar migraciones
 npm run seed              # Ejecutar seeds (admin/admin)
+npm run migrate:to-sqlite # Migrar datos de MariaDB a SQLite
 npm run dev               # Iniciar servidor con --watch (puerto 4000)
 npm start                 # Iniciar servidor en producción
 ```
 
-Orden inicial obligatorio: `sudo setup-db → migrate → seed → dev` (luego iniciar con `npm run dev` desde `api_gestor_servicios/`)
+**MariaDB** (default): `sudo setup-db → migrate → seed → dev`
+**SQLite** (alternativo): editar `.env`: `DB_DRIVER=sqlite` → `migrate:to-sqlite` (si hay datos en MariaDB) → `seed` → `dev`
+
+Para volver a MariaDB, solo cambiar `DB_DRIVER=mariadb` en `.env` y reiniciar. Ambos motores pueden coexistir — los datos no se pierden al cambiar.
 
 ### Frontend (`frontend/`)
 

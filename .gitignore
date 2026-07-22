@@ -4,4 +4,6 @@ dist/
 .DS_Store
 *.log
 .vscode
-uploads/
+uploads/data/
+*.db
+*.sql

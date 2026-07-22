@@ -1,6 +1,24 @@
 # ESQUEMA DE BASE DE DATOS
 
-Motor: **MariaDB** vía **Knex** (query builder).
+Motores soportados: **MariaDB** (default) o **SQLite** vía **Knex** (query builder).
+
+Configuración en `.env`:
+```env
+DB_DRIVER=mariadb        # mariadb (default) | sqlite
+DB_SQLITE_PATH=../data/app.db  # ruta del archivo SQLite (relativa a backend/)
+```
+
+**MariaDB:** requiere `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
+**SQLite:** solo requiere `DB_DRIVER=sqlite` y opcionalmente `DB_SQLITE_PATH`.
+
+Las migraciones de Knex (carpeta `backend/migrations/`) están diseñadas para MariaDB. Para SQLite se usa un schema builder dedicado en `backend/src/config/sqliteSchema.js` que genera todas las tablas con sintaxis portable (sin `.enu()`, `.alter()` ni `.raw()`).
+
+Para migrar datos existentes de MariaDB a SQLite:
+```bash
+npm run migrate:to-sqlite
+```
+
+Para volver a MariaDB, solo cambiar `DB_DRIVER=mariadb` en `.env`.
 
 ---
 

@@ -1,6 +1,12 @@
 import 'dotenv/config';
 import { spawnSync } from 'child_process';
 
+if (process.env.DB_DRIVER === 'sqlite') {
+  console.log('SQLite no necesita setup de base de datos. El archivo se crea automáticamente.');
+  console.log('Ejecutá: npm run migrate');
+  process.exit(0);
+}
+
 const host = process.env.DB_HOST;
 const port = process.env.DB_PORT;
 const appUser = process.env.DB_USER;

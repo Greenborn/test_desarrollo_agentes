@@ -17,10 +17,36 @@ function authGuard(req, res) {
   return true;
 }
 
+function getSqlitePath() {
+  const envPath = process.env.DB_SQLITE_PATH;
+  if (envPath) {
+    return path.resolve(__dirname, '../../../', envPath);
+  }
+  return path.resolve(__dirname, '../../../data/app.db');
+}
+
 router.post('/export', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
     const { output } = req.body;
+
+    const isSqlite = process.env.DB_DRIVER === 'sqlite';
+
+    if (isSqlite) {
+      const dbPath = getSqlitePath();
+      if (!fs.existsSync(dbPath)) {
+        throw new Error('Archivo SQLite no encontrado: ' + dbPath);
+      }
+
+      const absPath = output ? path.resolve(output) : path.join(EXPORTS_DIR, `db_export_${Date.now()}.db`);
+      const dir = path.dirname(absPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.copyFileSync(dbPath, absPath);
+      res.json({ success: true, result: `Base de datos exportada a: ${absPath}` });
+      return;
+    }
 
     const host = process.env.DB_HOST;
     const port = process.env.DB_PORT;

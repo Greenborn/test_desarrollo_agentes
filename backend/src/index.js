@@ -71,13 +71,17 @@ app.use('/api/procesos', procesosRoutes);
 async function start() {
   ensureStorageDir();
   await loadModuleRoutes(app);
-  try {
-    console.log('[migrate] Ejecutando migraciones pendientes...');
-    await db.migrate.latest();
-    console.log('[migrate] Migraciones ejecutadas correctamente.');
-  } catch (err) {
-    console.log('[migrate] Error al ejecutar migraciones:', err.message, '\n', err.stack);
-    process.exit(1);
+  if (process.env.DB_DRIVER !== 'sqlite') {
+    try {
+      console.log('[migrate] Ejecutando migraciones pendientes...');
+      await db.migrate.latest();
+      console.log('[migrate] Migraciones ejecutadas correctamente.');
+    } catch (err) {
+      console.log('[migrate] Error al ejecutar migraciones:', err.message, '\n', err.stack);
+      process.exit(1);
+    }
+  } else {
+    console.log('[migrate] SQLite activo — saltando migraciones (schema ya creado por migrate-to-sqlite)');
   }
 
   const server = http.createServer(app);

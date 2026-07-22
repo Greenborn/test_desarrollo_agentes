@@ -7,6 +7,7 @@
     "setup-db": "node scripts/setup-db.js",
     "migrate": "knex migrate:latest",
     "migrate:rollback": "knex migrate:rollback",
+    "migrate:to-sqlite": "node scripts/migrate-to-sqlite.js",
     "seed": "knex seed:run",
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
@@ -14,6 +15,7 @@
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
+    "better-sqlite3": "^11.10.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "knex": "^3.1.0",

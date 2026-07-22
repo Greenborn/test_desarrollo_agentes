@@ -19,17 +19,30 @@ if (!PORT) {
 
 let db = null;
 try {
-  db = knex({
-    client: 'mysql2',
-    connection: {
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT, 10) || 3306,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    },
-    pool: { min: 0, max: 5 },
-  });
+  const isSqlite = process.env.DB_DRIVER === 'sqlite';
+  if (isSqlite) {
+    const sqlitePath = process.env.DB_SQLITE_PATH
+      ? path.resolve(__dirname, '../../', process.env.DB_SQLITE_PATH)
+      : path.resolve(__dirname, '../../data/app.db');
+
+    db = knex({
+      client: 'better-sqlite3',
+      connection: { filename: sqlitePath },
+      useNullAsDefault: true,
+    });
+  } else {
+    db = knex({
+      client: 'mysql2',
+      connection: {
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT, 10) || 3306,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+      },
+      pool: { min: 0, max: 5 },
+    });
+  }
   browserManager.setDb(db);
 } catch (err) {
   console.log('[playwright] No se pudo conectar a la base de datos, los logs de red/consola no se guardarán:', err.message);
