@@ -39,6 +39,12 @@ import dbUserSettings from './config/dbUserSettings.js';
 import dbWorkspaceEnvironments from './config/dbWorkspaceEnvironments.js';
 import dbTemplates from './config/dbTemplates.js';
 import dbProjectVariables from './config/dbProjectVariables.js';
+import dbCommandHistory from './config/dbCommandHistory.js';
+import dbGastos from './config/dbGastos.js';
+import dbPlaywright from './config/dbPlaywright.js';
+import dbDocContent from './config/dbDocContent.js';
+import dbDocNotas from './config/dbDocNotas.js';
+import dbDocEscaneo from './config/dbDocEscaneo.js';
 import { runMigrations } from './config/dbFactory.js';
 import { fetchAllSessionRepos } from './services/gitFetchService.js';
 
@@ -99,6 +105,12 @@ async function start() {
       workspace_environments: dbWorkspaceEnvironments,
       templates: dbTemplates,
       project_variables: dbProjectVariables,
+      command_history: dbCommandHistory,
+      gastos: dbGastos,
+      playwright: dbPlaywright,
+      documentacion_content: dbDocContent,
+      documentacion_notas: dbDocNotas,
+      documentacion_escaneo: dbDocEscaneo,
     });
   } catch (err) {
     console.log('[migrate] Error al ejecutar migraciones:', err.message, '\n', err.stack);

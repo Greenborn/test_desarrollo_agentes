@@ -5,9 +5,7 @@ import knex from 'knex';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const sqlitePath = process.env.DB_SQLITE_PATH
-  ? path.resolve(__dirname, '../../../../', process.env.DB_SQLITE_PATH)
-  : path.resolve(__dirname, '../../../data/app.db');
+const sqlitePath = path.resolve(__dirname, '../../../data/app.db');
 
 const db = knex({
   client: 'better-sqlite3',
