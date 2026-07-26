@@ -28,6 +28,8 @@ const PROCESOS_API = '/api/procesos'
 const WS_PORT = import.meta.env.VITE_PROCESOS_CONSOLA_PORT || '3575'
 const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
 const TERMINAL_WS_HOST = `${WS_PROTOCOL}//${window.location.hostname}:${WS_PORT}`
+const RECONNECT_BASE_DELAY = parseInt(import.meta.env.VITE_TERMINAL_RECONNECT_BASE_DELAY || '2000', 10)
+const RECONNECT_MAX_DELAY = parseInt(import.meta.env.VITE_TERMINAL_RECONNECT_MAX_DELAY || '30000', 10)
 
 export default {
   props: {
@@ -55,6 +57,9 @@ export default {
     let closingIntentionally = false
     let accumulatedOutput = ''
     let ctxCloseHandler = null
+    let reconnectAttempts = 0
+    let reconnectTimer = null
+    let isReconnecting = false
 
     function fitTerminal() {
       if (!fitAddon || !terminal) return
@@ -106,6 +111,33 @@ export default {
       }
     }
 
+    function cancelReconnect() {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
+      reconnectAttempts = 0
+      isReconnecting = false
+    }
+
+    function scheduleReconnect() {
+      if (closingIntentionally) return
+
+      isReconnecting = true
+      reconnectAttempts++
+      const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(1.5, reconnectAttempts - 1), RECONNECT_MAX_DELAY)
+      const jitter = delay * (0.5 + Math.random() * 0.5)
+
+      if (terminal) {
+        terminal.write(`\r\n\x1b[38;5;214m[reconectando en ${Math.round(jitter / 1000)}s... (intento ${reconnectAttempts})]\x1b[0m\r\n`)
+      }
+
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null
+        connectWebSocket(currentTerminalId)
+      }, jitter)
+    }
+
     function connectWebSocket(terminalId) {
       if (!terminalId) return
       if (ws) {
@@ -119,6 +151,10 @@ export default {
 
       ws.onopen = () => {
         console.log('[xterm] terminal WebSocket conectado')
+        if (isReconnecting && terminal) {
+          terminal.write(`\r\n\x1b[38;5;245m[reconectado exitosamente]\x1b[0m\r\n`)
+        }
+        cancelReconnect()
         terminal.focus()
         fitTerminal()
       }
@@ -136,18 +172,18 @@ export default {
           terminal.write(msg.data)
         } else if (msg.type === 'exit' && terminal) {
           terminal.write(`\r\n\x1b[38;5;245m[proceso terminado: código ${msg.code}]\x1b[0m\r\n`)
+          cancelReconnect()
           emit('exit', { code: msg.code, output: msg.output || accumulatedOutput, terminalId: currentTerminalId })
+        } else if (msg.type === 'created' && terminal && isReconnecting) {
+          terminal.write(`\r\n\x1b[38;5;245m[reconectado exitosamente]\x1b[0m\r\n`)
         }
       }
 
       ws.onclose = () => {
         console.log('[xterm] terminal WebSocket desconectado')
         ws = null
-        if (terminal) {
-          terminal.write(`\r\n\x1b[38;5;245m[conexión terminada]\x1b[0m\r\n`)
-        }
         if (!closingIntentionally) {
-          emit('close', currentTerminalId)
+          scheduleReconnect()
         }
       }
 
@@ -211,6 +247,7 @@ export default {
 
     async function disconnect() {
       closingIntentionally = true
+      cancelReconnect()
       await closeTerminalViaApi(currentTerminalId)
       if (ws) {
         try { ws.close() } catch {}
@@ -358,6 +395,8 @@ export default {
     })
 
     onUnmounted(() => {
+      closingIntentionally = true
+      cancelReconnect()
       if (ctxCloseHandler) {
         document.removeEventListener('click', ctxCloseHandler)
         ctxCloseHandler = null

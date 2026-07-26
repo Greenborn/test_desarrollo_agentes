@@ -9,8 +9,25 @@ export function handleConnection(ws, req, terminalId) {
     return;
   }
 
+  if (record.status === 'closed') {
+    ws.send(JSON.stringify({ type: 'error', message: 'terminal ya cerrado' }));
+    ws.close();
+    return;
+  }
+
   if (terminalManager.hasActivePty(terminalId)) {
     terminalManager.attachWebSocket(terminalId, ws);
+
+    // Re-enviar salida acumulada al reconectar
+    if (record.output) {
+      try { ws.send(JSON.stringify({ type: 'data', data: record.output })); } catch (err) {
+        console.log('[procesos_consola] Error al reenviar salida acumulada:', err.message);
+      }
+    }
+
+    try { ws.send(JSON.stringify({ type: 'created', terminalId })); } catch (err) {
+      console.log(`[procesos_consola] terminal ${terminalId}: error al enviar created:`, err.message);
+    }
   } else {
     const shell = process.env.SHELL || 'bash';
     const args = record.cmd ? ['-c', record.cmd] : [];
@@ -25,6 +42,10 @@ export function handleConnection(ws, req, terminalId) {
 
     console.log(`[procesos_consola] terminal ${terminalId}: shell iniciada ${shell} (pid ${pty.pid}) en: ${record.cwd}`);
     terminalManager.activateTerminal(terminalId, pty, ws);
+
+    try { ws.send(JSON.stringify({ type: 'created', terminalId })); } catch (err) {
+      console.log(`[procesos_consola] terminal ${terminalId}: error al enviar created:`, err.message);
+    }
   }
 
   ws.on('message', (raw) => {
@@ -53,15 +74,11 @@ export function handleConnection(ws, req, terminalId) {
   });
 
   ws.on('close', () => {
-    terminalManager.closeTerminal(terminalId);
+    terminalManager.detachWebSocket(terminalId, ws);
   });
 
   ws.on('error', (err) => {
     console.log(`[procesos_consola] terminal ${terminalId}: error en conexión:`, err.message);
-    terminalManager.closeTerminal(terminalId);
+    terminalManager.detachWebSocket(terminalId, ws);
   });
-
-  try { ws.send(JSON.stringify({ type: 'created', terminalId })); } catch (err) {
-    console.log(`[procesos_consola] terminal ${terminalId}: error al enviar created:`, err.message);
-  }
 }

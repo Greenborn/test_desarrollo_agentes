@@ -299,7 +299,7 @@ router.get('/event-recordings', async (req, res) => {
   const { project_id, chat_session_id } = req.query;
 
   try {
-    let query = db('playwright_event_recordings as r')
+    let query = dbPlaywright('playwright_event_recordings as r')
       .leftJoin('playwright_events as e', 'r.id', 'e.recording_id')
       .select('r.*')
       .count('e.id as event_count')
@@ -332,7 +332,7 @@ router.get('/event-recordings/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const recording = await db('playwright_event_recordings as r')
+    const recording = await dbPlaywright('playwright_event_recordings as r')
       .leftJoin('playwright_events as e', 'r.id', 'e.recording_id')
       .select('r.*')
       .count('e.id as event_count')

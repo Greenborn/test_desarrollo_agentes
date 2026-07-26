@@ -711,9 +711,9 @@ export default {
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 .session-icon-tled.active {
-  background-color: #3b82f6;
-  border-color: #3b82f6;
-  box-shadow: 0 0 8px 1px #3b82f6;
+  background-color: #00d4ff;
+  border-color: #00d4ff;
+  box-shadow: 0 0 10px 2px #00d4ff;
 }
 .session-icon-ticket {
   font-size: 9px;
@@ -933,9 +933,9 @@ export default {
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 .session-nav-tled.active {
-  background-color: #3b82f6;
-  border-color: #3b82f6;
-  box-shadow: 0 0 6px 1px #3b82f6;
+  background-color: #00d4ff;
+  border-color: #00d4ff;
+  box-shadow: 0 0 8px 2px #00d4ff;
 }
 .context-menu-backdrop {
   position: fixed;

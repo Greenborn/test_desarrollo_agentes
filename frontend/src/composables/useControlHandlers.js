@@ -2372,7 +2372,7 @@ export function useControlHandlers(api) {
         if (idx >= 0) {
           chat.messages[idx] = { role: 'opencode_confirmed', content: `Workspace #${workspaceId} seleccionado`, _key: 'confirmed-' + Date.now() }
         }
-        const projRes = await fetch('/api/proyecto', { credentials: 'include' })
+        const projRes = await fetch(`/api/proyecto?workspace_id=${workspaceId}`, { credentials: 'include' })
         const projData = await projRes.json()
         const projOptions = (projData.proyectos || []).map(p => ({
           label: `${p.id} — ${p.descripcion || ''}`,

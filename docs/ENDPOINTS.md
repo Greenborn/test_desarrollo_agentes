@@ -521,8 +521,9 @@ Hace proxy al servicio Playwright independiente (puerto `4098`).
 
 ### `GET /api/proyecto`
 - **Auth:** Requerida
-- **Descripción:** Lista proyectos. El proyecto pineado (si existe) aparece primero.
-- **Respuesta:** `{ proyectos: [{ id, descripcion, color }], pinnedProjectId: string|null }`
+- **Descripción:** Lista proyectos. Opcionalmente filtra por workspace específico. El proyecto pineado (si existe) aparece primero.
+- **Query params:** `?workspace_id=N` (opcional) — filtra proyectos por un workspace específico. Si se omite, usa todos los workspaces seleccionados en sesión.
+- **Respuesta:** `{ proyectos: [{ id, descripcion, color, workspace_id }], pinnedProjectId: string|null }`
 
 ### `POST /api/proyecto`
 - **Auth:** Requerida

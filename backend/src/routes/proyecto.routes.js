@@ -19,7 +19,14 @@ router.get('/proyecto', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const proyectos = await db('proyectos').whereIn('workspace_id', wsIds).select('*').orderBy('id');
+    const filterWsId = req.query.workspace_id ? parseInt(req.query.workspace_id, 10) : null;
+    let query = db('proyectos');
+    if (filterWsId) {
+      query = query.where('workspace_id', filterWsId);
+    } else {
+      query = query.whereIn('workspace_id', wsIds);
+    }
+    const proyectos = await query.select('*').orderBy('id');
     const pinnedRow = await dbUserSettings('user_settings')
       .select('value')
       .where({ user_id: req.session.userId, key: 'pinned_project' })

@@ -8,6 +8,7 @@
     "start": "node --env-file=../backend/.env src/index.js"
   },
   "dependencies": {
+    "better-sqlite3": "^11.10.0",
     "express": "^4.21.2",
     "ws": "^8.21.0"
   }
