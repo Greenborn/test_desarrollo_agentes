@@ -5,6 +5,7 @@ import { execSync, spawn } from 'child_process';
 import db from '../config/db.js';
 import dbWorkspaceEnvironments from '../config/dbWorkspaceEnvironments.js';
 import dbCommandHistory from '../config/dbCommandHistory.js';
+import dbRedmineComentarios from '../config/dbRedmineComentarios.js';
 
 const router = Router();
 
@@ -695,7 +696,7 @@ router.post('/git-merge', async (req, res) => {
             redmineComment = { action: 'error', ticketId, error: 'Redmine no configurado' };
           }
         } else if (comentar === 'encolar') {
-          const [insertedId] = await db('redmine_comentarios').insert({
+          const [insertedId] = await dbRedmineComentarios('redmine_comentarios').insert({
             session_id: sessionId,
             ticket_redmine_id: ticketId,
             comentario: commentText,

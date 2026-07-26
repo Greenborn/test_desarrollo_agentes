@@ -45,6 +45,8 @@ import dbPlaywright from './config/dbPlaywright.js';
 import dbDocContent from './config/dbDocContent.js';
 import dbDocNotas from './config/dbDocNotas.js';
 import dbDocEscaneo from './config/dbDocEscaneo.js';
+import dbFuncionalidades from './config/dbFuncionalidades.js';
+import dbRedmineComentarios from './config/dbRedmineComentarios.js';
 import { runMigrations } from './config/dbFactory.js';
 import { fetchAllSessionRepos } from './services/gitFetchService.js';
 
@@ -111,6 +113,8 @@ async function start() {
       documentacion_content: dbDocContent,
       documentacion_notas: dbDocNotas,
       documentacion_escaneo: dbDocEscaneo,
+      funcionalidades: dbFuncionalidades,
+      redmine_comentarios: dbRedmineComentarios,
     });
   } catch (err) {
     console.log('[migrate] Error al ejecutar migraciones:', err.message, '\n', err.stack);

@@ -5,9 +5,6 @@
   <div v-else-if="!proyectoId" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
     <span>Sin proyecto asignado a esta sesión</span>
   </div>
-  <div v-else-if="loadingComandos" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small">
-    <span>Cargando comandos…</span>
-  </div>
   <div v-else class="comandos-list flex-grow-1 overflow-y-auto px-2 py-1">
     <button class="btn btn-sm btn-outline-argentina w-100 mb-2" style="font-size: 0.7rem;" @click.stop="crearComando">+ Crear comando</button>
     <template v-if="comandos.length > 0">
@@ -25,6 +22,9 @@
         </div>
       </div>
     </template>
+    <div v-else-if="loadingComandos" class="d-flex flex-column align-items-center justify-content-center text-secondary small py-2">
+      <span>Cargando comandos personalizados…</span>
+    </div>
 
     <template v-if="packageScripts.length > 0">
       <div class="section-divider d-flex align-items-center gap-2 my-2 px-1">
@@ -53,7 +53,7 @@
       </div>
     </template>
 
-    <div v-if="comandos.length === 0 && packageScripts.length === 0" class="d-flex flex-column align-items-center justify-content-center text-secondary small px-3 text-center py-3">
+    <div v-if="comandos.length === 0 && packageScripts.length === 0 && !loadingComandos && !loadingPackageScripts" class="d-flex flex-column align-items-center justify-content-center text-secondary small px-3 text-center py-3">
       <span>No hay comandos disponibles para este proyecto</span>
     </div>
   </div>

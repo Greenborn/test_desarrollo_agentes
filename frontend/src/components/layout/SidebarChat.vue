@@ -157,7 +157,7 @@
 </template>
 
 <script>
-import { computed, watch, ref, reactive, onMounted, nextTick } from 'vue'
+import { computed, watch, ref, reactive, shallowRef, onMounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../stores/chat.js'
 import { useCommandStore } from '../../stores/command.js'
@@ -192,7 +192,7 @@ export default {
       { id: 'servicios', label: 'Servicios', priority: 20 },
       { id: 'archived', label: 'Archivados', priority: 30 },
     ]
-    const localTabs = ref([])
+    const localTabs = shallowRef([])
     const dragIndex = ref(null)
     const dragOverIndex = ref(null)
 

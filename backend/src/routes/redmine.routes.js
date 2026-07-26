@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getRedmineToken, getRedmineUrl } from '../services/redmine.js';
 import db from '../config/db.js';
+import dbRedmineComentarios from '../config/dbRedmineComentarios.js';
 
 const router = Router();
 
@@ -583,7 +584,7 @@ router.post('/comments', async (req, res) => {
   try {
     const chatSession = await db('chat_sessions').where({ id: session_id }).select('workspace_id').first();
     const wsId = chatSession?.workspace_id || 1;
-    const [insertedId] = await db('redmine_comentarios').insert({
+    const [insertedId] = await dbRedmineComentarios('redmine_comentarios').insert({
       session_id,
       ticket_redmine_id,
       comentario: comentario.trim(),
@@ -603,7 +604,7 @@ router.get('/comments', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    let query = db('redmine_comentarios');
+    let query = dbRedmineComentarios('redmine_comentarios');
     let wsId = null;
 
     if (req.query.sessionId) {
@@ -655,7 +656,7 @@ router.post('/comments/send', async (req, res) => {
   }
 
   try {
-    const comentarios = await db('redmine_comentarios')
+    const comentarios = await dbRedmineComentarios('redmine_comentarios')
       .whereIn('id', comentarios_ids)
       .andWhere({ estado: 'pendiente' });
 
@@ -691,14 +692,14 @@ router.post('/comments/send', async (req, res) => {
 
     if (!response.ok) {
       const errText = await response.text();
-      await db('redmine_comentarios')
+      await dbRedmineComentarios('redmine_comentarios')
         .whereIn('id', comentarios_ids)
         .update({ estado: 'error', updated_at: db.fn.now() });
       console.log('Error al enviar comentario a Redmine:', errText.slice(0, 300));
       return res.status(500).json({ error: 'Error al enviar comentario a Redmine: ' + errText.slice(0, 300) });
     }
 
-    await db('redmine_comentarios')
+    await dbRedmineComentarios('redmine_comentarios')
       .whereIn('id', comentarios_ids)
       .update({ estado: 'enviado', updated_at: db.fn.now() });
 
@@ -720,7 +721,7 @@ router.delete('/comments/sent', async (req, res) => {
 
     const wsIds = req.session.workspaceIds || [];
 
-    let query = db('redmine_comentarios')
+    let query = dbRedmineComentarios('redmine_comentarios')
       .join('chat_sessions', 'redmine_comentarios.session_id', 'chat_sessions.id')
       .where('redmine_comentarios.estado', 'enviado')
       .whereIn('chat_sessions.workspace_id', wsIds.length > 0 ? wsIds : [0]);
@@ -744,7 +745,7 @@ router.delete('/comments/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
 
   try {
-    const comment = await db('redmine_comentarios').where({ id: req.params.id }).first();
+    const comment = await dbRedmineComentarios('redmine_comentarios').where({ id: req.params.id }).first();
     if (!comment) {
       return res.status(404).json({ error: 'Comentario no encontrado' });
     }
@@ -754,7 +755,7 @@ router.delete('/comments/:id', async (req, res) => {
       return res.status(403).json({ error: 'Acceso denegado al comentario' });
     }
 
-    await db('redmine_comentarios').where({ id: req.params.id }).del();
+    await dbRedmineComentarios('redmine_comentarios').where({ id: req.params.id }).del();
     res.json({ success: true });
   } catch (err) {
     console.log('Error al eliminar comentario:', err.message);

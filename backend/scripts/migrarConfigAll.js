@@ -23,6 +23,8 @@ const TABLES = [
   { name: 'documentacion_notas',      db: createDb('documentacion_notas', 'DB_DOC_NOTAS_SQLITE_PATH') },
   { name: 'documentacion_escaneo',    db: createDb('documentacion_escaneo', 'DB_DOC_ESCANEO_SQLITE_PATH') },
   { name: 'documentacion_archivo',    db: createDb('documentacion_escaneo', 'DB_DOC_ESCANEO_SQLITE_PATH') },
+  { name: 'funcionalidades',          db: createDb('funcionalidades', 'DB_FUNCIONALIDADES_SQLITE_PATH') },
+  { name: 'redmine_comentarios',      db: createDb('redmine_comentarios', 'DB_REDMINE_COMENTARIOS_SQLITE_PATH') },
 ];
 
 async function migrate() {

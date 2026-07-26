@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import db from '../config/db.js';
+import dbFuncionalidades from '../config/dbFuncionalidades.js';
 
 const router = Router();
 
@@ -14,7 +15,7 @@ function authGuard(req, res) {
 router.get('/funcionalidad/:sessionId', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const row = await db('funcionalidades').where({ session_id: req.params.sessionId }).first();
+    const row = await dbFuncionalidades('funcionalidades').where({ session_id: req.params.sessionId }).first();
     if (row && row.parametros) {
       try {
         row.parametros = JSON.parse(row.parametros);
@@ -46,7 +47,7 @@ router.post('/funcionalidad', async (req, res) => {
   }
 
   try {
-    const existing = await db('funcionalidades').where({ session_id: sessionId }).first();
+    const existing = await dbFuncionalidades('funcionalidades').where({ session_id: sessionId }).first();
 
     const data = {
       session_id: sessionId,
@@ -59,14 +60,14 @@ router.post('/funcionalidad', async (req, res) => {
     };
 
     if (existing) {
-      await db('funcionalidades').where({ session_id: sessionId }).update(data);
+      await dbFuncionalidades('funcionalidades').where({ session_id: sessionId }).update(data);
     } else {
-      await db('funcionalidades').insert(data);
+      await dbFuncionalidades('funcionalidades').insert(data);
     }
 
     await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
 
-    const saved = await db('funcionalidades').where({ session_id: sessionId }).first();
+    const saved = await dbFuncionalidades('funcionalidades').where({ session_id: sessionId }).first();
     if (saved && saved.parametros) {
       try {
         saved.parametros = JSON.parse(saved.parametros);
@@ -86,7 +87,7 @@ router.post('/funcionalidad', async (req, res) => {
 router.get('/funcionalidades/:proyectoId', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const rows = await db('funcionalidades')
+    const rows = await dbFuncionalidades('funcionalidades')
       .where({ proyecto_id: req.params.proyectoId })
       .orderBy('fecha_hora', 'desc')
       .select('id', 'nombre', 'etapa', 'url_redmine', 'session_id', 'fecha_hora');
@@ -100,7 +101,7 @@ router.get('/funcionalidades/:proyectoId', async (req, res) => {
 router.delete('/funcionalidad/:sessionId', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    await db('funcionalidades').where({ session_id: req.params.sessionId }).del();
+    await dbFuncionalidades('funcionalidades').where({ session_id: req.params.sessionId }).del();
     await db('chat_sessions').where({ id: req.params.sessionId }).update({ updated_at: db.fn.now() });
     res.json({ success: true });
   } catch (err) {

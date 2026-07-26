@@ -25,7 +25,7 @@
 </template>
 
 <script>
-import { watch, ref, computed } from 'vue'
+import { watch, ref, computed, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiStore } from '../../stores/ui.js'
 import { useChatStore } from '../../stores/chat.js'
@@ -40,7 +40,7 @@ export default {
     const { rightPanelCollapsed, rightPanelWidth, centralPanelCollapsed, sidebarWidthPct, sidebarCollapsed, sidebarRightTab, sidebarRightTabOrder } = storeToRefs(ui)
     const { activeSessionId, sessions } = storeToRefs(chat)
     const { sidebarRightTabs } = useModuleRegistry()
-    const localTabs = ref([])
+    const localTabs = shallowRef([])
     const dragIndex = ref(null)
     const dragOverIndex = ref(null)
 

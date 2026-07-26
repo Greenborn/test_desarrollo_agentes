@@ -13,6 +13,8 @@ import dbPlaywright from '../config/dbPlaywright.js';
 import dbDocContent from '../config/dbDocContent.js';
 import dbDocNotas from '../config/dbDocNotas.js';
 import dbDocEscaneo from '../config/dbDocEscaneo.js';
+import dbFuncionalidades from '../config/dbFuncionalidades.js';
+import dbRedmineComentarios from '../config/dbRedmineComentarios.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import memoriaClient from '../services/memoriaClient.js';
 
@@ -39,6 +41,8 @@ const TABLE_DB_MAP = {
   documentacion_notas: dbDocNotas,
   documentacion_escaneo: dbDocEscaneo,
   documentacion_archivo: dbDocEscaneo,
+  funcionalidades: dbFuncionalidades,
+  redmine_comentarios: dbRedmineComentarios,
 };
 
 function getDb(tableName) {

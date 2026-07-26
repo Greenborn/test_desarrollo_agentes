@@ -15,7 +15,7 @@
 </template>
 
 <script>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiStore } from '../../stores/ui.js'
 import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
@@ -29,7 +29,7 @@ export default {
     const stopTabSync = watch(devPanelTab, (v) => { tab.value = v; stopTabSync() })
     const { devPanelTabs } = useModuleRegistry()
 
-    const localTabs = ref([])
+    const localTabs = shallowRef([])
     const dragIndex = ref(null)
     const dragOverIndex = ref(null)
 
