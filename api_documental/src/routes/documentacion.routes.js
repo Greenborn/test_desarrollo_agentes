@@ -5,13 +5,20 @@ import knex from 'knex';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const sqlitePath = path.resolve(__dirname, '../../../data/app.db');
+function createDb(envVar, defaultRelPath) {
+  const dbPath = process.env[envVar]
+    ? path.resolve(__dirname, '../../../../', process.env[envVar])
+    : path.resolve(__dirname, defaultRelPath);
+  return knex({
+    client: 'better-sqlite3',
+    connection: { filename: dbPath },
+    useNullAsDefault: true,
+  });
+}
 
-const db = knex({
-  client: 'better-sqlite3',
-  connection: { filename: sqlitePath },
-  useNullAsDefault: true,
-});
+const dbContent = createDb('DB_DOC_CONTENT_SQLITE_PATH', '../../../data/documentacion_content.db');
+const dbNotas = createDb('DB_DOC_NOTAS_SQLITE_PATH', '../../../data/documentacion_notas.db');
+const dbEscaneo = createDb('DB_DOC_ESCANEO_SQLITE_PATH', '../../../data/documentacion_escaneo.db');
 
 const TABLAS = {
   base_datos: 'documentacion_base_datos',
@@ -32,7 +39,7 @@ router.get('/notas/:proyectoId', async (req, res) => {
     if (!proyectoId) {
       return res.status(400).json({ error: 'proyectoId requerido' });
     }
-    const rows = await db('documentacion_notas')
+    const rows = await dbNotas('documentacion_notas')
       .where({ id_proyecto: proyectoId })
       .orderBy('clave')
       .select('id', 'clave', 'id_ticket', 'created_at', 'updated_at');
@@ -49,7 +56,7 @@ router.get('/notas/:proyectoId/:clave', async (req, res) => {
     if (!proyectoId || !clave) {
       return res.status(400).json({ error: 'proyectoId y clave requeridos' });
     }
-    const row = await db('documentacion_notas')
+    const row = await dbNotas('documentacion_notas')
       .where({ id_proyecto: proyectoId, clave })
       .first();
     if (!row) {
@@ -75,8 +82,8 @@ router.post('/notas', async (req, res) => {
     const insertData = { id_proyecto, clave, valor };
     if (id_ticket || id_ticket === 0) insertData.id_ticket = id_ticket;
 
-    const [id] = await db('documentacion_notas').insert(insertData);
-    const row = await db('documentacion_notas').where({ id }).first();
+    const [id] = await dbNotas('documentacion_notas').insert(insertData);
+    const row = await dbNotas('documentacion_notas').where({ id }).first();
     res.status(201).json(row);
   } catch (err) {
     console.log('Error al crear nota:', err.message);
@@ -94,16 +101,16 @@ router.put('/notas/:id', async (req, res) => {
       return res.status(400).json({ error: `valor no puede exceder ${MAX_VALOR_LENGTH} caracteres` });
     }
 
-    const updateData = { clave, valor, updated_at: db.fn.now() };
+    const updateData = { clave, valor, updated_at: dbNotas.fn.now() };
     if (id_ticket || id_ticket === 0) updateData.id_ticket = id_ticket;
 
-    const updated = await db('documentacion_notas')
+    const updated = await dbNotas('documentacion_notas')
       .where({ id })
       .update(updateData);
     if (!updated) {
       return res.status(404).json({ error: 'Nota no encontrada' });
     }
-    const row = await db('documentacion_notas').where({ id }).first();
+    const row = await dbNotas('documentacion_notas').where({ id }).first();
     res.json(row);
   } catch (err) {
     console.log('Error al actualizar nota:', err.message);
@@ -114,7 +121,7 @@ router.put('/notas/:id', async (req, res) => {
 router.delete('/notas/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await db('documentacion_notas').where({ id }).del();
+    const deleted = await dbNotas('documentacion_notas').where({ id }).del();
     if (!deleted) {
       return res.status(404).json({ error: 'Nota no encontrada' });
     }
@@ -133,7 +140,7 @@ router.get('/:proyectoId', async (req, res) => {
 
     const result = {};
     for (const [key, table] of Object.entries(TABLAS)) {
-      const rows = await db(table).where({ id_proyecto: proyectoId }).orderBy('id');
+      const rows = await dbContent(TABLAS[tipo] || tipo).where({ id_proyecto: proyectoId }).orderBy('id');
       result[key] = rows;
     }
 
@@ -146,7 +153,7 @@ router.get('/:proyectoId', async (req, res) => {
 
 router.get('/escaneo/ultimo/:sessionId', async (req, res) => {
   try {
-    const row = await db('documentacion_escaneo')
+    const row = await dbEscaneo('documentacion_escaneo')
       .where({ session_id: req.params.sessionId })
       .orderBy('fecha_hora_inicio', 'desc')
       .first();
@@ -162,8 +169,8 @@ router.post('/escaneo/iniciar', async (req, res) => {
     const { session_id } = req.body;
     if (!session_id) return res.status(400).json({ error: 'session_id requerido' });
 
-    const [id] = await db('documentacion_escaneo').insert({ session_id });
-    const row = await db('documentacion_escaneo').where({ id }).first();
+    const [id] = await dbEscaneo('documentacion_escaneo').insert({ session_id });
+    const row = await dbEscaneo('documentacion_escaneo').where({ id }).first();
     res.status(201).json({ id, fecha_hora_inicio: row.fecha_hora_inicio });
   } catch (err) {
     console.log('Error al iniciar escaneo:', err.message);
@@ -176,10 +183,10 @@ router.put('/escaneo/:id/finalizar', async (req, res) => {
     const { id } = req.params;
     const { total_archivos, archivos_procesados } = req.body;
 
-    await db('documentacion_escaneo')
+    await dbEscaneo('documentacion_escaneo')
       .where({ id })
       .update({
-        fecha_hora_fin: db.fn.now(),
+        fecha_hora_fin: dbEscaneo.fn.now(),
         total_archivos: total_archivos || 0,
         archivos_procesados: archivos_procesados || 0,
       });
@@ -198,7 +205,7 @@ router.post('/archivo', async (req, res) => {
     if (!nombre) return res.status(400).json({ error: 'nombre requerido' });
     if (!ruta) return res.status(400).json({ error: 'ruta requerida' });
 
-    const [id] = await db('documentacion_archivo').insert({
+    const [id] = await dbEscaneo('documentacion_archivo').insert({
       escaneo_id,
       nombre,
       ruta,
@@ -217,7 +224,7 @@ router.post('/archivo', async (req, res) => {
 
 router.delete('/archivo/por-escaneo/:escaneoId', async (req, res) => {
   try {
-    await db('documentacion_archivo').where({ escaneo_id: req.params.escaneoId }).del();
+    await dbEscaneo('documentacion_archivo').where({ escaneo_id: req.params.escaneoId }).del();
     res.json({ success: true });
   } catch (err) {
     console.log('Error al limpiar archivos del escaneo:', err.message);
@@ -248,7 +255,7 @@ router.post('/archivo/batch', async (req, res) => {
       descripcion: item.descripcion || null,
     }));
 
-    await db('documentacion_archivo').insert(rows);
+    await dbEscaneo('documentacion_archivo').insert(rows);
     res.status(201).json({ inserted: rows.length });
   } catch (err) {
     console.log('Error al guardar batch de archivos:', err.message);

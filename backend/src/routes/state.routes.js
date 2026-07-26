@@ -7,6 +7,12 @@ import dbUserSettings from '../config/dbUserSettings.js';
 import dbWorkspaceEnvironments from '../config/dbWorkspaceEnvironments.js';
 import dbTemplates from '../config/dbTemplates.js';
 import dbProjectVariables from '../config/dbProjectVariables.js';
+import dbCommandHistory from '../config/dbCommandHistory.js';
+import dbGastos from '../config/dbGastos.js';
+import dbPlaywright from '../config/dbPlaywright.js';
+import dbDocContent from '../config/dbDocContent.js';
+import dbDocNotas from '../config/dbDocNotas.js';
+import dbDocEscaneo from '../config/dbDocEscaneo.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import memoriaClient from '../services/memoriaClient.js';
 
@@ -19,6 +25,20 @@ const TABLE_DB_MAP = {
   workspace_environments: dbWorkspaceEnvironments,
   templates: dbTemplates,
   project_variables: dbProjectVariables,
+  command_history: dbCommandHistory,
+  gastos_tokens_usados: dbGastos,
+  playwright_network_logs: dbPlaywright,
+  playwright_console_logs: dbPlaywright,
+  playwright_events: dbPlaywright,
+  playwright_event_recordings: dbPlaywright,
+  documentacion_base_datos: dbDocContent,
+  documentacion_subproyectos: dbDocContent,
+  documentacion_endpoints: dbDocContent,
+  documentacion_web_sockets: dbDocContent,
+  documentacion_funcionalidades: dbDocContent,
+  documentacion_notas: dbDocNotas,
+  documentacion_escaneo: dbDocEscaneo,
+  documentacion_archivo: dbDocEscaneo,
 };
 
 function getDb(tableName) {

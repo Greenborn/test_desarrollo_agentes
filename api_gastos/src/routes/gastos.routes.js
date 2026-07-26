@@ -5,13 +5,13 @@ import knex from 'knex';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const sqlitePath = process.env.DB_SQLITE_PATH
-  ? path.resolve(__dirname, '../../../../', process.env.DB_SQLITE_PATH)
-  : path.resolve(__dirname, '../../../data/app.db');
+const gastosDbPath = process.env.DB_GASTOS_SQLITE_PATH
+  ? path.resolve(__dirname, '../../../../', process.env.DB_GASTOS_SQLITE_PATH)
+  : path.resolve(__dirname, '../../../data/gastos.db');
 
 const db = knex({
   client: 'better-sqlite3',
-  connection: { filename: sqlitePath },
+  connection: { filename: gastosDbPath },
   useNullAsDefault: true,
 });
 

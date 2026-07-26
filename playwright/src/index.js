@@ -19,9 +19,9 @@ if (!PORT) {
 
 let db = null;
 try {
-  const sqlitePath = process.env.DB_SQLITE_PATH
-    ? path.resolve(__dirname, '../../', process.env.DB_SQLITE_PATH)
-    : path.resolve(__dirname, '../../data/app.db');
+  const sqlitePath = process.env.DB_PLAYWRIGHT_SQLITE_PATH
+    ? path.resolve(__dirname, '../../', process.env.DB_PLAYWRIGHT_SQLITE_PATH)
+    : path.resolve(__dirname, '../../data/playwright.db');
 
   db = knex({
     client: 'better-sqlite3',
@@ -30,7 +30,7 @@ try {
   });
   browserManager.setDb(db);
 } catch (err) {
-  console.log('[playwright] No se pudo conectar a la base de datos, los logs de red/consola no se guardarán:', err.message);
+  console.log('[playwright] No se pudo conectar a la base de datos playwright, los logs de red/consola no se guardarán:', err.message);
 }
 
 const app = express();

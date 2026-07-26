@@ -4,6 +4,7 @@ import path from 'path';
 import { execSync, spawn } from 'child_process';
 import db from '../config/db.js';
 import dbWorkspaceEnvironments from '../config/dbWorkspaceEnvironments.js';
+import dbCommandHistory from '../config/dbCommandHistory.js';
 
 const router = Router();
 
@@ -255,7 +256,7 @@ router.get('/arbol-directorios', async (req, res) => {
 router.get('/history', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const query = db('command_history')
+    const query = dbCommandHistory('command_history')
       .where({ user_id: req.session.userId });
     if (req.query.sessionId) {
       query.where({ session_id: parseInt(req.query.sessionId) });
@@ -277,7 +278,7 @@ router.post('/history', async (req, res) => {
     const { command, sessionId } = req.body;
     const record = { user_id: req.session.userId, command };
     if (sessionId) record.session_id = sessionId;
-    await db('command_history').insert(record);
+    await dbCommandHistory('command_history').insert(record);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -529,7 +530,7 @@ router.post('/execute', async (req, res) => {
     } else if (cmd === '/help') {
       result = 'Comando recibido — el modal de ayuda se muestra en cliente';
     } else if (cmd === '/history') {
-      const rows = await db('command_history')
+      const rows = await dbCommandHistory('command_history')
         .where({ user_id: req.session.userId })
         .orderBy('created_at', 'desc')
         .limit(20)
@@ -542,7 +543,7 @@ router.post('/execute', async (req, res) => {
 
     const histRecord = { user_id: req.session.userId, command };
     if (sessionId) histRecord.session_id = sessionId;
-    await db('command_history').insert(histRecord);
+    await dbCommandHistory('command_history').insert(histRecord);
 
     const success = !result.startsWith('Error:');
     res.json({ success, result, command });
