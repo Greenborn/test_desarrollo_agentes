@@ -267,7 +267,7 @@ register({
       const ocStore = useOpencodeStore()
 
       const modelOptions = [
-        { label: '🟢 DeepSeek Flash (deepseek-chat) — más rápido y económico', value: 'deepseek-chat' },
+        { label: '🟢 DeepSeek Flash (deepseek-v4-flash) — más rápido y económico', value: 'deepseek-v4-flash' },
         { label: '🔴 DeepSeek Reasoner (deepseek-reasoner) — razonamiento profundo', value: 'deepseek-reasoner' },
       ]
 
@@ -280,7 +280,7 @@ register({
           subStepType: 'model',
           options: modelOptions,
           placeholder: 'Selecciona modelo DeepSeek...',
-          preselect: ocStore.savedModel || 'deepseek-chat',
+          preselect: ocStore.savedModel || 'deepseek-v4-flash',
         },
         _key: 'ctrl-model-' + Date.now(),
       }, sessionId)

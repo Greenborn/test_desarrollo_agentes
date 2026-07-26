@@ -5,39 +5,15 @@ import knex from 'knex';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const isSqlite = process.env.DB_DRIVER === 'sqlite';
+const sqlitePath = process.env.DB_SQLITE_PATH
+  ? path.resolve(__dirname, '../../../../', process.env.DB_SQLITE_PATH)
+  : path.resolve(__dirname, '../../../data/app.db');
 
-let db;
-if (isSqlite) {
-  const sqlitePath = process.env.DB_SQLITE_PATH
-    ? path.resolve(__dirname, '../../../', process.env.DB_SQLITE_PATH)
-    : path.resolve(__dirname, '../../../data/app.db');
-
-  db = knex({
-    client: 'better-sqlite3',
-    connection: { filename: sqlitePath },
-    useNullAsDefault: true,
-  });
-} else {
-  const required = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
-  for (const key of required) {
-    if (!process.env[key]) {
-      console.log(`Falta ${key} en .env`);
-      process.exit(1);
-    }
-  }
-
-  db = knex({
-    client: 'mysql2',
-    connection: {
-      host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    },
-  });
-}
+const db = knex({
+  client: 'better-sqlite3',
+  connection: { filename: sqlitePath },
+  useNullAsDefault: true,
+});
 
 const TABLAS = {
   base_datos: 'documentacion_base_datos',
@@ -105,9 +81,6 @@ router.post('/notas', async (req, res) => {
     const row = await db('documentacion_notas').where({ id }).first();
     res.status(201).json(row);
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ error: 'Ya existe una nota con esa clave en el proyecto' });
-    }
     console.log('Error al crear nota:', err.message);
     res.status(500).json({ error: err.message });
   }
@@ -135,9 +108,6 @@ router.put('/notas/:id', async (req, res) => {
     const row = await db('documentacion_notas').where({ id }).first();
     res.json(row);
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ error: 'Ya existe una nota con esa clave en el proyecto' });
-    }
     console.log('Error al actualizar nota:', err.message);
     res.status(500).json({ error: err.message });
   }

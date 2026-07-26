@@ -3,5 +3,4 @@ export async function seed(knex) {
   if (!existing) {
     await knex('workspaces').insert({ id: 1, name: 'Por Defecto', color: '#75AADB', slug: 'por_defecto_1' });
   }
-  await knex.raw('ALTER TABLE workspaces AUTO_INCREMENT = 2');
 }

@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import db from '../config/db.js';
+import dbComandos from '../config/dbComandos.js';
+import dbProjectVariables from '../config/dbProjectVariables.js';
 import memoriaClient from '../services/memoriaClient.js';
 
 const router = Router();
@@ -24,7 +26,7 @@ function authGuard(req, res) {
 router.get('/detail/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const comando = await db('comandos_personalizados_proyectos')
+    const comando = await dbComandos('comandos_personalizados_proyectos')
       .where({ id: req.params.id })
       .first();
     if (!comando) {
@@ -49,7 +51,7 @@ router.get('/:proyectoId', async (req, res) => {
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
-    const comandos = await db('comandos_personalizados_proyectos')
+    const comandos = await dbComandos('comandos_personalizados_proyectos')
       .where({ id_proyecto: req.params.proyectoId })
       .orderBy('label', 'asc')
       .select('*');
@@ -85,14 +87,14 @@ router.post('/', async (req, res) => {
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
-    const [id] = await db('comandos_personalizados_proyectos').insert({
+    const [id] = await dbComandos('comandos_personalizados_proyectos').insert({
       label,
       descripcion: descripcion || null,
       id_proyecto,
       comando,
       ocultar_ejecucion: ocultar_ejecucion ? 1 : 0,
     });
-    const created = await db('comandos_personalizados_proyectos').where({ id }).first();
+    const created = await dbComandos('comandos_personalizados_proyectos').where({ id }).first();
     res.status(201).json({ comando: created });
   } catch (err) {
     console.log('Error al crear comando personalizado:', err.message);
@@ -113,7 +115,7 @@ router.put('/:id', async (req, res) => {
     return res.status(400).json({ error: 'comando no puede exceder 512 caracteres' });
   }
   try {
-    const existing = await db('comandos_personalizados_proyectos')
+    const existing = await dbComandos('comandos_personalizados_proyectos')
       .where({ id: req.params.id })
       .first();
     if (!existing) {
@@ -128,16 +130,16 @@ router.put('/:id', async (req, res) => {
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
-    await db('comandos_personalizados_proyectos')
+    await dbComandos('comandos_personalizados_proyectos')
       .where({ id: req.params.id })
       .update({
         label,
         descripcion: descripcion || null,
         comando,
         ocultar_ejecucion: ocultar_ejecucion !== undefined ? (ocultar_ejecucion ? 1 : 0) : undefined,
-        updated_at: db.fn.now(),
+        updated_at: dbComandos.fn.now(),
       });
-    const updated = await db('comandos_personalizados_proyectos').where({ id: req.params.id }).first();
+    const updated = await dbComandos('comandos_personalizados_proyectos').where({ id: req.params.id }).first();
     res.json({ comando: updated });
   } catch (err) {
     console.log('Error al actualizar comando personalizado:', err.message);
@@ -148,7 +150,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const existing = await db('comandos_personalizados_proyectos')
+    const existing = await dbComandos('comandos_personalizados_proyectos')
       .where({ id: req.params.id })
       .first();
     if (!existing) {
@@ -163,7 +165,7 @@ router.delete('/:id', async (req, res) => {
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
-    await db('comandos_personalizados_proyectos').where({ id: req.params.id }).delete();
+    await dbComandos('comandos_personalizados_proyectos').where({ id: req.params.id }).delete();
     res.json({ success: true });
   } catch (err) {
     console.log('Error al eliminar comando personalizado:', err.message);
@@ -175,7 +177,7 @@ router.post('/:id/resolve', async (req, res) => {
   if (!authGuard(req, res)) return;
   const { sessionId } = req.body;
   try {
-    const comando = await db('comandos_personalizados_proyectos')
+    const comando = await dbComandos('comandos_personalizados_proyectos')
       .where({ id: req.params.id })
       .first();
     if (!comando) {
@@ -191,7 +193,7 @@ router.post('/:id/resolve', async (req, res) => {
     let shellCommand = comando.comando;
     if (comando.id_proyecto && shellCommand.includes('{{')) {
       try {
-        const dbVariables = await db('project_variables')
+        const dbVariables = await dbProjectVariables('project_variables')
           .select('key', 'value', 'type')
           .where({ proyecto_id: comando.id_proyecto });
 
@@ -231,7 +233,7 @@ router.post('/:id/execute', async (req, res) => {
   if (!authGuard(req, res)) return;
   const { sessionId } = req.body;
   try {
-    const comando = await db('comandos_personalizados_proyectos')
+    const comando = await dbComandos('comandos_personalizados_proyectos')
       .where({ id: req.params.id })
       .first();
     if (!comando) {
@@ -247,7 +249,7 @@ router.post('/:id/execute', async (req, res) => {
     let shellCommand = comando.comando;
     if (comando.id_proyecto && shellCommand.includes('{{')) {
       try {
-        const dbVariables = await db('project_variables')
+        const dbVariables = await dbProjectVariables('project_variables')
           .select('key', 'value', 'type')
           .where({ proyecto_id: comando.id_proyecto });
 

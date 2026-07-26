@@ -547,7 +547,7 @@ Cambia el modo headless global y reinicia la sesión activa si existe.
 
 - Las sesiones se almacenan en memoria (Map) dentro del proceso.
 - Cada sesión contiene: instancia del navegador, contexto, página de Playwright y `chat_session_id` (si se proveyó).
-- Los logs de red y consola se escriben directamente a la base de datos MariaDB en tiempo real mediante Knex.
+- Los logs de red y consola se escriben directamente a la base de datos SQLite en tiempo real mediante Knex.
 - Solo se registran peticiones de tipo `document`, `xhr` y `fetch` (se omiten imágenes, CSS, fuentes, etc.).
 - Los cuerpos de respuesta se truncan a 10.000 caracteres.
 - Al reiniciar el servicio, todas las sesiones se pierden.
@@ -598,7 +598,7 @@ playwright/
 - **JavaScript puro** (ESM, no TypeScript)
 - Parámetros requeridos validados explícitamente — prohibido `||` como fallback silencioso
 - Errores registrados con `console.log` — prohibido `catch {}` vacío
-- Dependencias externas: express, dotenv, playwright, knex y mysql2
+- Dependencias externas: express, dotenv, playwright, knex y better-sqlite3
 
 ---
 

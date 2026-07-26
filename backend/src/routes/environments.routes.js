@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import db from '../config/db.js';
+import dbWorkspaceEnvironments from '../config/dbWorkspaceEnvironments.js';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.get('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const environments = await db('workspace_environments')
+    const environments = await dbWorkspaceEnvironments('workspace_environments')
       .whereIn('workspace_id', wsIds)
       .select('id', 'name', 'branch', 'description', 'created_at', 'updated_at')
       .orderBy('id');
@@ -40,21 +41,21 @@ router.post('/', async (req, res) => {
     const wsIds = req.session.workspaceIds || [1];
     const wsId = workspace_id && wsIds.includes(workspace_id) ? workspace_id : wsIds[0] || 1;
 
-    const existing = await db('workspace_environments')
+    const existing = await dbWorkspaceEnvironments('workspace_environments')
       .where({ workspace_id: wsId, name })
       .first();
     if (existing) {
       return res.status(409).json({ error: `Ya existe un ambiente con el nombre "${name}"` });
     }
 
-    const [insertId] = await db('workspace_environments').insert({
+    const [insertId] = await dbWorkspaceEnvironments('workspace_environments').insert({
       workspace_id: wsId,
       name,
       branch,
       description: description || null,
     });
 
-    const environment = await db('workspace_environments').where({ id: insertId }).first();
+    const environment = await dbWorkspaceEnvironments('workspace_environments').where({ id: insertId }).first();
     res.status(201).json({ success: true, environment });
   } catch (err) {
     console.log('Error al crear ambiente:', err.message);
@@ -67,7 +68,7 @@ router.put('/:id', async (req, res) => {
   try {
     const { name, branch, description, workspace_id } = req.body;
     const wsIds = req.session.workspaceIds || [1];
-    const env = await db('workspace_environments').where({ id: req.params.id }).first();
+    const env = await dbWorkspaceEnvironments('workspace_environments').where({ id: req.params.id }).first();
     if (!env) {
       return res.status(404).json({ error: 'Ambiente no encontrado' });
     }
@@ -81,7 +82,7 @@ router.put('/:id', async (req, res) => {
       if (!name) {
         return res.status(400).json({ error: 'El nombre no puede estar vacío' });
       }
-      const duplicate = await db('workspace_environments')
+      const duplicate = await dbWorkspaceEnvironments('workspace_environments')
         .where({ workspace_id: wsId, name })
         .whereNot({ id: req.params.id })
         .first();
@@ -100,10 +101,10 @@ router.put('/:id', async (req, res) => {
       updates.description = description || null;
     }
 
-    updates.updated_at = db.fn.now();
+    updates.updated_at = dbWorkspaceEnvironments.fn.now();
 
-    await db('workspace_environments').where({ id: req.params.id }).update(updates);
-    const updated = await db('workspace_environments').where({ id: req.params.id }).first();
+    await dbWorkspaceEnvironments('workspace_environments').where({ id: req.params.id }).update(updates);
+    const updated = await dbWorkspaceEnvironments('workspace_environments').where({ id: req.params.id }).first();
     res.json({ success: true, environment: updated });
   } catch (err) {
     console.log('Error al actualizar ambiente:', err.message);
@@ -114,7 +115,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const env = await db('workspace_environments').where({ id: req.params.id }).first();
+    const env = await dbWorkspaceEnvironments('workspace_environments').where({ id: req.params.id }).first();
     if (!env) {
       return res.status(404).json({ error: 'Ambiente no encontrado' });
     }
@@ -123,7 +124,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ error: 'Ambiente no pertenece a un workspace seleccionado' });
     }
 
-    await db('workspace_environments').where({ id: req.params.id }).del();
+    await dbWorkspaceEnvironments('workspace_environments').where({ id: req.params.id }).del();
     res.json({ success: true });
   } catch (err) {
     console.log('Error al eliminar ambiente:', err.message);

@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import db from '../config/db.js';
+import dbUserSettings from '../config/dbUserSettings.js';
+import dbConfig from '../config/dbConfig.js';
 import { streamChat } from '../services/deepseek.js';
 
 const router = Router();
@@ -10,6 +12,31 @@ function authGuard(req, res) {
     return false;
   }
   return true;
+}
+
+const REDMINE_URL_CACHE = {};
+
+async function enrichRedmineUrl(sessions) {
+  const wsIds = [...new Set(sessions.map(s => s.workspace_id))];
+  const missing = wsIds.filter(id => !(id in REDMINE_URL_CACHE));
+  if (missing.length > 0) {
+    const rows = await dbConfig('settings')
+      .whereIn('workspace_id', missing)
+      .where('setting_key', 'redmine_url')
+      .select('workspace_id', 'setting_value');
+    for (const row of rows) {
+      REDMINE_URL_CACHE[row.workspace_id] = row.setting_value;
+    }
+    for (const id of missing) {
+      if (!(id in REDMINE_URL_CACHE)) {
+        REDMINE_URL_CACHE[id] = null;
+      }
+    }
+  }
+  return sessions.map(s => ({
+    ...s,
+    session_redmine_url: REDMINE_URL_CACHE[s.workspace_id] || null,
+  }));
 }
 
 function generateTitle() {
@@ -29,10 +56,6 @@ router.get('/sessions', async (req, res) => {
       .orderBy('chat_sessions.updated_at', 'desc')
       .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
       .leftJoin('tickets', 'chat_sessions.id_ticket_redmine', 'tickets.redmine_id')
-      .leftJoin('settings as ws_redmine', function () {
-        this.on('chat_sessions.workspace_id', '=', 'ws_redmine.workspace_id')
-          .andOn('ws_redmine.setting_key', '=', db.raw('?', ['redmine_url']));
-      })
       .select(
         'chat_sessions.id',
         'title',
@@ -41,13 +64,13 @@ router.get('/sessions', async (req, res) => {
         'chat_sessions.proyecto_id',
         'id_ticket_redmine',
         'chat_sessions.workspace_id',
-        'ws_redmine.setting_value as session_redmine_url',
         'proyectos.descripcion as proyecto_descripcion',
         'proyectos.color as proyecto_color',
         'tickets.priority_id',
         'tickets.priority_name'
       );
-    res.json({ sessions });
+    const enriched = await enrichRedmineUrl(sessions);
+    res.json({ sessions: enriched });
   } catch (err) {
     console.log('Error al cargar sesiones:', err.message);
     res.status(500).json({ sessions: [], error: err.message });
@@ -99,7 +122,7 @@ router.post('/sessions/:id/workspace', async (req, res) => {
       const newIds = [...oldIds, workspaceId];
       req.session.workspaceIds = newIds;
       await new Promise(resolve => req.session.save(resolve));
-      await db('user_settings')
+      await dbUserSettings('user_settings')
         .insert({ user_id: req.session.userId, key: 'selected_workspace_id', value: JSON.stringify(newIds) })
         .onConflict(['user_id', 'key'])
         .merge();
@@ -609,10 +632,6 @@ router.get('/sessions/archived', async (req, res) => {
       .orderBy('chat_sessions.updated_at', 'desc')
       .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
       .leftJoin('tickets', 'chat_sessions.id_ticket_redmine', 'tickets.redmine_id')
-      .leftJoin('settings as ws_redmine', function () {
-        this.on('chat_sessions.workspace_id', '=', 'ws_redmine.workspace_id')
-          .andOn('ws_redmine.setting_key', '=', db.raw('?', ['redmine_url']));
-      })
       .select(
         'chat_sessions.id',
         'title',
@@ -621,13 +640,13 @@ router.get('/sessions/archived', async (req, res) => {
         'chat_sessions.proyecto_id',
         'id_ticket_redmine',
         'chat_sessions.workspace_id',
-        'ws_redmine.setting_value as session_redmine_url',
         'proyectos.descripcion as proyecto_descripcion',
         'proyectos.color as proyecto_color',
         'tickets.priority_id',
         'tickets.priority_name'
       );
-    res.json({ sessions });
+    const enriched = await enrichRedmineUrl(sessions);
+    res.json({ sessions: enriched });
   } catch (err) {
     console.log('Error al cargar sesiones archivadas:', err.message);
     res.status(500).json({ sessions: [], error: err.message });
@@ -705,14 +724,10 @@ router.post('/sessions/:id/clone', async (req, res) => {
       await db('chat_messages').insert(newMessages);
     }
 
-    const newSession = await db('chat_sessions')
+    let newSession = await db('chat_sessions')
       .where({ 'chat_sessions.id': newId })
       .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
       .leftJoin('tickets', 'chat_sessions.id_ticket_redmine', 'tickets.redmine_id')
-      .leftJoin('settings as ws_redmine', function () {
-        this.on('chat_sessions.workspace_id', '=', 'ws_redmine.workspace_id')
-          .andOn('ws_redmine.setting_key', '=', db.raw('?', ['redmine_url']));
-      })
       .select(
         'chat_sessions.id',
         'title',
@@ -721,13 +736,14 @@ router.post('/sessions/:id/clone', async (req, res) => {
         'chat_sessions.proyecto_id',
         'id_ticket_redmine',
         'chat_sessions.workspace_id',
-        'ws_redmine.setting_value as session_redmine_url',
         'proyectos.descripcion as proyecto_descripcion',
         'proyectos.color as proyecto_color',
         'tickets.priority_id',
         'tickets.priority_name'
       )
       .first();
+    const enriched = await enrichRedmineUrl([newSession]);
+    newSession = enriched[0];
     res.json({ success: true, session: newSession });
   } catch (err) {
     console.log('Error al clonar sesión:', err.message);

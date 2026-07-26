@@ -6,7 +6,7 @@ const { register } = useCommandRegistry();
 register({
   name: '/db_export',
   category: 'Base de datos',
-  description: 'Exporta la base de datos completa mediante mysqldump a un archivo .sql. Con --output=<ruta> se guarda donde se indique; sin él se guarda en /tmp/ con timestamp.',
+  description: 'Exporta la base de datos completa (archivo SQLite .db). Con --output=<ruta> se guarda donde se indique; sin él se guarda en backend/exports/ con timestamp.',
   usage: '/db_export [--output=<ruta>]',
   async autocomplete(args, cmdStore) {
     const usedFlags = getUsedFlags(args);

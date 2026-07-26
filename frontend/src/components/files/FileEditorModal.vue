@@ -11,18 +11,24 @@
       <div v-else class="d-flex flex-column flex-grow-1" style="min-height: 0;">
         <div class="file-path text-muted small px-3 py-1 flex-shrink-0 d-flex align-items-center justify-content-between">
           <span class="text-truncate">{{ filePath }}</span>
-          <button v-if="isMarkdown && !readonly" class="btn btn-sm" :class="editMode ? 'btn-outline-primary' : 'btn-outline-info'" @click="toggleMode">
+          <button v-if="(isMarkdown || isJson) && !readonly" class="btn btn-sm" :class="editMode ? 'btn-outline-primary' : 'btn-outline-info'" @click="toggleMode">
             {{ editMode ? 'Vista previa' : 'Editar' }}
           </button>
         </div>
-        <div v-if="readonly" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
+        <div v-if="readonly && !isJson" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
           <pre class="code-pre m-0"><code>{{ content }}</code></pre>
+        </div>
+        <div v-if="readonly && isJson" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
+          <JsonTreeView :data="parsedJson" />
         </div>
         <template v-else>
           <div v-if="isMarkdown && !editMode" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
             <ChatFormatter :text="content" />
           </div>
-          <textarea v-show="!isMarkdown || editMode"
+          <div v-else-if="isJson && !editMode" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
+            <JsonTreeView :data="parsedJson" />
+          </div>
+          <textarea v-show="(!isMarkdown && !isJson) || editMode"
             class="file-editor form-control flex-grow-1 border-0 rounded-0"
             v-model="content"
             :disabled="saving"
@@ -52,6 +58,7 @@
 import { ref, computed, onMounted } from 'vue'
 import ChatFormatter from '../chat/ChatFormatter.vue'
 import FileEditorOpenCodeChat from './FileEditorOpenCodeChat.vue'
+import JsonTreeView from '../utils/JsonTreeView.vue'
 import { useChatStore } from '../../stores/chat.js'
 import { settingSet, settingGet } from '../../services/settingService.js'
 
@@ -61,7 +68,7 @@ const OC_PANEL_WIDTH_DEFAULT = 320
 const OC_PANEL_WIDTH_MIN = 200
 
 export default {
-  components: { ChatFormatter, FileEditorOpenCodeChat },
+  components: { ChatFormatter, FileEditorOpenCodeChat, JsonTreeView },
   props: {
     filePath: { type: String, required: true },
     sessionId: { type: [Number, String], default: null },
@@ -81,6 +88,22 @@ export default {
 
     const dirty = computed(() => content.value !== originalContent.value)
     const isMarkdown = computed(() => props.filePath.toLowerCase().endsWith('.md'))
+    const isJson = computed(() => {
+      if (!props.filePath.toLowerCase().endsWith('.json')) return false
+      try {
+        const parsed = JSON.parse(content.value)
+        return parsed !== null && typeof parsed === 'object'
+      } catch {
+        return false
+      }
+    })
+    const parsedJson = computed(() => {
+      try {
+        return JSON.parse(content.value)
+      } catch {
+        return null
+      }
+    })
 
     const cwd = computed(() => {
       if (props.sessionId) {
@@ -195,7 +218,7 @@ export default {
 
     return {
       content, loading, saving, saved, error, dirty,
-      editMode, isMarkdown, toggleMode,
+      editMode, isMarkdown, isJson, parsedJson, toggleMode,
       save, reload, cwd,
       ocPanelWidth, onOcSplitStart,
     }

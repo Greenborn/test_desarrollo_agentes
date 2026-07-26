@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import db from '../config/db.js';
+import dbConfig from '../config/dbConfig.js';
+import dbUserSettings from '../config/dbUserSettings.js';
+import dbWorkspaceEnvironments from '../config/dbWorkspaceEnvironments.js';
 import opencode from '../services/opencode.js';
 
 const router = Router();
@@ -47,7 +50,7 @@ router.post('/', async (req, res) => {
     const slug = slugify(name, insertId);
     await db('workspaces').where({ id: insertId }).update({ slug });
 
-    const defaultSettings = await db('settings').where({ workspace_id: 1 });
+    const defaultSettings = await dbConfig('settings').where({ workspace_id: 1 });
     if (defaultSettings.length > 0) {
       const copies = defaultSettings.map(s => ({
         workspace_id: insertId,
@@ -55,10 +58,10 @@ router.post('/', async (req, res) => {
         setting_value: s.setting_value,
         encrypted: s.encrypted,
       }));
-      await db('settings').insert(copies).onConflict(['workspace_id', 'setting_key']).ignore();
+      await dbConfig('settings').insert(copies).onConflict(['workspace_id', 'setting_key']).ignore();
     }
 
-    const defaultEnvironments = await db('workspace_environments').where({ workspace_id: 1 });
+    const defaultEnvironments = await dbWorkspaceEnvironments('workspace_environments').where({ workspace_id: 1 });
     if (defaultEnvironments.length > 0) {
       const envCopies = defaultEnvironments.map(e => ({
         workspace_id: insertId,
@@ -66,7 +69,7 @@ router.post('/', async (req, res) => {
         branch: e.branch,
         description: e.description,
       }));
-      await db('workspace_environments').insert(envCopies);
+      await dbWorkspaceEnvironments('workspace_environments').insert(envCopies);
     }
 
     const workspace = await db('workspaces').where({ id: insertId }).first();
@@ -119,8 +122,8 @@ router.delete('/:id', async (req, res) => {
     await db('chat_sessions').where({ workspace_id: req.params.id }).del();
     await db('tickets').where({ workspace_id: req.params.id }).del();
     await db('proyectos').where({ workspace_id: req.params.id }).del();
-    await db('settings').where({ workspace_id: req.params.id }).del();
-    await db('workspace_environments').where({ workspace_id: req.params.id }).del();
+    await dbConfig('settings').where({ workspace_id: req.params.id }).del();
+    await dbWorkspaceEnvironments('workspace_environments').where({ workspace_id: req.params.id }).del();
     await db('workspaces').where({ id: req.params.id }).del();
 
     res.json({ success: true });
@@ -185,7 +188,7 @@ router.post('/select', async (req, res) => {
     req.session.workspaceIds = workspaceIds;
     await new Promise((resolve) => req.session.save(resolve));
 
-    await db('user_settings')
+    await dbUserSettings('user_settings')
       .insert({ user_id: req.session.userId, key: 'selected_workspace_id', value: JSON.stringify(workspaceIds) })
       .onConflict(['user_id', 'key'])
       .merge();
@@ -230,7 +233,7 @@ router.post('/switch', async (req, res) => {
     req.session.workspaceIds = newIds;
     await new Promise((resolve) => req.session.save(resolve));
 
-    await db('user_settings')
+    await dbUserSettings('user_settings')
       .insert({ user_id: req.session.userId, key: 'selected_workspace_id', value: JSON.stringify(newIds) })
       .onConflict(['user_id', 'key'])
       .merge();

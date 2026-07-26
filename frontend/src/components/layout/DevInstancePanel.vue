@@ -1,7 +1,14 @@
 <template>
   <div class="dev-instance-panel h-100 d-flex flex-column">
     <div class="tab-bar d-flex align-items-center px-3 pt-2 pb-0 flex-shrink-0">
-      <button v-for="t in allDevTabs" :key="t.id" class="tab-btn" :class="{ active: tab === t.id }" @click="selectDevTab(t.id)">{{ t.label }}</button>
+      <button v-for="(t, i) in localTabs" :key="t.id" class="tab-btn"
+        :class="{ active: tab === t.id, dragging: dragIndex === i, 'drag-over': dragOverIndex === i }"
+        draggable="true"
+        @click="selectDevTab(t.id)"
+        @dragstart="onDragStart(i, $event)"
+        @dragover.prevent="onDragOver(i)"
+        @drop.prevent="onDrop(i)"
+        @dragend="onDragEnd">{{ t.label }}</button>
     </div>
     <component :is="activeTabComponent" v-if="activeTabComponent" class="flex-grow-1" />
   </div>
@@ -12,19 +19,24 @@ import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiStore } from '../../stores/ui.js'
 import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
+import { sortTabs } from '../../utils/sortTabs.js'
 
 export default {
   setup() {
     const ui = useUiStore()
-    const { devPanelTab } = storeToRefs(ui)
+    const { devPanelTab, devPanelTabOrder } = storeToRefs(ui)
     const tab = ref('instancias')
     const stopTabSync = watch(devPanelTab, (v) => { tab.value = v; stopTabSync() })
     const { devPanelTabs } = useModuleRegistry()
 
-    const allDevTabs = computed(() => {
-      if (!devPanelTabs) return []
-      return [...devPanelTabs].sort((a, b) => (a.priority || 50) - (b.priority || 50))
-    })
+    const localTabs = ref([])
+    const dragIndex = ref(null)
+    const dragOverIndex = ref(null)
+
+    function buildTabs() {
+      if (!devPanelTabs) { localTabs.value = []; return }
+      localTabs.value = sortTabs([...devPanelTabs], devPanelTabOrder.value)
+    }
 
     const activeTabComponent = computed(() => {
       if (!devPanelTabs) return null
@@ -38,11 +50,55 @@ export default {
       ui.saveLayoutPrefs()
     }
 
+    function saveTabOrder(ids) {
+      devPanelTabOrder.value = ids
+      ui.saveLayoutPrefs()
+    }
+
+    function onDragStart(index, e) {
+      dragIndex.value = index
+      e.dataTransfer.effectAllowed = 'move'
+      e.dataTransfer.setData('text/plain', String(index))
+    }
+
+    function onDragOver(index) {
+      dragOverIndex.value = index
+    }
+
+    function onDrop(index) {
+      if (dragIndex.value === null || dragIndex.value === index) {
+        dragIndex.value = null
+        dragOverIndex.value = null
+        return
+      }
+      const items = [...localTabs.value]
+      const [moved] = items.splice(dragIndex.value, 1)
+      items.splice(index, 0, moved)
+      localTabs.value = items
+      saveTabOrder(items.map(t => t.id))
+      dragIndex.value = null
+      dragOverIndex.value = null
+    }
+
+    function onDragEnd() {
+      dragIndex.value = null
+      dragOverIndex.value = null
+    }
+
+    watch(devPanelTabs, () => buildTabs(), { immediate: true })
+    watch(devPanelTabOrder, () => buildTabs())
+
     return {
       tab,
-      allDevTabs,
+      localTabs,
       activeTabComponent,
       selectDevTab,
+      dragIndex,
+      dragOverIndex,
+      onDragStart,
+      onDragOver,
+      onDrop,
+      onDragEnd,
     }
   },
 }
@@ -71,6 +127,12 @@ export default {
 }
 .tab-btn.active {
   color: #75AADB;
+  border-bottom-color: #75AADB;
+}
+.tab-btn.dragging {
+  opacity: 0.4;
+}
+.tab-btn.drag-over {
   border-bottom-color: #75AADB;
 }
 </style>

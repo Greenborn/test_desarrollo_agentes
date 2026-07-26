@@ -1,9 +1,10 @@
 import db from '../config/db.js';
+import dbConfig from '../config/dbConfig.js';
 import { decrypt } from './crypto.js';
 
 export async function getRedmineToken(workspaceId) {
   try {
-    const row = await db('settings').where({ workspace_id: workspaceId || 1, setting_key: 'redmine_token' }).first();
+    const row = await dbConfig('settings').where({ workspace_id: workspaceId || 1, setting_key: 'redmine_token' }).first();
     if (!row || !row.setting_value) return null;
     return decrypt(row.setting_value);
   } catch (err) {
@@ -14,7 +15,7 @@ export async function getRedmineToken(workspaceId) {
 
 export async function getRedmineUrl(workspaceId) {
   try {
-    const row = await db('settings').where({ workspace_id: workspaceId || 1, setting_key: 'redmine_url' }).first();
+    const row = await dbConfig('settings').where({ workspace_id: workspaceId || 1, setting_key: 'redmine_url' }).first();
     return row ? row.setting_value : null;
   } catch (err) {
     console.log('Error al obtener redmine_url:', err.message);
@@ -95,9 +96,9 @@ export async function syncRedmineTicket(redmineId, wsId, proyectoId) {
     redmine_closed_on: toDateTime(issue.closed_on),
   };
 
-  const existing = await db('tickets').where({ redmine_id: issue.id }).first();
+  const existing = await db('tickets').where({ redmine_id: issue.id, workspace_id: wsId }).first();
   if (existing) {
-    await db('tickets').where({ redmine_id: issue.id }).update(ticketData);
+    await db('tickets').where({ redmine_id: issue.id, workspace_id: wsId }).update(ticketData);
     if (existing.workspace_id !== ticketData.workspace_id) {
       await db('chat_sessions')
         .where({ id_ticket_redmine: issue.id })

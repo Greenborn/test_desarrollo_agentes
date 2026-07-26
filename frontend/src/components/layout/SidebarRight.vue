@@ -5,10 +5,17 @@
     :style="sidebarStyle"
   >
     <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
-      <button v-for="t in moduleTabs" :key="t.id" class="tab-btn" :class="{ active: tab === t.id }" @click="selectTab(t.id)">{{ t.label }}</button>
+      <button v-for="(t, i) in localTabs" :key="t.id" class="tab-btn"
+        :class="{ active: tab === t.id, dragging: dragIndex === i, 'drag-over': dragOverIndex === i }"
+        draggable="true"
+        @click="selectTab(t.id)"
+        @dragstart="onDragStart(i, $event)"
+        @dragover.prevent="onDragOver(i)"
+        @drop.prevent="onDrop(i)"
+        @dragend="onDragEnd">{{ t.label }}</button>
     </div>
 
-    <template v-for="t in moduleTabs" :key="t.id">
+    <template v-for="t in localTabs" :key="t.id">
       <component :is="t.component" v-if="tab === t.id" />
     </template>
     <div class="sidebar-right-resize-handle" @mousedown.prevent="onResizeStart">
@@ -24,18 +31,28 @@ import { useUiStore } from '../../stores/ui.js'
 import { useChatStore } from '../../stores/chat.js'
 import { useDocumentacionNotasStore } from '../../stores/documentacionNotas.js'
 import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
+import { sortTabs } from '../../utils/sortTabs.js'
 export default {
   setup() {
     const ui = useUiStore()
     const chat = useChatStore()
     const docNotasStore = useDocumentacionNotasStore()
-    const { rightPanelCollapsed, rightPanelWidth, centralPanelCollapsed, sidebarWidthPct, sidebarCollapsed, sidebarRightTab } = storeToRefs(ui)
+    const { rightPanelCollapsed, rightPanelWidth, centralPanelCollapsed, sidebarWidthPct, sidebarCollapsed, sidebarRightTab, sidebarRightTabOrder } = storeToRefs(ui)
     const { activeSessionId, sessions } = storeToRefs(chat)
     const { sidebarRightTabs } = useModuleRegistry()
-    const moduleTabs = computed(() => {
-      if (!sidebarRightTabs) return []
-      return [...sidebarRightTabs].sort((a, b) => (a.priority || 50) - (b.priority || 50))
-    })
+    const localTabs = ref([])
+    const dragIndex = ref(null)
+    const dragOverIndex = ref(null)
+
+    function buildTabs() {
+      if (!sidebarRightTabs) { localTabs.value = []; return }
+      localTabs.value = sortTabs([...sidebarRightTabs], sidebarRightTabOrder.value)
+    }
+
+    function saveTabOrder(ids) {
+      sidebarRightTabOrder.value = ids
+      ui.saveLayoutPrefs()
+    }
     const tab = ref('comentarios')
     const stopTabSync = watch(sidebarRightTab, (v) => { tab.value = v; stopTabSync() })
 
@@ -62,6 +79,39 @@ export default {
       sidebarRightTab.value = val
       ui.saveLayoutPrefs()
     }
+
+    function onDragStart(index, e) {
+      dragIndex.value = index
+      e.dataTransfer.effectAllowed = 'move'
+      e.dataTransfer.setData('text/plain', String(index))
+    }
+
+    function onDragOver(index) {
+      dragOverIndex.value = index
+    }
+
+    function onDrop(index) {
+      if (dragIndex.value === null || dragIndex.value === index) {
+        dragIndex.value = null
+        dragOverIndex.value = null
+        return
+      }
+      const items = [...localTabs.value]
+      const [moved] = items.splice(dragIndex.value, 1)
+      items.splice(index, 0, moved)
+      localTabs.value = items
+      saveTabOrder(items.map(t => t.id))
+      dragIndex.value = null
+      dragOverIndex.value = null
+    }
+
+    function onDragEnd() {
+      dragIndex.value = null
+      dragOverIndex.value = null
+    }
+
+    watch(sidebarRightTabs, () => buildTabs(), { immediate: true })
+    watch(sidebarRightTabOrder, () => buildTabs())
 
     function onResizeStart(e) {
       const resizeHandle = e.currentTarget
@@ -111,7 +161,13 @@ export default {
       tab,
       selectTab,
       activeSessionId,
-      moduleTabs,
+      localTabs,
+      dragIndex,
+      dragOverIndex,
+      onDragStart,
+      onDragOver,
+      onDrop,
+      onDragEnd,
       onResizeStart,
     }
   },
@@ -140,6 +196,12 @@ export default {
 }
 .tab-btn.active {
   color: #75AADB;
+  border-bottom-color: #75AADB;
+}
+.tab-btn.dragging {
+  opacity: 0.4;
+}
+.tab-btn.drag-over {
   border-bottom-color: #75AADB;
 }
 .sidebar-right {

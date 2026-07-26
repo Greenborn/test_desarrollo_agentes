@@ -6,6 +6,9 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import zlib from 'zlib';
 import db from '../config/db.js';
+import dbConfig from '../config/dbConfig.js';
+import dbUserSettings from '../config/dbUserSettings.js';
+import dbProjectVariables from '../config/dbProjectVariables.js';
 import opencode from '../services/opencode.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -26,7 +29,7 @@ function authGuard(req, res) {
 
 async function getUserSetting(userId, key) {
   try {
-    const row = await db('user_settings').where({ user_id: userId, key }).first();
+    const row = await dbUserSettings('user_settings').where({ user_id: userId, key }).first();
     return row ? row.value : null;
   } catch (dbErr) {
     console.log('Error al obtener user_setting:', dbErr.message);
@@ -35,7 +38,7 @@ async function getUserSetting(userId, key) {
 }
 
 async function saveUserSetting(userId, key, value) {
-  await db('user_settings')
+  await dbUserSettings('user_settings')
     .insert({ user_id: userId, key, value })
     .onConflict(['user_id', 'key'])
     .merge();
@@ -80,6 +83,15 @@ function getRepoSkillPaths(repoDir) {
     console.log('[opencode] Error reading repo opencode config:', e.message)
   }
   return defaultPaths
+}
+
+function ensureGitignore(dir) {
+  const gitignorePath = path.join(dir, '.gitignore')
+  if (!fs.existsSync(gitignorePath)) {
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(gitignorePath, '*\n!.gitignore\n', 'utf-8')
+    console.log(`[opencode] .gitignore creado en ${gitignorePath}`)
+  }
 }
 
 async function mergeWorkspaceSkillPaths(cwd, workspaceIds) {
@@ -209,7 +221,7 @@ router.get('/start', async (req, res) => {
     }
     const wsIds = req.session.workspaceIds || [1];
     const wsId = wsIds[0] || 1;
-    const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
+    const localeRow = await dbConfig('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
     await mergeWorkspaceSkillPaths(cwd, req.session.workspaceIds);
     const providerData = await opencode.getModels(cwd, sessionId || null, locale);
@@ -222,7 +234,7 @@ router.get('/start', async (req, res) => {
     if (sessionId) {
       const chatSession = await db('chat_sessions').where({ id: sessionId }).select('proyecto_id').first();
       if (chatSession && chatSession.proyecto_id) {
-        const projectVars = await db('project_variables')
+        const projectVars = await dbProjectVariables('project_variables')
           .where({ proyecto_id: chatSession.proyecto_id })
           .whereIn('key', ['opencode_provider', 'opencode_model', 'opencode_thinking', 'opencode_mode', 'opencode_temperature'])
           .select('key', 'value');
@@ -263,7 +275,7 @@ router.post('/select', async (req, res) => {
     if (sessionId) {
       const chatSession = await db('chat_sessions').where({ id: sessionId }).select('proyecto_id').first();
       if (chatSession && chatSession.proyecto_id) {
-        await db('project_variables')
+        await dbProjectVariables('project_variables')
           .insert({ proyecto_id: chatSession.proyecto_id, key: `opencode_${key}`, value: String(value), type: 'db' })
           .onConflict(['proyecto_id', 'key'])
           .merge();
@@ -292,18 +304,18 @@ router.post('/send', async (req, res) => {
 
     const wsIds = req.session.workspaceIds || [1];
     const wsId = wsIds[0] || 1;
-    const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
+    const localeRow = await dbConfig('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
     await mergeWorkspaceSkillPaths(cwd, req.session.workspaceIds);
     const server = await opencode.getOrStartServer(cwd, sessionId, locale);
 
-    // Enforce terminal limit: close oldest agent if at capacity
+    // Enforce terminal limit: block if at capacity
     if (sessionId) {
-      const maxTerminalsRow = await db('settings').where({ workspace_id: wsId, setting_key: 'terminal_max_terminals' }).first();
+      const maxTerminalsRow = await dbConfig('settings').where({ workspace_id: wsId, setting_key: 'terminal_max_terminals' }).first();
       const maxTerminals = maxTerminalsRow ? parseInt(maxTerminalsRow.setting_value, 10) || 5 : 5;
       const activeSessions = await opencode.listSessions(sessionId);
       if (activeSessions.length >= maxTerminals) {
-        await opencode.closeOldestSession(sessionId);
+        return res.status(429).json({ error: `Límite de agentes alcanzado (${maxTerminals}). Cerrá un agente existente antes de abrir uno nuevo.` });
       }
     }
 
@@ -682,7 +694,7 @@ router.post('/editor-start', async (req, res) => {
 
     const wsIds = req.session.workspaceIds || [1];
     const wsId = wsIds[0] || 1;
-    const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
+    const localeRow = await dbConfig('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
 
     await mergeWorkspaceSkillPaths(cwd, req.session.workspaceIds);
@@ -708,7 +720,7 @@ router.post('/editor-send', async (req, res) => {
   try {
     const wsIds = req.session.workspaceIds || [1];
     const wsId = wsIds[0] || 1;
-    const localeRow = await db('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
+    const localeRow = await dbConfig('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
     const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
 
     await mergeWorkspaceSkillPaths(cwd, req.session.workspaceIds);
@@ -1119,6 +1131,8 @@ router.post('/sync-skills-project', async (req, res) => {
     const message = parts.length > 0
       ? `Skills de los espacios de trabajo sincronizados: ${parts.join(', ')}.`
       : 'No se encontraron skills para copiar de los espacios de trabajo seleccionados.'
+
+    ensureGitignore(targetSkillsDir)
 
     console.log(`[opencode] Skills copiados a ${targetSkillsDir}: ${copiedCount} copiados, ${skippedCount} omitidos, ${errorsCount} errores`)
     res.json({

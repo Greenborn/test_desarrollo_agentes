@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import db from '../config/db.js';
+import dbConfig from '../config/dbConfig.js';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ function authGuard(req, res) {
 
 async function getMaxSizeKb(wsId) {
   try {
-    const row = await db('settings')
+    const row = await dbConfig('settings')
       .where({ workspace_id: wsId, setting_key: 'request_response_max_size_kb' })
       .select('setting_value')
       .first();

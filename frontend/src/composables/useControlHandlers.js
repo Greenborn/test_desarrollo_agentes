@@ -95,7 +95,7 @@ export function useControlHandlers(api) {
             _key: 'confirmed-' + Date.now(),
           }
         }
-        const model = ocStore.selectedModel || 'deepseek-chat'
+        const model = ocStore.selectedModel || 'deepseek-v4-flash'
         await startDeteccionProcessing(chat.activeSessionId, chat, model, value)
       }
       return
@@ -2378,26 +2378,19 @@ export function useControlHandlers(api) {
           label: `${p.id} — ${p.descripcion || ''}`,
           value: p.id,
         }))
-        if (projOptions.length > 0) {
-          chat.pushMessage({
-            role: 'opencode_control',
-            controlData: {
-              controlId: 'setup-proj-' + Date.now(),
-              controlType: 'select',
-              stepType: 'new_session_project',
-              question: '2. Selecciona un proyecto:',
-              options: projOptions,
-              placeholder: 'Selecciona proyecto...',
-            },
-            _key: 'ctrl-setup-proj-' + Date.now(),
-          })
-        } else {
-          chat.pushMessage({
-            role: 'opencode_info',
-            content: JSON.stringify({ type: 'info', message: 'No hay proyectos en este espacio de trabajo. Podés usar /chat_set_proyecto o /redmine_importar_proyectos para crear o importar uno.' }),
-            _key: 'info-noproj-' + Date.now(),
-          })
-        }
+        projOptions.push({ label: '— Ninguno (saltar) —', value: '' })
+        chat.pushMessage({
+          role: 'opencode_control',
+          controlData: {
+            controlId: 'setup-proj-' + Date.now(),
+            controlType: 'select',
+            stepType: 'new_session_project',
+            question: '2. Selecciona un proyecto:',
+            options: projOptions,
+            placeholder: 'Selecciona proyecto...',
+          },
+          _key: 'ctrl-setup-proj-' + Date.now(),
+        })
       }
     } catch (err) {
       console.error('Error al asignar workspace en setup:', err)
@@ -2410,30 +2403,37 @@ export function useControlHandlers(api) {
 
   async function handleNewSessionProject(controlId, value, controlMsg) {
     try {
-      const res = await fetch('/api/proyecto/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ sessionId: chat.activeSessionId, proyectoId: value }),
-      })
-      const data = await res.json()
-      if (data.workspaceIds) {
-        const workspaceStore = useWorkspaceStore()
-        const auth = useAuthStore()
-        workspaceStore.selectedIds = data.workspaceIds
-        auth.setWorkspaceIds(data.workspaceIds)
+      if (value) {
+        const res = await fetch('/api/proyecto/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ sessionId: chat.activeSessionId, proyectoId: value }),
+        })
+        const data = await res.json()
+        if (data.workspaceIds) {
+          const workspaceStore = useWorkspaceStore()
+          const auth = useAuthStore()
+          workspaceStore.selectedIds = data.workspaceIds
+          auth.setWorkspaceIds(data.workspaceIds)
+        }
       }
       await chat.loadSessions()
       const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
       if (idx >= 0) {
-        chat.messages[idx] = { role: 'opencode_confirmed', content: `Proyecto "${value}" seleccionado`, _key: 'confirmed-' + Date.now() }
+        chat.messages[idx] = { role: 'opencode_confirmed', content: value ? `Proyecto "${value}" seleccionado` : 'Proyecto no seleccionado (saltado)', _key: 'confirmed-' + Date.now() }
       }
-      const tktRes = await fetch(`/api/tickets?proyecto_id=${encodeURIComponent(value)}`, { credentials: 'include' })
-      const tktData = await tktRes.json()
-      const tktOptions = (tktData.tickets || []).map(t => ({
-        label: `#${t.redmine_id} — ${t.subject || ''}`,
-        value: String(t.redmine_id),
-      }))
+      const tktOptions = []
+      if (value) {
+        const tktRes = await fetch(`/api/tickets?proyecto_id=${encodeURIComponent(value)}`, { credentials: 'include' })
+        const tktData = await tktRes.json()
+        const tktOpts = (tktData.tickets || []).map(t => ({
+          label: `#${t.redmine_id} — ${t.subject || ''}`,
+          value: String(t.redmine_id),
+        }))
+        tktOptions.push(...tktOpts)
+      }
+      tktOptions.push({ label: '— Ninguno (saltar) —', value: '' })
       chat.pushMessage({
         role: 'opencode_control',
         controlData: {
@@ -2456,30 +2456,30 @@ export function useControlHandlers(api) {
   }
 
   async function handleNewSessionTicket(controlId, value, controlMsg) {
-    const idTicketRedmine = parseInt(value, 10)
+    const idTicketRedmine = value ? parseInt(value, 10) : null
     try {
-      const res = await fetch('/api/tickets/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ sessionId: chat.activeSessionId, idTicketRedmine }),
-      })
-      const data = await res.json()
-      if (data.success) {
+      if (idTicketRedmine) {
+        const res = await fetch('/api/tickets/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ sessionId: chat.activeSessionId, idTicketRedmine }),
+        })
+        const data = await res.json()
         if (data.workspaceIds) {
           const workspaceStore = useWorkspaceStore()
           const auth = useAuthStore()
           workspaceStore.selectedIds = data.workspaceIds
           auth.setWorkspaceIds(data.workspaceIds)
         }
-        await chat.loadSessions()
-        if (typeof loadTicketInfo === 'function') {
-          await loadTicketInfo()
-        }
-        const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
-        if (idx >= 0) {
-          chat.messages[idx] = { role: 'opencode_confirmed', content: `Ticket #${idTicketRedmine} seleccionado`, _key: 'confirmed-' + Date.now() }
-        }
+      }
+      await chat.loadSessions()
+      if (idTicketRedmine && typeof loadTicketInfo === 'function') {
+        await loadTicketInfo()
+      }
+      const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
+      if (idx >= 0) {
+        chat.messages[idx] = { role: 'opencode_confirmed', content: idTicketRedmine ? `Ticket #${idTicketRedmine} seleccionado` : 'Ticket no seleccionado (saltado)', _key: 'confirmed-' + Date.now() }
       }
     } catch (err) {
       console.error('Error al asignar ticket en setup:', err)

@@ -12,7 +12,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 
 ## Stack
 
-- **Backend:** Node.js + Express + Knex + mysql2 + MariaDB — JavaScript puro (NO TypeScript)
+- **Backend:** Node.js + Express + Knex + better-sqlite3 + SQLite — JavaScript puro (NO TypeScript)
 - **Frontend:** Vue 3 + Vite + Bootstrap 5 — JavaScript puro (NO TypeScript)
 - **Comunicación:** HTTP REST + SSE streaming + WebSocket (api_memoria vía ws)
 - **Autenticación:** Sesiones con cookies (api_memoria — sesiones almacenadas en servicio de memoria centralizado)
@@ -24,7 +24,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 - **Prohibido TypeScript** en cualquier parte del proyecto
 - Migraciones y seeds con Knex (no raw SQL ni otros ORM)
 - Variables de entorno desde `backend/.env`
-- Script `backend/scripts/setup-db.js` para crear DB y usuario en MariaDB
+- Base de datos SQLite vía better-sqlite3 (archivo `data/app.db`)
 - API keys encriptadas antes de guardar en tabla `settings`
 - Comunicaciones frontend ↔ backend vía HTTP REST con `credentials: 'include'`
 - Streaming de chat vía Server-Sent Events sobre HTTP POST
@@ -35,18 +35,34 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 - **Módulos auto-registrables:** seguir el sistema descrito en `frontend/src/modules/` y `backend/src/modules/`. Ver sección "Sistema de Módulos" más abajo.
 - **Espacios de trabajo (workspaces):** tabla `workspaces` con id y name. La selección activa se guarda como array en la sesión (`req.session.workspaceIds`). Settings, chat_sessions, proyectos y tickets se filtran por los workspaces seleccionados (IN). Al cambiar/seleccionar workspaces se detienen procesos OpenCode y navegador si se deseleccionó alguno.
 - **Prohibido `alert()` en el frontend:** toda notificación al usuario debe mostrarse mediante el sistema de modales personalizado (`AppModal.vue` + `stores/modal.js`). Usar `AlertModal.vue` para notificaciones simples de una línea. Cualquier `alert()` existente debe reemplazarse por un modal apropiado.
+- **Prohibido usar librerías externas para funcionalidades simples de frontend:** tareas como drag & drop, tooltips, modales simples, tabs, acordeones, etc. deben implementarse con HTML/CSS/JS nativo o con Bootstrap 5 (ya disponible). No agregar dependencias nuevas como SortableJS, vue-draggable, ni similares para funcionalidades que el estándar web resuelve.
 
 ## Estructura
 
 ```
 /
 ├── backend/               # Express + Knex (iniciado por api_gestor_servicios)
-│   ├── migrations/        # Migraciones Knex
+│   ├── migrations/        # Migraciones Knex (app.db)
+│   ├── migrations_comandos/  # Migraciones Knex (comandos.db)
+│   ├── migrations_config/    # Migraciones Knex (config.db)
+│   ├── migrations_global_settings/  # Migraciones Knex (global_settings.db)
+│   ├── migrations_user_settings/    # Migraciones Knex (user_settings.db)
+│   ├── migrations_workspace_environments/  # Migraciones Knex (workspace_environments.db)
+│   ├── migrations_templates/  # Migraciones Knex (templates.db)
+│   ├── migrations_project_variables/  # Migraciones Knex (project_variables.db)
 │   ├── seeds/             # Seeds Knex (admin/admin)
-│   ├── scripts/           # setup-db.js
+│   ├── scripts/           # Utilidades
 │   └── src/
 │       ├── index.js       # Express (puerto 4000)
-│       ├── config/db.js   # Conexión Knex
+│       ├── config/db.js        # Conexión Knex → app.db
+│       ├── config/dbFactory.js # Fábrica genérica de conexiones Knex
+│       ├── config/dbComandos.js # Conexión Knex → comandos.db
+│       ├── config/dbConfig.js   # Conexión Knex → config.db
+│       ├── config/dbGlobalSettings.js  # Conexión Knex → global_settings.db
+│       ├── config/dbUserSettings.js    # Conexión Knex → user_settings.db
+│       ├── config/dbWorkspaceEnvironments.js  # Conexión Knex → workspace_environments.db
+│       ├── config/dbTemplates.js  # Conexión Knex → templates.db
+│       ├── config/dbProjectVariables.js  # Conexión Knex → project_variables.db
 │       ├── routes/        # 25 rutas (auth, chat, settings, workspaces, command, opencode, navegador,
 │       │                  #   funcionalidad, proyecto, documentacion, gastos, redmine, tickets, despliegue,
 │       │                  #   templates, environments, playwrightLogs, state, gestor, comandosPersonalizados,
@@ -108,18 +124,13 @@ npm start                 # Iniciar servidor en producción
 ### Backend (`backend/`)
 
 ```bash
-sudo npm run setup-db     # Crear DB y usuario (requiere sudo para mysql root)
 npm run migrate           # Ejecutar migraciones
 npm run seed              # Ejecutar seeds (admin/admin)
-npm run migrate:to-sqlite # Migrar datos de MariaDB a SQLite
 npm run dev               # Iniciar servidor con --watch (puerto 4000)
 npm start                 # Iniciar servidor en producción
 ```
 
-**MariaDB** (default): `sudo setup-db → migrate → seed → dev`
-**SQLite** (alternativo): editar `.env`: `DB_DRIVER=sqlite` → `migrate:to-sqlite` (si hay datos en MariaDB) → `seed` → `dev`
-
-Para volver a MariaDB, solo cambiar `DB_DRIVER=mariadb` en `.env` y reiniciar. Ambos motores pueden coexistir — los datos no se pierden al cambiar.
+**SQLite**: `migrate → seed → dev`
 
 ### Frontend (`frontend/`)
 

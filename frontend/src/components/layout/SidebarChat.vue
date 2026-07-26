@@ -6,7 +6,14 @@
   >
     <!-- Tab bar -->
     <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
-      <button v-for="t in allChatTabs" :key="t.id" class="tab-btn" :class="{ active: tab === t.id }" @click="selectChatTab(t.id)">{{ t.label }}</button>
+      <button v-for="(t, i) in localTabs" :key="t.id" class="tab-btn"
+        :class="{ active: tab === t.id, dragging: dragIndex === i, 'drag-over': dragOverIndex === i }"
+        draggable="true"
+        @click="selectChatTab(t.id)"
+        @dragstart="onDragStart(i, $event)"
+        @dragover.prevent="onDragOver(i)"
+        @drop.prevent="onDrop(i)"
+        @dragend="onDragEnd">{{ t.label }}</button>
     </div>
     <div v-if="tab === 'chats'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
     <div class="d-flex align-items-center gap-2 mb-2 flex-shrink-0">
@@ -38,6 +45,7 @@
                @click.stop
                title="Abrir ticket en Redmine">#{{ s.id_ticket_redmine }}</a>
             <span class="session-icon-led" :class="getSessionStatus(s.id)"></span>
+            <span class="session-icon-tled" :class="{ active: chat._hasTerminal(s.id) }"></span>
           </div>
           <div class="d-flex flex-column flex-grow-1 min-width-0">
             <span class="text-truncate">{{ s.title }}</span>
@@ -86,6 +94,7 @@
                  @click.stop
                  title="Abrir ticket en Redmine">#{{ s.id_ticket_redmine }}</a>
               <span class="session-icon-led archived"></span>
+              <span class="session-icon-tled" :class="{ active: chat._hasTerminal(s.id) }"></span>
             </div>
             <div class="d-flex flex-column flex-grow-1 min-width-0">
               <span class="text-truncate">{{ s.title }}</span>
@@ -132,8 +141,9 @@
     >
       <div class="session-nav-icon" :style="navIconStyle(s)">
         <span v-if="s.id_ticket_redmine" class="session-nav-ticket">#{{ s.id_ticket_redmine }}</span>
-        <span class="session-nav-led" :class="getSessionStatus(s.id)"></span>
-      </div>
+<span class="session-nav-led" :class="getSessionStatus(s.id)"></span>
+          <span class="session-nav-tled" :class="{ active: chat._hasTerminal(s.id) }"></span>
+        </div>
     </button>
   </div>
     <div v-if="ctxMenu.show" class="context-menu-backdrop" @click="closeSessionCtxMenu" @contextmenu.prevent="closeSessionCtxMenu"></div>
@@ -158,6 +168,7 @@ import { contrastTextColor } from '../../utils/color.js'
 import ServiciosPanel from '../services/ServiciosPanel.vue'
 import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
 import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
+import { sortTabs } from '../../utils/sortTabs.js'
 
 export default {
   components: { ServiciosPanel },
@@ -174,16 +185,62 @@ export default {
     const { redmineUrl } = storeToRefs(settings)
     const { workspaces, selectedIds } = storeToRefs(ws)
     const { sidebarChatTabs } = useModuleRegistry()
+    const { sidebarChatTabOrder } = storeToRefs(ui)
 
     const builtInChatTabs = [
       { id: 'chats', label: 'Chats', priority: 10 },
       { id: 'servicios', label: 'Servicios', priority: 20 },
       { id: 'archived', label: 'Archivados', priority: 30 },
     ]
-    const allChatTabs = computed(() => {
-      if (!sidebarChatTabs) return builtInChatTabs
-      return [...builtInChatTabs, ...sidebarChatTabs].sort((a, b) => (a.priority || 50) - (b.priority || 50))
-    })
+    const localTabs = ref([])
+    const dragIndex = ref(null)
+    const dragOverIndex = ref(null)
+
+    function buildTabs() {
+      const all = [...builtInChatTabs]
+      if (sidebarChatTabs) {
+        all.push(...sidebarChatTabs)
+      }
+      localTabs.value = sortTabs(all, sidebarChatTabOrder.value)
+    }
+
+    function saveTabOrder(ids) {
+      sidebarChatTabOrder.value = ids
+      ui.saveLayoutPrefs()
+    }
+
+    function onDragStart(index, e) {
+      dragIndex.value = index
+      e.dataTransfer.effectAllowed = 'move'
+      e.dataTransfer.setData('text/plain', String(index))
+    }
+
+    function onDragOver(index) {
+      dragOverIndex.value = index
+    }
+
+    function onDrop(index) {
+      if (dragIndex.value === null || dragIndex.value === index) {
+        dragIndex.value = null
+        dragOverIndex.value = null
+        return
+      }
+      const items = [...localTabs.value]
+      const [moved] = items.splice(dragIndex.value, 1)
+      items.splice(index, 0, moved)
+      localTabs.value = items
+      saveTabOrder(items.map(t => t.id))
+      dragIndex.value = null
+      dragOverIndex.value = null
+    }
+
+    function onDragEnd() {
+      dragIndex.value = null
+      dragOverIndex.value = null
+    }
+
+    watch(sidebarChatTabOrder, () => buildTabs(), { immediate: true })
+    watch(sidebarChatTabs, () => buildTabs(), { immediate: true })
     const activeRegistryChatComponent = computed(() => {
       if (!sidebarChatTabs) return null
       const found = sidebarChatTabs.find(t => t.id === tab.value)
@@ -443,7 +500,13 @@ export default {
       onSessionContextMenu,
       closeSessionCtxMenu,
       sessionNavEnabled,
-      allChatTabs,
+      localTabs,
+      dragIndex,
+      dragOverIndex,
+      onDragStart,
+      onDragOver,
+      onDrop,
+      onDragEnd,
       activeRegistryChatComponent,
     }
   },
@@ -472,6 +535,12 @@ export default {
 }
 .tab-btn.active {
   color: #75AADB;
+  border-bottom-color: #75AADB;
+}
+.tab-btn.dragging {
+  opacity: 0.4;
+}
+.tab-btn.drag-over {
   border-bottom-color: #75AADB;
 }
 .tab-label {
@@ -603,26 +672,48 @@ export default {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  transition: background-color 0.2s ease;
+  border: 1.5px solid #4b5563;
+  background-color: #000;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 .session-icon-led.idle {
-  background-color: #6b7280;
+  background-color: #000;
+  border-color: #6b7280;
 }
 .session-icon-led.executing {
   background-color: #22c55e;
-  box-shadow: 0 0 6px #22c55e;
+  border-color: #22c55e;
+  box-shadow: 0 0 8px 1px #22c55e;
 }
 .session-icon-led.error {
   background-color: #ef4444;
-  box-shadow: 0 0 6px #ef4444;
+  border-color: #ef4444;
+  box-shadow: 0 0 8px 1px #ef4444;
 }
 .session-icon-led.flash {
   background-color: #22c55e;
-  box-shadow: 0 0 6px #22c55e;
+  border-color: #22c55e;
+  box-shadow: 0 0 8px 1px #22c55e;
 }
 .session-icon-led.archived {
-  background-color: #6b7280;
-  opacity: 0.4;
+  background-color: #000;
+  border-color: #4b5563;
+  opacity: 0.6;
+}
+.session-icon-tled {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1.5px solid #4b5563;
+  background-color: #000;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.session-icon-tled.active {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  box-shadow: 0 0 8px 1px #3b82f6;
 }
 .session-icon-ticket {
   font-size: 9px;
@@ -803,25 +894,48 @@ export default {
   height: 5px;
   border-radius: 50%;
   flex-shrink: 0;
+  border: 1.5px solid #4b5563;
+  background-color: #000;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 .session-nav-led.idle {
-  background-color: #6b7280;
+  background-color: #000;
+  border-color: #6b7280;
 }
 .session-nav-led.executing {
   background-color: #22c55e;
-  box-shadow: 0 0 4px #22c55e;
+  border-color: #22c55e;
+  box-shadow: 0 0 6px 1px #22c55e;
 }
 .session-nav-led.error {
   background-color: #ef4444;
-  box-shadow: 0 0 4px #ef4444;
+  border-color: #ef4444;
+  box-shadow: 0 0 6px 1px #ef4444;
 }
 .session-nav-led.flash {
   background-color: #22c55e;
-  box-shadow: 0 0 4px #22c55e;
+  border-color: #22c55e;
+  box-shadow: 0 0 6px 1px #22c55e;
 }
 .session-nav-led.archived {
-  background-color: #6b7280;
-  opacity: 0.4;
+  background-color: #000;
+  border-color: #4b5563;
+  opacity: 0.6;
+}
+.session-nav-tled {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1.5px solid #4b5563;
+  background-color: #000;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.session-nav-tled.active {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  box-shadow: 0 0 6px 1px #3b82f6;
 }
 .context-menu-backdrop {
   position: fixed;

@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import db from '../config/db.js';
+import dbUserSettings from '../config/dbUserSettings.js';
+import dbProjectVariables from '../config/dbProjectVariables.js';
 import memoriaClient from '../services/memoriaClient.js';
 import { getRedmineToken, getRedmineUrl } from '../services/redmine.js';
 
@@ -18,7 +20,7 @@ router.get('/proyecto', async (req, res) => {
   try {
     const wsIds = req.session.workspaceIds || [1];
     const proyectos = await db('proyectos').whereIn('workspace_id', wsIds).select('*').orderBy('id');
-    const pinnedRow = await db('user_settings')
+    const pinnedRow = await dbUserSettings('user_settings')
       .select('value')
       .where({ user_id: req.session.userId, key: 'pinned_project' })
       .first();
@@ -184,7 +186,7 @@ router.post('/proyecto/session', async (req, res) => {
           req.session.workspaceIds = newIds;
           await new Promise(resolve => req.session.save(resolve));
 
-          await db('user_settings')
+          await dbUserSettings('user_settings')
             .insert({ user_id: req.session.userId, key: 'selected_workspace_id', value: JSON.stringify(newIds) })
             .onConflict(['user_id', 'key'])
             .merge();
@@ -207,12 +209,12 @@ router.post('/proyecto/pin', async (req, res) => {
   const { proyectoId } = req.body;
   try {
     if (proyectoId) {
-      await db('user_settings')
+      await dbUserSettings('user_settings')
         .insert({ user_id: req.session.userId, key: 'pinned_project', value: proyectoId })
         .onConflict(['user_id', 'key'])
         .merge();
     } else {
-      await db('user_settings')
+      await dbUserSettings('user_settings')
         .where({ user_id: req.session.userId, key: 'pinned_project' })
         .delete();
     }
@@ -302,7 +304,7 @@ router.get('/proyecto/:id/variables', async (req, res) => {
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
-    const dbVariables = await db('project_variables')
+    const dbVariables = await dbProjectVariables('project_variables')
       .select('key', 'value', 'type', 'created_at', 'updated_at')
       .where({ proyecto_id: req.params.id })
       .orderBy('key');
@@ -369,7 +371,7 @@ router.post('/proyecto/:id/variables', async (req, res) => {
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
-    const existing = await db('project_variables')
+    const existing = await dbProjectVariables('project_variables')
       .where({ proyecto_id: req.params.id, key })
       .first();
     if (existing) {
@@ -377,7 +379,7 @@ router.post('/proyecto/:id/variables', async (req, res) => {
     }
 
     if (varType === 'memory') {
-      await db('project_variables').insert({
+      await dbProjectVariables('project_variables').insert({
         proyecto_id: req.params.id,
         key,
         value: '',
@@ -386,7 +388,7 @@ router.post('/proyecto/:id/variables', async (req, res) => {
       const memNamespace = `proyecto:${req.params.id}`;
       await memoriaClient.set(memNamespace, key, value);
     } else {
-      await db('project_variables').insert({
+      await dbProjectVariables('project_variables').insert({
         proyecto_id: req.params.id,
         key,
         value: String(value),
@@ -417,7 +419,7 @@ router.put('/proyecto/:id/variables/:key', async (req, res) => {
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
-    const existing = await db('project_variables')
+    const existing = await dbProjectVariables('project_variables')
       .select('type')
       .where({ proyecto_id: req.params.id, key: req.params.key })
       .first();
@@ -431,21 +433,21 @@ router.put('/proyecto/:id/variables/:key', async (req, res) => {
     if (newType !== existing.type) {
       if (existing.type === 'memory') {
         try { await memoriaClient.del(memNamespace, req.params.key); } catch (err) { console.log('Error al eliminar variable de memoria:', err.message); }
-        await db('project_variables')
+        await dbProjectVariables('project_variables')
           .where({ proyecto_id: req.params.id, key: req.params.key })
-          .update({ value: String(value), type: 'db', updated_at: db.fn.now() });
+          .update({ value: String(value), type: 'db', updated_at: dbProjectVariables.fn.now() });
       } else {
         await memoriaClient.set(memNamespace, req.params.key, value);
-        await db('project_variables')
+        await dbProjectVariables('project_variables')
           .where({ proyecto_id: req.params.id, key: req.params.key })
-          .update({ value: '', type: 'memory', updated_at: db.fn.now() });
+          .update({ value: '', type: 'memory', updated_at: dbProjectVariables.fn.now() });
       }
     } else if (existing.type === 'memory') {
       await memoriaClient.set(memNamespace, req.params.key, value);
     } else {
-      await db('project_variables')
+      await dbProjectVariables('project_variables')
         .where({ proyecto_id: req.params.id, key: req.params.key })
-        .update({ value: String(value), updated_at: db.fn.now() });
+        .update({ value: String(value), updated_at: dbProjectVariables.fn.now() });
     }
 
     res.json({ success: true });
@@ -467,7 +469,7 @@ router.delete('/proyecto/:id/variables/:key', async (req, res) => {
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
-    const existing = await db('project_variables')
+    const existing = await dbProjectVariables('project_variables')
       .select('type')
       .where({ proyecto_id: req.params.id, key: req.params.key })
       .first();
@@ -482,7 +484,7 @@ router.delete('/proyecto/:id/variables/:key', async (req, res) => {
         console.log('Error al eliminar variable de memoria:', err.message);
       }
     }
-    await db('project_variables')
+    await dbProjectVariables('project_variables')
       .where({ proyecto_id: req.params.id, key: req.params.key })
       .delete();
     res.json({ success: true });

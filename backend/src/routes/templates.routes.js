@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import db from '../config/db.js';
+import dbTemplates from '../config/dbTemplates.js';
 
 const router = Router();
 const MAX_CONTENT_SIZE = 10000;
@@ -15,7 +16,7 @@ function authGuard(req, res) {
 router.get('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const rows = await db('templates').select('id', 'slug', 'is_protected', 'created_at', 'updated_at').orderBy('slug', 'asc');
+    const rows = await dbTemplates('templates').select('id', 'slug', 'is_protected', 'created_at', 'updated_at').orderBy('slug', 'asc');
     res.json(rows);
   } catch (err) {
     console.log('Error al obtener plantillas:', err.message);
@@ -26,7 +27,7 @@ router.get('/', async (req, res) => {
 router.get('/:slug', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const row = await db('templates').where({ slug: req.params.slug }).first();
+    const row = await dbTemplates('templates').where({ slug: req.params.slug }).first();
     if (!row) {
       res.status(404).json({ error: 'Plantilla no encontrada' });
       return;
@@ -64,7 +65,7 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    const [id] = await db('templates').insert({ slug: slug.trim(), content });
+    const [id] = await dbTemplates('templates').insert({ slug: slug.trim(), content });
     res.status(201).json({ success: true, id });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
@@ -79,7 +80,7 @@ router.post('/', async (req, res) => {
 router.put('/:slug', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const existing = await db('templates').where({ slug: req.params.slug }).first();
+    const existing = await dbTemplates('templates').where({ slug: req.params.slug }).first();
     if (!existing) {
       res.status(404).json({ error: 'Plantilla no encontrada' });
       return;
@@ -125,9 +126,9 @@ router.put('/:slug', async (req, res) => {
       return;
     }
 
-    updateData.updated_at = db.fn.now();
+    updateData.updated_at = dbTemplates.fn.now();
 
-    await db('templates').where({ slug: req.params.slug }).update(updateData);
+    await dbTemplates('templates').where({ slug: req.params.slug }).update(updateData);
     res.json({ success: true });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
@@ -142,7 +143,7 @@ router.put('/:slug', async (req, res) => {
 router.delete('/:slug', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const existing = await db('templates').where({ slug: req.params.slug }).first();
+    const existing = await dbTemplates('templates').where({ slug: req.params.slug }).first();
     if (!existing) {
       res.status(404).json({ error: 'Plantilla no encontrada' });
       return;
@@ -151,7 +152,7 @@ router.delete('/:slug', async (req, res) => {
       res.status(403).json({ error: 'No se puede eliminar una plantilla protegida del sistema' });
       return;
     }
-    await db('templates').where({ slug: req.params.slug }).del();
+    await dbTemplates('templates').where({ slug: req.params.slug }).del();
     res.json({ success: true });
   } catch (err) {
     console.log('Error al eliminar plantilla:', err.message);

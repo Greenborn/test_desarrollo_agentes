@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -30,44 +29,17 @@ router.post('/export', async (req, res) => {
   try {
     const { output } = req.body;
 
-    const isSqlite = process.env.DB_DRIVER === 'sqlite';
-
-    if (isSqlite) {
-      const dbPath = getSqlitePath();
-      if (!fs.existsSync(dbPath)) {
-        throw new Error('Archivo SQLite no encontrado: ' + dbPath);
-      }
-
-      const absPath = output ? path.resolve(output) : path.join(EXPORTS_DIR, `db_export_${Date.now()}.db`);
-      const dir = path.dirname(absPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.copyFileSync(dbPath, absPath);
-      res.json({ success: true, result: `Base de datos exportada a: ${absPath}` });
-      return;
+    const dbPath = getSqlitePath();
+    if (!fs.existsSync(dbPath)) {
+      throw new Error('Archivo SQLite no encontrado: ' + dbPath);
     }
 
-    const host = process.env.DB_HOST;
-    const port = process.env.DB_PORT;
-    const user = process.env.DB_USER;
-    const password = process.env.DB_PASSWORD;
-    const database = process.env.DB_NAME;
-
-    if (!host || !port || !user || !password || !database) {
-      throw new Error('Faltan credenciales de base de datos en .env');
-    }
-
-    const dumpCmd = `mysqldump --single-transaction --routines --triggers --events -h ${host} -P ${port} -u ${user} -p${password} ${database}`;
-
-    const dump = execSync(dumpCmd, { encoding: 'utf-8', maxBuffer: 500 * 1024 * 1024 });
-
-    const absPath = output ? path.resolve(output) : path.join(EXPORTS_DIR, `db_export_${Date.now()}.sql`);
+    const absPath = output ? path.resolve(output) : path.join(EXPORTS_DIR, `db_export_${Date.now()}.db`);
     const dir = path.dirname(absPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(absPath, dump, 'utf-8');
+    fs.copyFileSync(dbPath, absPath);
     res.json({ success: true, result: `Base de datos exportada a: ${absPath}` });
   } catch (err) {
     console.log('Error al exportar base de datos:', err.message);

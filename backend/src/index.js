@@ -32,6 +32,15 @@ import * as devInstanceManager from './services/devInstanceManager.js';
 import memoriaClient from './services/memoriaClient.js';
 import { setupFrontendWebSocket } from './services/frontendWsServer.js';
 import db from './config/db.js';
+import dbComandos from './config/dbComandos.js';
+import dbConfig from './config/dbConfig.js';
+import dbGlobalSettings from './config/dbGlobalSettings.js';
+import dbUserSettings from './config/dbUserSettings.js';
+import dbWorkspaceEnvironments from './config/dbWorkspaceEnvironments.js';
+import dbTemplates from './config/dbTemplates.js';
+import dbProjectVariables from './config/dbProjectVariables.js';
+import { runMigrations } from './config/dbFactory.js';
+import { fetchAllSessionRepos } from './services/gitFetchService.js';
 
 const PORT = process.env.PORT;
 if (!PORT) {
@@ -71,17 +80,29 @@ app.use('/api/procesos', procesosRoutes);
 async function start() {
   ensureStorageDir();
   await loadModuleRoutes(app);
-  if (process.env.DB_DRIVER !== 'sqlite') {
-    try {
-      console.log('[migrate] Ejecutando migraciones pendientes...');
-      await db.migrate.latest();
-      console.log('[migrate] Migraciones ejecutadas correctamente.');
-    } catch (err) {
-      console.log('[migrate] Error al ejecutar migraciones:', err.message, '\n', err.stack);
-      process.exit(1);
-    }
-  } else {
-    console.log('[migrate] SQLite activo — saltando migraciones (schema ya creado por migrate-to-sqlite)');
+  try {
+    console.log('[migrate] Ejecutando migraciones pendientes...');
+    await db.migrate.latest();
+    console.log('[migrate] Migraciones ejecutadas correctamente.');
+
+    console.log('[migrate] Ejecutando migraciones de comandos...');
+    await dbComandos.migrate.latest();
+    console.log('[migrate] Migraciones de comandos ejecutadas correctamente.');
+
+    console.log('[migrate] Ejecutando migraciones de configuración...');
+    await dbConfig.migrate.latest();
+    console.log('[migrate] Migraciones de configuración ejecutadas correctamente.');
+
+    await runMigrations({
+      global_settings: dbGlobalSettings,
+      user_settings: dbUserSettings,
+      workspace_environments: dbWorkspaceEnvironments,
+      templates: dbTemplates,
+      project_variables: dbProjectVariables,
+    });
+  } catch (err) {
+    console.log('[migrate] Error al ejecutar migraciones:', err.message, '\n', err.stack);
+    process.exit(1);
   }
 
   const server = http.createServer(app);
@@ -92,6 +113,7 @@ async function start() {
       process.exit(1);
     }
     console.log(`Server listening on port ${PORT}`);
+    fetchAllSessionRepos();
   });
 }
 

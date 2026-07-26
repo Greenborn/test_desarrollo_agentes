@@ -2,6 +2,8 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import db from '../config/db.js';
+import dbConfig from '../config/dbConfig.js';
+import dbUserSettings from '../config/dbUserSettings.js';
 import * as devInstanceManager from '../services/devInstanceManager.js';
 import playwrightManager from '../services/playwrightManager.js';
 import memoriaClient from '../services/memoriaClient.js';
@@ -339,13 +341,13 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
           resolution = customResolution;
         } else {
           try {
-            const defaultResRow = await db('user_settings')
+            const defaultResRow = await dbUserSettings('user_settings')
               .select('value')
               .where({ user_id: req.session.userId, key: 'default_resolution' })
               .first();
             if (defaultResRow && defaultResRow.value) {
               const wsIds = req.session.workspaceIds || [1];
-              const screenResRow = await db('settings')
+              const screenResRow = await dbConfig('settings')
                 .select('setting_value')
                 .where({ workspace_id: wsIds[0] || 1, setting_key: 'screen_resolutions' })
                 .first();

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import db from '../config/db.js';
+import dbUserSettings from '../config/dbUserSettings.js';
 import memoriaClient from '../services/memoriaClient.js';
 
 const router = Router();
@@ -30,7 +31,7 @@ router.post('/login', async (req, res) => {
     req.session.userId = user.id;
     req.session.username = user.username;
     req.session.role = user.role;
-    const userWs = await db('user_settings').where({ user_id: user.id, key: 'selected_workspace_id' }).first();
+    const userWs = await dbUserSettings('user_settings').where({ user_id: user.id, key: 'selected_workspace_id' }).first();
     let wsIds = [1];
     if (userWs) {
       try {

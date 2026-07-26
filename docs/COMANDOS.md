@@ -108,7 +108,7 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/db_export` | Exporta la base de datos completa mediante mysqldump a un archivo .sql. Con `--output=<ruta>` se guarda donde se indique; sin él se guarda en `backend/exports/` con timestamp | `/db_export [--output=<ruta>]` |
+| `/db_export` | Exporta la base de datos completa (archivo SQLite .db). Con `--output=<ruta>` se guarda donde se indique; sin él se guarda en `backend/exports/` con timestamp | `/db_export [--output=<ruta>]` |
 
 ---
 
@@ -130,7 +130,7 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 | `/dev_documento_listar` | Obtiene toda la documentación de un proyecto. Si no se especifica, usa el de la sesión actual | `/dev_documento_listar [--id=<id_proyecto>]` |
 | `/dev_documento_actualizar` | Actualiza la documentación del proyecto usando OpenCode para el tipo indicado | `/dev_documento_actualizar --tipo=<tipo>` |
 | `/chat_set_workspace` | Asigna un espacio de trabajo (workspace) a la sesión actual. Usa Tab para autocompletar con los workspaces disponibles | `/chat_set_workspace --id=<workspace_id>` |
-| `/dev_opencode_iniciar` | Inicia una sesión OpenCode: se habilita la barra inferior (`OpenCodeStickyBar`) con selector de proveedor, modelo, pensamiento, temperatura, modo, switch "Usar descripción del ticket" y textarea para enviar prompts. Los campos se precargan con los últimos valores usados en el proyecto (guardados en `project_variables`). Después de cada respuesta se puede seguir enviando mensajes. | `/dev_opencode_iniciar` |
+| `/dev_opencode_iniciar` | Inicia una sesión OpenCode: abre el CLI interactivo en una terminal dentro del directorio del proyecto asociado a la sesión. | `/dev_opencode_iniciar` |
 | `/dev_generar_commit` | Genera un mensaje de commit de los cambios realizados. Obtiene el diff de Git y contexto del ticket, y usa DeepSeek directamente para generar la propuesta. | `/dev_generar_commit` |
 | `/dev_opencode_finalizar` | Finaliza la sesión OpenCode activa | `/dev_opencode_finalizar` |
 | `/dev_git_crear_rama` | Crea una rama Git a partir del proyecto y ticket de la sesión. Con `--base` se salta la selección de rama base | `/dev_git_crear_rama [--base=<rama_base>]` |
@@ -229,7 +229,7 @@ Los comandos personalizados se gestionan desde:
 - **Panel lateral derecho** → pestaña **Comandos**: lista, ejecuta, edita y elimina comandos del proyecto asociado a la sesión activa.
 - **Chat**: mediante los comandos `/comando_*` listados arriba.
 
-Cada comando se guarda en la tabla `comandos_personalizados_proyectos` y se ejecuta como comando shell (`/bin/sh -c`) en el directorio de trabajo de la sesión.
+Cada comando se guarda en la tabla `comandos_personalizados_proyectos` (en una base de datos SQLite separada `data/comandos.db`) y se ejecuta como comando shell (`/bin/sh -c`) en el directorio de trabajo de la sesión.
 
 **Interpolación de variables:** El cuerpo del comando admite la sintaxis `{{nombre_variable}}`. Al ejecutar el comando, el sistema resuelve automáticamente las variables del proyecto (tanto persistentes `type=db` como no persistentes `type=memory`) reemplazando `{{nombre}}` por su valor actual.
 

@@ -13,7 +13,7 @@
           <div v-if="!loadingMore && !hasMoreMessages && messages.length > 50" class="text-center text-muted small py-1">
             — Todos los mensajes cargados —
           </div>
-          <ChatMessage v-for="m in messages" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
+          <ChatMessage v-for="m in messages.filter(Boolean)" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
           <template v-for="ts in terminalSessions" :key="ts.sid + '-' + ts._key">
             <XtermTerminal v-show="ts.isActive" :label="ts.label" :cwd="ts.cwd" :init-command="ts.initCommand" :session-id="ts.sid" :terminal-id="ts.terminalId" @close="onTerminalClose" @terminal-ready="onTerminalReady" @exit="onTerminalExit" />
           </template>
@@ -21,9 +21,7 @@
       </div>
       <DeteccionStateBar v-if="deteccionState.running && activeSessionId && getDeteccionSessionId() === activeSessionId" :deteccion-state="deteccionState" @abort="abortDeteccion" />
     </div>
-    <OpenCodeStickyBar v-if="ocStore.chatSessionId && activeSessionId && Number(activeSessionId) === Number(ocStore.chatSessionId)" :active-session-id="activeSessionId" v-model:oc-input="ocInput" :oc-streaming="ocStreaming" :maximized="ocMaximized" :style="ocMaximized && isOcSessionActive ? { flex: '1 1 0' } : {}" @send="sendToOpencodeFromSticky" @finish="finishOpencode" @toggle-terminal="showAgentTerminal = !showAgentTerminal" @toggle-maximize="toggleOcMaximized" />
-
-    <template v-if="showAgentTerminal && activeSessionId">
+    <template v-if="activeSessionId">
       <OpenCodeAgentTerminal
         v-for="agent in ocAgents"
         :key="agent.id"
@@ -61,12 +59,11 @@ import DeepSeekChatFab from './DeepSeekChatFab.vue'
 import XtermTerminal from './XtermTerminal.vue'
 import OpenCodeAgentTerminal from './OpenCodeAgentTerminal.vue'
 import DeteccionStateBar from './DeteccionStateBar.vue'
-import OpenCodeStickyBar from './OpenCodeStickyBar.vue'
 import ContextMenuChat from './ContextMenuChat.vue'
 import HelpContent from '../help/HelpModal.vue'
 
 export default {
-  components: { ChatMessage, DeepSeekChatFab, XtermTerminal, OpenCodeAgentTerminal, DeteccionStateBar, OpenCodeStickyBar, ContextMenuChat },
+  components: { ChatMessage, DeepSeekChatFab, XtermTerminal, OpenCodeAgentTerminal, DeteccionStateBar, ContextMenuChat },
   setup() {
     const chat = useChatStore()
     const cmdStore = useCommandStore()
@@ -154,7 +151,6 @@ export default {
     })
 
     const input = ref('')
-    const ocInput = ref('')
     const showAgentTerminal = ref(false)
     function clearAgent(agentId) {
       clearAgentTerminalContent(agentId)
@@ -239,7 +235,7 @@ export default {
         const sid = overrideSessionId || chat.activeSessionId
         chat.pushMessage({
           role: 'opencode_info',
-          content: JSON.stringify({ type: 'info', message: 'No hay sesión OpenCode configurada. Ejecutá /dev_opencode_iniciar primero.' }),
+          content: JSON.stringify({ type: 'info', message: 'No hay sesión OpenCode configurada. Seleccioná un proveedor en la configuración primero.' }),
           _key: 'info-' + Date.now(),
         }, sid)
         return
@@ -275,46 +271,6 @@ export default {
         _key: 'abort-' + Date.now(),
       })
       ocStore.messageQueue = []
-    }
-
-    async function sendToOpencodeFromSticky() {
-      const raw = ocInput.value.trim()
-      const targetSessionId = ocStore.chatSessionId || chat.activeSessionId
-      if (!raw || !targetSessionId) return
-      ocInput.value = ''
-      const resolved = await resolveInput(raw)
-      if (resolved.startsWith('/')) {
-        executeCommand(resolved)
-      } else if (ocStreaming.value) {
-        ocStore.messageQueue.push(resolved)
-        chat.pushMessage({
-          role: 'opencode_info',
-          content: JSON.stringify({ type: 'queued', message: `⏳ Mensaje encolado: "${resolved.slice(0, 80)}${resolved.length > 80 ? '...' : ''}"` }),
-          _key: 'queue-' + Date.now(),
-        }, targetSessionId)
-      } else {
-        chat.pushMessage({
-          role: 'opencode_confirmed',
-          content: resolved,
-          _key: 'confirmed-' + Date.now(),
-        }, targetSessionId)
-        chat._saveMessageToDb(targetSessionId, { role: 'opencode_confirmed', content: resolved })
-        sendToOpencode(resolved, targetSessionId)
-      }
-    }
-
-    async function finishOpencode() {
-      try {
-        await fetch('/api/opencode/finish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ ocSessionId: ocStore.ocSessionId, sessionId: chat.activeSessionId }),
-        })
-      } catch (err) {
-        console.error('Error al finalizar OpenCode:', err.message)
-      }
-      ocStore.finish()
     }
 
     function onContextMenu(e, msg) {
@@ -386,7 +342,7 @@ export default {
       const pending = chat.consumeCmdPendingSave(sid)
       if (!pending) return
 
-      const finalContent = output || '(sin salida)'
+      const finalContent = output ?? '(sin salida)'
       if (!pending.ocultarEjecucion) {
         try {
           await fetch('/api/chat/sessions/' + sid + '/save-messages', {
@@ -466,16 +422,14 @@ export default {
 
     watch(activeSessionId, (newId, oldId) => {
       if (oldId) {
-        ocStore.saveCurrentToMap(oldId, { ocInput: ocInput.value, showTerminal: showAgentTerminal.value, terminalContent: terminalContent.value })
+        ocStore.saveCurrentToMap(oldId, { showTerminal: showAgentTerminal.value, terminalContent: terminalContent.value })
         ocStore.setSessionShowTerminal(oldId, showAgentTerminal.value)
-        ocInput.value = ''
       }
       if (newId) {
         ocStore.activateSession(newId)
         ocStreaming.value = chat.getIsOcStreaming(newId)
         streamingConsole.value = false
         streamingApi._syncStreamData(newId)
-        ocInput.value = ocStore.getSessionOcInput(newId)
         showAgentTerminal.value = ocStore.getSessionShowTerminal(newId)
         const savedTerminal = ocStore.getSessionExtra(newId, 'terminalContent')
         if (savedTerminal && !terminalContent.value) {
@@ -518,6 +472,7 @@ export default {
       if (activeSessionId.value) {
         ocStore.restoreActiveAgents(activeSessionId.value)
       }
+      ui.ocMaximized = false
     })
 
     onUnmounted(() => {
@@ -533,20 +488,16 @@ export default {
       return ocStore.chatSessionId && activeSessionId.value && Number(activeSessionId.value) === Number(ocStore.chatSessionId)
     })
 
-    function toggleOcMaximized() {
-      ui.toggleOcMaximized()
-    }
-
     return {
       chat, activeSessionId, messages, streaming, currentChunk, currentThinking,
       sessions, loadingMore, hasMoreMessages, input, gitStore, ocStore,
-      ocInput, ocStreaming, terminalContent, sessionCwd, terminalSessions, onTerminalClose, onTerminalReady, onTerminalExit,
+      ocStreaming, terminalContent, sessionCwd, terminalSessions, onTerminalClose, onTerminalReady, onTerminalExit,
       ticketInfo, ocMaximized, isOcSessionActive,
       deteccionState, abortDeteccion,
       ctxMenu, rawMsgKeys, msgKey,
       messagesContainer,
-      send, handleFabSend, sendToOpencodeFromSticky, finishOpencode,
-      onControlConfirm, toggleOcMaximized,
+      send, handleFabSend,
+      onControlConfirm,
       onContextMenu, closeCtxMenu, toggleRawView, copyPlainText, deleteMessage,
       showAgentTerminal, clearAgent, closeAgent, ocAgents, getAgentTerminalContent,
     }

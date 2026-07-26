@@ -2,6 +2,8 @@ import { WebSocketServer } from 'ws';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import db from '../config/db.js';
+import dbUserSettings from '../config/dbUserSettings.js';
+import dbProjectVariables from '../config/dbProjectVariables.js';
 import memoriaClient from './memoriaClient.js';
 import opencode from './opencode.js';
 
@@ -89,7 +91,7 @@ async function handleSettingSet(payload, cookieToken) {
   if (!key) return { type: 'error', error: 'key requerido' };
   if (value === undefined || value === null) return { type: 'error', error: 'value requerido' };
 
-  await db('user_settings')
+  await dbUserSettings('user_settings')
     .insert({ user_id: session.userId, key, value: String(value) })
     .onConflict(['user_id', 'key'])
     .merge();
@@ -106,7 +108,7 @@ async function handleSettingGet(payload, cookieToken) {
   const { key } = payload;
   if (!key) return { type: 'error', error: 'key requerido' };
 
-  const row = await db('user_settings')
+  const row = await dbUserSettings('user_settings')
     .where({ user_id: session.userId, key })
     .first();
 
@@ -126,7 +128,7 @@ async function handleProyectoVarListar(payload) {
   const proyecto = await db('proyectos').select('id').where({ id: proyectoId }).whereIn('workspace_id', wsIds).first();
   if (!proyecto) return { type: 'error', error: 'Proyecto no encontrado' };
 
-  const dbVariables = await db('project_variables')
+  const dbVariables = await dbProjectVariables('project_variables')
     .select('key', 'value', 'type', 'created_at', 'updated_at')
     .where({ proyecto_id: proyectoId })
     .orderBy('key');
@@ -187,14 +189,14 @@ async function handleProyectoVarCrear(payload) {
   const proyecto = await db('proyectos').select('id').where({ id: proyectoId }).whereIn('workspace_id', wsIds).first();
   if (!proyecto) return { type: 'error', error: 'Proyecto no encontrado' };
 
-  const existing = await db('project_variables').where({ proyecto_id: proyectoId, key }).first();
+  const existing = await dbProjectVariables('project_variables').where({ proyecto_id: proyectoId, key }).first();
   if (existing) return { type: 'error', error: `La variable "${key}" ya existe en este proyecto` };
 
   if (varType === 'memory') {
-    await db('project_variables').insert({ proyecto_id: proyectoId, key, value: '', type: 'memory' });
+    await dbProjectVariables('project_variables').insert({ proyecto_id: proyectoId, key, value: '', type: 'memory' });
     await memoriaClient.set(`proyecto:${proyectoId}`, key, value);
   } else {
-    await db('project_variables').insert({ proyecto_id: proyectoId, key, value: String(value), type: 'db' });
+    await dbProjectVariables('project_variables').insert({ proyecto_id: proyectoId, key, value: String(value), type: 'db' });
   }
 
   return { type: 'proyecto_var_crear_result', success: true };
@@ -215,7 +217,7 @@ async function handleProyectoVarActualizar(payload) {
   const proyecto = await db('proyectos').select('id').where({ id: proyectoId }).whereIn('workspace_id', wsIds).first();
   if (!proyecto) return { type: 'error', error: 'Proyecto no encontrado' };
 
-  const existing = await db('project_variables').select('type').where({ proyecto_id: proyectoId, key }).first();
+  const existing = await dbProjectVariables('project_variables').select('type').where({ proyecto_id: proyectoId, key }).first();
   if (!existing) return { type: 'error', error: `Variable "${key}" no encontrada` };
 
   const newType = type === 'memory' ? 'memory' : 'db';
@@ -223,15 +225,15 @@ async function handleProyectoVarActualizar(payload) {
   if (newType !== existing.type) {
     if (existing.type === 'memory') {
       try { await memoriaClient.del(`proyecto:${proyectoId}`, key); } catch (err) { console.log('[frontendWs] Error al eliminar variable de memoria:', err.message); }
-      await db('project_variables').where({ proyecto_id: proyectoId, key }).update({ value: String(value), type: 'db', updated_at: db.fn.now() });
+      await dbProjectVariables('project_variables').where({ proyecto_id: proyectoId, key }).update({ value: String(value), type: 'db', updated_at: dbProjectVariables.fn.now() });
     } else {
       await memoriaClient.set(`proyecto:${proyectoId}`, key, value);
-      await db('project_variables').where({ proyecto_id: proyectoId, key }).update({ value: '', type: 'memory', updated_at: db.fn.now() });
+      await dbProjectVariables('project_variables').where({ proyecto_id: proyectoId, key }).update({ value: '', type: 'memory', updated_at: dbProjectVariables.fn.now() });
     }
   } else if (existing.type === 'memory') {
     await memoriaClient.set(`proyecto:${proyectoId}`, key, value);
   } else {
-    await db('project_variables').where({ proyecto_id: proyectoId, key }).update({ value: String(value), updated_at: db.fn.now() });
+    await dbProjectVariables('project_variables').where({ proyecto_id: proyectoId, key }).update({ value: String(value), updated_at: dbProjectVariables.fn.now() });
   }
 
   return { type: 'proyecto_var_actualizar_result', success: true };
@@ -251,7 +253,7 @@ async function handleProyectoVarEliminar(payload) {
   const proyecto = await db('proyectos').select('id').where({ id: proyectoId }).whereIn('workspace_id', wsIds).first();
   if (!proyecto) return { type: 'error', error: 'Proyecto no encontrado' };
 
-  const existing = await db('project_variables').select('type').where({ proyecto_id: proyectoId, key }).first();
+  const existing = await dbProjectVariables('project_variables').select('type').where({ proyecto_id: proyectoId, key }).first();
   if (!existing) return { type: 'error', error: `Variable "${key}" no encontrada` };
 
   if (existing.type === 'memory') {
@@ -259,7 +261,7 @@ async function handleProyectoVarEliminar(payload) {
       console.log('[frontendWs] Error al eliminar variable de memoria:', err.message);
     }
   }
-  await db('project_variables').where({ proyecto_id: proyectoId, key }).delete();
+  await dbProjectVariables('project_variables').where({ proyecto_id: proyectoId, key }).delete();
 
   return { type: 'proyecto_var_eliminar_result', success: true };
 }
@@ -281,7 +283,7 @@ async function handleLogin(payload) {
     return { type: 'login_result', success: false, error: 'Credenciales inválidas' };
   }
 
-  const userWs = await db('user_settings').where({ user_id: user.id, key: 'selected_workspace_id' }).first();
+  const userWs = await dbUserSettings('user_settings').where({ user_id: user.id, key: 'selected_workspace_id' }).first();
   let wsIds = [1];
   if (userWs) {
     try {
@@ -392,7 +394,7 @@ async function handleSelectWorkspaces(payload, cookieToken) {
   session.workspaceIds = workspaceIds;
   await saveSession(token, session);
 
-  await db('user_settings')
+  await dbUserSettings('user_settings')
     .insert({ user_id: session.userId, key: 'selected_workspace_id', value: JSON.stringify(workspaceIds) })
     .onConflict(['user_id', 'key'])
     .merge();

@@ -1,15 +1,33 @@
 export async function up(knex) {
   const hasUnique = await knex.schema.hasColumn('proyectos', 'redmine_id');
-  if (hasUnique) {
-    await knex.raw('ALTER TABLE proyectos DROP INDEX proyectos_redmine_id_unique');
-    await knex.raw('ALTER TABLE proyectos ADD UNIQUE KEY proyectos_redmine_id_workspace_id_unique (redmine_id, workspace_id)');
+  if (!hasUnique) return;
+
+  const driver = knex.client.config.client;
+  if (driver === 'better-sqlite3' || driver === 'sqlite') {
+    await knex.schema.alterTable('proyectos', (table) => {
+      table.dropUnique(['redmine_id']);
+      table.unique(['redmine_id', 'workspace_id']);
+    });
+    return;
   }
+
+  await knex.raw('ALTER TABLE proyectos DROP INDEX proyectos_redmine_id_unique');
+  await knex.raw('ALTER TABLE proyectos ADD UNIQUE KEY proyectos_redmine_id_workspace_id_unique (redmine_id, workspace_id)');
 }
 
 export async function down(knex) {
   const hasUnique = await knex.schema.hasColumn('proyectos', 'redmine_id');
-  if (hasUnique) {
-    await knex.raw('ALTER TABLE proyectos DROP INDEX proyectos_redmine_id_workspace_id_unique');
-    await knex.raw('ALTER TABLE proyectos ADD UNIQUE KEY proyectos_redmine_id_unique (redmine_id)');
+  if (!hasUnique) return;
+
+  const driver = knex.client.config.client;
+  if (driver === 'better-sqlite3' || driver === 'sqlite') {
+    await knex.schema.alterTable('proyectos', (table) => {
+      table.dropUnique(['redmine_id', 'workspace_id']);
+      table.unique(['redmine_id']);
+    });
+    return;
   }
+
+  await knex.raw('ALTER TABLE proyectos DROP INDEX proyectos_redmine_id_workspace_id_unique');
+  await knex.raw('ALTER TABLE proyectos ADD UNIQUE KEY proyectos_redmine_id_unique (redmine_id)');
 }

@@ -34,7 +34,7 @@ register({
       }
 
       if (data.success) {
-        return data.stdout || '(sin salida)';
+        return data.stdout ?? '(sin salida)';
       }
       throw new Error(data.stderr || data.error || 'Error desconocido');
     } catch (err) {

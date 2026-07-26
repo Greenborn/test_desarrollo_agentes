@@ -1,24 +1,31 @@
 # ESQUEMA DE BASE DE DATOS
 
-Motores soportados: **MariaDB** (default) o **SQLite** vía **Knex** (query builder).
+Motor: **SQLite** vía **Knex** (query builder) con driver `better-sqlite3`.
 
 Configuración en `.env`:
 ```env
-DB_DRIVER=mariadb        # mariadb (default) | sqlite
-DB_SQLITE_PATH=../data/app.db  # ruta del archivo SQLite (relativa a backend/)
+DB_SQLITE_PATH=../data/app.db                          # datos principales
+DB_COMANDOS_SQLITE_PATH=../data/comandos.db            # comandos personalizados
+DB_CONFIG_SQLITE_PATH=../data/config.db                # settings de workspace
+DB_GLOBAL_SETTINGS_SQLITE_PATH=../data/global_settings.db  # configuraciones globales
+DB_USER_SETTINGS_SQLITE_PATH=../data/user_settings.db       # preferencias de usuario
+DB_WORKSPACE_ENVIRONMENTS_SQLITE_PATH=../data/workspace_environments.db  # ambientes por workspace
+DB_TEMPLATES_SQLITE_PATH=../data/templates.db               # plantillas de texto
+DB_PROJECT_VARIABLES_SQLITE_PATH=../data/project_variables.db  # variables por proyecto
 ```
 
-**MariaDB:** requiere `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
-**SQLite:** solo requiere `DB_DRIVER=sqlite` y opcionalmente `DB_SQLITE_PATH`.
+### Bases de datos
 
-Las migraciones de Knex (carpeta `backend/migrations/`) están diseñadas para MariaDB. Para SQLite se usa un schema builder dedicado en `backend/src/config/sqliteSchema.js` que genera todas las tablas con sintaxis portable (sin `.enu()`, `.alter()` ni `.raw()`).
-
-Para migrar datos existentes de MariaDB a SQLite:
-```bash
-npm run migrate:to-sqlite
-```
-
-Para volver a MariaDB, solo cambiar `DB_DRIVER=mariadb` en `.env`.
+| Archivo | Propósito | Migraciones |
+|---------|-----------|-------------|
+| `data/app.db` | Datos principales del sistema (usuarios, sesiones, proyectos, tickets, etc.) | `backend/migrations/` |
+| `data/comandos.db` | Comandos personalizados de proyecto | `backend/migrations_comandos/` |
+| `data/config.db` | Configuraciones workspace (`settings`) | `backend/migrations_config/` |
+| `data/global_settings.db` | Configuraciones globales del sistema | `backend/migrations_global_settings/` |
+| `data/user_settings.db` | Preferencias de usuario (UI, OpenCode, etc.) | `backend/migrations_user_settings/` |
+| `data/workspace_environments.db` | Ambientes de despliegue por workspace | `backend/migrations_workspace_environments/` |
+| `data/templates.db` | Plantillas de texto reutilizables | `backend/migrations_templates/` |
+| `data/project_variables.db` | Variables por proyecto | `backend/migrations_project_variables/` |
 
 ---
 
@@ -78,6 +85,9 @@ Para volver a MariaDB, solo cambiar `DB_DRIVER=mariadb` en `.env`.
 ---
 
 ## 5. `settings`
+
+> **Nota:** Esta tabla reside en una base de datos SQLite separada (`config.db`), no en `app.db`.  
+> Ver [Base de datos de configuración](#base-de-datos-de-configuración-configdb).
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -165,6 +175,9 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 | `casos_prueba_list_width_full` | `'300'` | Ancho de la lista de casos de prueba cuando el panel derecho ocupa todo el ancho |
 | `casos_prueba_middle_width` | `'180'` | Ancho de la columna media de casos de prueba (modo normal) |
 | `casos_prueba_middle_width_full` | `'300'` | Ancho de la columna media de casos de prueba cuando el panel derecho ocupa todo el ancho |
+| `sidebar_chat_tab_order` | `'["chats","servicios","archived"]'` | Orden de pestañas del sidebar izquierdo (array JSON de IDs) |
+| `sidebar_right_tab_order` | `'["archivos","comentarios","terminales","variables","comandos","documentacion","capturas","skills"]'` | Orden de pestañas del panel derecho (array JSON de IDs) |
+| `dev_panel_tab_order` | `'["instancias","repositorio","tickets","proyectos","console_logs","events","network_logs"]'` | Orden de pestañas del panel inferior (array JSON de IDs) |
 
 ---
 
@@ -282,7 +295,7 @@ Las variables `type='memory'` almacenan su valor real en el servicio `api_memori
 - `opencode_mode` — Último modo (ej: `'Build'`)
 - `opencode_temperature` — Última temperatura (ej: `'0.7'`)
 
-Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar` mediante `POST /api/opencode/select` con `sessionId`. Al iniciar una nueva sesión, se cargan como defaults del proyecto sobreescribiendo los valores globales de `user_settings`.
+Estas keys se guardan automáticamente mediante `POST /api/opencode/select` con `sessionId`. Al iniciar una nueva sesión, se cargan como defaults del proyecto sobreescribiendo los valores globales de `user_settings`.
 
 ---
 
@@ -431,13 +444,17 @@ Estas keys se guardan automáticamente al cambiar valores en `OpenCodeStickyBar`
 
 ## 22. `comandos_personalizados_proyectos`
 
+> **Nota:** Esta tabla reside en una base de datos SQLite separada (`comandos.db`), no en `app.db`.  
+> Ver [Base de datos de comandos](#base-de-datos-de-comandos-comandosdb).
+
 | Columna | Tipo | Restricciones |
 |---------|------|---------------|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
 | `label` | VARCHAR(255) | NOT NULL — nombre visible del comando |
 | `descripcion` | TEXT | nullable — descripción opcional |
-| `id_proyecto` | VARCHAR(255) | NOT NULL — FK lógica → `proyectos(id)` |
+| `id_proyecto` | VARCHAR(255) | NOT NULL — FK lógica → `proyectos(id)` (en `app.db`) |
 | `comando` | VARCHAR(512) | NOT NULL — comando shell a ejecutar |
+| `ocultar_ejecucion` | BOOLEAN | NOT NULL, DEFAULT `false` — si es `true`, oculta la ejecución en la UI |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 
@@ -533,7 +550,7 @@ El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos
 | `playwright_console_logs` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 | `playwright_event_recordings` | `chat_session_id` | `chat_sessions` | `id` | SET NULL |
 | `documentacion_escaneo` | `session_id` | `chat_sessions` | `id` | CASCADE |
-| `comandos_personalizados_proyectos` | `id_proyecto` | `proyectos` | `id` | — (FK lógica) |
+| `comandos_personalizados_proyectos` ⚡ | `id_proyecto` | `proyectos` | `id` | — (FK lógica, cross-database) |
 | `documentacion_archivo` | `escaneo_id` | `documentacion_escaneo` | `id` | CASCADE |
 | `archivos` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 | `capturas_metadata` | `archivo_id` | `archivos` | `id` | CASCADE |

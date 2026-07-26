@@ -457,14 +457,9 @@ async function importarIssuesDeRedmine(proyecto, token, url, workspaceId) {
         redmine_closed_on: toDateTime(issue.closed_on),
       };
 
-      const existing = await db('tickets').where({ redmine_id: issue.id }).first();
+      const existing = await db('tickets').where({ redmine_id: issue.id, workspace_id: workspaceId || 1 }).first();
       if (existing) {
-        await db('tickets').where({ redmine_id: issue.id }).update(ticketData);
-        if (existing.workspace_id !== ticketData.workspace_id) {
-          await db('chat_sessions')
-            .where({ id_ticket_redmine: issue.id })
-            .update({ workspace_id: ticketData.workspace_id, updated_at: db.fn.now() });
-        }
+        await db('tickets').where({ redmine_id: issue.id, workspace_id: workspaceId || 1 }).update(ticketData);
         actualizados++;
       } else {
         await db('tickets').insert(ticketData);
@@ -619,7 +614,8 @@ router.get('/comments', async (req, res) => {
     if (wsId) {
       query.where({ workspace_id: wsId });
     } else if (req.query.ticket_redmine_id) {
-      const ticket = await db('tickets').where({ redmine_id: req.query.ticket_redmine_id }).select('workspace_id').first();
+      const wsIds = req.session.workspaceIds || [1];
+      const ticket = await db('tickets').where({ redmine_id: req.query.ticket_redmine_id }).whereIn('workspace_id', wsIds).select('workspace_id').first();
       if (ticket?.workspace_id) {
         query.where({ workspace_id: ticket.workspace_id });
       }

@@ -73,7 +73,7 @@ async function _ejecutarComandoSimple(comandoId, sessionId) {
     }
   }
 
-  return { output: fullOutput || '(sin salida)', ocultarEjecucion }
+  return { output: fullOutput ?? '(sin salida)', ocultarEjecucion }
 }
 
 register({

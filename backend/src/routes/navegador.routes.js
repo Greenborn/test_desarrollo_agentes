@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import playwrightManager from '../services/playwrightManager.js';
 import db from '../config/db.js';
+import dbConfig from '../config/dbConfig.js';
 import { STORAGE_DIR, ensureStorageDir } from './archivos.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -98,13 +99,13 @@ router.post('/command', async (req, res) => {
       try {
         const wsIds = req.session.workspaceIds || [1];
         const wsId = wsIds[0] || 1;
-        const stealthRow = await db('settings').where({ workspace_id: wsId, setting_key: 'browser_stealth_enabled' }).first();
+        const stealthRow = await dbConfig('settings').where({ workspace_id: wsId, setting_key: 'browser_stealth_enabled' }).first();
         if (stealthRow && (stealthRow.setting_value === '1' || stealthRow.setting_value === 'true')) {
           pwParametros.stealth = true;
         }
         const navegadorParam = parametros?.navegador || 'chrome';
         const uaKey = navegadorParam === 'firefox' ? 'browser_user_agent_firefox' : 'browser_user_agent_chrome';
-        const uaRow = await db('settings').where({ workspace_id: wsId, setting_key: uaKey }).first();
+        const uaRow = await dbConfig('settings').where({ workspace_id: wsId, setting_key: uaKey }).first();
         if (uaRow && uaRow.setting_value) {
           pwParametros.user_agent = uaRow.setting_value;
         }

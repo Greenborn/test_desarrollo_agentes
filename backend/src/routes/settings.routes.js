@@ -4,6 +4,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import db from '../config/db.js';
+import dbConfig from '../config/dbConfig.js';
+import dbGlobalSettings from '../config/dbGlobalSettings.js';
+import dbWorkspaceEnvironments from '../config/dbWorkspaceEnvironments.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,7 +27,7 @@ router.get('/', async (req, res) => {
   try {
     const wsIds = req.session.workspaceIds || [1];
     const wsId = req.query.workspace_id ? parseInt(req.query.workspace_id, 10) : wsIds[0] || 1;
-    const rows = await db('settings').where({ workspace_id: wsId }).select('setting_key', 'setting_value', 'encrypted');
+    const rows = await dbConfig('settings').where({ workspace_id: wsId }).select('setting_key', 'setting_value', 'encrypted');
     const keys = {};
     for (const row of rows) {
       if (row.setting_key === 'deepseek_key' && row.setting_value) {
@@ -148,7 +151,7 @@ router.get('/', async (req, res) => {
 router.get('/global', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const rows = await db('global_settings').select('setting_key', 'setting_value');
+    const rows = await dbGlobalSettings('global_settings').select('setting_key', 'setting_value');
     const keys = {};
     for (const row of rows) {
       keys[row.setting_key] = row.setting_value;
@@ -175,7 +178,7 @@ router.post('/global', async (req, res) => {
     if (!key) {
       return res.status(400).json({ error: 'key es requerido' });
     }
-    await db('global_settings')
+    await dbGlobalSettings('global_settings')
       .insert({ setting_key: key, setting_value: String(value) })
       .onConflict('setting_key')
       .merge();
@@ -200,7 +203,7 @@ router.post('/', async (req, res) => {
       encrypted = true;
     }
 
-    await db('settings')
+    await dbConfig('settings')
       .insert({ workspace_id: wsId, setting_key: key, setting_value: toStore, encrypted })
       .onConflict(['workspace_id', 'setting_key'])
       .merge();
@@ -219,7 +222,7 @@ router.get('/export-all', async (req, res) => {
     const configuracionGeneral = {};
 
     for (const ws of workspaces) {
-      const settingsRows = await db('settings')
+      const settingsRows = await dbConfig('settings')
         .where({ workspace_id: ws.id })
         .select('setting_key', 'setting_value', 'encrypted');
 
@@ -240,7 +243,7 @@ router.get('/export-all', async (req, res) => {
         }
       }
 
-      const environments = await db('workspace_environments')
+      const environments = await dbWorkspaceEnvironments('workspace_environments')
         .where({ workspace_id: ws.id })
         .select('name', 'branch', 'description')
         .orderBy('id');
@@ -257,7 +260,7 @@ router.get('/export-all', async (req, res) => {
       configuracionGeneral[ws.name] = wsData;
     }
 
-    const globalRows = await db('global_settings').select('setting_key', 'setting_value');
+    const globalRows = await dbGlobalSettings('global_settings').select('setting_key', 'setting_value');
     const globalKeys = {};
     for (const row of globalRows) {
       globalKeys[row.setting_key] = row.setting_value;
@@ -285,7 +288,7 @@ router.post('/import-all', async (req, res) => {
 
     if (configuracion_general && typeof configuracion_general === 'object') {
       for (const [key, value] of Object.entries(configuracion_general)) {
-        await db('global_settings')
+        await dbGlobalSettings('global_settings')
           .insert({ setting_key: key, setting_value: String(value) })
           .onConflict('setting_key')
           .merge();
@@ -314,7 +317,7 @@ router.post('/import-all', async (req, res) => {
           toStore = JSON.stringify(value);
         }
 
-        await db('settings')
+        await dbConfig('settings')
           .insert({ workspace_id: ws.id, setting_key: key, setting_value: toStore, encrypted })
           .onConflict(['workspace_id', 'setting_key'])
           .merge();
@@ -323,7 +326,7 @@ router.post('/import-all', async (req, res) => {
       if (Array.isArray(ambientes)) {
         for (const env of ambientes) {
           if (!env.nombre || !env.rama) continue;
-          await db('workspace_environments')
+          await dbWorkspaceEnvironments('workspace_environments')
             .insert({
               workspace_id: ws.id,
               name: env.nombre,
@@ -357,7 +360,7 @@ router.post('/clone-skill-repo', async (req, res) => {
       return res.status(404).json({ error: 'Workspace no encontrado' });
     }
 
-    const setting = await db('settings')
+    const setting = await dbConfig('settings')
       .where({ workspace_id: wsId, setting_key: 'skill_repository_url' })
       .first();
 

@@ -7,3 +7,4 @@ dist/
 uploads/data/
 *.db
 *.sql
+.opencode/skills/

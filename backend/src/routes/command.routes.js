@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync, spawn } from 'child_process';
 import db from '../config/db.js';
+import dbWorkspaceEnvironments from '../config/dbWorkspaceEnvironments.js';
 
 const router = Router();
 
@@ -135,6 +136,10 @@ function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeByt
   const stat = fs.statSync(dirPath)
   const node = { name, type: stat.isDirectory() ? 'directory' : 'file', path: dirPath }
   if (stat.isDirectory()) {
+    if (maxDepth > 0 && currentDepth >= maxDepth) {
+      node.children = []
+      return node
+    }
     let patterns = parentPatterns
     if (useGitignore) {
       patterns = parentPatterns.concat(loadGitignore(dirPath))
@@ -149,19 +154,15 @@ function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeByt
           return !matchesGitignore(e, dirPath, patterns)
         })
       }
-      if (maxDepth > 0 && currentDepth >= maxDepth) {
-        node.children = []
-      } else {
-        node.children = filtered.map((e) => {
-          const fullPath = path.join(dirPath, e.name)
-          try {
-            return buildTree(fullPath, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth + 1)
-          } catch (err) {
-            console.log(`Error al procesar ${fullPath}: ${err.message}`)
-            return { name: e.name, type: 'error', error: err.message, path: fullPath }
-          }
-        })
-      }
+      node.children = filtered.map((e) => {
+        const fullPath = path.join(dirPath, e.name)
+        try {
+          return buildTree(fullPath, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth + 1)
+        } catch (err) {
+          console.log(`Error al procesar ${fullPath}: ${err.message}`)
+          return { name: e.name, type: 'error', error: err.message, path: fullPath }
+        }
+      })
     } catch (err) {
       console.log(`Error al leer directorio ${dirPath}: ${err.message}`)
       node.children = []
@@ -311,9 +312,9 @@ router.post('/git', async (req, res) => {
         env: { ...process.env, GIT_PAGER: 'cat', PAGER: 'cat' },
       }
       if (commitMessage && command.startsWith('commit')) {
-        stdout = execSync(`git ${command} -F -`, { ...execOptions, input: commitMessage })
+        stdout = execSync(`git ${command} -F - 2>&1`, { ...execOptions, input: commitMessage })
       } else {
-        stdout = execSync(`git ${command}`, execOptions)
+        stdout = execSync(`git ${command} 2>&1`, execOptions)
       }
       success = true;
     } catch (err) {
@@ -565,7 +566,7 @@ router.post('/git-merge', async (req, res) => {
 
     const wsIds = req.session.workspaceIds || [1];
 
-    const env = await db('workspace_environments')
+    const env = await dbWorkspaceEnvironments('workspace_environments')
       .whereIn('workspace_id', wsIds)
       .where({ name: ambienteName })
       .first();
@@ -741,7 +742,7 @@ router.post('/git-diff-branches', async (req, res) => {
     const wsId = chatSession?.workspace_id || 1;
     const wsIds = [wsId];
 
-    const source = await db('workspace_environments')
+    const source = await dbWorkspaceEnvironments('workspace_environments')
       .whereIn('workspace_id', wsIds)
       .where({ name: sourceEnv })
       .first();
@@ -749,7 +750,7 @@ router.post('/git-diff-branches', async (req, res) => {
       return res.status(400).json({ success: false, error: `Ambiente "${sourceEnv}" no encontrado` });
     }
 
-    const target = await db('workspace_environments')
+    const target = await dbWorkspaceEnvironments('workspace_environments')
       .whereIn('workspace_id', wsIds)
       .where({ name: targetEnv })
       .first();

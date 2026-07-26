@@ -597,14 +597,11 @@ Los mensajes relacionados con OpenCode usan roles especiales en `chat_messages`:
 4. El backend consulta `GET /config/providers` y devuelve los proveedores disponibles.
 5. El backend lee `user_settings` + `project_variables` y devuelve las preferencias guardadas.
 6. El frontend aplica `saved*` a `selected*` y vincula el `chatSessionId`.
-7. Aparece `OpenCodeStickyBar` en la parte inferior con los campos precargados.
-8. Si no hay proveedor guardado, se muestra el selector de proveedor dentro del StickyBar.
 
 ### Envío de prompt
 
-1. Usuario escribe un mensaje en el `OpenCodeStickyBar` (textarea de 5 filas con auto-resize).
-2. Opcional: activa el switch "Usar descripción del ticket" para precargar la descripción.
-3. El frontend llama a `useOpencodeStreaming().opencodeStreamPrompt()` (o variante).
+1. El usuario envía un mensaje desde el input principal del chat o desde `ChatOpencodeForm`.
+2. El frontend llama a `useOpencodeStreaming().opencodeStreamPrompt()` (o variante).
 4. Se crea un mensaje temporal `opencode_stream` en el chat.
 5. Se llama a `opencodeStore.streamPrompt()` → `POST /api/opencode/send`.
 5. El backend:
@@ -671,7 +668,6 @@ sessionStorage.setItem('oc_opencode_state', JSON.stringify({
 
 | Componente | Archivo | Propósito |
 |---|---|---|
-| `OpenCodeStickyBar` | `frontend/src/components/chat/OpenCodeStickyBar.vue` | Barra inferior con selector de proveedor (si no hay), modelo/pensamiento/temperatura/modo, switch "Usar descripción del ticket" y textarea (5 filas, auto-resize). Incluye autocompletado de variables `{{...}}`. Se activa al ejecutar `/dev_opencode_iniciar`. |
 | `OpenCodeStreamDisplay` | `frontend/src/components/chat/OpenCodeStreamDisplay.vue` | Visualización del streaming en vivo (thinking colapsable + respuesta). |
 | `ChatOpencodeForm` | `frontend/src/components/chat-controls/ChatOpencodeForm.vue` | Formulario completo con selector de modelo, thinking, temperatura, modo y opción de usar descripción del ticket. Usado en comandos que requieren wizard paso a paso. |
 | `VariableAutocomplete` | `frontend/src/components/chat/VariableAutocomplete.vue` | Autocompletado de variables `{{...}}` usando datos reales del proyecto. |

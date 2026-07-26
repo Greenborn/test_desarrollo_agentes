@@ -386,6 +386,18 @@ export function useOpencodeStreaming() {
   }
 
   async function opencodeStreamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature) {
+    if (sessionId) {
+      const totalSlots = chat.getTotalConcurrentSlots(sessionId)
+      if (totalSlots >= chat.maxTerminalsLimit.value) {
+        chat.pushMessage({
+          role: 'opencode_info',
+          content: JSON.stringify({ type: 'info', message: `Límite de agentes alcanzado (${chat.maxTerminalsLimit.value}). Cerrá un agente existente antes de abrir uno nuevo.` }),
+          _key: 'info-' + Date.now(),
+        }, sessionId)
+        return
+      }
+    }
+
     const sd = _ensureStreamData(sessionId)
     sd.text = ''
     sd.thinking = ''
@@ -400,23 +412,6 @@ export function useOpencodeStreaming() {
     }
     if (sessionId) chat.setSessionStatus(sessionId, 'executing')
     chat.setOcStreaming(sessionId, true)
-
-    const totalSlots = chat.getTotalConcurrentSlots(sessionId)
-    if (totalSlots >= chat.maxTerminalsLimit.value) {
-      const agents = ocStore.getAgents(sessionId)
-      if (agents.length > 0) {
-        const oldest = agents.reduce((a, b) => a.createdAt < b.createdAt ? a : b)
-        if (oldest.ocSessionId) {
-          fetch('/api/opencode/close-agent', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ ocSessionId: oldest.ocSessionId, sessionId }),
-          }).catch(err => console.error('Error al cerrar agente más antiguo:', err.message))
-        }
-        ocStore.removeAgent(sessionId, oldest.id)
-      }
-    }
 
     const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
     streamMsg._key = 'stream-' + Date.now()

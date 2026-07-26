@@ -9,9 +9,9 @@ Orquestador de agentes IA. En su fase inicial, ofrece un chat con un agente de p
 | Capa | Tecnología | Versión |
 |---|---|---|
 | Backend | Node.js + Express | 21+ / 4.21+ |
-| Base de datos | MariaDB | 10+ |
+| Base de datos | SQLite | — |
 | Query builder | Knex | 3+ |
-| Driver BD | mysql2 | 3+ |
+| Driver BD | better-sqlite3 | 11+ |
 | Frontend | Vue 3 + Vite | 3.5+ / 6+ |
 | Estilos | Bootstrap | 5.3+ |
 | Comunicación | HTTP REST + WebSocket (ws) | 8+ |
@@ -31,7 +31,7 @@ Orquestador de agentes IA. En su fase inicial, ofrece un chat con un agente de p
                             │          │          │
                        [Auth]     [Chat]    [Settings]
                             │          │
-                       [MariaDB]  [DeepSeek API]
+                        [SQLite]  [DeepSeek API]
 ```
 
 - Frontend SPA se comunica **exclusivamente** por Socket.IO (sin HTTP REST)
@@ -52,7 +52,7 @@ Orquestador de agentes IA. En su fase inicial, ofrece un chat con un agente de p
 │   ├── package.json
 │   ├── knexfile.js              # Configuración Knex
 │   ├── scripts/
-│   │   └── setup-db.js          # Crea DB + usuario en MariaDB
+
 │   ├── migrations/              # Migraciones Knex
 │   │   ├── 001_create_users.js
 │   │   ├── 002_create_chat_sessions.js
@@ -266,7 +266,6 @@ VITE_BACKEND_URL=http://localhost:4000
 
 ```bash
 cd backend
-npm run setup-db        # Crear DB + usuario (requiere MariaDB corriendo, ejecutar con sudo)
 npm run migrate         # Ejecutar migraciones
 npm run seed            # Seed admin/admin
 npm run dev             # Servidor con --watch (puerto 4000)

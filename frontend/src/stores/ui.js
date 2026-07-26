@@ -16,6 +16,9 @@ export const useUiStore = defineStore('ui', () => {
   const sidebarChatTab = ref('chats')
   const sidebarRightTab = ref('comentarios')
   const devPanelTab = ref('instancias')
+  const sidebarChatTabOrder = ref(null)
+  const sidebarRightTabOrder = ref(null)
+  const devPanelTabOrder = ref(null)
   const ocMaximized = ref(false)
   const projectFilterEnabled = ref(true)
 
@@ -73,6 +76,9 @@ export const useUiStore = defineStore('ui', () => {
         settingSet('sidebar_chat_tab', sidebarChatTab.value),
         settingSet('sidebar_right_tab', sidebarRightTab.value),
         settingSet('dev_panel_tab', devPanelTab.value),
+        settingSet('sidebar_chat_tab_order', JSON.stringify(sidebarChatTabOrder.value)),
+        settingSet('sidebar_right_tab_order', JSON.stringify(sidebarRightTabOrder.value)),
+        settingSet('dev_panel_tab_order', JSON.stringify(devPanelTabOrder.value)),
         settingSet('oc_maximized', String(ocMaximized.value)),
         settingSet('project_filter_enabled', String(projectFilterEnabled.value)),
       ])
@@ -156,6 +162,18 @@ export const useUiStore = defineStore('ui', () => {
       if (devPanelTabData.value !== null) {
         devPanelTab.value = devPanelTabData.value
       }
+      const sidebarChatTabOrderData = await settingGet('sidebar_chat_tab_order')
+      if (sidebarChatTabOrderData.value !== null) {
+        try { sidebarChatTabOrder.value = JSON.parse(sidebarChatTabOrderData.value) } catch (e) { console.error('Error parsing sidebar_chat_tab_order:', e) }
+      }
+      const sidebarRightTabOrderData = await settingGet('sidebar_right_tab_order')
+      if (sidebarRightTabOrderData.value !== null) {
+        try { sidebarRightTabOrder.value = JSON.parse(sidebarRightTabOrderData.value) } catch (e) { console.error('Error parsing sidebar_right_tab_order:', e) }
+      }
+      const devPanelTabOrderData = await settingGet('dev_panel_tab_order')
+      if (devPanelTabOrderData.value !== null) {
+        try { devPanelTabOrder.value = JSON.parse(devPanelTabOrderData.value) } catch (e) { console.error('Error parsing dev_panel_tab_order:', e) }
+      }
       if (ocMaximizedData.value !== null) {
         ocMaximized.value = ocMaximizedData.value === 'true'
       }
@@ -184,9 +202,12 @@ export const useUiStore = defineStore('ui', () => {
     sidebarChatTab.value = 'chats'
     sidebarRightTab.value = 'comentarios'
     devPanelTab.value = 'instancias'
+    sidebarChatTabOrder.value = null
+    sidebarRightTabOrder.value = null
+    devPanelTabOrder.value = null
     ocMaximized.value = false
     projectFilterEnabled.value = true
   }
 
-  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, rightPanelCollapsed, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarWidthPct, sidebarChatTab, sidebarRightTab, devPanelTab, ocMaximized, projectFilterEnabled, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setSidebarWidthPct, toggleOcMaximized, saveLayoutPrefs, loadLayoutPrefs, reset }
+  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, rightPanelCollapsed, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarWidthPct, sidebarChatTab, sidebarRightTab, devPanelTab, sidebarChatTabOrder, sidebarRightTabOrder, devPanelTabOrder, ocMaximized, projectFilterEnabled, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setSidebarWidthPct, toggleOcMaximized, saveLayoutPrefs, loadLayoutPrefs, reset }
 })
