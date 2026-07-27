@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getRedmineToken, getRedmineUrl } from '../services/redmine.js';
 import db from '../config/db.js';
 import dbRedmineComentarios from '../config/dbRedmineComentarios.js';
+import dbRedmineData from '../config/dbRedmineData.js';
 
 const router = Router();
 
@@ -238,10 +239,10 @@ router.post('/proyectos/import-all', async (req, res) => {
           continue;
         }
 
-        const existing = await db('proyectos').where({ redmine_id: p.id, workspace_id: wsId }).first();
+        const existing = await dbRedmineData('proyectos').where({ redmine_id: p.id, workspace_id: wsId }).first();
 
         if (existing) {
-          await db('proyectos').where({ redmine_id: p.id, workspace_id: wsId }).update({
+          await dbRedmineData('proyectos').where({ redmine_id: p.id, workspace_id: wsId }).update({
             descripcion: p.description || '',
             redmine_status: p.status || null,
             redmine_updated_on: toDateTime(p.updated_on),
@@ -258,7 +259,7 @@ router.post('/proyectos/import-all', async (req, res) => {
           continue;
         }
 
-        await db('proyectos').insert({
+        await dbRedmineData('proyectos').insert({
           id: proyectoId,
           descripcion: p.description || '',
           redmine_id: p.id,
@@ -311,7 +312,7 @@ router.post('/proyectos/import', async (req, res) => {
     const session = await _getWsId(req);
     const wsId = session?.workspace_id || wsIds[0] || 1;
 
-    const existing = await db('proyectos').where({ redmine_id: id, workspace_id: wsId }).first();
+    const existing = await dbRedmineData('proyectos').where({ redmine_id: id, workspace_id: wsId }).first();
 
     const data = {
       descripcion: description || '',
@@ -325,11 +326,11 @@ router.post('/proyectos/import', async (req, res) => {
     };
 
     if (existing) {
-      await db('proyectos').where({ redmine_id: id, workspace_id: wsId }).update(data);
+      await dbRedmineData('proyectos').where({ redmine_id: id, workspace_id: wsId }).update(data);
       res.json({ success: true, proyectoId: existing.id, action: 'updated' });
     } else {
       data.id = proyectoId;
-      await db('proyectos').insert(data);
+      await dbRedmineData('proyectos').insert(data);
       res.json({ success: true, proyectoId, action: 'imported' });
     }
   } catch (err) {
@@ -344,7 +345,7 @@ router.get('/proyectos/:proyectoId/tickets', async (req, res) => {
   try {
     const wsIds = req.session.workspaceIds || [1];
 
-    const proyecto = await db('proyectos').where({ id: req.params.proyectoId }).whereIn('workspace_id', wsIds).first();
+    const proyecto = await dbRedmineData('proyectos').where({ id: req.params.proyectoId }).whereIn('workspace_id', wsIds).first();
 
     if (!proyecto) {
       res.json({ success: false, message: `Proyecto "${req.params.proyectoId}" no encontrado en la base local para el workspace activo.` });
@@ -458,12 +459,12 @@ async function importarIssuesDeRedmine(proyecto, token, url, workspaceId) {
         redmine_closed_on: toDateTime(issue.closed_on),
       };
 
-      const existing = await db('tickets').where({ redmine_id: issue.id, workspace_id: workspaceId || 1 }).first();
+      const existing = await dbRedmineData('tickets').where({ redmine_id: issue.id, workspace_id: workspaceId || 1 }).first();
       if (existing) {
-        await db('tickets').where({ redmine_id: issue.id, workspace_id: workspaceId || 1 }).update(ticketData);
+        await dbRedmineData('tickets').where({ redmine_id: issue.id, workspace_id: workspaceId || 1 }).update(ticketData);
         actualizados++;
       } else {
-        await db('tickets').insert(ticketData);
+        await dbRedmineData('tickets').insert(ticketData);
         importados++;
       }
     } catch (err) {
@@ -479,7 +480,7 @@ router.post('/proyectos/:proyectoId/importar-tickets', async (req, res) => {
 
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const proyecto = await db('proyectos').where({ id: req.params.proyectoId }).whereIn('workspace_id', wsIds).first();
+    const proyecto = await dbRedmineData('proyectos').where({ id: req.params.proyectoId }).whereIn('workspace_id', wsIds).first();
 
     if (!proyecto) {
       res.json({ success: false, message: `Proyecto "${req.params.proyectoId}" no encontrado en la base local para el workspace activo.` });
@@ -523,7 +524,7 @@ router.post('/proyectos/importar-tickets-all', async (req, res) => {
       return;
     }
 
-    const proyectos = await db('proyectos').whereIn('workspace_id', wsIds).whereNotNull('redmine_id').orderBy('id');
+    const proyectos = await dbRedmineData('proyectos').whereIn('workspace_id', wsIds).whereNotNull('redmine_id').orderBy('id');
 
     if (proyectos.length === 0) {
       res.json({ success: false, message: 'No hay proyectos con ID de Redmine asociado.' });
@@ -616,7 +617,7 @@ router.get('/comments', async (req, res) => {
       query.where({ workspace_id: wsId });
     } else if (req.query.ticket_redmine_id) {
       const wsIds = req.session.workspaceIds || [1];
-      const ticket = await db('tickets').where({ redmine_id: req.query.ticket_redmine_id }).whereIn('workspace_id', wsIds).select('workspace_id').first();
+      const ticket = await dbRedmineData('tickets').where({ redmine_id: req.query.ticket_redmine_id }).whereIn('workspace_id', wsIds).select('workspace_id').first();
       if (ticket?.workspace_id) {
         query.where({ workspace_id: ticket.workspace_id });
       }

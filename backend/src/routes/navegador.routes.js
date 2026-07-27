@@ -6,6 +6,8 @@ import crypto from 'crypto';
 import playwrightManager from '../services/playwrightManager.js';
 import db from '../config/db.js';
 import dbConfig from '../config/dbConfig.js';
+import dbChatMessages from '../config/dbChatMessages.js';
+import dbFiles from '../config/dbFiles.js';
 import { STORAGE_DIR, ensureStorageDir } from './archivos.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,8 +25,7 @@ function authGuard(req, res) {
 async function saveToChat(sessionId, role, content) {
   if (!sessionId) return;
   try {
-    const db = (await import('../config/db.js')).default;
-    await db('chat_messages').insert({
+    await dbChatMessages('chat_messages').insert({
       session_id: sessionId,
       role,
       content: typeof content === 'string' ? content : JSON.stringify(content),
@@ -199,7 +200,7 @@ router.post('/capturar-pantalla', async (req, res) => {
     const filePath = path.join(STORAGE_DIR, nombreStorage);
     fs.writeFileSync(filePath, imageBuffer);
 
-    const [archivoId] = await db('archivos').insert({
+    const [archivoId] = await dbFiles('archivos').insert({
       proyecto_id: session.proyecto_id,
       chat_session_id: sessionId,
       nombre_original: `screenshot_${new Date().toISOString().slice(0, 19).replace(/[^0-9]/g, '_')}.png`,
@@ -208,7 +209,7 @@ router.post('/capturar-pantalla', async (req, res) => {
       tamano: imageBuffer.length,
     });
 
-    const archivo = await db('archivos').where({ id: archivoId }).first();
+    const archivo = await dbFiles('archivos').where({ id: archivoId }).first();
 
     // Capturar HTML de la página y guardarlo como metadata
     try {
@@ -219,7 +220,7 @@ router.post('/capturar-pantalla', async (req, res) => {
       });
       const htmlData = await htmlRes.json();
       if (!htmlData.error && htmlData.html) {
-        await db('capturas_metadata').insert({
+        await dbFiles('capturas_metadata').insert({
           archivo_id: archivoId,
           key: 'page_html',
           value: htmlData.html,
@@ -238,7 +239,7 @@ router.post('/capturar-pantalla', async (req, res) => {
       });
       const inputsData = await inputsRes.json();
       if (!inputsData.error && inputsData.controls) {
-        await db('capturas_metadata').insert({
+        await dbFiles('capturas_metadata').insert({
           archivo_id: archivoId,
           key: 'detected_inputs',
           value: JSON.stringify({

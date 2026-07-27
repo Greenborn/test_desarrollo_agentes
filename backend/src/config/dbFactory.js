@@ -17,6 +17,12 @@ export function createDb(dbName, envVarName) {
     client: 'better-sqlite3',
     connection: { filename: dbPath },
     useNullAsDefault: true,
+    pool: {
+      afterCreate: (conn, cb) => {
+        conn.pragma('foreign_keys = OFF');
+        cb();
+      },
+    },
     migrations: {
       directory: migrationsDir,
       extension: 'js',

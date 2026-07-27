@@ -1,6 +1,7 @@
 import db from '../config/db.js';
 import dbConfig from '../config/dbConfig.js';
 import { decrypt } from './crypto.js';
+import dbRedmineData from '../config/dbRedmineData.js';
 
 export async function getRedmineToken(workspaceId) {
   try {
@@ -60,7 +61,7 @@ export async function syncRedmineTicket(redmineId, wsId, proyectoId) {
   if (!proyectoId) {
     const redmineProjectId = issue.project?.id;
     if (redmineProjectId) {
-      const localProyecto = await db('proyectos')
+      const localProyecto = await dbRedmineData('proyectos')
         .where({ redmine_id: redmineProjectId, workspace_id: wsId })
         .select('id')
         .first();
@@ -96,9 +97,9 @@ export async function syncRedmineTicket(redmineId, wsId, proyectoId) {
     redmine_closed_on: toDateTime(issue.closed_on),
   };
 
-  const oldWsId = (await db('tickets').where({ redmine_id: issue.id }).first())?.workspace_id;
-  await db('tickets').where({ redmine_id: issue.id }).del();
-  await db('tickets').insert(ticketData);
+  const oldWsId = (await dbRedmineData('tickets').where({ redmine_id: issue.id }).first())?.workspace_id;
+  await dbRedmineData('tickets').where({ redmine_id: issue.id }).del();
+  await dbRedmineData('tickets').insert(ticketData);
   if (oldWsId && oldWsId !== ticketData.workspace_id) {
     await db('chat_sessions')
       .where({ id_ticket_redmine: issue.id })

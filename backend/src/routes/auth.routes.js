@@ -6,6 +6,13 @@ import memoriaClient from '../services/memoriaClient.js';
 
 const router = Router();
 
+async function filterValidWorkspaceIds(wsIds) {
+  if (!wsIds || !Array.isArray(wsIds) || wsIds.length === 0) return [1];
+  const existing = new Set((await db('workspaces').select('id')).map(w => w.id));
+  const valid = wsIds.filter(id => existing.has(id));
+  return valid.length > 0 ? valid : [1];
+}
+
 function getUser(req) {
   const userId = req.session?.userId;
   if (!userId) return null;
@@ -41,11 +48,11 @@ router.post('/login', async (req, res) => {
         wsIds = [parseInt(userWs.value, 10) || 1];
       }
     }
-    req.session.workspaceIds = wsIds;
+    req.session.workspaceIds = await filterValidWorkspaceIds(wsIds);
     await new Promise((resolve) => req.session.save(resolve));
     res.json({
       success: true,
-      user: { id: user.id, username: user.username, role: user.role, workspaceIds: wsIds },
+      user: { id: user.id, username: user.username, role: user.role, workspaceIds: req.session.workspaceIds },
     });
   } catch (err) {
     console.log('Error en login:', err.message);
@@ -72,7 +79,7 @@ router.post('/apply-session', async (req, res) => {
     req.session.userId = data.value.userId;
     req.session.username = data.value.username;
     req.session.role = data.value.role;
-    req.session.workspaceIds = data.value.workspaceIds || [1];
+    req.session.workspaceIds = await filterValidWorkspaceIds(data.value.workspaceIds || [1]);
     req.session._token = sessionToken;
     await new Promise((resolve) => req.session.save(resolve));
     res.cookie('session_token', sessionToken, {
@@ -83,7 +90,7 @@ router.post('/apply-session', async (req, res) => {
       domain: 'localhost',
       maxAge: 86400 * 1000,
     });
-    res.json({ success: true, user: { id: data.value.userId, username: data.value.username, role: data.value.role, workspaceIds: data.value.workspaceIds || [1] } });
+    res.json({ success: true, user: { id: data.value.userId, username: data.value.username, role: data.value.role, workspaceIds: req.session.workspaceIds } });
   } catch (err) {
     console.log('Error en apply-session:', err.message);
     res.status(500).json({ success: false, error: 'Error interno' });

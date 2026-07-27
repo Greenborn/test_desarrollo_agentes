@@ -3,6 +3,7 @@ import db from '../config/db.js';
 import dbConfig from '../config/dbConfig.js';
 import dbUserSettings from '../config/dbUserSettings.js';
 import dbWorkspaceEnvironments from '../config/dbWorkspaceEnvironments.js';
+import dbRedmineData from '../config/dbRedmineData.js';
 import opencode from '../services/opencode.js';
 
 const router = Router();
@@ -120,8 +121,8 @@ router.delete('/:id', async (req, res) => {
     }
 
     await db('chat_sessions').where({ workspace_id: req.params.id }).del();
-    await db('tickets').where({ workspace_id: req.params.id }).del();
-    await db('proyectos').where({ workspace_id: req.params.id }).del();
+    await dbRedmineData('tickets').where({ workspace_id: req.params.id }).del();
+    await dbRedmineData('proyectos').where({ workspace_id: req.params.id }).del();
     await dbConfig('settings').where({ workspace_id: req.params.id }).del();
     await dbWorkspaceEnvironments('workspace_environments').where({ workspace_id: req.params.id }).del();
     await db('workspaces').where({ id: req.params.id }).del();

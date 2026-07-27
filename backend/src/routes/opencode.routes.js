@@ -9,6 +9,7 @@ import db from '../config/db.js';
 import dbConfig from '../config/dbConfig.js';
 import dbUserSettings from '../config/dbUserSettings.js';
 import dbProjectVariables from '../config/dbProjectVariables.js';
+import dbChatMessages from '../config/dbChatMessages.js';
 import opencode from '../services/opencode.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,7 +49,7 @@ const MAX_MSG_LENGTH = 50000;
 
 async function saveLongMessage(sessionId, role, content, extraFields = {}) {
   if (!content) {
-    await db('chat_messages').insert({ session_id: sessionId, role, content: '(sin respuesta)', ...extraFields });
+    await dbChatMessages('chat_messages').insert({ session_id: sessionId, role, content: '(sin respuesta)', ...extraFields });
     return;
   }
 
@@ -66,7 +67,7 @@ async function saveLongMessage(sessionId, role, content, extraFields = {}) {
     ...(i === 0 ? extraFields : {}),
   }));
 
-  await db('chat_messages').insert(inserts);
+  await dbChatMessages('chat_messages').insert(inserts);
 }
 
 function getRepoSkillPaths(repoDir) {
@@ -325,7 +326,7 @@ router.post('/send', async (req, res) => {
     const ocSessionId = ocSession.id;
 
     if (sessionId) {
-      await db('chat_messages').insert({
+      await dbChatMessages('chat_messages').insert({
         session_id: sessionId, role: 'user', content: prompt,
       });
       await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
@@ -393,7 +394,7 @@ router.post('/send', async (req, res) => {
         res.write(`data: ${JSON.stringify({ type: 'control_request', control: controlData, agentId })}\n\n`);
 
         if (sessionId) {
-          db('chat_messages').insert({
+          dbChatMessages('chat_messages').insert({
             session_id: sessionId,
             role: 'opencode_control',
             content: JSON.stringify(controlData),

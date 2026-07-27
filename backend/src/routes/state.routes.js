@@ -15,6 +15,7 @@ import dbDocNotas from '../config/dbDocNotas.js';
 import dbDocEscaneo from '../config/dbDocEscaneo.js';
 import dbFuncionalidades from '../config/dbFuncionalidades.js';
 import dbRedmineComentarios from '../config/dbRedmineComentarios.js';
+import dbRedmineData from '../config/dbRedmineData.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import memoriaClient from '../services/memoriaClient.js';
 
@@ -43,6 +44,8 @@ const TABLE_DB_MAP = {
   documentacion_archivo: dbDocEscaneo,
   funcionalidades: dbFuncionalidades,
   redmine_comentarios: dbRedmineComentarios,
+  proyectos: dbRedmineData,
+  tickets: dbRedmineData,
 };
 
 function getDb(tableName) {

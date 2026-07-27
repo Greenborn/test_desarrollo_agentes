@@ -2,6 +2,8 @@ import { Router } from 'express';
 import db from '../config/db.js';
 import dbUserSettings from '../config/dbUserSettings.js';
 import dbConfig from '../config/dbConfig.js';
+import dbChatMessages from '../config/dbChatMessages.js';
+import dbRedmineData from '../config/dbRedmineData.js';
 import { streamChat } from '../services/deepseek.js';
 
 const router = Router();
@@ -45,6 +47,46 @@ function generateTitle() {
   return `${pad(now.getDate())}/${pad(now.getMonth() + 1)} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }
 
+async function enrichSessionsWithProyectosYTickets(sessions) {
+  if (sessions.length === 0) return;
+
+  const proyectoIds = [...new Set(sessions.map(s => s.proyecto_id).filter(Boolean))];
+
+  const redmineTicketIds = [...new Set(sessions.map(s => s.id_ticket_redmine).filter(Boolean))];
+
+  if (proyectoIds.length > 0) {
+    const proyectos = await dbRedmineData('proyectos')
+      .whereIn('id', proyectoIds)
+      .select('id', 'descripcion', 'color');
+    const proyectoMap = {};
+    for (const p of proyectos) proyectoMap[p.id] = p;
+    for (const s of sessions) {
+      if (s.proyecto_id && proyectoMap[s.proyecto_id]) {
+        s.proyecto_descripcion = proyectoMap[s.proyecto_id].descripcion;
+        s.proyecto_color = proyectoMap[s.proyecto_id].color;
+      }
+    }
+  }
+
+  if (redmineTicketIds.length > 0) {
+    const tickets = await dbRedmineData('tickets')
+      .whereIn('redmine_id', redmineTicketIds)
+      .select('redmine_id', 'workspace_id', 'priority_id', 'priority_name');
+    const ticketMap = {};
+    for (const t of tickets) ticketMap[`${t.redmine_id}-${t.workspace_id}`] = t;
+    for (const s of sessions) {
+      if (s.id_ticket_redmine && s.workspace_id) {
+        const key = `${s.id_ticket_redmine}-${s.workspace_id}`;
+        const t = ticketMap[key];
+        if (t) {
+          s.priority_id = t.priority_id;
+          s.priority_name = t.priority_name;
+        }
+      }
+    }
+  }
+}
+
 router.get('/sessions', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
@@ -54,11 +96,6 @@ router.get('/sessions', async (req, res) => {
       .where('chat_sessions.archived', false)
       .whereIn('chat_sessions.workspace_id', wsIds)
       .orderBy('chat_sessions.updated_at', 'desc')
-      .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
-      .leftJoin('tickets', function () {
-        this.on('chat_sessions.id_ticket_redmine', '=', 'tickets.redmine_id')
-          .andOn('chat_sessions.workspace_id', '=', 'tickets.workspace_id')
-      })
       .select(
         'chat_sessions.id',
         'title',
@@ -66,12 +103,9 @@ router.get('/sessions', async (req, res) => {
         'cwd',
         'chat_sessions.proyecto_id',
         'id_ticket_redmine',
-        'chat_sessions.workspace_id',
-        'proyectos.descripcion as proyecto_descripcion',
-        'proyectos.color as proyecto_color',
-        'tickets.priority_id',
-        'tickets.priority_name'
+        'chat_sessions.workspace_id'
       );
+    await enrichSessionsWithProyectosYTickets(sessions);
     const enriched = await enrichRedmineUrl(sessions);
     res.json({ sessions: enriched });
   } catch (err) {
@@ -83,8 +117,15 @@ router.get('/sessions', async (req, res) => {
 router.post('/sessions', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const wsIds = req.session.workspaceIds || [1];
-    const wsId = req.body.workspace_id && wsIds.includes(req.body.workspace_id) ? req.body.workspace_id : wsIds[0] || 1;
+    let wsId = req.body.workspace_id || (req.session.workspaceIds || [])[0] || null;
+    if (wsId) {
+      const ws = await db('workspaces').where({ id: wsId }).first();
+      if (!ws) wsId = null;
+    }
+    if (!wsId) {
+      const defaultWs = await db('workspaces').where({ is_default: true }).first();
+      wsId = defaultWs ? defaultWs.id : 1;
+    }
     const title = generateTitle();
     const cwd = req.body.cwd ? req.body.cwd : process.cwd();
     const [id] = await db('chat_sessions').insert({ user_id: req.session.userId, workspace_id: wsId, title, cwd });
@@ -145,7 +186,7 @@ router.get('/sessions/:id/messages', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
     const before = req.query.before ? parseInt(req.query.before) : null;
 
-    const query = db('chat_messages')
+    const query = dbChatMessages('chat_messages')
       .where({ session_id: sessionId })
       .select('id', 'role', 'content', 'thinking', 'created_at');
 
@@ -165,7 +206,7 @@ router.get('/sessions/:id/messages', async (req, res) => {
     // Only count total on first page
     let total = null;
     if (!before) {
-      const [{ count }] = await db('chat_messages').where({ session_id: sessionId }).count('* as count');
+      const [{ count }] = await dbChatMessages('chat_messages').where({ session_id: sessionId }).count('* as count');
       total = Number(count);
     }
 
@@ -186,10 +227,10 @@ router.post('/sessions/:id/messages', async (req, res) => {
     if (!session) {
       return res.status(404).json({ error: 'Sesión no encontrada' });
     }
-    await db('chat_messages').insert({ session_id: sessionId, role: 'user', content: message });
+    await dbChatMessages('chat_messages').insert({ session_id: sessionId, role: 'user', content: message });
     await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
 
-    const history = await db('chat_messages')
+    const history = await dbChatMessages('chat_messages')
       .where({ session_id: sessionId })
       .orderBy('created_at', 'asc')
       .select('role', 'content');
@@ -218,7 +259,7 @@ router.post('/sessions/:id/messages', async (req, res) => {
       res.write(`data: ${JSON.stringify({ ...chunk, sessionId })}\n\n`);
     }
 
-    await db('chat_messages').insert({
+    await dbChatMessages('chat_messages').insert({
       session_id: sessionId,
       role: 'assistant',
       content: fullResponse,
@@ -276,7 +317,7 @@ router.post('/sessions/:id/agent-documentacion', async (req, res) => {
       return res.status(404).json({ error: 'Sesión no encontrada' });
     }
 
-    await db('chat_messages').insert({
+    await dbChatMessages('chat_messages').insert({
       session_id: sessionId,
       role: 'user',
       content: `[AGENTE DOCUMENTACIÓN]\n\n${noteContent}`,
@@ -311,7 +352,7 @@ router.post('/sessions/:id/agent-documentacion', async (req, res) => {
       res.write(`data: ${JSON.stringify({ ...chunk, sessionId })}\n\n`);
     }
 
-    await db('chat_messages').insert({
+    await dbChatMessages('chat_messages').insert({
       session_id: sessionId,
       role: 'assistant',
       content: fullResponse,
@@ -372,7 +413,7 @@ router.post('/sessions/:id/save-messages', async (req, res) => {
       content: m.content,
       thinking: m.thinking || null,
     }));
-    await db('chat_messages').insert(inserts);
+    await dbChatMessages('chat_messages').insert(inserts);
     await db('chat_sessions').where({ id: req.params.id }).update({ updated_at: db.fn.now() });
     res.json({ success: true });
   } catch (err) {
@@ -386,7 +427,7 @@ router.delete('/sessions/:sessionId/messages/:messageId', async (req, res) => {
   try {
     const session = await db('chat_sessions').where({ id: req.params.sessionId, user_id: req.session.userId }).first();
     if (!session) return res.status(404).json({ error: 'Sesión no encontrada' });
-    const deleted = await db('chat_messages').where({ id: req.params.messageId, session_id: req.params.sessionId }).del();
+    const deleted = await dbChatMessages('chat_messages').where({ id: req.params.messageId, session_id: req.params.sessionId }).del();
     if (!deleted) return res.status(404).json({ error: 'Mensaje no encontrado' });
     res.json({ success: true });
   } catch (err) {
@@ -400,7 +441,7 @@ router.delete('/sessions/:id/messages', async (req, res) => {
   try {
     const session = await db('chat_sessions').where({ id: req.params.id, user_id: req.session.userId }).first();
     if (!session) return res.status(404).json({ error: 'Sesión no encontrada' });
-    await db('chat_messages').where({ session_id: req.params.id }).del();
+    await dbChatMessages('chat_messages').where({ session_id: req.params.id }).del();
     res.json({ success: true, sessionId: req.params.id });
   } catch (err) {
     console.log('Error al limpiar mensajes:', err.message);
@@ -633,11 +674,6 @@ router.get('/sessions/archived', async (req, res) => {
       .where('chat_sessions.archived', true)
       .whereIn('chat_sessions.workspace_id', wsIds)
       .orderBy('chat_sessions.updated_at', 'desc')
-      .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
-      .leftJoin('tickets', function () {
-        this.on('chat_sessions.id_ticket_redmine', '=', 'tickets.redmine_id')
-          .andOn('chat_sessions.workspace_id', '=', 'tickets.workspace_id')
-      })
       .select(
         'chat_sessions.id',
         'title',
@@ -645,12 +681,9 @@ router.get('/sessions/archived', async (req, res) => {
         'cwd',
         'chat_sessions.proyecto_id',
         'id_ticket_redmine',
-        'chat_sessions.workspace_id',
-        'proyectos.descripcion as proyecto_descripcion',
-        'proyectos.color as proyecto_color',
-        'tickets.priority_id',
-        'tickets.priority_name'
+        'chat_sessions.workspace_id'
       );
+    await enrichSessionsWithProyectosYTickets(sessions);
     const enriched = await enrichRedmineUrl(sessions);
     res.json({ sessions: enriched });
   } catch (err) {
@@ -715,7 +748,7 @@ router.post('/sessions/:id/clone', async (req, res) => {
       updated_at: db.fn.now(),
     });
 
-    const messages = await db('chat_messages')
+    const messages = await dbChatMessages('chat_messages')
       .where({ session_id: req.params.id })
       .orderBy('created_at', 'asc');
 
@@ -727,16 +760,11 @@ router.post('/sessions/:id/clone', async (req, res) => {
         thinking: m.thinking,
         created_at: m.created_at,
       }));
-      await db('chat_messages').insert(newMessages);
+      await dbChatMessages('chat_messages').insert(newMessages);
     }
 
     let newSession = await db('chat_sessions')
       .where({ 'chat_sessions.id': newId })
-      .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
-      .leftJoin('tickets', function () {
-        this.on('chat_sessions.id_ticket_redmine', '=', 'tickets.redmine_id')
-          .andOn('chat_sessions.workspace_id', '=', 'tickets.workspace_id')
-      })
       .select(
         'chat_sessions.id',
         'title',
@@ -744,13 +772,10 @@ router.post('/sessions/:id/clone', async (req, res) => {
         'cwd',
         'chat_sessions.proyecto_id',
         'id_ticket_redmine',
-        'chat_sessions.workspace_id',
-        'proyectos.descripcion as proyecto_descripcion',
-        'proyectos.color as proyecto_color',
-        'tickets.priority_id',
-        'tickets.priority_name'
+        'chat_sessions.workspace_id'
       )
       .first();
+    await enrichSessionsWithProyectosYTickets(newSession ? [newSession] : []);
     const enriched = await enrichRedmineUrl([newSession]);
     newSession = enriched[0];
     res.json({ success: true, session: newSession });
@@ -763,7 +788,7 @@ router.post('/sessions/:id/clone', async (req, res) => {
 router.delete('/sessions/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    await db('chat_messages').where({ session_id: req.params.id }).del();
+    await dbChatMessages('chat_messages').where({ session_id: req.params.id }).del();
     await db('chat_sessions').where({ id: req.params.id }).del();
     res.json({ success: true, sessionId: req.params.id });
   } catch (err) {

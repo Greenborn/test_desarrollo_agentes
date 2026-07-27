@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import db from '../config/db.js';
 import dbComandos from '../config/dbComandos.js';
 import dbProjectVariables from '../config/dbProjectVariables.js';
+import dbRedmineData from '../config/dbRedmineData.js';
 import memoriaClient from '../services/memoriaClient.js';
 
 const router = Router();
@@ -43,7 +44,7 @@ router.get('/:proyectoId', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .select('id')
       .where({ id: req.params.proyectoId })
       .whereIn('workspace_id', wsIds)
@@ -79,7 +80,7 @@ router.post('/', async (req, res) => {
   }
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .select('id')
       .where({ id: id_proyecto })
       .whereIn('workspace_id', wsIds)
@@ -122,7 +123,7 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Comando no encontrado' });
     }
     const wsIds = req.session.workspaceIds || [1];
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .select('id')
       .where({ id: existing.id_proyecto })
       .whereIn('workspace_id', wsIds)
@@ -157,7 +158,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Comando no encontrado' });
     }
     const wsIds = req.session.workspaceIds || [1];
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .select('id')
       .where({ id: existing.id_proyecto })
       .whereIn('workspace_id', wsIds)

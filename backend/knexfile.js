@@ -14,6 +14,12 @@ const config = {
     filename: sqlitePath,
   },
   useNullAsDefault: true,
+  pool: {
+    afterCreate: (conn, cb) => {
+      conn.pragma('foreign_keys = OFF');
+      cb();
+    },
+  },
   migrations: {
     directory: './migrations',
     extension: 'js',

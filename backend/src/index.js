@@ -40,6 +40,9 @@ import dbWorkspaceEnvironments from './config/dbWorkspaceEnvironments.js';
 import dbTemplates from './config/dbTemplates.js';
 import dbProjectVariables from './config/dbProjectVariables.js';
 import dbCommandHistory from './config/dbCommandHistory.js';
+import dbChatMessages from './config/dbChatMessages.js';
+import dbFiles from './config/dbFiles.js';
+import dbRedmineData from './config/dbRedmineData.js';
 import dbGastos from './config/dbGastos.js';
 import dbPlaywright from './config/dbPlaywright.js';
 import dbDocContent from './config/dbDocContent.js';
@@ -89,9 +92,21 @@ async function start() {
   ensureStorageDir();
   await loadModuleRoutes(app);
   try {
-    console.log('[migrate] Ejecutando migraciones pendientes...');
+    console.log('[migrate] Ejecutando migraciones de chat_messages (nueva DB)...');
+    await dbChatMessages.migrate.latest();
+    console.log('[migrate] Migraciones de chat_messages ejecutadas correctamente.');
+
+    console.log('[migrate] Ejecutando migraciones de files (nueva DB)...');
+    await dbFiles.migrate.latest();
+    console.log('[migrate] Migraciones de files ejecutadas correctamente.');
+
+    console.log('[migrate] Ejecutando migraciones de redmine_data (nueva DB)...');
+    await dbRedmineData.migrate.latest();
+    console.log('[migrate] Migraciones de redmine_data ejecutadas correctamente.');
+
+    console.log('[migrate] Ejecutando migraciones pendientes de app.db...');
     await db.migrate.latest();
-    console.log('[migrate] Migraciones ejecutadas correctamente.');
+    console.log('[migrate] Migraciones de app.db ejecutadas correctamente.');
 
     console.log('[migrate] Ejecutando migraciones de comandos...');
     await dbComandos.migrate.latest();

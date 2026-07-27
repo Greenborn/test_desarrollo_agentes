@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db from '../config/db.js';
 import dbFuncionalidades from '../config/dbFuncionalidades.js';
+import dbRedmineData from '../config/dbRedmineData.js';
 
 const router = Router();
 
@@ -40,7 +41,7 @@ router.post('/funcionalidad', async (req, res) => {
   }
 
   if (proyectoId) {
-    const proy = await db('proyectos').where({ id: proyectoId }).first();
+    const proy = await dbRedmineData('proyectos').where({ id: proyectoId }).first();
     if (!proy) {
       return res.status(400).json({ error: `El proyecto '${proyectoId}' no existe` });
     }

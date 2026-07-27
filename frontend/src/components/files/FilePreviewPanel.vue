@@ -139,7 +139,7 @@ import CsvViewerModal from './CsvViewerModal.vue'
 const EXT_TO_LANG = {
   js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
   ts: 'typescript', tsx: 'typescript',
-  vue: 'vue',
+  vue: 'xml',
   py: 'python',
   php: 'php',
   java: 'java',

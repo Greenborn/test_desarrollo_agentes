@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db from '../config/db.js';
 import dbUserSettings from '../config/dbUserSettings.js';
+import dbRedmineData from '../config/dbRedmineData.js';
 import { getRedmineToken, getRedmineUrl, syncRedmineTicket } from '../services/redmine.js';
 
 const router = Router();
@@ -18,7 +19,7 @@ router.get('/', async (req, res) => {
 
   try {
     const wsIds = req.session.workspaceIds || [1];
-    let query = db('tickets').whereIn('workspace_id', wsIds);
+    let query = dbRedmineData('tickets').whereIn('workspace_id', wsIds);
 
     if (req.query.proyecto_id) {
       query = query.where({ proyecto_id: req.query.proyecto_id });
@@ -103,7 +104,7 @@ router.get('/session/:sessionId', async (req, res) => {
 
     if (idTicketRedmine) {
       const wsIds = req.session.workspaceIds || [1];
-      ticket = await db('tickets')
+      ticket = await dbRedmineData('tickets')
         .where({ redmine_id: idTicketRedmine })
         .whereIn('workspace_id', wsIds)
         .first();
@@ -114,7 +115,7 @@ router.get('/session/:sessionId', async (req, res) => {
     if (idTicketRedmine) {
       try {
         const wsIds = req.session.workspaceIds || [1];
-        const localTicket = await db('tickets').where({ redmine_id: idTicketRedmine }).whereIn('workspace_id', wsIds).select('workspace_id').first();
+        const localTicket = await dbRedmineData('tickets').where({ redmine_id: idTicketRedmine }).whereIn('workspace_id', wsIds).select('workspace_id').first();
         const wsId = req.query.wsId ? parseInt(req.query.wsId) : (localTicket && localTicket.workspace_id) || wsIds[0] || 1;
         const token = await getRedmineToken(wsId);
         const url = await getRedmineUrl(wsId);
@@ -148,7 +149,7 @@ router.get('/session/:sessionId', async (req, res) => {
     if (idTicketRedmine && req.query.comments === 'true') {
       try {
         const wsIds = req.session.workspaceIds || [1];
-        const localTicket = await db('tickets').where({ redmine_id: idTicketRedmine }).whereIn('workspace_id', wsIds).select('workspace_id').first();
+        const localTicket = await dbRedmineData('tickets').where({ redmine_id: idTicketRedmine }).whereIn('workspace_id', wsIds).select('workspace_id').first();
         const wsId = req.query.wsId ? parseInt(req.query.wsId) : (localTicket && localTicket.workspace_id) || wsIds[0] || 1;
         const token = await getRedmineToken(wsId);
         const url = await getRedmineUrl(wsId);
@@ -205,7 +206,7 @@ router.post('/session', async (req, res) => {
         wsId = bodyWsId;
       } else {
         const searchWsIds = req.session.workspaceIds || [1];
-        const existingTicket = await db('tickets')
+        const existingTicket = await dbRedmineData('tickets')
           .where({ redmine_id: idTicketRedmine })
           .whereIn('workspace_id', searchWsIds)
           .select('*')
@@ -222,7 +223,7 @@ router.post('/session', async (req, res) => {
 
           if (session?.proyecto_id) {
             proyectoId = session.proyecto_id;
-            const proyecto = await db('proyectos')
+            const proyecto = await dbRedmineData('proyectos')
               .where({ id: session.proyecto_id })
               .select('workspace_id')
               .first();
@@ -242,7 +243,7 @@ router.post('/session', async (req, res) => {
       }
 
       // 3. Obtener datos frescos del ticket (sync pudo resolver proyectoId)
-      const ticket = await db('tickets')
+      const ticket = await dbRedmineData('tickets')
         .where({ redmine_id: idTicketRedmine, workspace_id: wsId })
         .select('*')
         .first();
@@ -396,7 +397,7 @@ router.get('/project-members/:projectId', async (req, res) => {
 
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .select('redmine_id', 'workspace_id')
       .where({ id: req.params.projectId })
       .whereIn('workspace_id', wsIds)
@@ -446,7 +447,7 @@ router.get('/project-trackers/:projectId', async (req, res) => {
 
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .select('redmine_id', 'workspace_id')
       .where({ id: req.params.projectId })
       .whereIn('workspace_id', wsIds)
@@ -503,7 +504,7 @@ router.post('/create', async (req, res) => {
   try {
     const wsIds = req.session.workspaceIds || [1];
 
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .select('redmine_id', 'workspace_id')
       .where({ id: project_id })
       .whereIn('workspace_id', wsIds)
@@ -611,9 +612,9 @@ router.post('/create', async (req, res) => {
       redmine_updated_on: createdIssue.updated_on ? createdIssue.updated_on.replace('Z', '') : null,
     };
 
-    const [insertedId] = await db('tickets').insert(insertData);
+    const [insertedId] = await dbRedmineData('tickets').insert(insertData);
 
-    const created = await db('tickets').where({ id: insertedId }).first();
+    const created = await dbRedmineData('tickets').where({ id: insertedId }).first();
 
     res.json({ success: true, ticket: created });
   } catch (err) {
@@ -663,11 +664,11 @@ router.put('/session/:sessionId', async (req, res) => {
 
     // Resolver wsId para el ticket
     const wsIds = req.session.workspaceIds || [1];
-    const localTicket = await db('tickets').where({ redmine_id: idTicketRedmine }).whereIn('workspace_id', wsIds).select('workspace_id').first();
+    const localTicket = await dbRedmineData('tickets').where({ redmine_id: idTicketRedmine }).whereIn('workspace_id', wsIds).select('workspace_id').first();
     const targetWsId = workspace_id || (localTicket && localTicket.workspace_id) || wsIds[0] || 1;
 
     if (Object.keys(localUpdate).length > 0) {
-      await db('tickets')
+      await dbRedmineData('tickets')
         .where({ redmine_id: idTicketRedmine, workspace_id: targetWsId })
         .update(localUpdate);
     }
@@ -696,7 +697,7 @@ router.put('/session/:sessionId', async (req, res) => {
       }
     }
 
-    const updated = await db('tickets')
+    const updated = await dbRedmineData('tickets')
       .where({ redmine_id: idTicketRedmine, workspace_id: targetWsId })
       .first();
 
@@ -712,7 +713,7 @@ router.get('/attachments/by-ticket/:redmineId', async (req, res) => {
 
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const localTicket = await db('tickets').where({ redmine_id: req.params.redmineId }).whereIn('workspace_id', wsIds).select('workspace_id').first();
+    const localTicket = await dbRedmineData('tickets').where({ redmine_id: req.params.redmineId }).whereIn('workspace_id', wsIds).select('workspace_id').first();
     const wsId = (localTicket && localTicket.workspace_id) || wsIds[0] || 1;
     const token = await getRedmineToken(wsId);
     const url = await getRedmineUrl(wsId);

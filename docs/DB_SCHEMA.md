@@ -12,13 +12,16 @@ DB_USER_SETTINGS_SQLITE_PATH=../data/user_settings.db       # preferencias de us
 DB_WORKSPACE_ENVIRONMENTS_SQLITE_PATH=../data/workspace_environments.db  # ambientes por workspace
 DB_TEMPLATES_SQLITE_PATH=../data/templates.db               # plantillas de texto
 DB_PROJECT_VARIABLES_SQLITE_PATH=../data/project_variables.db  # variables por proyecto
+DB_CHAT_MESSAGES_SQLITE_PATH=../data/chat_messages.db       # mensajes de chat
+DB_FILES_SQLITE_PATH=../data/files.db                       # archivos y capturas
+DB_REDMINE_DATA_SQLITE_PATH=../data/redmine_data.db         # proyectos y tickets
 ```
 
 ### Bases de datos
 
 | Archivo | Propósito | Migraciones |
 |---------|-----------|-------------|
-| `data/app.db` | Datos principales del sistema (usuarios, sesiones, proyectos, tickets, etc.) | `backend/migrations/` |
+| `data/app.db` | Datos principales del sistema (usuarios, sesiones, workspaces) | `backend/migrations/` |
 | `data/comandos.db` | Comandos personalizados de proyecto | `backend/migrations_comandos/` |
 | `data/config.db` | Configuraciones workspace (`settings`) | `backend/migrations_config/` |
 | `data/global_settings.db` | Configuraciones globales del sistema | `backend/migrations_global_settings/` |
@@ -26,6 +29,9 @@ DB_PROJECT_VARIABLES_SQLITE_PATH=../data/project_variables.db  # variables por p
 | `data/workspace_environments.db` | Ambientes de despliegue por workspace | `backend/migrations_workspace_environments/` |
 | `data/templates.db` | Plantillas de texto reutilizables | `backend/migrations_templates/` |
 | `data/project_variables.db` | Variables por proyecto | `backend/migrations_project_variables/` |
+| `data/chat_messages.db` | Mensajes de chat | `backend/migrations_chat_messages/` |
+| `data/files.db` | Archivos y metadatos de capturas | `backend/migrations_files/` |
+| `data/redmine_data.db` | Proyectos y tickets de Redmine | `backend/migrations_redmine_data/` |
 
 ---
 
@@ -47,7 +53,7 @@ DB_PROJECT_VARIABLES_SQLITE_PATH=../data/project_variables.db  # variables por p
 |---|---|---|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
 | `user_id` | INTEGER UNSIGNED | NOT NULL, FK → `users(id)` ON DELETE CASCADE |
-| `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` — FK → `workspaces(id)` |
+| `workspace_id` | INTEGER UNSIGNED | NOT NULL, DEFAULT `1` |
 | `title` | VARCHAR(255) | nullable |
 | `cwd` | VARCHAR(500) | nullable — directorio de trabajo de la sesión |
 | `proyecto_id` | VARCHAR(255) | nullable — FK lógica → `proyectos(id)` |
@@ -60,10 +66,12 @@ DB_PROJECT_VARIABLES_SQLITE_PATH=../data/project_variables.db  # variables por p
 
 ## 3. `chat_messages`
 
+> **Nota:** Esta tabla reside en una base de datos SQLite separada (`chat_messages.db`), no en `app.db`.
+
 | Columna | Tipo | Restricciones |
 |---|---|---|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
-| `session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
+| `session_id` | INTEGER UNSIGNED | NOT NULL — FK lógica → `chat_sessions(id)` |
 | `role` | ENUM(`'user'`, `'assistant'`, `'command'`, `'result'`, `'opencode_info'`, `'opencode_result'`, `'opencode_control'`, `'opencode_confirmed'`) | NOT NULL |
 | `content` | LONGTEXT | NOT NULL |
 | `thinking` | LONGTEXT | nullable — contenido del thinking de DeepSeek |
@@ -210,6 +218,8 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 
 ## 10. `proyectos`
 
+> **Nota:** Esta tabla reside en una base de datos SQLite separada (`redmine_data.db`), no en `app.db`.
+
 | Columna | Tipo | Restricciones |
 |---|---|---|
 | `id` | VARCHAR(255) | PK (string, no auto-increment) — slug del nombre Redmine |
@@ -300,6 +310,8 @@ Estas keys se guardan automáticamente mediante `POST /api/opencode/select` con 
 ---
 
 ## 15. `tickets`
+
+> **Nota:** Esta tabla reside en una base de datos SQLite separada (`redmine_data.db`), no en `app.db`.
 
 | Columna | Tipo | Restricciones |
 |---|---|---|
@@ -462,11 +474,13 @@ Estas keys se guardan automáticamente mediante `POST /api/opencode/select` con 
 
 ## 23. `archivos`
 
+> **Nota:** Esta tabla reside en una base de datos SQLite separada (`files.db`), no en `app.db`.
+
 | Columna | Tipo | Restricciones |
 |---------|------|---------------|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
 | `proyecto_id` | VARCHAR(255) | NOT NULL — FK lógica → `proyectos(id)` |
-| `chat_session_id` | INTEGER UNSIGNED | NOT NULL, FK → `chat_sessions(id)` ON DELETE CASCADE |
+| `chat_session_id` | INTEGER UNSIGNED | NOT NULL — FK lógica → `chat_sessions(id)` |
 | `nombre_original` | VARCHAR(500) | NOT NULL — nombre original del archivo subido/capturado |
 | `nombre_storage` | VARCHAR(500) | NOT NULL — nombre único UUID en disco (`uploads/archivos/`) |
 | `tipo` | VARCHAR(100) | NOT NULL — MIME type (`image/png`, etc.) |
@@ -477,15 +491,17 @@ Estas keys se guardan automáticamente mediante `POST /api/opencode/select` con 
 
 ## 24. `capturas_metadata`
 
+> **Nota:** Esta tabla reside en una base de datos SQLite separada (`files.db`), no en `app.db`.
+
 | Columna | Tipo | Restricciones |
 |---------|------|---------------|
 | `id` | INTEGER | PK, AUTO_INCREMENT |
-| `archivo_id` | INTEGER UNSIGNED | NOT NULL, FK → `archivos(id)` ON DELETE CASCADE |
+| `archivo_id` | INTEGER UNSIGNED | NOT NULL — FK lógica → `archivos(id)` |
 | `key` | VARCHAR(255) | NOT NULL |
 | `value` | LONGTEXT | NOT NULL — texto o JSON |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 
-El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos`, se eliminen automáticamente todos sus registros de metadata.
+La relación entre `capturas_metadata` y `archivos` se mantiene a nivel aplicación (cross-database).
 
 **Keys conocidas:**
 
@@ -534,15 +550,15 @@ El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos
 | Origen | Columna | Destino | Columna | ON DELETE |
 |---|---|---|---|---|
 | `chat_sessions` | `user_id` | `users` | `id` | CASCADE |
-| `chat_messages` | `session_id` | `chat_sessions` | `id` | CASCADE |
+| `chat_messages` ⚡ | `session_id` | `chat_sessions` | `id` | — (FK lógica, cross-database) |
 | `user_settings` | `user_id` | `users` | `id` | CASCADE |
 | `command_history` | `user_id` | `users` | `id` | CASCADE |
 | `command_history` | `session_id` | `chat_sessions` | `id` | SET NULL |
 | `funcionalidades` | `session_id` | `chat_sessions` | `id` | CASCADE |
 | `gastos_tokens_usados` | `id_chat_session` | `chat_sessions` | `id` | CASCADE |
-| `gastos_tokens_usados` | `id_proyecto` | `proyectos` | `id` | CASCADE |
-| `tickets` | `proyecto_id` | `proyectos` | `id` | CASCADE |
-| `project_variables` | `proyecto_id` | `proyectos` | `id` | CASCADE |
+| `gastos_tokens_usados` ⚡ | `id_proyecto` | `proyectos` | `id` | — (FK lógica, cross-database) |
+| `tickets` ⚡ | `proyecto_id` | `proyectos` | `id` | — (FK lógica, cross-database) |
+| `project_variables` ⚡ | `proyecto_id` | `proyectos` | `id` | — (FK lógica, cross-database) |
 | `redmine_comentarios` | `session_id` | `chat_sessions` | `id` | CASCADE |
 | `playwright_network_logs` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
 | `playwright_events` | `chat_session_id` | `chat_sessions` | `id` | SET NULL |
@@ -552,8 +568,8 @@ El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos
 | `documentacion_escaneo` | `session_id` | `chat_sessions` | `id` | CASCADE |
 | `comandos_personalizados_proyectos` ⚡ | `id_proyecto` | `proyectos` | `id` | — (FK lógica, cross-database) |
 | `documentacion_archivo` | `escaneo_id` | `documentacion_escaneo` | `id` | CASCADE |
-| `archivos` | `chat_session_id` | `chat_sessions` | `id` | CASCADE |
-| `capturas_metadata` | `archivo_id` | `archivos` | `id` | CASCADE |
+| `archivos` ⚡ | `chat_session_id` | `chat_sessions` | `id` | — (FK lógica, cross-database) |
+| `capturas_metadata` ⚡ | `archivo_id` | `archivos` | `id` | — (FK lógica, cross-database) |
 | `documentacion_notas` | `id_proyecto` | `proyectos` | `id` | — (FK lógica) |
 | `documentacion_notas` | `id_ticket` | `tickets` | `redmine_id` | — (FK lógica) |
 
@@ -565,27 +581,27 @@ El `ON DELETE CASCADE` asegura que al eliminar una captura de la tabla `archivos
 workspaces
  ├─ settings.workspace_id (FK lógica)
  ├─ chat_sessions.workspace_id (FK lógica)
- ├─ proyectos.workspace_id (FK lógica)
- ├─ tickets.workspace_id (FK lógica)
+ ├─ proyectos ⚡.workspace_id (FK lógica, cross-database)
+ ├─ tickets ⚡.workspace_id (FK lógica, cross-database)
  ├─ redmine_comentarios.workspace_id (FK lógica)
  └─ workspace_environments.workspace_id (FK lógica)
 
 users
  ├─ chat_sessions (user_id)
- │   ├─ chat_messages (session_id)
-  │   └─ funcionalidades (session_id)
+ │   ├─ chat_messages ⚡ (session_id — FK lógica, cross-database)
+ │   └─ funcionalidades (session_id)
  ├─ user_settings (user_id)
  └─ command_history (user_id)
 
-proyectos
+proyectos ⚡
  ├─ chat_sessions.proyecto_id (FK lógica)
  ├─ funcionalidades.proyecto_id (FK lógica)
  ├─ gastos_tokens_usados.id_proyecto (FK)
- ├─ tickets.proyecto_id (FK)
- ├─ project_variables.proyecto_id (FK)
+ ├─ tickets ⚡.proyecto_id (FK lógica, cross-database)
+ ├─ project_variables.proyecto_id (FK lógica)
  └─ documentacion_notas.id_proyecto (FK lógica)
 
-tickets
+tickets ⚡
  └─ chat_sessions.id_ticket_redmine (FK lógica)
 
 templates

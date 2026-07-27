@@ -4,6 +4,7 @@ import path from 'path';
 import db from '../config/db.js';
 import dbConfig from '../config/dbConfig.js';
 import dbUserSettings from '../config/dbUserSettings.js';
+import dbRedmineData from '../config/dbRedmineData.js';
 import * as devInstanceManager from '../services/devInstanceManager.js';
 import playwrightManager from '../services/playwrightManager.js';
 import memoriaClient from '../services/memoriaClient.js';
@@ -57,7 +58,7 @@ router.post('/upd-config', async (req, res) => {
       });
     }
 
-    await db('proyectos')
+    await dbRedmineData('proyectos')
       .where({ id: session.proyecto_id })
       .update({ despliegue_config: JSON.stringify(deployConfig) });
 
@@ -139,7 +140,7 @@ router.post('/crear-config', async (req, res) => {
     const deployPath = path.resolve(projectDir, 'deploy.json');
     fs.writeFileSync(deployPath, JSON.stringify(deployConfig, null, 2), 'utf-8');
 
-    await db('proyectos')
+    await dbRedmineData('proyectos')
       .where({ id: session.proyecto_id })
       .update({ despliegue_config: JSON.stringify(deployConfig) });
 
@@ -205,7 +206,7 @@ router.post('/save-config', async (req, res) => {
     const deployPath = path.resolve(projectDir, 'deploy.json');
     fs.writeFileSync(deployPath, JSON.stringify(deployConfig, null, 2), 'utf-8');
 
-    await db('proyectos')
+    await dbRedmineData('proyectos')
       .where({ id: session.proyecto_id })
       .update({ despliegue_config: JSON.stringify(deployConfig) });
 
@@ -236,7 +237,7 @@ router.get('/config', async (req, res) => {
       });
     }
 
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .where({ id: session.proyecto_id })
       .select('despliegue_config')
       .first();
@@ -286,7 +287,7 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
       });
     }
 
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .where({ id: session.proyecto_id })
       .select('despliegue_config')
       .first();

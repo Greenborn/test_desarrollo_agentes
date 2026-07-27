@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt';
 import db from '../config/db.js';
 import dbUserSettings from '../config/dbUserSettings.js';
 import dbProjectVariables from '../config/dbProjectVariables.js';
+import dbRedmineData from '../config/dbRedmineData.js';
 import memoriaClient from './memoriaClient.js';
 import opencode from './opencode.js';
 
@@ -125,7 +126,7 @@ async function handleProyectoVarListar(payload) {
   if (!proyectoId) return { type: 'error', error: 'proyectoId requerido' };
 
   const wsIds = session.workspaceIds || [1];
-  const proyecto = await db('proyectos').select('id').where({ id: proyectoId }).whereIn('workspace_id', wsIds).first();
+  const proyecto = await dbRedmineData('proyectos').select('id').where({ id: proyectoId }).whereIn('workspace_id', wsIds).first();
   if (!proyecto) return { type: 'error', error: 'Proyecto no encontrado' };
 
   const dbVariables = await dbProjectVariables('project_variables')
@@ -186,7 +187,7 @@ async function handleProyectoVarCrear(payload) {
 
   const varType = type === 'memory' ? 'memory' : 'db';
   const wsIds = session.workspaceIds || [1];
-  const proyecto = await db('proyectos').select('id').where({ id: proyectoId }).whereIn('workspace_id', wsIds).first();
+  const proyecto = await dbRedmineData('proyectos').select('id').where({ id: proyectoId }).whereIn('workspace_id', wsIds).first();
   if (!proyecto) return { type: 'error', error: 'Proyecto no encontrado' };
 
   const existing = await dbProjectVariables('project_variables').where({ proyecto_id: proyectoId, key }).first();
@@ -214,7 +215,7 @@ async function handleProyectoVarActualizar(payload) {
   if (value === undefined || value === null) return { type: 'error', error: 'value requerido' };
 
   const wsIds = session.workspaceIds || [1];
-  const proyecto = await db('proyectos').select('id').where({ id: proyectoId }).whereIn('workspace_id', wsIds).first();
+  const proyecto = await dbRedmineData('proyectos').select('id').where({ id: proyectoId }).whereIn('workspace_id', wsIds).first();
   if (!proyecto) return { type: 'error', error: 'Proyecto no encontrado' };
 
   const existing = await dbProjectVariables('project_variables').select('type').where({ proyecto_id: proyectoId, key }).first();
@@ -250,7 +251,7 @@ async function handleProyectoVarEliminar(payload) {
   if (!key) return { type: 'error', error: 'key requerido' };
 
   const wsIds = session.workspaceIds || [1];
-  const proyecto = await db('proyectos').select('id').where({ id: proyectoId }).whereIn('workspace_id', wsIds).first();
+  const proyecto = await dbRedmineData('proyectos').select('id').where({ id: proyectoId }).whereIn('workspace_id', wsIds).first();
   if (!proyecto) return { type: 'error', error: 'Proyecto no encontrado' };
 
   const existing = await dbProjectVariables('project_variables').select('type').where({ proyecto_id: proyectoId, key }).first();

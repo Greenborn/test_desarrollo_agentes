@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import db from '../config/db.js';
+import dbFiles from '../config/dbFiles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STORAGE_DIR = path.resolve(__dirname, '../../../uploads/archivos');
@@ -27,7 +28,7 @@ router.get('/', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
     const { proyecto_id, chat_session_id, tipo, include_metadata } = req.query;
-    let query = db('archivos').orderBy('created_at', 'desc');
+    let query = dbFiles('archivos').orderBy('created_at', 'desc');
     if (proyecto_id) {
       query = query.where({ proyecto_id });
     }
@@ -40,7 +41,7 @@ router.get('/', async (req, res) => {
     let archivos = await query.select('*');
     if (include_metadata === 'true' && archivos.length > 0) {
       const archivoIds = archivos.map(a => a.id);
-      const metadataRows = await db('capturas_metadata')
+      const metadataRows = await dbFiles('capturas_metadata')
         .whereIn('archivo_id', archivoIds)
         .orderBy('created_at', 'asc')
         .select('*');
@@ -64,7 +65,7 @@ router.get('/', async (req, res) => {
 router.get('/:id/download', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const archivo = await db('archivos').where({ id: req.params.id }).first();
+    const archivo = await dbFiles('archivos').where({ id: req.params.id }).first();
     if (!archivo) {
       return res.status(404).json({ error: 'Archivo no encontrado' });
     }
@@ -82,11 +83,11 @@ router.get('/:id/download', async (req, res) => {
 router.get('/:id/metadata', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const archivo = await db('archivos').where({ id: req.params.id }).first();
+    const archivo = await dbFiles('archivos').where({ id: req.params.id }).first();
     if (!archivo) {
       return res.status(404).json({ error: 'Archivo no encontrado' });
     }
-    const metadata = await db('capturas_metadata')
+    const metadata = await dbFiles('capturas_metadata')
       .where({ archivo_id: req.params.id })
       .orderBy('created_at', 'asc')
       .select('*');
@@ -100,7 +101,7 @@ router.get('/:id/metadata', async (req, res) => {
 router.post('/:id/metadata', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const archivo = await db('archivos').where({ id: req.params.id }).first();
+    const archivo = await dbFiles('archivos').where({ id: req.params.id }).first();
     if (!archivo) {
       return res.status(404).json({ error: 'Archivo no encontrado' });
     }
@@ -108,21 +109,21 @@ router.post('/:id/metadata', async (req, res) => {
     if (!key || value === undefined || value === null) {
       return res.status(400).json({ error: 'key y value son requeridos' });
     }
-    const existing = await db('capturas_metadata')
+    const existing = await dbFiles('capturas_metadata')
       .where({ archivo_id: req.params.id, key })
       .first();
     if (existing) {
-      await db('capturas_metadata')
+      await dbFiles('capturas_metadata')
         .where({ id: existing.id })
-        .update({ value, created_at: db.fn.now() });
+        .update({ value, created_at: dbFiles.fn.now() });
     } else {
-      await db('capturas_metadata').insert({
+      await dbFiles('capturas_metadata').insert({
         archivo_id: req.params.id,
         key,
         value,
       });
     }
-    const record = await db('capturas_metadata')
+    const record = await dbFiles('capturas_metadata')
       .where({ archivo_id: req.params.id, key })
       .first();
     res.json({ metadata: record });
@@ -135,11 +136,11 @@ router.post('/:id/metadata', async (req, res) => {
 router.delete('/:id/metadata/:mid', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const archivo = await db('archivos').where({ id: req.params.id }).first();
+    const archivo = await dbFiles('archivos').where({ id: req.params.id }).first();
     if (!archivo) {
       return res.status(404).json({ error: 'Archivo no encontrado' });
     }
-    const deleted = await db('capturas_metadata')
+    const deleted = await dbFiles('capturas_metadata')
       .where({ id: req.params.mid, archivo_id: req.params.id })
       .del();
     if (!deleted) {
@@ -155,7 +156,7 @@ router.delete('/:id/metadata/:mid', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const archivo = await db('archivos').where({ id: req.params.id }).first();
+    const archivo = await dbFiles('archivos').where({ id: req.params.id }).first();
     if (!archivo) {
       return res.status(404).json({ error: 'Archivo no encontrado' });
     }
@@ -167,7 +168,7 @@ router.delete('/:id', async (req, res) => {
     } catch (fsErr) {
       console.log('Error al eliminar archivo del disco:', fsErr.message);
     }
-    await db('archivos').where({ id: req.params.id }).del();
+    await dbFiles('archivos').where({ id: req.params.id }).del();
     res.json({ success: true });
   } catch (err) {
     console.log('Error al eliminar archivo:', err.message);

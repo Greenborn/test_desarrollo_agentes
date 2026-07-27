@@ -2,6 +2,7 @@ import { Router } from 'express';
 import db from '../config/db.js';
 import dbUserSettings from '../config/dbUserSettings.js';
 import dbProjectVariables from '../config/dbProjectVariables.js';
+import dbRedmineData from '../config/dbRedmineData.js';
 import memoriaClient from '../services/memoriaClient.js';
 import { getRedmineToken, getRedmineUrl } from '../services/redmine.js';
 
@@ -20,7 +21,7 @@ router.get('/proyecto', async (req, res) => {
   try {
     const wsIds = req.session.workspaceIds || [1];
     const filterWsId = req.query.workspace_id ? parseInt(req.query.workspace_id, 10) : null;
-    let query = db('proyectos');
+    let query = dbRedmineData('proyectos');
     if (filterWsId) {
       query = query.where('workspace_id', filterWsId);
     } else {
@@ -55,7 +56,7 @@ router.post('/proyecto', async (req, res) => {
   try {
     const wsIds = req.session.workspaceIds || [1];
     const wsId = req.body.workspace_id && wsIds.includes(req.body.workspace_id) ? req.body.workspace_id : wsIds[0] || 1;
-    await db('proyectos').insert({ id, descripcion, workspace_id: wsId });
+    await dbRedmineData('proyectos').insert({ id, descripcion, workspace_id: wsId });
     res.json({ success: true });
   } catch (err) {
     console.log('Error al crear proyecto:', err.message);
@@ -132,9 +133,9 @@ router.post('/proyecto/crear-en-redmine', async (req, res) => {
       redmine_parent_name: redmineProject.parent?.name || null,
     };
 
-    await db('proyectos').insert(insertData);
+    await dbRedmineData('proyectos').insert(insertData);
 
-    const created = await db('proyectos').where({ id: slug }).first();
+    const created = await dbRedmineData('proyectos').where({ id: slug }).first();
 
     if (asignar_a_sesion && req.body.sessionId) {
       await db('chat_sessions')
@@ -179,7 +180,7 @@ router.post('/proyecto/session', async (req, res) => {
     if (cwd) updateData.cwd = cwd;
 
     if (proyectoId) {
-      const proyecto = await db('proyectos')
+      const proyecto = await dbRedmineData('proyectos')
         .where({ id: proyectoId })
         .select('workspace_id')
         .first();
@@ -240,7 +241,7 @@ router.put('/proyecto/:id/color', async (req, res) => {
   }
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const updated = await db('proyectos')
+    const updated = await dbRedmineData('proyectos')
       .where({ id: req.params.id })
       .whereIn('workspace_id', wsIds)
       .update({ color });
@@ -262,7 +263,7 @@ router.put('/proyecto/repositorio', async (req, res) => {
   }
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const updated = await db('proyectos')
+    const updated = await dbRedmineData('proyectos')
       .where({ id: proyectoId })
       .whereIn('workspace_id', wsIds)
       .update({ url_github: url_github || null });
@@ -279,7 +280,7 @@ router.put('/proyecto/repositorio', async (req, res) => {
 router.get('/proyecto/repositorio/:proyectoId', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    let query = db('proyectos').select('url_github').where({ id: req.params.proyectoId });
+    let query = dbRedmineData('proyectos').select('url_github').where({ id: req.params.proyectoId });
 
     const sessionId = req.query.sessionId || req.body?.sessionId;
     if (sessionId) {
@@ -303,7 +304,7 @@ router.get('/proyecto/:id/variables', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .select('id')
       .where({ id: req.params.id })
       .whereIn('workspace_id', wsIds)
@@ -370,7 +371,7 @@ router.post('/proyecto/:id/variables', async (req, res) => {
   const varType = type === 'memory' ? 'memory' : 'db';
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .select('id')
       .where({ id: req.params.id })
       .whereIn('workspace_id', wsIds)
@@ -418,7 +419,7 @@ router.put('/proyecto/:id/variables/:key', async (req, res) => {
   }
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .select('id')
       .where({ id: req.params.id })
       .whereIn('workspace_id', wsIds)
@@ -468,7 +469,7 @@ router.delete('/proyecto/:id/variables/:key', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
     const wsIds = req.session.workspaceIds || [1];
-    const proyecto = await db('proyectos')
+    const proyecto = await dbRedmineData('proyectos')
       .select('id')
       .where({ id: req.params.id })
       .whereIn('workspace_id', wsIds)
