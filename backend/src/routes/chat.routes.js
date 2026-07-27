@@ -19,6 +19,7 @@ function authGuard(req, res) {
 const REDMINE_URL_CACHE = {};
 
 async function enrichRedmineUrl(sessions) {
+  sessions = sessions.filter(Boolean);
   const wsIds = [...new Set(sessions.map(s => s.workspace_id))];
   const missing = wsIds.filter(id => !(id in REDMINE_URL_CACHE));
   if (missing.length > 0) {
@@ -775,12 +776,15 @@ router.post('/sessions/:id/clone', async (req, res) => {
         'chat_sessions.workspace_id'
       )
       .first();
-    await enrichSessionsWithProyectosYTickets(newSession ? [newSession] : []);
+    if (!newSession) {
+      return res.status(500).json({ success: false, error: 'No se pudo recuperar la sesión clonada' });
+    }
+    await enrichSessionsWithProyectosYTickets([newSession]);
     const enriched = await enrichRedmineUrl([newSession]);
     newSession = enriched[0];
     res.json({ success: true, session: newSession });
   } catch (err) {
-    console.log('Error al clonar sesión:', err.message);
+    console.error('Error al clonar sesión:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

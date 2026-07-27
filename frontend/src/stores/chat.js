@@ -846,6 +846,7 @@ export const useChatStore = defineStore('chat', () => {
         sessions.value.unshift(data.session)
         return data.session
       }
+      console.error('Error al clonar sesión: la respuesta no incluye session', data)
     } catch (err) {
       console.error('Error al clonar sesión:', err)
     }

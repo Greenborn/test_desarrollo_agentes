@@ -259,6 +259,11 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - **Respuesta:** `{ success: true, sessionId }`
 - **Descripción:** Elimina todos los mensajes de una sesión sin eliminar la sesión ni sus metadatos (ticket, proyecto, etc.).
 
+### `POST /api/chat/sessions/:id/clone`
+- **Auth:** Requerida
+- **Respuesta:** `{ success: true, session: { id, title, updated_at, cwd, proyecto_id, id_ticket_redmine, workspace_id, proyecto_descripcion, proyecto_color, priority_id, priority_name, session_redmine_url } }`
+- **Descripción:** Clona una sesión existente incluyendo todos sus mensajes. La nueva sesión se crea con `archived: false` y timestamps actuales. Los mensajes se copian con sus timestamps originales.
+
 ---
 
 ## Configuración (`/api/settings`)
