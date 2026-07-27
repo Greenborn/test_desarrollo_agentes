@@ -338,10 +338,10 @@ export const useChatStore = defineStore('chat', () => {
     const cmdKey = 'cmd-' + Date.now()
     const loadingKey = 'loading-' + Date.now()
 
-    messages.value.push({ role: 'command', content: raw, _key: cmdKey })
+    messages.value.push({ role: 'command', content: raw, _key: cmdKey, _createdAt: new Date().toISOString() })
     flashLed(sid)
     const loadingIdx = messages.value.length
-    messages.value.push({ role: 'result', content: '⏳ Ejecutando comando...', _key: loadingKey })
+    messages.value.push({ role: 'result', content: '⏳ Ejecutando comando...', _key: loadingKey, _createdAt: new Date().toISOString() })
     flashLed(sid)
 
     try {
@@ -374,7 +374,7 @@ export const useChatStore = defineStore('chat', () => {
           if (idx >= 0) {
             const output = result.output !== undefined ? String(result.output) : null
             if (output !== null) {
-              messages.value[idx] = { role: 'result', content: output, _key: 'result-' + Date.now() }
+              messages.value[idx] = { role: 'result', content: output, _key: 'result-' + Date.now(), _createdAt: new Date().toISOString() }
             } else {
               messages.value.splice(idx, 1)
             }
@@ -385,9 +385,9 @@ export const useChatStore = defineStore('chat', () => {
           if (idx >= 0) {
             if (result !== undefined && result !== null) {
               if (typeof result === 'object' && result.role) {
-                messages.value[idx] = { ...result, _key: 'result-' + Date.now() }
+                messages.value[idx] = { ...result, _key: 'result-' + Date.now(), _createdAt: new Date().toISOString() }
               } else {
-                messages.value[idx] = { role: 'result', content: String(result), _key: 'result-' + Date.now() }
+                messages.value[idx] = { role: 'result', content: String(result), _key: 'result-' + Date.now(), _createdAt: new Date().toISOString() }
               }
             } else {
               messages.value.splice(idx, 1)
@@ -423,7 +423,7 @@ export const useChatStore = defineStore('chat', () => {
       if (Number(activeSessionId.value) === Number(sid)) {
         const idx = messages.value.findIndex(m => m._key === loadingKey)
         if (idx >= 0) {
-          messages.value[idx] = { role: 'result', content: errorResult, _key: 'err-' + Date.now() }
+          messages.value[idx] = { role: 'result', content: errorResult, _key: 'err-' + Date.now(), _createdAt: new Date().toISOString() }
           flashLed(sid)
         }
       } else if (sid && !(err.__silent === true)) {
@@ -539,6 +539,7 @@ export const useChatStore = defineStore('chat', () => {
           thinking: ocCache.thinking || null,
           streaming: true,
           _key: ocCache.msgKey || 'stream-oc-' + Date.now(),
+          _createdAt: new Date().toISOString(),
         })
       }
       const cmdCache = _cmdSessionStreamCache.value[sessionId]
@@ -548,6 +549,7 @@ export const useChatStore = defineStore('chat', () => {
           content: cmdCache.content || '⏳ Ejecutando...',
           _key: cmdCache.streamKey,
           streaming: true,
+          _createdAt: new Date().toISOString(),
         })
       }
     } catch (err) {
@@ -593,7 +595,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function sendMessage(sessionId, message) {
-    messages.value.push({ role: 'user', content: message })
+    messages.value.push({ role: 'user', content: message, _createdAt: new Date().toISOString() })
     flashLed(sessionId)
     _streamingSessions.value[sessionId] = true
     currentChunk.value = ''
@@ -669,6 +671,7 @@ export const useChatStore = defineStore('chat', () => {
                   role: 'assistant',
                   content: currentChunk.value,
                   thinking: currentThinking.value || null,
+                  _createdAt: new Date().toISOString(),
                 })
                 flashLed(sessionId)
                 currentChunk.value = ''
@@ -701,6 +704,7 @@ export const useChatStore = defineStore('chat', () => {
             role: 'assistant',
             content: currentChunk.value,
             thinking: currentThinking.value || null,
+            _createdAt: new Date().toISOString(),
           })
           flashLed(sessionId)
           currentChunk.value = ''
@@ -722,7 +726,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function deleteMessage(sessionId, msg) {
-    const key = msg.id || msg._key
+    const key = msg.id ?? msg._key
     try {
       if (msg.id) {
         const res = await fetch(`${API}/chat/sessions/${sessionId}/messages/${msg.id}`, {
@@ -734,7 +738,7 @@ export const useChatStore = defineStore('chat', () => {
           throw new Error(errData.error || 'Error al eliminar mensaje')
         }
       }
-      messages.value = messages.value.filter(m => (m.id || m._key) !== key)
+      messages.value = messages.value.filter(m => (m.id ?? m._key) !== key)
     } catch (err) {
       console.error('Error al eliminar mensaje:', err)
     }
@@ -898,6 +902,12 @@ export const useChatStore = defineStore('chat', () => {
 
   async function pushMessage(msg, targetSessionId) {
     const sid = targetSessionId || activeSessionId.value
+    if (!msg._createdAt && !msg.created_at) {
+      msg._createdAt = new Date().toISOString()
+    }
+    if (!msg._key) {
+      msg._key = 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)
+    }
     flashLed(sid)
     if (!sid || Number(sid) === Number(activeSessionId.value)) {
       messages.value.push(msg)
@@ -908,7 +918,7 @@ export const useChatStore = defineStore('chat', () => {
 
   function updateMessageByKey(key, updates, targetSessionId) {
     if (targetSessionId && Number(targetSessionId) !== Number(activeSessionId.value)) return -1
-    const idx = messages.value.findIndex(m => (m.id || m._key) === key)
+    const idx = messages.value.findIndex(m => (m.id ?? m._key) === key)
     if (idx >= 0) {
       messages.value[idx] = { ...messages.value[idx], ...updates }
     }
@@ -932,7 +942,7 @@ export const useChatStore = defineStore('chat', () => {
 
   function findMessageIndex(key, targetSessionId) {
     if (targetSessionId && Number(targetSessionId) !== Number(activeSessionId.value)) return -1
-    return messages.value.findIndex(m => (m.id || m._key) === key)
+    return messages.value.findIndex(m => (m.id ?? m._key) === key)
   }
 
   function setSessionStatus(sid, status) {

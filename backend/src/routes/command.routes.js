@@ -133,6 +133,12 @@ function loadGitignore(dirPath) {
   return []
 }
 
+const ALWAYS_SKIP_DIRS = new Set([
+  'node_modules', '.git', '.svn', '.hg', '.next', '.cache',
+  'dist', 'build', '.nyc_output', 'coverage', '__pycache__',
+  '.pnpm', '.yarn',
+])
+
 function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeBytes, maxDepth = 0, currentDepth = 0) {
   const name = path.basename(dirPath) || dirPath
   const stat = fs.statSync(dirPath)
@@ -149,9 +155,9 @@ function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeByt
     try {
       const entries = fs.readdirSync(dirPath, { withFileTypes: true })
       let filtered = entries.filter((e) => e.name !== '.' && e.name !== '..')
+      filtered = filtered.filter((e) => !(e.isDirectory() && ALWAYS_SKIP_DIRS.has(e.name)))
       if (useGitignore) {
         filtered = filtered.filter((e) => {
-          if (e.name === '.git') return false
           if (showHidden && e.name.startsWith('.')) return true
           return !matchesGitignore(e, dirPath, patterns)
         })
@@ -159,7 +165,10 @@ function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeByt
       node.children = filtered.map((e) => {
         const fullPath = path.join(dirPath, e.name)
         try {
-          return buildTree(fullPath, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth + 1)
+          if (e.isDirectory()) {
+            return _buildDirNode(fullPath, e.name, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth + 1)
+          }
+          return _buildFileNode(fullPath, e.name, maxSizeBytes)
         } catch (err) {
           console.log(`Error al procesar ${fullPath}: ${err.message}`)
           return { name: e.name, type: 'error', error: err.message, path: fullPath }
@@ -170,12 +179,55 @@ function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeByt
       node.children = []
       node.error = err.message
     }
-  }
-  if (!stat.isDirectory()) {
+  } else if (maxSizeBytes) {
     node.size = stat.size
-    if (maxSizeBytes && stat.size > maxSizeBytes) {
-      node.skipped = true
+    if (stat.size > maxSizeBytes) node.skipped = true
+  }
+  return node
+}
+
+function _buildDirNode(dirPath, name, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth) {
+  const node = { name, type: 'directory', path: dirPath }
+  if (maxDepth > 0 && currentDepth >= maxDepth) {
+    node.children = []
+    return node
+  }
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+    let filtered = entries.filter((e) => e.name !== '.' && e.name !== '..')
+    filtered = filtered.filter((e) => !(e.isDirectory() && ALWAYS_SKIP_DIRS.has(e.name)))
+    if (useGitignore) {
+      filtered = filtered.filter((e) => {
+        if (showHidden && e.name.startsWith('.')) return true
+        return !matchesGitignore(e, dirPath, patterns)
+      })
     }
+    node.children = filtered.map((e) => {
+      const fullPath = path.join(dirPath, e.name)
+      try {
+        if (e.isDirectory()) {
+          return _buildDirNode(fullPath, e.name, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth + 1)
+        }
+        return _buildFileNode(fullPath, e.name, maxSizeBytes)
+      } catch (err) {
+        console.log(`Error al procesar ${fullPath}: ${err.message}`)
+        return { name: e.name, type: 'error', error: err.message, path: fullPath }
+      }
+    })
+  } catch (err) {
+    console.log(`Error al leer directorio ${dirPath}: ${err.message}`)
+    node.children = []
+    node.error = err.message
+  }
+  return node
+}
+
+function _buildFileNode(dirPath, name, maxSizeBytes) {
+  const node = { name, type: 'file', path: dirPath }
+  if (maxSizeBytes) {
+    const stat = fs.statSync(dirPath)
+    node.size = stat.size
+    if (stat.size > maxSizeBytes) node.skipped = true
   }
   return node
 }

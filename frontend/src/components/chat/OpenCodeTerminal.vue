@@ -102,7 +102,7 @@ export default {
     async function copyAll() {
       try {
         await navigator.clipboard.writeText(internalLines.value.join('\n'))
-      } catch {}
+      } catch (err) { console.log('[OpenCodeTerminal] Error al copiar al portapapeles:', err.message); }
     }
 
     watch(() => internalLines.value.length, async () => {

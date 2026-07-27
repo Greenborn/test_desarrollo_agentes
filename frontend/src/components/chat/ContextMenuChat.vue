@@ -17,7 +17,7 @@ export default {
   props: {
     ctxMenu: { type: Object, required: true },
     rawMsgKeys: { type: Set, default: () => new Set() },
-    msgKey: { type: Function, default: (msg) => msg.id || msg._key },
+    msgKey: { type: Function, default: (msg) => msg.id ?? msg._key },
   },
   emits: ['toggleRaw', 'copyPlain', 'delete', 'close', 'adjustPosition'],
   computed: {

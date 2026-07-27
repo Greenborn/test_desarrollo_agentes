@@ -398,7 +398,7 @@ async function streamRefine(text, systemPrompt, sessionId) {
   })
   if (!res.ok) {
     let errMsg = 'Error en la consulta'
-    try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
+    try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch (parseErr) { console.log('[DescripcionMejorar] Error al parsear body de error:', parseErr.message); }
     throw new Error(errMsg)
   }
   const reader = res.body.getReader()
@@ -823,7 +823,7 @@ export default {
           }),
         })
         ocStore.saveCurrentToMap(props.sessionId)
-        chatStore.pushMessage({ role: 'opencode_info', content: 'OpenCode iniciado' })
+        chatStore.pushMessage({ role: 'opencode_info', content: 'OpenCode iniciado', _key: 'oc-info-' + Date.now() })
       } catch (err) {
         console.error('Error al iniciar OpenCode:', err)
       }

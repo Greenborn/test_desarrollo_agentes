@@ -55,7 +55,10 @@ router.get('/sessions', async (req, res) => {
       .whereIn('chat_sessions.workspace_id', wsIds)
       .orderBy('chat_sessions.updated_at', 'desc')
       .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
-      .leftJoin('tickets', 'chat_sessions.id_ticket_redmine', 'tickets.redmine_id')
+      .leftJoin('tickets', function () {
+        this.on('chat_sessions.id_ticket_redmine', '=', 'tickets.redmine_id')
+          .andOn('chat_sessions.workspace_id', '=', 'tickets.workspace_id')
+      })
       .select(
         'chat_sessions.id',
         'title',
@@ -631,7 +634,10 @@ router.get('/sessions/archived', async (req, res) => {
       .whereIn('chat_sessions.workspace_id', wsIds)
       .orderBy('chat_sessions.updated_at', 'desc')
       .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
-      .leftJoin('tickets', 'chat_sessions.id_ticket_redmine', 'tickets.redmine_id')
+      .leftJoin('tickets', function () {
+        this.on('chat_sessions.id_ticket_redmine', '=', 'tickets.redmine_id')
+          .andOn('chat_sessions.workspace_id', '=', 'tickets.workspace_id')
+      })
       .select(
         'chat_sessions.id',
         'title',
@@ -727,7 +733,10 @@ router.post('/sessions/:id/clone', async (req, res) => {
     let newSession = await db('chat_sessions')
       .where({ 'chat_sessions.id': newId })
       .leftJoin('proyectos', 'chat_sessions.proyecto_id', 'proyectos.id')
-      .leftJoin('tickets', 'chat_sessions.id_ticket_redmine', 'tickets.redmine_id')
+      .leftJoin('tickets', function () {
+        this.on('chat_sessions.id_ticket_redmine', '=', 'tickets.redmine_id')
+          .andOn('chat_sessions.workspace_id', '=', 'tickets.workspace_id')
+      })
       .select(
         'chat_sessions.id',
         'title',

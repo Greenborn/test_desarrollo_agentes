@@ -1,5 +1,19 @@
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
 import db from '../config/db.js';
+
+function execAsync(cmd, opts = {}) {
+  return new Promise((resolve, reject) => {
+    exec(cmd, opts, (error, stdout, stderr) => {
+      if (error) {
+        error.stdout = stdout;
+        error.stderr = stderr;
+        reject(error);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+  });
+}
 
 export async function fetchAllSessionRepos() {
   console.log('[git-fetch] Iniciando actualización de repositorios de sesiones de chat...');
@@ -18,14 +32,15 @@ export async function fetchAllSessionRepos() {
 
     for (const dir of dirs) {
       try {
-        const rootPath = execSync('git rev-parse --show-toplevel', {
+        const { stdout } = await execAsync('git rev-parse --show-toplevel', {
           cwd: dir,
           encoding: 'utf-8',
           timeout: 5000,
-        }).trim();
+        });
+        const rootPath = stdout.trim();
 
         console.log(`[git-fetch] Ejecutando git fetch en: ${rootPath}`);
-        execSync('git fetch', {
+        await execAsync('git fetch', {
           cwd: rootPath,
           encoding: 'utf-8',
           timeout: 30000,

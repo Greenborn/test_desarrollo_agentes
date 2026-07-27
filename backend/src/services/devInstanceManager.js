@@ -84,7 +84,115 @@ async function detectInstancePort(entry) {
   }
 }
 
-export async function startDevInstance(projectRoot, deployConfig, sessionId = null) {
+function spawnSubproject(sub, index, projectRoot, sessionId, session, npmCiResult) {
+  const fullPath = path.resolve(projectRoot, sub.cwd);
+
+  if (!fs.existsSync(fullPath)) {
+    return { name: sub.cwd, type: sub.type, status: 'error', error: `Directorio no encontrado: ${fullPath}` };
+  }
+
+  if (npmCiResult.status === 'rejected') {
+    return { name: sub.cwd, type: sub.type, status: 'error', error: 'npm ci falló. Revise los logs del servidor.' };
+  }
+
+  let proc;
+  if (sub.command) {
+    const parts = sub.command.split(/\s+/);
+    const cmd = parts[0];
+    const args = parts.slice(1);
+    console.log(`[dev] Ejecutando comando personalizado para ${sub.cwd}: ${sub.command}`);
+    proc = spawn(cmd, args, {
+      cwd: fullPath,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env },
+      detached: true,
+    });
+  } else if (sub.type === 'backend') {
+    proc = spawn('npx', ['nodemon'], {
+      cwd: fullPath,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env },
+      detached: true,
+    });
+  } else {
+    proc = spawn('npm', ['run', 'dev'], {
+      cwd: fullPath,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env },
+      detached: true,
+    });
+  }
+
+  const entry = {
+    name: sub.cwd,
+    type: sub.type,
+    cwd: fullPath,
+    process: proc,
+    status: 'running',
+    logs: [],
+    sessionId,
+    detectedPort: null,
+    detectedUrl: null,
+  };
+
+  const MAX_LOG_LINES = 200;
+  const tag = `[dev:${sub.cwd}]`;
+  const urlRegex = /https?:\/\/localhost:\d+/g;
+
+  proc.stdout.on('data', (data) => {
+    const text = data.toString().trim();
+    if (text) {
+      console.log(tag, text);
+      entry.logs.push(text);
+      if (entry.logs.length > MAX_LOG_LINES) entry.logs.splice(0, entry.logs.length - MAX_LOG_LINES);
+      if (sub.type === 'frontend' && !entry.detectedUrl) {
+        const match = text.match(urlRegex);
+        if (match) {
+          entry.detectedUrl = match[0];
+          entry.detectedPort = parseInt(new URL(match[0]).port, 10);
+        }
+      }
+    }
+  });
+
+  proc.stderr.on('data', (data) => {
+    const text = data.toString().trim();
+    if (text) {
+      console.log(tag, text);
+      entry.logs.push(text);
+      if (entry.logs.length > MAX_LOG_LINES) entry.logs.splice(0, entry.logs.length - MAX_LOG_LINES);
+      if (sub.type === 'frontend' && !entry.detectedUrl) {
+        const match = text.match(urlRegex);
+        if (match) {
+          entry.detectedUrl = match[0];
+          entry.detectedPort = parseInt(new URL(match[0]).port, 10);
+        }
+      }
+    }
+  });
+
+  proc.on('exit', (code) => {
+    console.log(tag, `proceso terminado, código: ${code}`);
+    entry.status = 'stopped';
+    entry.process = null;
+  });
+
+  proc.on('error', (err) => {
+    console.log(tag, `error: ${err.message}`);
+    entry.status = 'error';
+    entry.process = null;
+  });
+
+  session.instances.set(sub.cwd, entry);
+
+  if (proc && proc.pid) {
+    detectInstancePort(entry);
+  }
+
+  return { name: sub.cwd, type: sub.type, status: 'running' };
+}
+
+export async function startDevInstance(projectRoot, deployConfig, sessionId = null, maxConcurrent = 1) {
   if (!sessionId) {
     throw new Error('Se requiere sessionId para iniciar una instancia de desarrollo.');
   }
@@ -101,113 +209,20 @@ export async function startDevInstance(projectRoot, deployConfig, sessionId = nu
 
   const results = [];
 
-  for (let i = 0; i < subprojects.length; i++) {
-    const sub = subprojects[i];
-    const fullPath = path.resolve(projectRoot, sub.cwd);
-
-    if (!fs.existsSync(fullPath)) {
-      results.push({ name: sub.cwd, type: sub.type, status: 'error', error: `Directorio no encontrado: ${fullPath}` });
-      continue;
+  if (!maxConcurrent || maxConcurrent <= 1) {
+    for (let i = 0; i < subprojects.length; i++) {
+      results.push(spawnSubproject(subprojects[i], i, projectRoot, sessionId, session, npmCiResults[i]));
     }
-
-    if (npmCiResults[i].status === 'rejected') {
-      results.push({ name: sub.cwd, type: sub.type, status: 'error', error: 'npm ci falló. Revise los logs del servidor.' });
-      continue;
-    }
-
-    let proc;
-    if (sub.command) {
-      const parts = sub.command.split(/\s+/);
-      const cmd = parts[0];
-      const args = parts.slice(1);
-      console.log(`[dev] Ejecutando comando personalizado para ${sub.cwd}: ${sub.command}`);
-      proc = spawn(cmd, args, {
-        cwd: fullPath,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env },
-        detached: true,
-      });
-    } else if (sub.type === 'backend') {
-      proc = spawn('npx', ['nodemon'], {
-        cwd: fullPath,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env },
-        detached: true,
-      });
-    } else {
-      proc = spawn('npm', ['run', 'dev'], {
-        cwd: fullPath,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env },
-        detached: true,
-      });
-    }
-
-    const entry = {
-      name: sub.cwd,
-      type: sub.type,
-      cwd: fullPath,
-      process: proc,
-      status: 'running',
-      logs: [],
-      sessionId,
-      detectedPort: null,
-      detectedUrl: null,
-    };
-
-    const MAX_LOG_LINES = 200;
-    const tag = `[dev:${sub.cwd}]`;
-    const urlRegex = /https?:\/\/localhost:\d+/g;
-
-    proc.stdout.on('data', (data) => {
-      const text = data.toString().trim();
-      if (text) {
-        console.log(tag, text);
-        entry.logs.push(text);
-        if (entry.logs.length > MAX_LOG_LINES) entry.logs.splice(0, entry.logs.length - MAX_LOG_LINES);
-        if (sub.type === 'frontend' && !entry.detectedUrl) {
-          const match = text.match(urlRegex);
-          if (match) {
-            entry.detectedUrl = match[0];
-            entry.detectedPort = parseInt(new URL(match[0]).port, 10);
-          }
-        }
+  } else {
+    for (let i = 0; i < subprojects.length; i += maxConcurrent) {
+      const batch = subprojects.slice(i, i + maxConcurrent);
+      for (let j = 0; j < batch.length; j++) {
+        const idx = i + j;
+        results.push(spawnSubproject(batch[j], idx, projectRoot, sessionId, session, npmCiResults[idx]));
       }
-    });
-
-    proc.stderr.on('data', (data) => {
-      const text = data.toString().trim();
-      if (text) {
-        console.log(tag, text);
-        entry.logs.push(text);
-        if (entry.logs.length > MAX_LOG_LINES) entry.logs.splice(0, entry.logs.length - MAX_LOG_LINES);
-        if (sub.type === 'frontend' && !entry.detectedUrl) {
-          const match = text.match(urlRegex);
-          if (match) {
-            entry.detectedUrl = match[0];
-            entry.detectedPort = parseInt(new URL(match[0]).port, 10);
-          }
-        }
+      if (i + maxConcurrent < subprojects.length) {
+        await new Promise(r => setTimeout(r, 500));
       }
-    });
-
-    proc.on('exit', (code) => {
-      console.log(tag, `proceso terminado, código: ${code}`);
-      entry.status = 'stopped';
-      entry.process = null;
-    });
-
-    proc.on('error', (err) => {
-      console.log(tag, `error: ${err.message}`);
-      entry.status = 'error';
-      entry.process = null;
-    });
-
-    session.instances.set(sub.cwd, entry);
-    results.push({ name: sub.cwd, type: sub.type, status: 'running' });
-
-    if (proc && proc.pid) {
-      detectInstancePort(entry);
     }
   }
 

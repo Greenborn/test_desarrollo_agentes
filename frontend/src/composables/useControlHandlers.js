@@ -1446,7 +1446,7 @@ export function useControlHandlers(api) {
 
       if (!res.ok) {
         let errMsg = 'Error al refinar descripción'
-        try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
+        try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch (parseErr) { console.log('[refine] Error al parsear body de error:', parseErr.message); }
         throw new Error(errMsg)
       }
 

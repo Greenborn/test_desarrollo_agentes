@@ -141,7 +141,7 @@ export default {
     function connectWebSocket(terminalId) {
       if (!terminalId) return
       if (ws) {
-        try { ws.close() } catch {}
+        try { ws.close() } catch (err) { console.log('[xterm] Error al cerrar WS (esperado si ya está cerrado):', err.message); }
         ws = null
       }
 
@@ -174,6 +174,8 @@ export default {
           terminal.write(`\r\n\x1b[38;5;245m[proceso terminado: código ${msg.code}]\x1b[0m\r\n`)
           cancelReconnect()
           emit('exit', { code: msg.code, output: msg.output || accumulatedOutput, terminalId: currentTerminalId })
+          closingIntentionally = true
+          setTimeout(() => disconnect(), 1500)
         } else if (msg.type === 'created' && terminal && isReconnecting) {
           terminal.write(`\r\n\x1b[38;5;245m[reconectado exitosamente]\x1b[0m\r\n`)
         }
@@ -250,7 +252,7 @@ export default {
       cancelReconnect()
       await closeTerminalViaApi(currentTerminalId)
       if (ws) {
-        try { ws.close() } catch {}
+        try { ws.close() } catch (err) { console.log('[xterm] Error al cerrar WS en disconnect:', err.message); }
         ws = null
       }
       emit('close', currentTerminalId)
@@ -408,7 +410,7 @@ export default {
         fsResizeObserver.disconnect()
       }
       if (ws) {
-        try { ws.close() } catch {}
+        try { ws.close() } catch (err) { console.log('[xterm] Error al cerrar WS en unmount:', err.message); }
         ws = null
       }
       if (terminal) {

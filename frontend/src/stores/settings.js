@@ -33,6 +33,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const browserUserAgentFirefox = ref('')
   const skillRepositoryUrl = ref('')
   const terminalMaxTerminals = ref(5)
+  const executionMode = ref('sequential')
+  const maxConcurrentProcesses = ref(10)
   const defaultCommentModeCommit = ref('encolar')
   const defaultCommentModeTicket = ref('encolar')
   const defaultCommentModeDiff = ref('encolar')
@@ -83,6 +85,8 @@ export const useSettingsStore = defineStore('settings', () => {
       browserUserAgentFirefox.value = keys.browser_user_agent_firefox || ''
       skillRepositoryUrl.value = keys.skill_repository_url || ''
       terminalMaxTerminals.value = parseInt(keys.terminal_max_terminals, 10) || 5
+      executionMode.value = keys.execution_mode || 'sequential'
+      maxConcurrentProcesses.value = parseInt(keys.max_concurrent_processes, 10) || 10
       defaultCommentModeCommit.value = keys.default_comment_mode_commit || 'encolar'
       defaultCommentModeTicket.value = keys.default_comment_mode_ticket || 'encolar'
       defaultCommentModeDiff.value = keys.default_comment_mode_diff || 'encolar'
@@ -148,6 +152,8 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'browser_user_agent_firefox': browserUserAgentFirefox.value = value; break
       case 'skill_repository_url': skillRepositoryUrl.value = value; break
       case 'terminal_max_terminals': terminalMaxTerminals.value = parseInt(value, 10) || 5; break
+      case 'execution_mode': executionMode.value = value || 'sequential'; break
+      case 'max_concurrent_processes': maxConcurrentProcesses.value = parseInt(value, 10) || 10; break
       case 'default_comment_mode_commit': defaultCommentModeCommit.value = value || 'encolar'; break
       case 'default_comment_mode_ticket': defaultCommentModeTicket.value = value || 'encolar'; break
       case 'default_comment_mode_diff': defaultCommentModeDiff.value = value || 'encolar'; break
@@ -189,6 +195,8 @@ export const useSettingsStore = defineStore('settings', () => {
     browserUserAgentFirefox.value = ''
     skillRepositoryUrl.value = ''
     terminalMaxTerminals.value = 5
+    executionMode.value = 'sequential'
+    maxConcurrentProcesses.value = 10
     defaultCommentModeCommit.value = 'encolar'
     defaultCommentModeTicket.value = 'encolar'
     defaultCommentModeDiff.value = 'encolar'
@@ -203,8 +211,8 @@ export const useSettingsStore = defineStore('settings', () => {
            documentacionPromptFuncionalidades, ticketDescripcionPrompt, ticketRefinarPrompt,
            deteccionFuncionalidadesPrompt, codeFileExtensions, codeFileMaxSizeKb,
            priorityColorLow, priorityColorNormal, priorityColorHigh, priorityColorUrgent, priorityColorImmediate,
-            skillRepositoryUrl, terminalMaxTerminals,
-            defaultCommentModeCommit, defaultCommentModeTicket, defaultCommentModeDiff,
+            skillRepositoryUrl, terminalMaxTerminals, executionMode, maxConcurrentProcesses,
+             defaultCommentModeCommit, defaultCommentModeTicket, defaultCommentModeDiff,
              saveError, saveSuccess, clearFeedback, load, save, applyPriorityColors, reset,
             requestResponseMaxSizeKb, browserStealthEnabled, browserUserAgentChrome, browserUserAgentFirefox }
 })

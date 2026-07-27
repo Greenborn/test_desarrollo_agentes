@@ -13,7 +13,7 @@
           <div v-if="!loadingMore && !hasMoreMessages && messages.length > 50" class="text-center text-muted small py-1">
             — Todos los mensajes cargados —
           </div>
-          <ChatMessage v-for="m in messages.filter(Boolean)" :key="m.id || m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
+          <ChatMessage v-for="m in messages.filter(Boolean)" :key="m.id ?? m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
           <template v-for="ts in terminalSessions" :key="ts.sid + '-' + ts._key">
             <XtermTerminal v-show="ts.isActive" :label="ts.label" :cwd="ts.cwd" :init-command="ts.initCommand" :session-id="ts.sid" :terminal-id="ts.terminalId" @close="onTerminalClose" @terminal-ready="onTerminalReady" @exit="onTerminalExit" />
           </template>
@@ -204,7 +204,7 @@ export default {
     })
 
     function msgKey(msg) {
-      return msg.id || msg._key
+      return msg.id ?? msg._key
     }
 
     async function send() {

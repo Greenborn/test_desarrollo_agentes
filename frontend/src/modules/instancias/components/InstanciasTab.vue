@@ -5,6 +5,30 @@
         <input type="checkbox" v-model="filterBySession" class="form-check-input m-0" style="cursor: pointer; width: 14px; height: 14px;" />
         Solo sesión actual
       </label>
+
+      <select
+        v-model="localExecutionMode"
+        class="form-select form-select-sm"
+        style="font-size: 0.7rem; width: auto; background: #0d1117; color: #e0e0e0; border-color: #374151; padding: 1px 4px;"
+        title="Modo de ejecución"
+      >
+        <option value="sequential">Secuencial</option>
+        <option value="concurrent">Concurrente</option>
+      </select>
+
+      <template v-if="localExecutionMode === 'concurrent'">
+        <label class="small text-secondary" style="font-size: 0.65rem; white-space: nowrap;">Máx.:</label>
+        <input
+          v-model.number="localMaxConcurrent"
+          type="number"
+          min="1"
+          max="50"
+          step="1"
+          class="form-control form-control-sm"
+          style="font-size: 0.7rem; width: 60px; background: #0d1117; color: #e0e0e0; border-color: #374151; padding: 1px 4px;"
+        />
+      </template>
+
       <button
         class="btn btn-sm py-0 px-1"
         style="font-size: 0.7rem; color: #6b7280; background: none; border: none; line-height: 1;"
@@ -104,6 +128,7 @@ import { useChatStore } from '../../../stores/chat.js'
 import { useDevInstanceStore } from '../../../stores/devInstance.js'
 import { useCommandRegistry } from '../../../composables/useCommandRegistry.js'
 import { useCommandStore } from '../../../stores/command.js'
+import { useSettingsStore } from '../../../stores/settings.js'
 import { useProjectStore } from '../../../stores/project.js'
 import { useProjectVariablesStore } from '../../../stores/projectVariables.js'
 
@@ -131,10 +156,25 @@ export default {
 
     const chatStore = useChatStore()
     const cmdStore = useCommandStore()
+    const settingsStore = useSettingsStore()
     const projectVarsStore = useProjectVariablesStore()
     const projectStore = useProjectStore()
     const { pinnedProjectId } = storeToRefs(projectStore)
     const { find } = useCommandRegistry()
+
+    const localExecutionMode = ref(settingsStore.executionMode)
+    const localMaxConcurrent = ref(settingsStore.maxConcurrentProcesses)
+
+    watch(localExecutionMode, (val) => {
+      settingsStore.save('execution_mode', val)
+    })
+
+    watch(localMaxConcurrent, (val) => {
+      const num = parseInt(val, 10)
+      if (num >= 1 && num <= 50) {
+        settingsStore.save('max_concurrent_processes', String(num))
+      }
+    })
 
     const activeSessionId = computed(() => chatStore.activeSessionId)
 
@@ -282,6 +322,8 @@ export default {
       refrescar,
       cerrarPuertosAction,
       detener: devDetener,
+      localExecutionMode,
+      localMaxConcurrent,
     }
   },
 }

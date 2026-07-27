@@ -1,35 +1,41 @@
 <template>
   <div class="commit-result-control">
-    <div class="mb-2" style="color: #9ca3af; font-size: 0.8rem;">Propuesta de commit:</div>
-    <textarea
-      v-model="editedMessage"
-      class="form-control bg-dark text-light border-secondary font-monospace p-3 mb-2 rounded-3"
-      style="min-height: 100px; resize: vertical; font-size: 0.875rem;"
-    ></textarea>
-    <div v-if="repoUrl" class="mb-2" style="color: #9ca3af; font-size: 0.8rem;">
-      Repositorio: <a :href="repoUrl" target="_blank" rel="noopener noreferrer" style="color: #75AADB; text-decoration: none;">{{ repoUrl }}</a>
-    </div>
-    <label class="d-flex align-items-center gap-2 mb-2" style="color: #9ca3af; font-size: 0.8rem; cursor: pointer;">
-      <input type="checkbox" v-model="addComment" class="form-check-input" style="cursor: pointer;" />
-      Agregar comentario al ticket
-    </label>
-    <div class="d-flex align-items-center gap-2 mb-2">
-      <label class="small text-light-emphasis mb-0" style="color: #9ca3af; font-size: 0.8rem;">Modo envío:</label>
-      <select v-model="modoEnvio" class="form-select form-select-sm bg-dark text-light border-secondary font-monospace" style="width: auto;">
-        <option value="encolar">Encolar</option>
-        <option value="enviar">Enviar</option>
-      </select>
-    </div>
-    <div class="d-flex gap-2">
-      <button class="btn btn-sm btn-success" @click="confirmar">
-        Confirmar
-      </button>
-      <button class="btn btn-sm btn-argentina" @click="reintentar" :disabled="loading">
-        {{ loading ? 'Generando...' : 'Reintentar' }}
-      </button>
-      <button class="btn btn-sm btn-outline-argentina" @click="cancelar" :disabled="loading">
-        Cancelar
-      </button>
+    <template v-if="!loading">
+      <div class="mb-2" style="color: #9ca3af; font-size: 0.8rem;">Propuesta de commit:</div>
+      <textarea
+        v-model="editedMessage"
+        class="form-control bg-dark text-light border-secondary font-monospace p-3 mb-2 rounded-3"
+        style="min-height: 100px; resize: vertical; font-size: 0.875rem;"
+      ></textarea>
+      <div v-if="repoUrl" class="mb-2" style="color: #9ca3af; font-size: 0.8rem;">
+        Repositorio: <a :href="repoUrl" target="_blank" rel="noopener noreferrer" style="color: #75AADB; text-decoration: none;">{{ repoUrl }}</a>
+      </div>
+      <label class="d-flex align-items-center gap-2 mb-2" style="color: #9ca3af; font-size: 0.8rem; cursor: pointer;">
+        <input type="checkbox" v-model="addComment" class="form-check-input" style="cursor: pointer;" />
+        Agregar comentario al ticket
+      </label>
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <label class="small text-light-emphasis mb-0" style="color: #9ca3af; font-size: 0.8rem;">Modo envío:</label>
+        <select v-model="modoEnvio" class="form-select form-select-sm bg-dark text-light border-secondary font-monospace" style="width: auto;">
+          <option value="encolar">Encolar</option>
+          <option value="enviar">Enviar</option>
+        </select>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-success" @click="confirmar">
+          Confirmar
+        </button>
+        <button class="btn btn-sm btn-argentina" @click="reintentar">
+          Reintentar
+        </button>
+        <button class="btn btn-sm btn-outline-argentina" @click="cancelar">
+          Cancelar
+        </button>
+      </div>
+    </template>
+    <div v-else class="d-flex flex-column align-items-center gap-2 py-3">
+      <div class="spinner-border text-success" role="status" style="width: 2rem; height: 2rem;"></div>
+      <span style="color: #9ca3af; font-size: 0.875rem;">Procesando commit...</span>
     </div>
   </div>
 </template>

@@ -84,7 +84,7 @@ export function useOpencodeStreaming() {
     function formatToolCall(content) {
       let name = content
       let args = ''
-      try { const p = JSON.parse(content); if (p.name) name = p.name; if (p.arguments) args = typeof p.arguments === 'object' ? JSON.stringify(p.arguments, null, 2) : String(p.arguments) } catch {}
+      try { const p = JSON.parse(content); if (p.name) name = p.name; if (p.arguments) args = typeof p.arguments === 'object' ? JSON.stringify(p.arguments, null, 2) : String(p.arguments) } catch (err) { console.log('[streaming] Error al parsear tool call:', err.message); }
       let block = `\n\n┌─ 🔧 ${name}`
       if (args) block += `\n│ ${args.split('\n').join('\n│ ')}`
       block += '\n└──────────────\n'
@@ -508,7 +508,7 @@ export function useOpencodeStreaming() {
     })
     if (!res.ok) {
       let errMsg = 'Error en refine'
-      try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
+      try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch (parseErr) { console.log('[refine] Error al parsear body de error:', parseErr.message); }
       throw new Error(errMsg)
     }
     let result = ''
@@ -579,7 +579,7 @@ export function useOpencodeStreaming() {
 
       if (!res.ok) {
         let errMsg = 'Error al traducir mensaje de commit'
-        try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
+        try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch (parseErr) { console.log('[traducir] Error al parsear body de error:', parseErr.message); }
         throw new Error(errMsg)
       }
 
@@ -807,7 +807,7 @@ export function useOpencodeStreaming() {
 
           if (!res.ok) {
             let errMsg = 'Error al reducir mensaje de commit'
-            try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch {}
+            try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch (parseErr) { console.log('[reducir] Error al parsear body de error:', parseErr.message); }
             throw new Error(errMsg)
           }
 

@@ -1019,8 +1019,10 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 
 ### `POST /api/despliegue/iniciar-instancia-dev`
 - **Auth:** Requerida
-- **Body:** `{ sessionId: number }`
-- **Descripción:** Lee la configuración de despliegue del proyecto vinculado a la sesión, identifica subproyectos desde `install[]` (backends por `pm2[]`, fronts por `build[]`), ejecuta `npm ci` en paralelo en cada uno y luego inicia los procesos de desarrollo: `npx nodemon` para backends, `npm run dev` para fronts. Los procesos quedan bajo gestión del servidor (órbita de control).
+- **Body:** `{ sessionId: number, executionMode?: "sequential"|"concurrent", maxConcurrent?: number }`
+  - `executionMode`: modo de ejecución (`"sequential"` lanza procesos uno tras otro, `"concurrent"` los lanza en lotes). Por defecto `"sequential"`.
+  - `maxConcurrent`: número máximo de procesos a lanzar simultáneamente (solo aplica si `executionMode === "concurrent"`). Por defecto 10.
+- **Descripción:** Lee la configuración de despliegue del proyecto vinculado a la sesión, identifica subproyectos desde `install[]` (backends por `pm2[]`, fronts por `build[]`), ejecuta `npm ci` en paralelo en cada uno y luego inicia los procesos de desarrollo: `npx nodemon` para backends, `npm run dev` para fronts. Los procesos quedan bajo gestión del servidor (órbita de control). Si `executionMode` es `"concurrent"`, los procesos se lanzan en lotes de hasta `maxConcurrent` simultáneamente.
 - **Respuesta 200:** `{ success: true, results: [{ name: string, type: "backend"|"frontend", status: "running"|"error", error?: string }] }`
 - **Respuesta 400:** `{ success: false, error: "..." }` (sin proyecto, sin config de despliegue, etc.)
 

@@ -16,7 +16,7 @@
     </div>
 
     <template v-for="t in localTabs" :key="t.id">
-      <component :is="t.component" v-if="tab === t.id" />
+      <component :is="t.component" v-if="t.component && tab === t.id" />
     </template>
     <div class="sidebar-right-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-right-resize-handle-bar"></div>

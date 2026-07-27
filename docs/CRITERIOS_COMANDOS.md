@@ -29,7 +29,7 @@
 
 - **Todo parámetro requerido debe validarse explícitamente.**
 - **Prohibido `||` como fallback de parámetros:** si un argumento es requerido, validarlo y devolver error si falta.
-- **Prohibido `catch {}` vacío:** todo error debe registrarse con `console.error` (frontend) o `console.log` (backend).
+- **Prohibido `catch {}` vacío:** todo error debe registrarse con `console.log` como mínimo (tanto frontend como backend).
 - Los errores de validación deben ser descriptivos: indicar qué parámetro falta y el formato esperado.
 
 ### Ejemplo de validación

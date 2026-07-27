@@ -264,11 +264,15 @@ router.get('/config', async (req, res) => {
 
 router.post('/iniciar-instancia-dev', async (req, res) => {
   try {
-    const { sessionId, resolution: customResolution } = req.body;
+    const { sessionId, resolution: customResolution, executionMode, maxConcurrent } = req.body;
 
     if (!sessionId) {
       return res.status(400).json({ success: false, error: 'Se requiere sessionId.' });
     }
+
+    const maxConcurrentValue = executionMode === 'concurrent'
+      ? (parseInt(maxConcurrent, 10) || 10)
+      : 1;
 
     const session = await db('chat_sessions')
       .where({ id: sessionId, user_id: req.session.userId })
@@ -306,7 +310,7 @@ router.post('/iniciar-instancia-dev', async (req, res) => {
 
     const projectRoot = session.cwd || process.cwd();
 
-    const results = await devInstanceManager.startDevInstance(projectRoot, deployConfig, sessionId);
+    const results = await devInstanceManager.startDevInstance(projectRoot, deployConfig, sessionId, maxConcurrentValue);
 
     const allPorts = await devInstanceManager.waitForAllPorts(sessionId, 20000);
 

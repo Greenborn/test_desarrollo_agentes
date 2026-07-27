@@ -29,7 +29,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 - Comunicaciones frontend ↔ backend vía HTTP REST con `credentials: 'include'`
 - Streaming de chat vía Server-Sent Events sobre HTTP POST
 - **Prohibido `||` como fallback de parámetros:** si un argumento es requerido, validarlo explícitamente y devolver error si falta. No usar valores por defecto silenciosos.
-- **Prohibido `catch {}` vacío o `catch { /* silencio */ }`:** todo error debe registrarse con `console.error` (frontend) o `console.log` (backend) como mínimo. El silencio absoluto solo se permite en casos excepcionales documentados con comentario.
+- **Prohibido `catch {}` vacío o `catch { /* silencio */ }`:** todo error debe registrarse con `console.log` como mínimo (tanto frontend como backend). El silencio absoluto solo se permite en casos excepcionales documentados con comentario.
 - **Prohibido ocultar errores en consola:** nunca silenciar un error sin registrarlo. Si un error es esperado y manejado, documentar por qué.
 - **Sistema de comandos extensible:** usar `useCommandRegistry.js` para registrar comandos via `register({ name, category, description, usage, execute })`. No agregar nuevos comandos fuera del registry.
 - **Módulos auto-registrables:** seguir el sistema descrito en `frontend/src/modules/` y `backend/src/modules/`. Ver sección "Sistema de Módulos" más abajo.

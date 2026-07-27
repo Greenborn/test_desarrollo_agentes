@@ -69,7 +69,7 @@ async function _ejecutarComandoSimple(comandoId, sessionId) {
         } else if (json.type === 'error') {
           fullOutput += '\n[Error: ' + json.content + ']'
         }
-      } catch {}
+      } catch (err) { console.log('[comandos] Error al parsear línea SSE:', err.message); }
     }
   }
 

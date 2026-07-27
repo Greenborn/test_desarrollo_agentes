@@ -135,7 +135,7 @@ export default router
 5. **Sin stores dedicadas en el módulo:** Si el módulo necesita estado, usar stores Pinia existentes o `ref()` locales dentro del componente. Si se necesita una store nueva, crearla en `frontend/src/stores/` e importarla normalmente en el componente.
 6. **Session-scoping obligatorio:** Si el tab depende de una sesión de chat activa, validar dentro del componente con `useChatStore().activeSessionId`.
 7. **Prohibido `||` como fallback de parámetros:** Validar explícitamente cada argumento requerido y devolver error si falta.
-8. **Manejo de errores:** Todo `catch` debe registrar el error con `console.error` (frontend) o `console.log` (backend). Prohibido `catch {}` vacío o silencioso.
+8. **Manejo de errores:** Todo `catch` debe registrar el error con `console.log` (tanto frontend como backend). Prohibido `catch {}` vacío o silencioso.
 9. **Prohibido `alert()`:** Usar `modal.open(AlertModal, ...)` para notificaciones al usuario.
 
 ## Paneles disponibles

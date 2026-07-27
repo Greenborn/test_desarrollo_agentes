@@ -5,9 +5,11 @@ import knex from 'knex';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const projectDir = path.resolve(__dirname, '../../..');
+
 const gastosDbPath = process.env.DB_GASTOS_SQLITE_PATH
-  ? path.resolve(__dirname, '../../../../', process.env.DB_GASTOS_SQLITE_PATH)
-  : path.resolve(__dirname, '../../../data/gastos.db');
+  ? path.resolve(projectDir, 'backend', process.env.DB_GASTOS_SQLITE_PATH)
+  : path.resolve(projectDir, 'data/gastos.db');
 
 const db = knex({
   client: 'better-sqlite3',

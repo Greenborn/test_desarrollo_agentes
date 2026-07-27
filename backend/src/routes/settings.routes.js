@@ -86,6 +86,10 @@ router.get('/', async (req, res) => {
         keys.skill_repository_url = row.setting_value;
       } else if (row.setting_key === 'terminal_max_terminals') {
         keys.terminal_max_terminals = row.setting_value;
+      } else if (row.setting_key === 'execution_mode') {
+        keys.execution_mode = row.setting_value;
+      } else if (row.setting_key === 'max_concurrent_processes') {
+        keys.max_concurrent_processes = row.setting_value;
       } else if (row.setting_key === 'default_comment_mode_commit') {
         keys.default_comment_mode_commit = row.setting_value;
       } else if (row.setting_key === 'default_comment_mode_ticket') {
@@ -118,6 +122,8 @@ router.get('/', async (req, res) => {
       browser_user_agent_chrome: '',
       browser_user_agent_firefox: '',
       terminal_max_terminals: '5',
+      execution_mode: 'sequential',
+      max_concurrent_processes: '10',
       default_comment_mode_commit: 'encolar',
       default_comment_mode_ticket: 'encolar',
       default_comment_mode_diff: 'encolar',

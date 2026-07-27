@@ -123,20 +123,39 @@ export default {
     const flatTree = computed(() => props.sessionId ? fileTreeStore.getFlatTree(props.sessionId) : [])
 
     const imagePreviews = reactive({})
+    const loadingImages = new Set()
+    const IMAGE_PREVIEW_CONCURRENCY = 3
+    let imagePreviewQueue = []
+    let imagePreviewActive = 0
 
-    async function loadImagePreview(path) {
-      if (imagePreviews[path]) return
-      try {
-        const res = await fetch(`/api/command/read-file-base64?path=${encodeURIComponent(path)}`, {
-          credentials: 'include',
-        })
-        const data = await res.json()
-        if (data.success) {
-          imagePreviews[path] = `data:${data.mime};base64,${data.base64}`
+    async function _processImageQueue() {
+      while (imagePreviewQueue.length > 0 && imagePreviewActive < IMAGE_PREVIEW_CONCURRENCY) {
+        const path = imagePreviewQueue.shift()
+        if (imagePreviews[path] || loadingImages.has(path)) continue
+        imagePreviewActive++
+        loadingImages.add(path)
+        try {
+          const res = await fetch(`/api/command/read-file-base64?path=${encodeURIComponent(path)}`, {
+            credentials: 'include',
+          })
+          const data = await res.json()
+          if (data.success) {
+            imagePreviews[path] = `data:${data.mime};base64,${data.base64}`
+          }
+        } catch (err) {
+          console.error('Error al cargar preview de imagen:', err.message)
+        } finally {
+          imagePreviewActive--
+          loadingImages.delete(path)
+          _processImageQueue()
         }
-      } catch (err) {
-        console.error('Error al cargar preview de imagen:', err.message)
       }
+    }
+
+    function loadImagePreview(path) {
+      if (imagePreviews[path] || loadingImages.has(path)) return
+      imagePreviewQueue.push(path)
+      _processImageQueue()
     }
 
     function handleSelectFile(path, name) {
@@ -372,11 +391,17 @@ export default {
       if (newId) fileTreeStore.fetchTree(newId)
     }, { immediate: true })
 
+    const imagePreviewsQueued = new Set()
+
     watch(flatTree, (items) => {
       if (!items) return
       for (const item of items) {
         if (item.node.type === 'file' && isImageFile(item.node.name)) {
-          loadImagePreview(item.node.path)
+          const p = item.node.path
+          if (!imagePreviewsQueued.has(p)) {
+            imagePreviewsQueued.add(p)
+            loadImagePreview(p)
+          }
         }
       }
     }, { immediate: true, deep: false })

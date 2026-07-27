@@ -103,6 +103,11 @@ export const useFileTreeStore = defineStore('fileTree', () => {
     }
   }
 
+  async function ensureChildren(sessionId, path) {
+    if (isChildrenLoaded(sessionId, path)) return
+    await fetchChildren(sessionId, path)
+  }
+
   async function toggleDirectory(sessionId, path) {
     const paths = { ...(expandedPathsMap.value[sessionId] || {}) }
     if (paths[path]) {
@@ -156,6 +161,6 @@ export const useFileTreeStore = defineStore('fileTree', () => {
   return {
     getTree, getLoading, getError, getExpandedPaths,
     isExpanded, isChildrenLoaded, isLoadingChildren,
-    getFlatTree, fetchTree, toggleDirectory, fetchChildren, reset,
+    getFlatTree, fetchTree, toggleDirectory, fetchChildren, ensureChildren, reset,
   }
 })

@@ -168,7 +168,7 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 | `/despliegue_crear_config` | Escanea el directorio del proyecto, detecta subproyectos con `package.json` y genera automáticamente el archivo `deploy.json` | `/despliegue_crear_config [--dir=<ruta>]` |
 | `/despliegue_actualizar_config` | Lee `deploy.json` del directorio del proyecto y guarda la configuración de despliegue. Si no existe `deploy.json`, muestra un formulario interactivo para crearlo | `/despliegue_actualizar_config [--dir=<ruta>]` |
 | `/despliegue_mostrar_config` | Muestra la configuración de despliegue guardada para el proyecto actual como JSON formateado | `/despliegue_mostrar_config` |
-| `/despliegue_iniciar_instancia` | Lee la configuración de despliegue, ejecuta `npm ci` en paralelo en cada subproyecto e inicia los procesos de desarrollo | `/despliegue_iniciar_instancia [--resolucion=ID]` |
+| `/despliegue_iniciar_instancia` | Lee la configuración de despliegue, ejecuta `npm ci` en paralelo en cada subproyecto e inicia los procesos de desarrollo. El modo de ejecución (secuencial o concurrente) y el máximo de procesos simultáneos se configuran desde el panel de control (InstanciasTab). | `/despliegue_iniciar_instancia [--resolucion=ID]` |
 | `/despliegue_detener_instancia` | Detiene todos los procesos de desarrollo iniciados con `/despliegue_iniciar_instancia` | `/despliegue_detener_instancia` |
 | `/despliegue_ver_estado` | Muestra el estado (running/stopped/error) de cada proceso de desarrollo | `/despliegue_ver_estado` |
 

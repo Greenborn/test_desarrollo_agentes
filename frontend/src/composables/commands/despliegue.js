@@ -1,5 +1,6 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { useUiStore } from '../../stores/ui.js';
+import { useSettingsStore } from '../../stores/settings.js';
 import { settingGet } from '../../services/settingService.js';
 import { getUsedFlags } from '../parseCommandArgs.js';
 
@@ -19,7 +20,7 @@ async function fetchDefaultResolution(resolutions) {
   try {
     const data = await settingGet('default_resolution');
     if (data.value) return resolutions.find(r => r.id === data.value) || null;
-  } catch {}
+  } catch (err) { console.log('[despliegue] Error al obtener default_resolution:', err.message); }
   return null;
 }
 
@@ -171,7 +172,12 @@ register({
       resolution = await fetchDefaultResolution(resolutions);
     }
 
-    const body = { sessionId };
+    const settingsStore = useSettingsStore();
+    const body = {
+      sessionId,
+      executionMode: settingsStore.executionMode,
+      maxConcurrent: settingsStore.maxConcurrentProcesses,
+    };
     if (resolution) body.resolution = resolution;
 
     const res = await fetch('/api/despliegue/iniciar-instancia-dev', {

@@ -118,6 +118,9 @@
       </div>
       <ChatFormatter v-if="!isRaw" :text="msg.content" /><pre v-else class="mb-0" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
     </div>
+    <div v-if="messageTime" class="small" :class="msg.role === 'user' || msg.role === 'command' ? 'text-end' : 'text-start'" style="color: #6b7280; font-size: 0.65rem; margin-top: 2px;">
+      {{ messageTime }}
+    </div>
   </div>
 </template>
 
@@ -165,7 +168,7 @@ export default {
       return useSettingsStore()
     },
     msgKey() {
-      return this.msg.id || this.msg._key
+      return this.msg.id ?? this.msg._key
     },
     isRaw() {
       return this.rawMsgKeys.has(this.msgKey)
@@ -202,6 +205,18 @@ export default {
         console.error('Error parsing infoContent message:', e)
       }
       return null
+    },
+
+    messageTime() {
+      const ts = this.msg.created_at || this.msg._createdAt
+      if (!ts) return ''
+      const d = new Date(ts)
+      if (isNaN(d.getTime())) return ''
+      const now = new Date()
+      const isToday = d.toDateString() === now.toDateString()
+      const time = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+      if (isToday) return time
+      return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + time
     },
 
   },

@@ -33,7 +33,7 @@ function connect() {
   }
 
   if (ws) {
-    try { ws.close() } catch {}
+    try { ws.close() } catch (err) { console.log('[wsClient] Error al cerrar WS antes de reconectar:', err.message); }
     ws = null
   }
 
@@ -46,7 +46,7 @@ function connect() {
     rejectConnect = reject
     const timeout = setTimeout(() => {
       if (ws) {
-        try { ws.close() } catch {}
+        try { ws.close() } catch (err) { console.log('[wsClient] Error al cerrar WS por timeout:', err.message); }
         ws = null
       }
       connectPromise = null

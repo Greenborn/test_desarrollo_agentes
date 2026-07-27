@@ -17,7 +17,7 @@ requires: []
 5. **Categorías deben coincidir con COMANDOS.md.** Si agregas un comando a una categoría existente, verificar en `docs/COMANDOS.md` que el nombre de categoría coincida. Si creas categoría nueva, agregarla también en COMANDOS.md.
 6. **Documentar en COMANDOS.md.** Todo comando debe tener su fila en la tabla correspondiente de `docs/COMANDOS.md`.
 7. **Prohibido `||` como fallback de parámetros.** Validar explícitamente cada argumento requerido y devolver error si falta.
-8. **Manejo de errores.** Todo `catch` debe registrar el error con `console.error` (frontend) o `console.log` (backend). Prohibido `catch {}` vacío o silencioso.
+8. **Manejo de errores.** Todo `catch` debe registrar el error con `console.log` (tanto frontend como backend). Prohibido `catch {}` vacío o silencioso.
 
 ## Dónde registrar comandos
 
@@ -117,5 +117,5 @@ Ejecutar los siguientes pasos y **confirmar cada resultado**:
 | 4 | Leer `docs/COMANDOS.md` | La fila/documentación del comando está presente y actualizada |
 | 5 | Verificar `category` en código vs `docs/COMANDOS.md` | Coinciden exactamente (mismo string, mayúsculas/minúsculas) |
 | 6 | Revisar el código del comando | No usa argumentos posicionales. Todos los parámetros usan `--nombre=valor` |
-| 7 | Revisar bloque `catch` | No hay `catch {}` vacío. Todo error se registra con `console.error` |
+| 7 | Revisar bloque `catch` | No hay `catch {}` vacío. Todo error se registra con `console.log` |
 | 8 | Revisar validación de parámetros | No hay `\|\|` como fallback. Cada requerido se valida explícitamente con `parseCommandArgs` |

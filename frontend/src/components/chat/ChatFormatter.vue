@@ -35,10 +35,19 @@ function processInline(text) {
   return result
 }
 
+function stripAnsi(str) {
+  return str
+    .replace(/\x1b\[[0-9;<=>?!]*[ -/]*[a-zA-Z~]/g, '')
+    .replace(/\x1b\].*?(?:\x07|\x1b\\)/g, '')
+    .replace(/\x1b_G[^\x1b]*\x1b\\/g, '')
+    .replace(/\x1b[PX^_].*?\x1b\\/g, '')
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
+}
+
 function parseMarkdown(text) {
   if (!text) return ''
 
-  let html = escapeHtml(text)
+  let html = escapeHtml(stripAnsi(text))
 
   const codeBlocks = []
   html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
@@ -200,7 +209,12 @@ export default {
     },
     parsedHtml() {
       if (this.parsedJson) return ''
-      return parseMarkdown(this.text)
+      try {
+        return parseMarkdown(this.text)
+      } catch (e) {
+        console.log('ChatFormatter: markdown parse error, falling back to plain text', e)
+        return ''
+      }
     },
   },
 }

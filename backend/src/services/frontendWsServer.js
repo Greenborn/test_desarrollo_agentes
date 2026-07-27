@@ -140,7 +140,7 @@ async function handleProyectoVarListar(payload) {
     if (v.type === 'memory') {
       try {
         const memResult = await memoriaClient.get(memoryNamespace, v.key);
-        variables.push({ key: v.key, value: memResult.value, type: 'memory', created_at: v.created_at, updated_at: v.updated_at });
+        variables.push({ key: v.key, value: memResult ? memResult.value : '', type: 'memory', created_at: v.created_at, updated_at: v.updated_at });
       } catch (err) {
         console.log('[frontendWs] Error al obtener variable de memoria:', err.message);
         variables.push({ key: v.key, value: '', type: 'memory', created_at: v.created_at, updated_at: v.updated_at });
@@ -158,7 +158,7 @@ async function handleProyectoVarListar(payload) {
         if (!existingDbKeys.has(memKey)) {
           try {
             const memResult = await memoriaClient.get(memoryNamespace, memKey);
-            variables.push({ key: memKey, value: memResult.value, type: 'memory', created_at: null, updated_at: null });
+            variables.push({ key: memKey, value: memResult ? memResult.value : '', type: 'memory', created_at: null, updated_at: null });
           } catch (err) {
             console.log('[frontendWs] Error al obtener variable de memoria:', err.message);
             variables.push({ key: memKey, value: '', type: 'memory', created_at: null, updated_at: null });

@@ -12,6 +12,7 @@
       <button v-if="ticketInfo" class="btn btn-sm btn-outline-argentina px-2" @click="modificarTicket" title="Modificar ticket">✏️</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="seleccionarTicket" title="Seleccionar ticket">🔍</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="crearTicket" title="Crear ticket">🎫</button>
+      <button class="btn btn-sm btn-outline-argentina px-2" @click="crearProyecto" title="Crear proyecto">📁</button>
       <button v-if="!devInstanceRunning" class="btn btn-sm btn-outline-argentina px-2" @click="iniciarInstanciaDev" title="Iniciar instancia desarrollo">▶️</button>
       <button v-else class="btn btn-sm btn-outline-danger px-2" @click="detenerInstanciaDev" title="Detener instancia desarrollo">⏹️</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="configurarDespliegue" title="Configurar despliegue (deploy.json)">📋</button>
@@ -182,6 +183,11 @@ export default {
       await executeCommand('/redmine_crear_ticket')
     }
 
+    async function crearProyecto() {
+      if (!activeSessionId.value) return
+      await executeCommand('/redmine_crear_proyecto')
+    }
+
     async function iniciarOpencode() {
       if (!activeSessionId.value) return
       await executeCommand('/dev_opencode_iniciar')
@@ -225,7 +231,7 @@ export default {
       branchMismatch, truncatedSubject, priorityClass, devInstanceRunning,
       zoomIn, zoomOut,
       generarCommit, configurarDespliegue, iniciarInstanciaDev, detenerInstanciaDev,
-      modificarTicket, seleccionarTicket, crearTicket, iniciarOpencode, syncSkills, iniciarTerminal, clearChat, abrirNavegador,
+      modificarTicket, seleccionarTicket, crearTicket, crearProyecto, iniciarOpencode, syncSkills, iniciarTerminal, clearChat, abrirNavegador,
     }
   },
 }

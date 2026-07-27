@@ -96,16 +96,13 @@ export async function syncRedmineTicket(redmineId, wsId, proyectoId) {
     redmine_closed_on: toDateTime(issue.closed_on),
   };
 
-  const existing = await db('tickets').where({ redmine_id: issue.id, workspace_id: wsId }).first();
-  if (existing) {
-    await db('tickets').where({ redmine_id: issue.id, workspace_id: wsId }).update(ticketData);
-    if (existing.workspace_id !== ticketData.workspace_id) {
-      await db('chat_sessions')
-        .where({ id_ticket_redmine: issue.id })
-        .update({ workspace_id: ticketData.workspace_id, updated_at: db.fn.now() });
-    }
-  } else {
-    await db('tickets').insert(ticketData);
+  const oldWsId = (await db('tickets').where({ redmine_id: issue.id }).first())?.workspace_id;
+  await db('tickets').where({ redmine_id: issue.id }).del();
+  await db('tickets').insert(ticketData);
+  if (oldWsId && oldWsId !== ticketData.workspace_id) {
+    await db('chat_sessions')
+      .where({ id_ticket_redmine: issue.id })
+      .update({ workspace_id: ticketData.workspace_id, updated_at: db.fn.now() });
   }
 
   return { found: true, ticket: ticketData };
