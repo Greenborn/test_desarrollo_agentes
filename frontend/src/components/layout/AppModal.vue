@@ -22,7 +22,7 @@
         </div>
       </div>
       <div class="modal-window-body" @contextmenu.prevent="showModalContextMenu">
-        <component :is="modal.component" v-if="modal.component" v-bind="modal.props" @close="close(modal.id)" @cancel="close(modal.id)" />
+        <component :is="modal.component" v-if="modal.component" v-bind="modal.props" @close="close(modal.id)" @cancel="close(modal.id, 'cancel')" />
       </div>
     </div>
 

@@ -11,27 +11,22 @@
           {{ ws.name }}
         </option>
       </select>
-      <input
-        v-model="projectFilter"
-        type="text"
-        class="form-control form-control-sm flex-grow-1"
-        placeholder="Buscar proyectos..."
-        style="background: #0d1117; border-color: #374151; color: #e0e0e0; font-size: 0.75rem;"
-      />
     </div>
-    <div class="overflow-y-auto flex-grow-1 px-2 pb-2">
-      <div
-        v-for="p in filteredProjects"
-        :key="p.id"
-        class="project-item d-flex align-items-center px-2 py-1 mb-1 rounded"
-        :class="{ selected: selectedProject?.id === p.id }"
-        @click="selectProject(p)"
-      >
-        <span class="ms-1 text-truncate">{{ p.id }} — {{ p.descripcion }}</span>
-      </div>
-      <div v-if="filteredProjects.length === 0" class="text-muted small text-center py-4">
-        No hay proyectos
-      </div>
+    <div class="flex-grow-1" style="min-height: 0;">
+      <TableEditor
+        :data="tableData"
+        :config="{
+          selectionMode: 'single',
+          hideToolbar: true,
+          hideRefresh: true,
+          hideCsvExport: true,
+          showPaginator: false,
+          striped: true,
+          scrollHeight: '100%',
+          pageSize: 200,
+        }"
+        @rowSelected="onRowSelected"
+      />
     </div>
   </div>
 </template>
@@ -42,15 +37,16 @@ import { storeToRefs } from 'pinia'
 import { useProjectStore } from '../../../stores/project.js'
 import { useWorkspaceStore } from '../../../stores/workspace.js'
 import { useChatStore } from '../../../stores/chat.js'
+import TableEditor from '../../../components/TableEditor.vue'
 
 export default {
+  components: { TableEditor },
   setup() {
     const projectStore = useProjectStore()
     const workspaceStore = useWorkspaceStore()
     const chatStore = useChatStore()
     const { projects, selectedProject } = storeToRefs(projectStore)
     const { activeSessionId, sessions } = storeToRefs(chatStore)
-    const projectFilter = ref('')
     const selectedWsFilter = ref('')
 
     function syncWsFilter() {
@@ -79,31 +75,40 @@ export default {
     })
 
     const filteredProjects = computed(() => {
-      let list = projects.value
+      let list = projects.value || []
       if (selectedWsFilter.value) {
         list = list.filter(p => p.workspace_id === selectedWsFilter.value)
       }
-      const filter = projectFilter.value.toLowerCase().trim()
-      if (!filter) return list
-      return list.filter(p => {
-        const id = (p.id || '').toLowerCase()
-        const desc = (p.descripcion || '').toLowerCase()
-        return id.includes(filter) || desc.includes(filter)
-      })
+      return list
     })
 
-    function selectProject(p) {
-      projectStore.selectProject(p)
+    const tableData = computed(() => ({
+      fields_def: [
+        { field: 'id', headerName: 'ID' },
+        { field: 'descripcion', headerName: 'Descripción' },
+        { field: 'workspace_id', headerName: 'Workspace' },
+      ],
+      rows: filteredProjects.value.map(p => ({
+        id: p.id,
+        descripcion: p.descripcion,
+        workspace_id: p.workspace_id,
+      })),
+    }))
+
+    function onRowSelected(row) {
+      if (row) {
+        const p = projects.value.find(pr => pr.id === row.id)
+        if (p) projectStore.selectProject(p)
+      }
     }
 
     return {
-      projectStore,
       workspaceStore,
       selectedProject,
-      projectFilter,
       selectedWsFilter,
       filteredProjects,
-      selectProject,
+      tableData,
+      onRowSelected,
     }
   },
 }
@@ -113,19 +118,4 @@ export default {
 .proyectos-panel {
   background: #16213e;
 }
-.project-item {
-  cursor: pointer;
-  color: #cbd5e1;
-  font-size: 0.75rem;
-  transition: background 0.15s;
-}
-.project-item:hover {
-  background: rgba(117, 170, 219, 0.1);
-}
-.project-item.selected {
-  background: rgba(117, 170, 219, 0.18);
-  color: #75AADB;
-  border-left: 3px solid #75AADB;
-}
-
 </style>

@@ -7,26 +7,15 @@
   </div>
   <div v-else class="comandos-list flex-grow-1 overflow-y-auto px-2 py-1">
     <button class="btn btn-sm btn-outline-argentina w-100 mb-2" style="font-size: 0.7rem;" @click.stop="crearComando">+ Crear comando</button>
-    <template v-if="comandos.length > 0">
-      <div v-for="c in comandos" :key="c.id" class="comando-item d-flex flex-column px-2 py-2 mb-1 rounded">
-        <div class="d-flex align-items-center gap-1 mb-1">
-          <span class="comando-label small fw-semibold text-truncate">{{ c.label }}</span>
-        </div>
-        <div v-if="c.descripcion" class="comando-desc text-muted small text-truncate mb-2">{{ c.descripcion }}</div>
-        <div class="d-flex gap-1 justify-content-end">
-          <button v-if="!executingCommands.has(c.id)" class="btn btn-sm btn-outline-success py-0 px-2" style="font-size: 0.65rem;" @click.stop="ejecutarComando(c)">▶ Ejecutar</button>
-          <button v-else class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size: 0.65rem;" @click.stop="detenerComando(c)">⏹ Detener</button>
-          <button class="btn btn-sm btn-outline-info py-0 px-2" style="font-size: 0.65rem;" @click.stop="editarComando(c)">✏</button>
-          <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.65rem;" @click.stop="copiarComando(c)">📋</button>
-          <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.65rem;" @click.stop="eliminarComando(c)">🗑</button>
-        </div>
-      </div>
-    </template>
-    <div v-else-if="loadingComandos" class="d-flex flex-column align-items-center justify-content-center text-secondary small py-2">
-      <span>Cargando comandos personalizados…</span>
-    </div>
 
-    <template v-if="packageScripts.length > 0">
+    <template v-if="comandos.length > 0 || loadingComandos">
+      <div v-if="loadingComandos" class="d-flex flex-column align-items-center justify-content-center text-secondary small py-2">
+        <span>Cargando comandos personalizados…</span>
+      </div>
+      <TableEditor v-else :data="commandsData" :config="commandsConfig" />
+    </template>
+
+    <template v-if="scriptsRows.length > 0 || loadingPackageScripts">
       <div class="section-divider d-flex align-items-center gap-2 my-2 px-1">
         <span class="text-muted flex-shrink-0" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">Scripts package.json</span>
         <div class="flex-grow-1" style="height: 1px; background: #374151;"></div>
@@ -34,26 +23,10 @@
       <div v-if="loadingPackageScripts" class="d-flex align-items-center justify-content-center text-secondary small py-2">
         <span>Cargando scripts…</span>
       </div>
-      <div v-else>
-        <div v-for="pkg in packageScripts" :key="pkg.relativePath" class="package-group mb-2">
-          <div class="package-path small text-muted px-1 mb-1" style="font-size: 0.6rem;">📦 {{ pkg.relativePath }}</div>
-          <div v-for="script in pkg.scripts" :key="script.name" class="script-item d-flex align-items-center px-2 py-1 mb-1 rounded">
-            <div class="flex-grow-1 min-width-0">
-              <div class="script-name small fw-semibold text-truncate">{{ script.name }}</div>
-              <div class="script-command text-muted" style="font-size: 0.55rem; font-family: monospace;">$ {{ script.command }}</div>
-            </div>
-            <button v-if="!executingScripts.has(pkg.relativePath + '/' + script.name)"
-                    class="btn btn-sm btn-outline-success py-0 px-2 flex-shrink-0" style="font-size: 0.65rem;"
-                    @click.stop="ejecutarNpmScript(pkg.relativePath, script.name, script.command)">▶ Ejecutar</button>
-            <button v-else
-                    class="btn btn-sm btn-outline-warning py-0 px-2 flex-shrink-0" style="font-size: 0.65rem;"
-                    @click.stop="detenerNpmScript(pkg.relativePath, script.name)">⏹</button>
-          </div>
-        </div>
-      </div>
+      <TableEditor v-else :data="scriptsData" :config="scriptsConfig" />
     </template>
 
-    <div v-if="comandos.length === 0 && packageScripts.length === 0 && !loadingComandos && !loadingPackageScripts" class="d-flex flex-column align-items-center justify-content-center text-secondary small px-3 text-center py-3">
+    <div v-if="comandos.length === 0 && scriptsRows.length === 0 && !loadingComandos && !loadingPackageScripts" class="d-flex flex-column align-items-center justify-content-center text-secondary small px-3 text-center py-3">
       <span>No hay comandos disponibles para este proyecto</span>
     </div>
   </div>
@@ -64,8 +37,11 @@ import { watch, ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useComandosPersonalizadosStore } from '../../../stores/comandosPersonalizados.js'
+import TableEditor from '../../../components/TableEditor.vue'
+import { BtnConfig } from '@/components/BtnConfig'
 
 export default {
+  components: { TableEditor },
   setup() {
     const chat = useChatStore()
     const comandosStore = useComandosPersonalizadosStore()
@@ -373,6 +349,76 @@ export default {
       }
     }
 
+    const commandsData = computed(() => {
+      const rows = (comandos.value || []).map(c => ({
+        ...c,
+        name: c.label,
+        description: c.descripcion || '',
+      }))
+      return {
+        fields_def: [
+          { field: 'name', headerName: 'Comando', sortable: true },
+          { field: 'description', headerName: 'Descripción', sortable: true },
+        ],
+        rows,
+      }
+    })
+
+    const commandsConfig = computed(() => ({
+      hideToolbar: true,
+      hideRefresh: true,
+      hideCsvExport: true,
+      showPaginator: false,
+      selectionMode: null,
+      buttons: {
+        rowActions: [
+          new BtnConfig({ key: 'ejecutar', icon: 'bi bi-play-fill', severity: 'btn-outline-success', label: '▶ Ejecutar', onClick: (row) => ejecutarComando(row) }),
+          new BtnConfig({ key: 'detener', icon: 'bi bi-stop-fill', severity: 'btn-outline-warning', label: '⏹ Detener', onClick: (row) => detenerComando(row) }),
+          new BtnConfig({ key: 'edit', icon: 'bi bi-pencil', severity: 'btn-outline-info', label: '✏', onClick: (row) => editarComando(row) }),
+          new BtnConfig({ key: 'copy', icon: 'bi bi-files', severity: 'btn-outline-secondary', label: '📋', onClick: (row) => copiarComando(row) }),
+          new BtnConfig({ key: 'delete', icon: 'bi bi-trash', severity: 'btn-outline-danger', label: '🗑', onClick: (row) => eliminarComando(row) }),
+        ],
+      },
+    }))
+
+    const scriptsRows = computed(() => {
+      const result = []
+      for (const pkg of packageScripts.value) {
+        for (const script of pkg.scripts) {
+          result.push({
+            name: script.name,
+            command: script.command,
+            _packagePath: pkg.relativePath,
+            _scriptName: script.name,
+            _scriptKey: pkg.relativePath + '/' + script.name,
+          })
+        }
+      }
+      return result
+    })
+
+    const scriptsData = computed(() => ({
+      fields_def: [
+        { field: 'name', headerName: 'Script', sortable: true },
+        { field: 'command', headerName: 'Comando', sortable: true },
+      ],
+      rows: scriptsRows.value,
+    }))
+
+    const scriptsConfig = computed(() => ({
+      hideToolbar: true,
+      hideRefresh: true,
+      hideCsvExport: true,
+      showPaginator: false,
+      selectionMode: null,
+      buttons: {
+        rowActions: [
+          new BtnConfig({ key: 'ejecutar', icon: 'bi bi-play-fill', severity: 'btn-outline-success', label: '▶ Ejecutar', onClick: (row) => ejecutarNpmScript(row._packagePath, row._scriptName, row.command) }),
+          new BtnConfig({ key: 'detener', icon: 'bi bi-stop-fill', severity: 'btn-outline-warning', label: '⏹ Detener', onClick: (row) => detenerNpmScript(row._packagePath, row._scriptName) }),
+        ],
+      },
+    }))
+
     watch([proyectoId, activeSessionId], () => {
       const pid = proyectoId.value
       if (!pid) {
@@ -402,18 +448,13 @@ export default {
       proyectoId,
       comandos,
       loadingComandos,
-      executingCommands,
-      packageScripts,
       loadingPackageScripts,
-      executingScripts,
-      ejecutarComando,
-      detenerComando,
+      scriptsRows,
+      commandsData,
+      commandsConfig,
+      scriptsData,
+      scriptsConfig,
       crearComando,
-      editarComando,
-      copiarComando,
-      eliminarComando,
-      ejecutarNpmScript,
-      detenerNpmScript,
     }
   },
 }
@@ -422,42 +463,5 @@ export default {
 <style scoped>
 .comandos-list {
   background: #16213e;
-}
-.comando-item {
-  background: #1a2744;
-  border: 1px solid #374151;
-  position: relative;
-}
-.comando-item:hover {
-  background: #1e3050;
-}
-.comando-label {
-  color: #75AADB;
-}
-.comando-desc {
-  font-size: 0.65rem;
-  line-height: 1.2;
-}
-.package-group {
-  background: transparent;
-}
-.package-path {
-  color: #6b7280;
-}
-.script-item {
-  background: #1a2744;
-  border: 1px solid #374151;
-  cursor: default;
-}
-.script-item:hover {
-  background: #1e3050;
-}
-.script-name {
-  color: #e8b800;
-  font-size: 0.7rem;
-}
-.script-command {
-  color: #6b7280;
-  font-family: monospace;
 }
 </style>

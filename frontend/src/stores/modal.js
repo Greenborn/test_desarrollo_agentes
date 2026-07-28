@@ -24,15 +24,18 @@ export const useModalStore = defineStore('modal', () => {
       size: options.wide ? { width: w, height: Math.min(window.innerHeight * 0.9, 800) } : { width: w, height: null },
       zIndex,
       onClose: options.onClose || null,
+      onCancel: options.onCancel || null,
     })
     return id
   }
 
-  function close(id) {
+  function close(id, reason) {
     const idx = stack.value.findIndex((m) => m.id === id)
     if (idx >= 0) {
       const m = stack.value[idx]
-      if (m.onClose) {
+      if (reason === 'cancel' && m.onCancel) {
+        try { m.onCancel() } catch (err) { console.error('Error in onCancel callback:', err) }
+      } else if (m.onClose) {
         try { m.onClose() } catch (err) { console.error('Error in onClose callback:', err) }
       }
       stack.value.splice(idx, 1)

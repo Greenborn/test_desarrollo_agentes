@@ -124,7 +124,7 @@ export default {
     function selectTicket(t) {
       searchQuery.value = String(t.redmine_id)
       directId.value = ''
-      showDropdown = false
+      showDropdown.value = false
       errorMsg.value = ''
     }
 

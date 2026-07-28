@@ -20,24 +20,12 @@
       <span class="text-secondary small text-nowrap">{{ filteredTickets.length }} tickets</span>
     </div>
 
-    <div class="ticket-list overflow-y-auto flex-grow-1 px-1">
-      <div
-        v-for="t in filteredTickets"
-        :key="t.id"
-        class="ticket-row d-flex align-items-center gap-2 px-2 py-1"
-        :class="[ticketPriorityClass(t.priority_id), { active: selectedTicket && selectedTicket.id === t.id }]"
-        @click="selectTicket(t)"
-      >
-        <span class="ticket-id text-nowrap">#{{ t.redmine_id }}</span>
-        <span class="ticket-subject text-truncate">{{ t.subject }}</span>
-        <span class="ticket-project text-muted text-nowrap">{{ t.proyecto_id }}</span>
-        <span class="ticket-priority-label text-nowrap" :class="priorityTextClass(t.priority_id)">
-          {{ priorityName(t.priority_id) }}
-        </span>
-      </div>
-      <div v-if="filteredTickets.length === 0" class="text-muted small text-center mt-4">
-        No hay tickets
-      </div>
+    <div class="flex-grow-1 min-h-0">
+      <TableEditor
+        :data="tableData"
+        :config="tableConfig"
+        @rowSelected="onRowSelected"
+      />
     </div>
   </div>
 </template>
@@ -49,8 +37,10 @@ import { useChatStore } from '../../stores/chat.js'
 import { useTicketStore } from '../../stores/ticket.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useProjectStore } from '../../stores/project.js'
+import TableEditor from '../../components/TableEditor.vue'
 
 export default {
+  components: { TableEditor },
   setup() {
     const chatStore = useChatStore()
     const ticketStore = useTicketStore()
@@ -65,10 +55,6 @@ export default {
       const session = chatStore.sessions.find(s => s.id === chatStore.activeSessionId)
       return session?.proyecto_id || null
     })
-
-    function selectTicket(t) {
-      ticketStore.selectTicket(t)
-    }
 
     function priorityName(priorityId) {
       if (!priorityId) return 'Sin prioridad'
@@ -87,16 +73,6 @@ export default {
       if (priorityId === 3) return 'priority-high'
       if (priorityId >= 5) return 'priority-immediate'
       if (priorityId >= 4) return 'priority-urgent'
-      return ''
-    }
-
-    function priorityTextClass(priorityId) {
-      if (!priorityId) return ''
-      if (priorityId <= 1) return 'text-priority-low'
-      if (priorityId === 2) return 'text-priority-normal'
-      if (priorityId === 3) return 'text-priority-high'
-      if (priorityId >= 5) return 'text-priority-immediate'
-      if (priorityId >= 4) return 'text-priority-urgent'
       return ''
     }
 
@@ -126,14 +102,58 @@ export default {
       return list
     })
 
+    const tableData = computed(() => ({
+      fields_def: [
+        { field: 'redmine_id', headerName: '#' },
+        { field: 'subject', headerName: 'Asunto' },
+        { field: 'proyecto_id', headerName: 'Proyecto' },
+        { field: 'priority_name', headerName: 'Prioridad' },
+      ],
+      rows: filteredTickets.value.map(t => ({
+        id: t.id,
+        redmine_id: t.redmine_id,
+        subject: t.subject,
+        proyecto_id: t.proyecto_id,
+        priority_name: priorityName(t.priority_id),
+        _priority_id: t.priority_id,
+        _ticket: t,
+      })),
+    }))
+
+    const tableConfig = {
+      selectionMode: 'single',
+      hideToolbar: true,
+      showPaginator: false,
+      styling: {
+        rowClassFn: (row) => ticketPriorityClass(row._priority_id),
+      },
+      valueFormatters: {
+        redmine_id: (row) => `#${row.redmine_id}`,
+        priority_name: (row) => {
+          const pid = row._priority_id
+          let color
+          if (!pid) color = '#6b7280'
+          else if (pid <= 1) color = '#6b7280'
+          else if (pid === 2) color = '#3b82f6'
+          else if (pid === 3) color = '#eab308'
+          else if (pid >= 5) color = '#ef4444'
+          else color = '#ef4444'
+          const weight = pid >= 5 ? '600' : '400'
+          return `<span style="color:${color};font-weight:${weight}">${row.priority_name}</span>`
+        },
+      },
+    }
+
+    function onRowSelected(row) {
+      if (row?._ticket) ticketStore.selectTicket(row._ticket)
+    }
+
     return {
       localFilter,
       filteredTickets,
-      selectedTicket,
-      selectTicket,
-      priorityName,
-      ticketPriorityClass,
-      priorityTextClass,
+      tableData,
+      tableConfig,
+      onRowSelected,
       ui,
       sessionProjectId,
     }
@@ -160,65 +180,59 @@ export default {
   background: #16213e;
   color: #e0e0e0;
 }
-.ticket-list {
-  min-height: 0;
+
+.ticket-panel :deep(.te-wrapper) {
+  background: #1a1a2e;
 }
-.ticket-row {
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.1s;
-  font-size: 0.75rem;
-  min-height: 28px;
+.ticket-panel :deep(.te-scroll-wrap) {
+  background: #16213e;
+  border-color: #374151;
+}
+.ticket-panel :deep(.te-table) {
   color: #cbd5e1;
 }
-.ticket-row:hover {
-  background: rgba(117, 170, 219, 0.1);
+.ticket-panel :deep(.te-th) {
+  background: #1a1a2e !important;
+  color: #94a3b8 !important;
+  border-bottom-color: #374151 !important;
+  border-right-color: #2a2a3e !important;
 }
-.ticket-row.active {
-  background: rgba(117, 170, 219, 0.18);
+.ticket-panel :deep(.te-td) {
+  background: #16213e;
+  color: #cbd5e1;
+  border-bottom-color: #1e2a3a;
+  border-right-color: #1e2a3a;
 }
-.ticket-row.priority-low {
-  border-left: 3px solid var(--priority-low-color, #6b7280);
+.ticket-panel :deep(.te-tr:hover .te-td) {
+  background: rgba(117, 170, 219, 0.1) !important;
 }
-.ticket-row.priority-normal {
-  border-left: 3px solid var(--priority-normal-color, #3b82f6);
+.ticket-panel :deep(.te-tr.te-tr-highlight .te-td),
+.ticket-panel :deep(.te-tr.te-tr-selected .te-td) {
+  background: rgba(117, 170, 219, 0.18) !important;
 }
-.ticket-row.priority-high {
-  border-left: 3px solid var(--priority-high-color, #eab308);
+.ticket-panel :deep(.te-tr.te-tr-highlight:hover .te-td) {
+  background: rgba(117, 170, 219, 0.22) !important;
 }
-.ticket-row.priority-urgent {
-  border-left: 3px solid var(--priority-urgent-color, #ef4444);
+.ticket-panel :deep(.te-empty) {
+  color: #6b7280;
 }
-.ticket-row.priority-immediate {
-  border-left: 3px solid var(--priority-immediate-color, #ef4444);
-  border-left-width: 4px;
+.ticket-panel :deep(.te-td-sel) {
+  border-right-color: #374151 !important;
 }
-.ticket-id {
-  color: #60a5fa;
-  font-weight: 600;
-  min-width: 55px;
-  flex-shrink: 0;
+
+.ticket-panel :deep(.te-tr.priority-low) {
+  box-shadow: inset 3px 0 0 0 var(--priority-low-color, #6b7280);
 }
-.ticket-subject {
-  flex: 1;
-  min-width: 0;
+.ticket-panel :deep(.te-tr.priority-normal) {
+  box-shadow: inset 3px 0 0 0 var(--priority-normal-color, #3b82f6);
 }
-.ticket-project {
-  min-width: 80px;
-  max-width: 120px;
-  text-align: right;
-  flex-shrink: 0;
-  font-size: 0.65rem;
+.ticket-panel :deep(.te-tr.priority-high) {
+  box-shadow: inset 3px 0 0 0 var(--priority-high-color, #eab308);
 }
-.ticket-priority-label {
-  min-width: 60px;
-  text-align: right;
-  flex-shrink: 0;
-  font-size: 0.65rem;
+.ticket-panel :deep(.te-tr.priority-urgent) {
+  box-shadow: inset 3px 0 0 0 var(--priority-urgent-color, #ef4444);
 }
-.text-priority-low { color: var(--priority-low-color, #6b7280); }
-.text-priority-normal { color: var(--priority-normal-color, #3b82f6); }
-.text-priority-high { color: var(--priority-high-color, #eab308); }
-.text-priority-urgent { color: var(--priority-urgent-color, #ef4444); }
-.text-priority-immediate { color: var(--priority-immediate-color, #ef4444); font-weight: 600; }
+.ticket-panel :deep(.te-tr.priority-immediate) {
+  box-shadow: inset 3px 0 0 0 var(--priority-immediate-color, #ef4444);
+}
 </style>
