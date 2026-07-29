@@ -14,6 +14,12 @@
         @click="abrirModalInstalar"
       >+ Instalar</button>
       <button
+        v-if="commitModelName"
+        class="btn btn-sm py-0 px-2"
+        style="font-size: 0.7rem; color: #ef4444; background: none; border: 1px solid rgba(239, 68, 68, 0.3);"
+        @click="resetearCommitModel"
+      >Reset</button>
+      <button
         class="btn btn-sm py-0 px-1 ms-auto"
         style="font-size: 0.7rem; color: #6b7280; background: none; border: none; line-height: 1;"
         @click="cargarModelos"
@@ -151,14 +157,17 @@ export default {
         { field: 'name', headerName: 'Modelo' },
         { field: 'size', headerName: 'Tamaño' },
         { field: 'modified', headerName: 'Modificado' },
+        { field: 'commitModel', headerName: 'Commits', sortable: false },
       ],
       rows: modelos.value.map(m => {
         const isCommit = commitModelName.value && m.name === commitModelName.value
         return {
-          name: isCommit ? m.name + ' ✓' : m.name,
-          _nameClass: isCommit ? 'text-info' : '',
+          name: m.name,
+          _nameClass: isCommit ? 'text-info fw-semibold' : '',
           size: formatearTamano(m.size),
           modified: formatearFecha(m.modified_at),
+          commitModel: isCommit ? '✔' : '',
+          _commitModelClass: isCommit ? 'text-info' : 'text-muted',
           _raw: m,
         }
       }),
@@ -269,6 +278,7 @@ export default {
     async function eliminarModelo(modelo) {
       eliminando.value = modelo.name
       errorTmp.value = ''
+      const wasCommitModel = commitModelName.value === modelo.name
       try {
         const res = await fetch('/api/ollama/delete', {
           method: 'POST',
@@ -278,6 +288,15 @@ export default {
         })
         const data = await res.json()
         if (data.status) {
+          if (wasCommitModel) {
+            await fetch('/api/ollama/config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ commitModel: '' }),
+            })
+            commitModelName.value = ''
+          }
           statusMsg.value = 'Modelo "' + modelo.name + '" eliminado'
           limpiarStatus()
           await cargarModelos()
@@ -308,6 +327,34 @@ export default {
       } catch (err) {
         console.log('[OllamaTab] Error al cargar config:', err)
       }
+    }
+
+    function resetearCommitModel() {
+      modal.open(ConfirmModal, {
+        message: '¿Desactivar el modelo local para commits? A partir de ahora se usará DeepSeek nuevamente.',
+        confirmLabel: 'Usar DeepSeek',
+        confirmSeverity: 'btn-danger',
+      }, {
+        title: 'Resetear configuración',
+        onClose: async () => {
+          try {
+            const res = await fetch('/api/ollama/config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ commitModel: '' }),
+            })
+            const data = await res.json()
+            if (data.status) {
+              commitModelName.value = ''
+              statusMsg.value = 'Configuración reseteada. Se usará DeepSeek para commits.'
+              limpiarStatus()
+            }
+          } catch (err) {
+            console.log('[OllamaTab] Error al resetear config:', err)
+          }
+        },
+      })
     }
 
     function abrirModalConfig() {
@@ -374,6 +421,7 @@ export default {
       eliminarModelo,
       onRowSelected,
       abrirModalConfig,
+      resetearCommitModel,
     }
   },
 }
