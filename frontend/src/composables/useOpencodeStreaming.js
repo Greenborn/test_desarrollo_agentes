@@ -542,11 +542,13 @@ export function useOpencodeStreaming() {
   async function deepseekStreamCommit(sessionId, prompt, systemPrompt) {
     const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
     streamMsg._key = 'stream-' + Date.now()
+    chat.updateOcStreamCache(sessionId, '', null, streamMsg._key)
 
     if (sessionId) chat.setSessionStatus(sessionId, 'executing')
     chat.setOcStreaming(sessionId, true)
 
     try {
+      chat.updateOcStreamCache(sessionId, 'Generando propuesta...', null, streamMsg._key)
       if (isActiveSession(sessionId)) {
         const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
         if (idx >= 0) {
@@ -560,6 +562,7 @@ export function useOpencodeStreaming() {
         throw new Error('No se generó propuesta de commit')
       }
 
+      chat.updateOcStreamCache(sessionId, 'Traduciendo a español...', null, streamMsg._key)
       if (isActiveSession(sessionId)) {
         const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
         if (idx >= 0) {
@@ -601,6 +604,7 @@ export function useOpencodeStreaming() {
             const j = JSON.parse(t.slice(6))
             if (j.type === 'response') {
               translatedText += j.content
+              chat.updateOcStreamCache(sessionId, translatedText, null, streamMsg._key)
               if (isActiveSession(sessionId)) {
                 const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
                 if (idx >= 0) {
@@ -678,6 +682,8 @@ export function useOpencodeStreaming() {
         await chat._saveMessageToDb(sessionId, controlMsg)
         chat.pendingNotifications.value[sessionId] = Date.now()
       }
+
+      chat.clearOcStreamCache(sessionId)
     } catch (err) {
       console.error('Error al generar commit:', err.message)
       chat.setOcStreaming(sessionId, false)
@@ -706,6 +712,8 @@ export function useOpencodeStreaming() {
         await chat._saveMessageToDb(sessionId, errorControlMsg)
         chat.pendingNotifications.value[sessionId] = Date.now()
       }
+
+      chat.clearOcStreamCache(sessionId)
     }
 
     fetchGitBranch()

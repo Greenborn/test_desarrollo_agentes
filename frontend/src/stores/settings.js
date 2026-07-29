@@ -7,6 +7,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const deepseekKey = ref('')
   const redmineToken = ref('')
   const redmineUrl = ref('')
+  const gestionUrl = ref('')
+  const gestionApiUser = ref('')
+  const gestionApiPassword = ref('')
   const systemPrompt = ref('')
   const documentacionPromptBaseDatos = ref('')
   const documentacionPromptSubproyectos = ref('')
@@ -59,6 +62,9 @@ export const useSettingsStore = defineStore('settings', () => {
       deepseekKey.value = keys.deepseek_key ? keys.deepseek_key : ''
       redmineToken.value = keys.redmine_token ? keys.redmine_token : ''
       redmineUrl.value = keys.redmine_url ? keys.redmine_url : ''
+      gestionUrl.value = keys.gestion_url ? keys.gestion_url : ''
+      gestionApiUser.value = keys.gestion_api_user ? keys.gestion_api_user : ''
+      gestionApiPassword.value = keys.gestion_api_password ? keys.gestion_api_password : ''
       systemPrompt.value = keys.system_prompt ? keys.system_prompt : ''
       documentacionPromptBaseDatos.value = keys.documentacion_prompt_base_datos || ''
       documentacionPromptSubproyectos.value = keys.documentacion_prompt_subproyectos || ''
@@ -124,6 +130,9 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'deepseek_key': deepseekKey.value = value; break
       case 'redmine_token': redmineToken.value = value; break
       case 'redmine_url': redmineUrl.value = value; break
+      case 'gestion_url': gestionUrl.value = value; break
+      case 'gestion_api_user': gestionApiUser.value = value; break
+      case 'gestion_api_password': gestionApiPassword.value = value; break
       case 'system_prompt': systemPrompt.value = value; break
       case 'documentacion_prompt_base_datos': documentacionPromptBaseDatos.value = value; break
       case 'documentacion_prompt_subproyectos': documentacionPromptSubproyectos.value = value; break
@@ -169,6 +178,9 @@ export const useSettingsStore = defineStore('settings', () => {
     deepseekKey.value = ''
     redmineToken.value = ''
     redmineUrl.value = ''
+    gestionUrl.value = ''
+    gestionApiUser.value = ''
+    gestionApiPassword.value = ''
     systemPrompt.value = ''
     documentacionPromptBaseDatos.value = ''
     documentacionPromptSubproyectos.value = ''
@@ -204,7 +216,7 @@ export const useSettingsStore = defineStore('settings', () => {
     saveSuccess.value = ''
   }
 
-  return { deepseekKey, redmineToken, redmineUrl, systemPrompt, repoAcronimo,
+  return { deepseekKey, redmineToken, redmineUrl, gestionUrl, gestionApiUser, gestionApiPassword, systemPrompt, repoAcronimo,
            locale, screenResolutions,
            documentacionPromptBaseDatos, documentacionPromptSubproyectos,
            documentacionPromptEndpoints, documentacionPromptWebSockets,

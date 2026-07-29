@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { login, uploadFile, getGestionCredentials } from '../services/gestionApi.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXPORTS_DIR = path.resolve(__dirname, '../../exports');
@@ -43,6 +45,83 @@ router.post('/export', async (req, res) => {
     res.json({ success: true, result: `Base de datos exportada a: ${absPath}` });
   } catch (err) {
     console.log('Error al exportar base de datos:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/backup', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const wsIds = req.session.workspaceIds || [1];
+    const wsId = req.query.workspace_id ? parseInt(req.query.workspace_id, 10) : wsIds[0] || 1;
+    const { all, upload } = req.body;
+
+    const dataDir = path.resolve(__dirname, '../../../data');
+    const timestamp = Date.now();
+    const backupDir = path.join(EXPORTS_DIR, `backup_${timestamp}`);
+    fs.mkdirSync(backupDir, { recursive: true });
+
+    const files = all
+      ? fs.readdirSync(dataDir).filter(f => f.endsWith('.db'))
+      : [path.basename(getSqlitePath())];
+
+    if (files.length === 0) {
+      throw new Error('No se encontraron archivos de base de datos para respaldar');
+    }
+
+    for (const file of files) {
+      const src = path.join(dataDir, file);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, path.join(backupDir, file));
+      }
+    }
+
+    const zipName = `backup_${timestamp}.zip`;
+    const zipPath = path.join(EXPORTS_DIR, zipName);
+    execSync(`zip -j "${zipPath}" "${backupDir}"/*.db`, { stdio: 'pipe', timeout: 60000 });
+
+    fs.rmSync(backupDir, { recursive: true, force: true });
+
+    let uploadResult = null;
+    let uploadError = null;
+    const requestLogs = [];
+    if (upload) {
+      try {
+        const creds = await getGestionCredentials(wsId);
+        if (creds) {
+          const loginResult = await login(creds.gestionUrl, creds.username, creds.password);
+          requestLogs.push(loginResult.requestLog);
+          const fileBase64 = fs.readFileSync(zipPath, { encoding: 'base64' });
+          const uploadFileResult = await uploadFile(creds.gestionUrl, loginResult.token, zipName, 'application/zip', fileBase64);
+          requestLogs.push(uploadFileResult.requestLog);
+          uploadResult = uploadFileResult.data;
+        } else {
+          uploadError = 'Credenciales de gestión interna no configuradas';
+        }
+      } catch (uploadErr) {
+        uploadError = uploadErr.message;
+        if (uploadErr.requestLog) requestLogs.push(uploadErr.requestLog);
+        console.log('[backup] Error al subir a gestión:', uploadErr.message);
+      }
+    }
+
+    const resultMsg = upload
+      ? uploadResult
+        ? `Backup creado y subido a gestión interna: ${zipPath}`
+        : `Backup creado pero no se pudo subir a gestión interna: ${uploadError || 'error desconocido'}: ${zipPath}`
+      : `Backup creado: ${zipPath}`;
+
+    res.json({
+      success: true,
+      result: resultMsg,
+      zipPath,
+      uploaded: !!uploadResult,
+      uploadError,
+      uploadData: uploadResult,
+      requestLogs,
+    });
+  } catch (err) {
+    console.log('Error al hacer backup:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });

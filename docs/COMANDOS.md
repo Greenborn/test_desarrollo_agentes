@@ -108,7 +108,7 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/db_export` | Exporta la base de datos completa (archivo SQLite .db). Con `--output=<ruta>` se guarda donde se indique; sin él se guarda en `backend/exports/` con timestamp | `/db_export [--output=<ruta>]` |
+| `/db_export` | Exporta/backup de base de datos. Sin flags exporta solo `app.db`. Con `--all` copia todos los `.db` en un zip. Con `--upload` sube el backup al servicio de gestión interna. Con `--output=<ruta>` guarda donde se indique | `/db_export [--output=<ruta>] [--all] [--upload]` |
 
 ---
 

@@ -25,12 +25,9 @@
           <button class="btn btn-sm btn-outline-danger" @click="executeDelete" :disabled="deleting">Sí, eliminar</button>
           <button class="btn btn-sm btn-outline-secondary" @click="cancelDelete">Cancelar</button>
         </div>
-        <button class="btn btn-sm btn-outline-argentina flex-shrink-0 ms-auto" @click="exportAllConfig">Exportar</button>
-        <button class="btn btn-sm btn-outline-argentina flex-shrink-0" @click="triggerImport">Importar</button>
-        <input type="file" ref="importInput" accept=".json" @change="handleImport" style="display:none" />
-        <button class="btn btn-sm btn-outline-info flex-shrink-0" @click="exportFullState">Exportar Estado DB</button>
-        <button class="btn btn-sm btn-outline-info flex-shrink-0" @click="triggerImportState">Importar Estado DB</button>
-        <input type="file" ref="importStateInput" accept=".json" @change="handleImportState" style="display:none" />
+        <button class="btn btn-sm btn-outline-success flex-shrink-0 ms-auto" @click="triggerDbBackup" :disabled="backupRunning">
+          {{ backupRunning ? 'Subiendo...' : 'Subir backup a gestión' }}
+        </button>
       </div>
     </div>
 
@@ -83,6 +80,58 @@
                 placeholder="https://redmine.tudominio.com"
               />
               <button class="btn btn-sm mt-1 btn-argentina" @click="saveRedmineUrl">Guardar URL</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col" v-if="cardHasVisible(['url servicio gestion interno', 'usuario api gestion', 'contraseña api gestion', 'gestion interna'])">
+        <div class="card bg-dark border-secondary h-100">
+          <div class="card-header bg-dark border-secondary py-2 px-3">
+            <h6 class="mb-0 fw-semibold">Gestión Interna</h6>
+          </div>
+          <div class="card-body d-flex flex-column gap-3">
+            <div v-if="matches('url servicio gestion interno')">
+              <label class="form-label small mb-1">URL Servicio de Gestión Interno</label>
+              <input
+                type="text"
+                class="form-control form-control-sm bg-dark text-light border-secondary"
+                v-model="gestionUrlInput"
+                placeholder="https://gestion.tudominio.com"
+              />
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveGestionUrl">Guardar URL</button>
+            </div>
+
+            <div v-if="matches('usuario api gestion')">
+              <label class="form-label small mb-1">Usuario API Gestión</label>
+              <div class="input-group input-group-sm">
+                <input
+                  :type="showGestionApiUser ? 'text' : 'password'"
+                  class="form-control bg-dark text-light border-secondary"
+                  v-model="gestionApiUserInput"
+                  placeholder="usuario"
+                />
+                <button class="btn btn-outline-argentina" @click="showGestionApiUser = !showGestionApiUser">
+                  {{ showGestionApiUser ? 'Ocultar' : 'Mostrar' }}
+                </button>
+              </div>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveGestionApiUser">Guardar Usuario</button>
+            </div>
+
+            <div v-if="matches('contraseña api gestion')">
+              <label class="form-label small mb-1">Contraseña API Gestión</label>
+              <div class="input-group input-group-sm">
+                <input
+                  :type="showGestionApiPassword ? 'text' : 'password'"
+                  class="form-control bg-dark text-light border-secondary"
+                  v-model="gestionApiPasswordInput"
+                  placeholder="contraseña"
+                />
+                <button class="btn btn-outline-argentina" @click="showGestionApiPassword = !showGestionApiPassword">
+                  {{ showGestionApiPassword ? 'Ocultar' : 'Mostrar' }}
+                </button>
+              </div>
+              <button class="btn btn-sm mt-1 btn-argentina" @click="saveGestionApiPassword">Guardar Contraseña</button>
             </div>
           </div>
         </div>
@@ -543,6 +592,11 @@ export default {
     const keyInput = ref('')
     const redmineTokenInput = ref('')
     const redmineUrlInput = ref('')
+    const gestionUrlInput = ref('')
+    const gestionApiUserInput = ref('')
+    const gestionApiPasswordInput = ref('')
+    const showGestionApiUser = ref(false)
+    const showGestionApiPassword = ref(false)
     const promptInput = ref('')
     const docBdInput = ref('')
     const docSubInput = ref('')
@@ -585,7 +639,7 @@ export default {
     const newEnvDescription = ref('')
     const selectedWId = ref(1)
     const wsMessage = ref('')
-    const importInput = ref(null)
+    const backupRunning = ref(false)
     const skillRepoUrlInput = ref('')
     const cloningRepo = ref(false)
     const repoCloneMessage = ref('')
@@ -643,6 +697,18 @@ export default {
 
     watch(() => settings.redmineUrl, (val) => {
       redmineUrlInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.gestionUrl, (val) => {
+      gestionUrlInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.gestionApiUser, (val) => {
+      gestionApiUserInput.value = val
+    }, { immediate: true })
+
+    watch(() => settings.gestionApiPassword, (val) => {
+      gestionApiPasswordInput.value = val
     }, { immediate: true })
 
     watch(() => settings.repoAcronimo, (val) => {
@@ -837,6 +903,21 @@ export default {
     function saveRedmineUrl() {
       settings.clearFeedback()
       settings.save('redmine_url', redmineUrlInput.value, selectedWId.value)
+    }
+
+    function saveGestionUrl() {
+      settings.clearFeedback()
+      settings.save('gestion_url', gestionUrlInput.value, selectedWId.value)
+    }
+
+    function saveGestionApiUser() {
+      settings.clearFeedback()
+      settings.save('gestion_api_user', gestionApiUserInput.value, selectedWId.value)
+    }
+
+    function saveGestionApiPassword() {
+      settings.clearFeedback()
+      settings.save('gestion_api_password', gestionApiPasswordInput.value, selectedWId.value)
     }
 
     function savePrompt() {
@@ -1045,108 +1126,43 @@ export default {
       }
     }
 
-    function triggerImport() {
-      importInput.value?.click()
-    }
-
-    async function exportAllConfig() {
+    async function triggerDbBackup() {
+      backupRunning.value = true
+      wsMessage.value = ''
       try {
-        const res = await fetch('/api/settings/export-all', { credentials: 'include' })
-        const data = await res.json()
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `configuracion_${new Date().toISOString().split('T')[0]}.json`
-        a.click()
-        URL.revokeObjectURL(url)
-      } catch (err) {
-        console.error('Error al exportar configuración:', err.message)
-        wsMessage.value = 'Error al exportar configuración'
-        setTimeout(() => { wsMessage.value = '' }, 3000)
-      }
-    }
-
-    async function handleImport(event) {
-      const file = event.target.files[0]
-      if (!file) return
-      try {
-        const text = await file.text()
-        const data = JSON.parse(text)
-        const res = await fetch('/api/settings/import-all', {
+        const res = await fetch('/api/db/backup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify(data),
+          body: JSON.stringify({ all: true, upload: true }),
         })
-        const result = await res.json()
-        if (result.success) {
-          wsMessage.value = 'Configuración importada correctamente.'
-          await reloadSettings()
-        } else {
-          wsMessage.value = result.error || 'Error al importar configuración'
-        }
-      } catch (err) {
-        console.error('Error al importar configuración:', err.message)
-        wsMessage.value = 'Error al importar configuración'
-      }
-      setTimeout(() => { wsMessage.value = '' }, 3000)
-      event.target.value = ''
-    }
-
-    const importStateInput = ref(null)
-
-    function triggerImportState() {
-      importStateInput.value?.click()
-    }
-
-    async function exportFullState() {
-      try {
-        const res = await fetch('/api/state/export', { credentials: 'include' })
         const data = await res.json()
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `estado_db_${new Date().toISOString().split('T')[0]}.json`
-        a.click()
-        URL.revokeObjectURL(url)
-      } catch (err) {
-        console.error('Error al exportar estado DB:', err.message)
-        wsMessage.value = 'Error al exportar estado DB'
-        setTimeout(() => { wsMessage.value = '' }, 3000)
-      }
-    }
-
-    async function handleImportState(event) {
-      const file = event.target.files[0]
-      if (!file) return
-      try {
-        const text = await file.text()
-        const data = JSON.parse(text)
-        const res = await fetch('/api/state/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(data),
-        })
-        const result = await res.json()
-        if (result.success) {
-          wsMessage.value = 'Estado DB importado correctamente.'
-          await reloadSettings()
+        if (data.success) {
+          let msg = data.result
+          if (data.requestLogs && data.requestLogs.length > 0) {
+            const lines = data.requestLogs.map(r => {
+              const icon = r.statusCode >= 200 && r.statusCode < 300 ? '✅' : '❌'
+              return `${icon} ${r.method} ${r.url} → ${r.statusCode}`
+            })
+            msg += ' | ' + lines.join(' | ')
+          }
+          wsMessage.value = msg
         } else {
-          wsMessage.value = result.error || 'Error al importar estado DB'
+          wsMessage.value = data.error || 'Error al hacer backup'
         }
       } catch (err) {
-        console.error('Error al importar estado DB:', err.message)
-        wsMessage.value = 'Error al importar estado DB'
+        console.error('Error al hacer backup:', err.message)
+        wsMessage.value = 'Error al hacer backup: ' + err.message
       }
-      setTimeout(() => { wsMessage.value = '' }, 3000)
-      event.target.value = ''
+      backupRunning.value = false
+      setTimeout(() => { wsMessage.value = '' }, 8000)
     }
 
     return {
-      keyInput, redmineTokenInput, redmineUrlInput, promptInput, docBdInput, docSubInput,
+      keyInput, redmineTokenInput, redmineUrlInput,
+      gestionUrlInput, gestionApiUserInput, gestionApiPasswordInput,
+      showGestionApiUser, showGestionApiPassword,
+      promptInput, docBdInput, docSubInput,
       docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput, refinarPromptInput,
       deteccionPromptInput,
       codeExtensionsInput, codeMaxSizeInput,
@@ -1159,7 +1175,12 @@ export default {
       newEnvName, newEnvBranch, newEnvDescription,
       replayIntervalInput,
       requestResponseMaxSizeInput,
-      saveKey, saveRedmineToken, saveRedmineUrl, savePrompt, saveDoc,
+      defaultCommentModeCommitInput, defaultCommentModeTicketInput, defaultCommentModeDiffInput,
+      ticketDescripcionMejorarPromptInput, ticketObjetivoPromptInput, ticketPlantillaDescripcionInput,
+      deleteEnvIndex,
+      saveKey, saveRedmineToken, saveRedmineUrl,
+      saveGestionUrl, saveGestionApiUser, saveGestionApiPassword,
+      savePrompt, saveDoc,
       saveDescripcionPrompt, saveRefinarPrompt, saveDeteccionPrompt, saveCodeConfig, saveRepoAcronimo,
       saveLocale, savePriorityColor, saveReplayInterval, saveRequestResponseMaxSize,
       saveBrowserStealth, saveBrowserUaChrome, saveBrowserUaFirefox,
@@ -1171,8 +1192,10 @@ export default {
       skillRepoUrlInput, cloningRepo, repoCloneMessage, repoCloneError,
       saveSkillRepoUrl, saveAndCloneSkillRepo,
       openCreateModal, openEditModal, openDeleteConfirm, cancelDelete, executeDelete, deleteConfirmWs, deleting,
-      exportAllConfig, handleImport, triggerImport, importInput,
-      exportFullState, handleImportState, triggerImportState, importStateInput,
+      triggerDbBackup, backupRunning,
+      removeEnvironment, executeDeleteEnv, cancelDeleteEnv, addEnvironment,
+      saveDefaultCommentMode,
+      saveTicketDescripcionMejorarPrompt, saveTicketObjetivoPrompt, saveTicketPlantillaDescripcion,
     }
   },
 }

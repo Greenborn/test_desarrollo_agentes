@@ -9,8 +9,8 @@
     </a>
     <LayoutControls />
     <TicketInfoBar v-if="user" class="flex-grow-1" />
-    <div class="dropdown" v-if="user">
-      <button class="btn btn-dark dropdown-toggle" data-bs-toggle="dropdown">
+    <div class="dropdown" v-if="user" ref="userMenuDropdown">
+      <button class="btn btn-dark dropdown-toggle" data-bs-toggle="dropdown" type="button">
         {{ user.username }}
       </button>
       <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
@@ -23,7 +23,8 @@
 </template>
 
 <script>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, nextTick, ref } from 'vue'
+import { Dropdown } from 'bootstrap'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../../stores/auth.js'
 import { useRouter } from 'vue-router'
@@ -56,6 +57,8 @@ export default {
     const { user } = storeToRefs(auth)
     const { workspaces } = storeToRefs(wsStore)
     const { register } = useCommandRegistry()
+
+    const userMenuDropdown = ref(null)
 
     const selectedWorkspaces = computed(() => {
       if (!auth.user || !workspaces.value.length) return []
@@ -554,9 +557,33 @@ export default {
       modal.open(WorkspaceSwitcherModal, {}, { title: 'Espacios de Trabajo' })
     }
 
+    let dropdownInstance = null
+
+    function initDropdown() {
+      nextTick(() => {
+        const el = userMenuDropdown.value
+        if (!el) {
+          console.error('Topbar: dropdown container no encontrado')
+          return
+        }
+        const toggleBtn = el.querySelector('[data-bs-toggle="dropdown"]')
+        if (!toggleBtn) {
+          console.error('Topbar: dropdown toggle no encontrado')
+          return
+        }
+        if (dropdownInstance) dropdownInstance.dispose()
+        try {
+          dropdownInstance = new Dropdown(toggleBtn)
+        } catch (err) {
+          console.error('Topbar: error al crear Dropdown:', err)
+        }
+      })
+    }
+
     onMounted(() => {
       cmdStore.loadLastDirectory()
       wsStore.loadWorkspaces()
+      initDropdown()
     })
 
     function logout() {
@@ -564,7 +591,7 @@ export default {
       router.push('/')
     }
 
-    return { user, logout, openSettings, openWorkspaceSwitcher, selectedWorkspaces, workspaceBadgeStyle }
+    return { user, logout, openSettings, openWorkspaceSwitcher, selectedWorkspaces, workspaceBadgeStyle, userMenuDropdown }
   },
 }
 </script>

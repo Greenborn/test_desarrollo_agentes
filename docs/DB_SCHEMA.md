@@ -130,6 +130,9 @@ DB_REDMINE_DATA_SQLITE_PATH=../data/redmine_data.db         # proyectos y ticket
 | `default_comment_mode_commit` | `'encolar'` | Modo de envío predeterminado para commits (`'encolar'` o `'enviar'`). Se configura desde Settings → Preferencias o se auto-guarda al confirmar un commit. |
 | `default_comment_mode_ticket` | `'encolar'` | Modo de envío predeterminado para comentarios de ticket (`'encolar'` o `'enviar'`). Se configura desde Settings → Preferencias o se auto-guarda al confirmar un comentario. |
 | `default_comment_mode_diff` | `'encolar'` | Modo de envío predeterminado para comentarios de diff entre ambientes (`'encolar'` o `'enviar'`). Se configura desde Settings → Preferencias o se auto-guarda al confirmar. |
+| `gestion_url` | `''` | URL del servicio de gestión interno |
+| `gestion_api_user` | `''` | Usuario de API del servicio de gestión (encriptado) |
+| `gestion_api_password` | `''` | Contraseña de API del servicio de gestión (encriptada) |
 
 ---
 

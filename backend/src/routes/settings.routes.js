@@ -46,6 +46,24 @@ router.get('/', async (req, res) => {
           console.log('Error al desencriptar redmine_token:', errDec.message);
           keys.redmine_token = row.setting_value.slice(0, 10) + '...';
         }
+      } else if (row.setting_key === 'gestion_api_user' && row.setting_value) {
+        try {
+          const decrypted = decrypt(row.setting_value);
+          keys.gestion_api_user = decrypted.slice(0, 10) + '...';
+        } catch (errDec) {
+          console.log('Error al desencriptar gestion_api_user:', errDec.message);
+          keys.gestion_api_user = row.setting_value.slice(0, 10) + '...';
+        }
+      } else if (row.setting_key === 'gestion_api_password' && row.setting_value) {
+        try {
+          const decrypted = decrypt(row.setting_value);
+          keys.gestion_api_password = decrypted.slice(0, 10) + '...';
+        } catch (errDec) {
+          console.log('Error al desencriptar gestion_api_password:', errDec.message);
+          keys.gestion_api_password = row.setting_value.slice(0, 10) + '...';
+        }
+      } else if (row.setting_key === 'gestion_url') {
+        keys.gestion_url = row.setting_value;
       } else if (row.setting_key === 'redmine_url') {
         keys.redmine_url = row.setting_value;
       } else if (row.setting_key === 'system_prompt') {
@@ -127,6 +145,7 @@ router.get('/', async (req, res) => {
       default_comment_mode_commit: 'encolar',
       default_comment_mode_ticket: 'encolar',
       default_comment_mode_diff: 'encolar',
+      gestion_url: '',
       screen_resolutions: [
         { id: 'fullhd', width: 1920, height: 1080 },
         { id: 'hd', width: 1366, height: 768 },
@@ -204,7 +223,7 @@ router.post('/', async (req, res) => {
     let toStore = value;
     let encrypted = false;
 
-    if (key === 'deepseek_key' || key === 'redmine_token') {
+    if (key === 'deepseek_key' || key === 'redmine_token' || key === 'gestion_api_user' || key === 'gestion_api_password') {
       toStore = encrypt(value);
       encrypted = true;
     }
@@ -314,7 +333,7 @@ router.post('/import-all', async (req, res) => {
         let toStore = String(value);
         let encrypted = false;
 
-        if (key === 'deepseek_key' || key === 'redmine_token') {
+        if (key === 'deepseek_key' || key === 'redmine_token' || key === 'gestion_api_user' || key === 'gestion_api_password') {
           toStore = encrypt(String(value));
           encrypted = true;
         }

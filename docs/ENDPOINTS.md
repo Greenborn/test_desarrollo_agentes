@@ -283,8 +283,8 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 ### `POST /api/settings`
 - **Auth:** Requerida
 - **Body:** `{ key: string, value: string, workspace_id?: number }` — si no se envía `workspace_id`, usa el primary
-- Si `key === "deepseek_key"` se encripta con AES-256-CBC antes de almacenar
-- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `screen_resolutions`, `request_response_max_size_kb`, `terminal_max_terminals`
+- Si `key === "deepseek_key"` o `key === "gestion_api_user"` o `key === "gestion_api_password"` se encripta con AES-256-CBC antes de almacenar
+- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `gestion_url`, `gestion_api_user`, `gestion_api_password`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `screen_resolutions`, `request_response_max_size_kb`, `terminal_max_terminals`
 - **Respuesta:** `{ success: true }`
 
 ### `GET /api/settings/global`
@@ -301,7 +301,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 
 ### `GET /api/settings/export-all`
 - **Auth:** Requerida
-- **Descripción:** Exporta todas las configuraciones de todos los workspaces, incluyendo settings, ambientes (DEV/TST/PRD) y configuraciones globales. Los valores encriptados (`deepseek_key`, `redmine_token`) se devuelven en texto plano. Sin hardcoding de keys — incluye automáticamente cualquier key presente en la DB.
+- **Descripción:** Exporta todas las configuraciones de todos los workspaces, incluyendo settings, ambientes (DEV/TST/PRD) y configuraciones globales. Los valores encriptados (`deepseek_key`, `redmine_token`, `gestion_api_user`, `gestion_api_password`) se devuelven en texto plano. Sin hardcoding de keys — incluye automáticamente cualquier key presente en la DB.
 - **Respuesta 200:**
 ```json
 {
@@ -330,7 +330,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 ### `POST /api/settings/import-all`
 - **Auth:** Requerida
 - **Body:** Misma estructura que `GET /api/settings/export-all`. El campo `configuracion_general` se restaura en la tabla `global_settings` (compartido entre workspaces).
-- **Descripción:** Importa configuraciones desde un JSON. Busca cada workspace por **nombre** en la DB. Las credenciales (`deepseek_key`, `redmine_token`) se re-encriptan antes de almacenar. Los ambientes se actualizan por nombre dentro de cada workspace. Las keys nuevas se crean automáticamente sin necesidad de actualizar el código.
+- **Descripción:** Importa configuraciones desde un JSON. Busca cada workspace por **nombre** en la DB. Las credenciales (`deepseek_key`, `redmine_token`, `gestion_api_user`, `gestion_api_password`) se re-encriptan antes de almacenar. Los ambientes se actualizan por nombre dentro de cada workspace. Las keys nuevas se crean automáticamente sin necesidad de actualizar el código.
 - **Respuesta 200:** `{ success: true }`
 - **Respuesta 400:** `{ error: "workspaces es requerido" }`
 
@@ -1314,7 +1314,7 @@ Endpoint base: `http://localhost:4099/api/documentacion`
 
 ### `GET /api/state/export`
 - **Auth:** Requerida
-- **Descripción:** Exporta el estado completo de la base de datos (configuración, proyectos, tickets, plantillas, etc.) en un JSON estructurado. Los valores encriptados (`deepseek_key`, `redmine_token`) se devuelven en texto plano. Incluye las siguientes tablas:
+- **Descripción:** Exporta el estado completo de la base de datos (configuración, proyectos, tickets, plantillas, etc.) en un JSON estructurado. Los valores encriptados (`deepseek_key`, `redmine_token`, `gestion_api_user`, `gestion_api_password`) se devuelven en texto plano. Incluye las siguientes tablas:
   - `workspaces` — espacios de trabajo
   - `settings` — configuración por workspace
   - `workspace_environments` — ambientes por workspace
@@ -1348,9 +1348,54 @@ Endpoint base: `http://localhost:4099/api/documentacion`
 ### `POST /api/state/import`
 - **Auth:** Requerida
 - **Body:** Misma estructura que `GET /api/state/export` (campo `tables`)
-- **Descripción:** Reemplaza completamente los datos de las tablas incluidas con los del JSON importado. Usa `FOREIGN_KEY_CHECKS=0` para evitar pérdida de datos en tablas no incluidas. El workspace por defecto (id=1) está protegido contra eliminación. Las credenciales (`deepseek_key`, `redmine_token`) se re-encriptan automáticamente. Todo el proceso se ejecuta dentro de una transacción: si algo falla, se revierte completamente.
+- **Descripción:** Reemplaza completamente los datos de las tablas incluidas con los del JSON importado. Usa `FOREIGN_KEY_CHECKS=0` para evitar pérdida de datos en tablas no incluidas. El workspace por defecto (id=1) está protegido contra eliminación. Las credenciales (`deepseek_key`, `redmine_token`, `gestion_api_user`, `gestion_api_password`) se re-encriptan automáticamente. Todo el proceso se ejecuta dentro de una transacción: si algo falla, se revierte completamente.
 - **Respuesta 200:** `{ success: true }`
 - **Respuesta 400:** `{ error: "tables es requerido" }`
+
+---
+
+## Base de datos (`/api/db`)
+
+### `POST /api/db/export`
+- **Auth:** Requerida (sesión)
+- **Body:** `{ "output": "/ruta/opcional/archivo.db" }`
+- **Descripción:** Exporta la base de datos SQLite principal (`app.db`) mediante copia directa del archivo. Si no se especifica `output`, se guarda en `backend/exports/` con nombre `db_export_<timestamp>.db`.
+- **Respuesta 200:**
+```json
+{ "success": true, "result": "Base de datos exportada a: /ruta/archivo.db" }
+```
+
+### `POST /api/db/backup`
+- **Auth:** Requerida (sesión)
+- **Body:**
+```json
+{
+  "all": true,
+  "upload": true
+}
+```
+- **Descripción:** Crea un backup completo de las bases de datos SQLite. Con `all: true` copia **todos** los archivos `.db` del directorio `data/` y los empaqueta en un zip con timestamp. Con `upload: true` intenta autenticarse y subir el zip al servicio de gestión interna usando las credenciales configuradas (`gestion_url`, `gestion_api_user`, `gestion_api_password`). Si el upload falla, se incluye el error en la respuesta pero el backup local se conserva.
+- **Respuesta 200:**
+```json
+{
+  "success": true,
+  "result": "Backup creado y subido a gestión interna: /ruta/backup_<timestamp>.zip",
+  "zipPath": "/ruta/backup_<timestamp>.zip",
+  "uploaded": true,
+  "uploadError": null,
+  "uploadData": { "id": 1, "nombre_original": "backup_<timestamp>.zip", ... }
+}
+```
+- **Respuesta 200 (upload fallido):**
+```json
+{
+  "success": true,
+  "result": "Backup creado pero no se pudo subir a gestión interna: <motivo>: /ruta/backup_<timestamp>.zip",
+  "zipPath": "/ruta/backup_<timestamp>.zip",
+  "uploaded": false,
+  "uploadError": "Credenciales de gestión interna no configuradas"
+}
+```
 
 ---
 
