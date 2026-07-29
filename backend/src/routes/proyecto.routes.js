@@ -182,7 +182,7 @@ router.post('/proyecto/session', async (req, res) => {
     if (proyectoId) {
       const proyecto = await dbRedmineData('proyectos')
         .where({ id: proyectoId })
-        .select('workspace_id')
+        .select('workspace_id', 'repo_path')
         .first();
 
       if (proyecto?.workspace_id) {
@@ -199,6 +199,10 @@ router.post('/proyecto/session', async (req, res) => {
             .onConflict(['user_id', 'key'])
             .merge();
         }
+      }
+
+      if (proyecto?.repo_path && !cwd) {
+        updateData.cwd = proyecto.repo_path;
       }
     }
 
@@ -294,6 +298,28 @@ router.get('/proyecto/repositorio/:proyectoId', async (req, res) => {
     res.json({ url_github: proyecto?.url_github || null });
   } catch (err) {
     console.log('Error al obtener repositorio:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/proyecto/:id/repo-path', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const { repo_path } = req.body;
+  if (repo_path === undefined) {
+    return res.status(400).json({ error: 'repo_path es requerido' });
+  }
+  try {
+    const wsIds = req.session.workspaceIds || [1];
+    const updated = await dbRedmineData('proyectos')
+      .where({ id: req.params.id })
+      .whereIn('workspace_id', wsIds)
+      .update({ repo_path: repo_path || null });
+    if (!updated) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+    res.json({ success: true, repo_path });
+  } catch (err) {
+    console.log('Error al actualizar repo_path:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

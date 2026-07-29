@@ -7,7 +7,7 @@ const { register } = useCommandRegistry()
 register({
   name: '/dev_generar_commit',
   category: 'Desarrollo',
-  description: 'Genera un mensaje de commit de los cambios realizados. Obtiene el diff de Git y contexto del ticket, y usa DeepSeek para generar una propuesta.',
+  description: 'Genera un mensaje de commit de los cambios realizados. Obtiene el diff de Git y usa DeepSeek para generar una propuesta basada en los cambios.',
   usage: '/dev_generar_commit',
   async execute(args, { cmdStore, chatStore, sessionId }) {
     if (!sessionId) {
@@ -70,45 +70,14 @@ register({
       return
     }
 
-    let ticketContext = ''
-    try {
-      const session = chat.sessions.find(s => Number(s.id) === Number(sessionId))
-      const ticketRedmineId = session?.id_ticket_redmine || null
-      if (ticketRedmineId) {
-        const ticketRes = await fetch(`/api/tickets/session/${sessionId}?comments=true`, { credentials: 'include' })
-        const ticketData = await ticketRes.json()
-        if (ticketData.ticket) {
-          ticketContext += `## Contexto del ticket #${ticketRedmineId}\n\n`
-          ticketContext += `- **Título:** ${ticketData.ticket.subject || ''}\n`
-          ticketContext += `- **Estado:** ${ticketData.ticket.status_name || ''}\n`
-          ticketContext += `- **Prioridad:** ${ticketData.ticket.priority_name || ''}\n`
-          ticketContext += `- **Asignado a:** ${ticketData.ticket.assigned_to_name || ''}\n`
-          if (ticketData.ticket.description) {
-            ticketContext += `- **Descripción:** ${ticketData.ticket.description}\n`
-          }
-        }
-        if (ticketData.comments && ticketData.comments.length > 0) {
-          ticketContext += `\n### Comentarios existentes en Redmine (${ticketData.comments.length})\n\n`
-          for (const c of ticketData.comments) {
-            ticketContext += `- **${c.user}** (${c.created_on}): ${c.notes}\n`
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Error al obtener contexto del ticket:', err.message)
-    }
-
     const DIFF_LIMIT = 15000
     const truncatedDiff = gitDiff.length > DIFF_LIMIT
       ? gitDiff.slice(0, DIFF_LIMIT) + '\n... (diff truncado por longitud)'
       : gitDiff
 
-    const prompt = (ticketContext ? ticketContext + '\n---\n\n' : '') +
-      `## Git diff de los cambios realizados\n\n\`\`\`diff\n${truncatedDiff}\n\`\`\``
+    const prompt = `## Git diff de los cambios realizados\n\n\`\`\`diff\n${truncatedDiff}\n\`\`\``
 
-    const systemPrompt = ticketContext
-      ? 'Eres un asistente experto en generar mensajes de commit. Regla 75/25: el 75% del mensaje debe describir los cambios PUNTUALES del diff (archivos, funciones, lógica modificada). Solo el 25% restante puede usar el contexto del ticket para redondear el propósito general. Priorizá siempre los cambios concretos del diff sobre la descripción del ticket. Máximo 512 caracteres. Devolvé ÚNICAMENTE el mensaje de commit.'
-      : 'Eres un asistente experto en generar mensajes de commit. Basate en los cambios del git diff para describir los cambios PUNTUALES (archivos, funciones, lógica modificada) y el IMPACTO de esos cambios en el proyecto. Máximo 512 caracteres. Devolvé ÚNICAMENTE el mensaje de commit.'
+    const systemPrompt = 'Eres un asistente experto en generar mensajes de commit. Basate en los cambios del git diff para describir los cambios PUNTUALES (archivos, funciones, lógica modificada) y el IMPACTO de esos cambios en el proyecto. Máximo 512 caracteres. Devolvé ÚNICAMENTE el mensaje de commit.'
 
     const { deepseekStreamCommit } = useOpencodeStreaming()
     await deepseekStreamCommit(sessionId, prompt, systemPrompt)

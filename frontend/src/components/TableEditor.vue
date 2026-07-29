@@ -2,15 +2,16 @@
   <div class="te-wrapper">
     <div v-if="!props.config?.hideToolbar" class="te-toolbar">
       <div class="te-toolbar-start">
-        <button v-for="btn in buttonGroups.toolbar" :key="btn.key"
-          v-if="btn.isVisible()"
-          :class="['btn', 'btn-sm', btn.severity, btn.class]"
-          :disabled="btn.isDisabled()"
-          :data-help="btn.helpKey"
-          @click="btn.onClick">
-          <i v-if="btn.icon" :class="btn.icon + ' me-1'"></i>
-          {{ btn.getLabel() }}
-        </button>
+        <template v-for="btn in buttonGroups.toolbar" :key="btn.key">
+          <button v-if="btn.isVisible()"
+            :class="['btn', 'btn-sm', btn.severity, btn.class]"
+            :disabled="btn.isDisabled()"
+            :data-help="btn.helpKey"
+            @click="btn.onClick">
+            <i v-if="btn.icon" :class="btn.icon + ' me-1'"></i>
+            {{ btn.getLabel() }}
+          </button>
+        </template>
       </div>
       <div class="te-toolbar-end">
         <div class="dropdown d-inline-block me-2">
@@ -57,7 +58,17 @@
                 <input v-if="selectionMode === 'multiple'" type="checkbox" :checked="isAllSelected"
                   @change="_toggleSelectAll" />
               </th>
-              <th v-if="actionButtons.length" class="te-th te-th-acts" :rowspan="2">Acciones</th>
+              <th v-if="actionButtons.length" class="te-th te-th-acts" :rowspan="2" :style="{ width: columnWidths['__actions__'] }">
+                  <div class="te-th-content">
+                    <span class="te-th-label">Acciones</span>
+                  </div>
+                  <div class="te-resize-handle"
+                    :class="{ 'te-resizing-active': _resizingField === '__actions__' }"
+                    draggable="false"
+                    @pointerdown.stop="_onResizeStart($event, '__actions__')"
+                    @dblclick.stop="_onResizeDblClick($event, '__actions__')"
+                    @click.stop />
+                </th>
               <template v-for="hcol of columnGroupHeaders" :key="hcol._key">
                 <th v-if="hcol._type === 'group'" :colspan="hcol._span" class="te-th te-th-group">
                   <div class="te-th-content">
@@ -119,7 +130,17 @@
               <input v-if="selectionMode === 'multiple'" type="checkbox" :checked="isAllSelected"
                 @change="_toggleSelectAll" />
             </th>
-            <th v-if="actionButtons.length" class="te-th te-th-acts">Acciones</th>
+            <th v-if="actionButtons.length" class="te-th te-th-acts" :style="{ width: columnWidths['__actions__'] }">
+              <div class="te-th-content">
+                <span class="te-th-label">Acciones</span>
+              </div>
+              <div class="te-resize-handle"
+                :class="{ 'te-resizing-active': _resizingField === '__actions__' }"
+                draggable="false"
+                @pointerdown.stop="_onResizeStart($event, '__actions__')"
+                @dblclick.stop="_onResizeDblClick($event, '__actions__')"
+                @click.stop />
+            </th>
             <th v-for="col of visibleColumns" :key="col.field"
               :data-field="col.field"
               :style="{ width: columnWidths[col.field] }"
@@ -157,7 +178,7 @@
           </tr>
           <tr v-if="showFilterRow" class="te-filter-row">
             <td v-if="selectionMode !== null" class="te-td" />
-            <td v-if="actionButtons.length" class="te-td" />
+            <td v-if="actionButtons.length" class="te-td" :style="{ width: columnWidths['__actions__'] }" />
             <td v-for="col of visibleColumns" :key="'f-' + col.field" class="te-td"
               :style="{ width: columnWidths[col.field] }"
               @dragenter.prevent="_onDragEnter($event, col.field)"
@@ -188,16 +209,18 @@
                 @change="_toggleRowSelection(row)" />
               <input v-else type="radio" :checked="selectedRow === row" @change="_selectSingle(row)" />
             </td>
-            <td v-if="actionButtons.length" class="te-td te-td-acts">
+            <td v-if="actionButtons.length" class="te-td te-td-acts" :style="{ width: columnWidths['__actions__'] }">
               <div class="te-actions-wrap">
-                <button v-for="btn of actionButtons" :key="btn.key" v-if="btn.isVisible()"
-                  :class="['btn', 'btn-sm', btn.severity, btn.class]"
-                  :disabled="btn.isDisabled()"
-                  :data-help="btn.helpKey"
-                  @click.stop="btn.onClick(row)">
-                  <i v-if="btn.icon" :class="btn.icon + ' me-1'"></i>
-                  {{ btn.getLabel() }}
-                </button>
+                <template v-for="btn of actionButtons" :key="btn.key">
+                  <button v-if="btn.isVisible()"
+                    :class="['btn', 'btn-sm', btn.severity, btn.class]"
+                    :disabled="btn.isDisabled()"
+                    :data-help="btn.helpKey"
+                    @click.stop="btn.onClick(row)">
+                    <i v-if="btn.icon" :class="btn.icon + ' me-1'"></i>
+                    {{ btn.getLabel() }}
+                  </button>
+                </template>
               </div>
             </td>
             <td v-for="col of visibleColumns" :key="col.field"
@@ -299,6 +322,7 @@ async function _savePersistedConfig() {
   const key = _getPrefKey()
   if (!key) return
   const fields = visibleColumns.value.map(c => c.field)
+  if (actionButtons.value.length) fields.push('__actions__')
   const cw = {}
   for (const f of fields) cw[f] = columnWidths.value[f] || '15rem'
   const ord = columnOrder.value.length ? columnOrder.value : fields
@@ -1125,6 +1149,10 @@ async function _processData(data) {
       const w = parseFloat(widths[col.field])
       columnWidths.value[col.field] = w ? Math.max(100, w) + 'px' : '15rem'
     }
+    if (actionButtons.value.length) {
+      const w = parseFloat(widths['__actions__'])
+      columnWidths.value['__actions__'] = w ? Math.max(100, w) + 'px' : 'auto'
+    }
     columnOrder.value = saved?.columnOrder || []
     availableColumns.value = [...selectedColumns.value]
   }
@@ -1241,7 +1269,7 @@ watch(infiniteScroll, (v) => { if (v) nextTick(() => _setupInfiniteScroll()) })
   display: grid;
   grid-template-rows: auto 1fr auto;
   height: 100%;
-  font-size: 0.875rem;
+  font-size: 1rem;
 }
 
 .te-toolbar {
@@ -1280,7 +1308,7 @@ watch(infiniteScroll, (v) => { if (v) nextTick(() => _setupInfiniteScroll()) })
   border-radius: 50%;
   animation: te-spin 0.6s linear infinite;
 }
-.te-loading-text { font-size: 0.9rem; color: #6b7280; }
+.te-loading-text {   font-size: 1rem; color: #6b7280; }
 
 .te-table {
   width: 1px; min-width: 100%; border-collapse: collapse; table-layout: fixed;
@@ -1299,7 +1327,7 @@ watch(infiniteScroll, (v) => { if (v) nextTick(() => _setupInfiniteScroll()) })
 
 .te-header-row .te-th {
   position: sticky; top: 0; z-index: 2;
-  background: #f0f2f5; font-weight: 600; font-size: 0.85rem; padding: 0 10px 0 0; color: #2c3e50;
+  background: #f0f2f5; font-weight: 600; font-size: 1rem; padding: 0 10px 0 0; color: #2c3e50;
   border-bottom: 2px solid #d0d5dd; white-space: nowrap; user-select: none;
   border-right: 1px solid #dce0e6;
   &:last-child { border-right: none; }
@@ -1309,7 +1337,7 @@ watch(infiniteScroll, (v) => { if (v) nextTick(() => _setupInfiniteScroll()) })
 }
 .te-header-group-row .te-th {
   position: sticky; top: 0; z-index: 3;
-  background: #e2e8f0; font-weight: 700; font-size: 0.85rem; padding: 0 10px 0 0; color: #1e293b;
+  background: #e2e8f0; font-weight: 700; font-size: 1rem; padding: 0 10px 0 0; color: #1e293b;
   text-align: center;
   white-space: nowrap; user-select: none;
   border-right: 1px solid #dce0e6;
@@ -1331,7 +1359,7 @@ watch(infiniteScroll, (v) => { if (v) nextTick(() => _setupInfiniteScroll()) })
   &:hover { color: #1a56db; }
 }
 .te-sort-icon-std {
-  font-size: 0.7rem; color: #adb5bd; line-height: 1; margin-left: 0.3rem;
+  font-size: 1rem; color: #adb5bd; line-height: 1; margin-left: 0.3rem;
   .te-th-label:hover & { color: #3b82f6; }
 }
 .te-th[draggable='true'] { cursor: grab; }
@@ -1372,12 +1400,12 @@ watch(infiniteScroll, (v) => { if (v) nextTick(() => _setupInfiniteScroll()) })
 }
 
 .te-filter-row .te-td { padding: 0.2rem 10px 0.2rem 0.4rem; background: #f8f9fa; }
-.te-filter-input { width: 100%; font-size: 0.8rem; padding: 0.2rem 0.4rem; }
+.te-filter-input { width: 100%; font-size: 1rem; padding: 0.2rem 0.4rem; }
 
 .te-td {
   position: relative;
   box-sizing: border-box;
-  padding: 0.4rem 10px 0.4rem 0.75rem; font-size: 0.875rem; line-height: 1.45;
+  padding: 0.4rem 10px 0.4rem 0.75rem; font-size: 1rem; line-height: 1.45;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   border-bottom: 1px solid #f0f0f0; border-right: 1px solid #f0f0f0;
   &:last-child { border-right: none; }
@@ -1389,25 +1417,25 @@ watch(infiniteScroll, (v) => { if (v) nextTick(() => _setupInfiniteScroll()) })
 .te-empty { text-align: center; color: #999; padding: 2rem; border-right: none; }
 .te-color-badge {
   display: inline-block; padding: 0.1rem 0.5rem; border-radius: 4px;
-  border: 1px solid rgba(0,0,0,.15); font-weight: 600; font-size: 0.75rem;
+  border: 1px solid rgba(0,0,0,.15); font-weight: 600; font-size: 1rem;
 }
 
 .te-paginator {
   background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 0 0 8px 8px;
-  padding: 0.4rem 0.75rem; font-size: 0.85rem;
+  padding: 0.4rem 0.75rem; font-size: 1rem;
 }
 .te-page-info { color: #6c757d; }
 .te-page-controls { display: inline; }
 .te-page-btn {
   background: #fff; border: 1px solid #dee2e6; border-radius: 4px; padding: 0.25rem 0.5rem;
-  cursor: pointer; font-size: 0.8rem; color: #495057;
+  cursor: pointer; font-size: 1rem; color: #495057;
   &:hover:not(:disabled) { background: #e9ecef; }
   &:disabled { opacity: 0.4; cursor: default; }
 }
 .te-page-current { padding: 0 0.5rem; font-weight: 600; }
 .te-page-size {
   background: #fff; border: 1px solid #dee2e6; border-radius: 4px; padding: 0.25rem 0.5rem;
-  font-size: 0.85rem;
+  font-size: 1rem;
 }
 
 .te-sentinel { text-align: center; padding: 1rem; min-height: 3rem; }
@@ -1458,10 +1486,76 @@ watch(infiniteScroll, (v) => { if (v) nextTick(() => _setupInfiniteScroll()) })
   color: #4b5563;
   cursor: pointer;
   transition: opacity 0.15s, background 0.15s;
-  font-size: 0.7rem;
+  font-size: 1rem;
   padding: 0;
   line-height: 1;
 }
 .te-td-inline-edit:hover .te-inline-edit-btn { opacity: 1; }
 .te-inline-edit-btn:hover { background: #3b82f6; color: #fff; }
+
+/* === DARK MODE === */
+[data-bs-theme="dark"] .te-toolbar {
+  background: #1e1e2e; border-color: #3a3a50;
+}
+[data-bs-theme="dark"] .te-scroll-wrap {
+  border-color: #3a3a50; background: #1e1e2e;
+}
+[data-bs-theme="dark"] .te-scroll-wrap::-webkit-scrollbar-track { background: #2a2a3d; }
+[data-bs-theme="dark"] .te-scroll-wrap::-webkit-scrollbar-thumb { background: #4a4a65; border-radius: 4px; }
+[data-bs-theme="dark"] .te-scroll-wrap::-webkit-scrollbar-thumb:hover { background: #5a5a75; }
+[data-bs-theme="dark"] .te-loading-overlay { background: rgba(0, 0, 0, 0.75); }
+[data-bs-theme="dark"] .te-loading-spinner-large { border-color: #3a3a50; border-top-color: #60a5fa; }
+[data-bs-theme="dark"] .te-loading-text { color: #94a3b8; }
+[data-bs-theme="dark"] .te-striped .te-tr:nth-child(even) { background: #2a2a3d; }
+[data-bs-theme="dark"] .te-tr:hover { background: #2a3a5c !important; }
+[data-bs-theme="dark"] .te-tr.te-tr-highlight { background: #1e3a5f !important; color: #e0e0e0; }
+[data-bs-theme="dark"] .te-tr.te-tr-selected td { background: #1e3050; }
+[data-bs-theme="dark"] .te-tr.te-tr-selected:hover td { background: #2a3a5c !important; }
+[data-bs-theme="dark"] .te-td-selected { background: #1e3050 !important; }
+[data-bs-theme="dark"] .te-header-row .te-th {
+  background: #2a2a3d; color: #e0e0e0;
+  border-bottom-color: #4a4a65; border-right-color: #3a3a50;
+}
+[data-bs-theme="dark"] .te-header-row.te-has-groups .te-th { background: #333348; }
+[data-bs-theme="dark"] .te-header-group-row .te-th {
+  background: #333348; color: #e0e0e0; border-right-color: #3a3a50;
+}
+[data-bs-theme="dark"] .te-th-label:hover { color: #60a5fa; }
+[data-bs-theme="dark"] .te-sort-icon-std { color: #64748b; }
+[data-bs-theme="dark"] .te-th-label:hover .te-sort-icon-std { color: #60a5fa; }
+[data-bs-theme="dark"] .te-th-grip { color: #64748b; }
+[data-bs-theme="dark"] .te-th:hover .te-th-grip { color: #94a3b8; }
+[data-bs-theme="dark"] .te-th-dragging { opacity: 0.35; background: #3a3a50 !important; }
+[data-bs-theme="dark"] .te-th-dragover-left { background: #1e3050 !important; box-shadow: inset 3px 0 0 0 #60a5fa; }
+[data-bs-theme="dark"] .te-th-dragover-right { background: #1e3050 !important; box-shadow: inset -3px 0 0 0 #60a5fa; }
+[data-bs-theme="dark"] .te-drop-indicator { background: #60a5fa; }
+[data-bs-theme="dark"] .te-drop-indicator::after { background: #60a5fa; }
+[data-bs-theme="dark"] .te-resize-handle::before { background: #3a3a50; }
+[data-bs-theme="dark"] .te-resize-handle:hover::before,
+[data-bs-theme="dark"] .te-resize-handle:active::before { background: #60a5fa; }
+[data-bs-theme="dark"] .te-resize-handle:hover { background: rgba(96, 165, 250, 0.08); }
+[data-bs-theme="dark"] .te-resize-handle.te-resizing-active::before { background: #3b82f6; }
+[data-bs-theme="dark"] .te-filter-row .te-td { background: #252536; }
+[data-bs-theme="dark"] .te-td {
+  border-bottom-color: #2a2a3d; border-right-color: #2a2a3d;
+}
+[data-bs-theme="dark"] .te-empty { color: #6b7280; }
+[data-bs-theme="dark"] .te-paginator {
+  background: #252536; border-color: #3a3a50;
+}
+[data-bs-theme="dark"] .te-page-info { color: #94a3b8; }
+[data-bs-theme="dark"] .te-page-btn {
+  background: #1e1e2e; border-color: #3a3a50; color: #cbd5e1;
+}
+[data-bs-theme="dark"] .te-page-btn:hover:not(:disabled) { background: #333348; }
+[data-bs-theme="dark"] .te-page-size {
+  background: #1e1e2e; border-color: #3a3a50; color: #cbd5e1;
+}
+[data-bs-theme="dark"] .te-filter-input { background: #2a2a3d; color: #e0e0e0; border-color: #3a3a50; }
+[data-bs-theme="dark"] .te-editing-input {
+  border-color: #60a5fa; background: #2a2a3d; color: #e0e0e0;
+}
+[data-bs-theme="dark"] .te-inline-edit-btn { background: #3a3a50; color: #94a3b8; }
+[data-bs-theme="dark"] .te-td-inline-edit:hover .te-inline-edit-btn { opacity: 1; }
+[data-bs-theme="dark"] .te-inline-edit-btn:hover { background: #60a5fa; color: #fff; }
 </style>

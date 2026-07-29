@@ -33,7 +33,7 @@
 </template>
 
 <script>
-import { watch, ref, computed, onMounted } from 'vue'
+import { watch, ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useComandosPersonalizadosStore } from '../../../stores/comandosPersonalizados.js'
@@ -53,8 +53,16 @@ export default {
 
     const proyectoId = computed(() => activeSession.value?.proyecto_id || null)
 
-    const comandos = computed(() => comandosStore.getCommandsForProject(proyectoId.value))
-    const loadingComandos = computed(() => comandosStore.loadingByProject[proyectoId.value] || false)
+    const comandos = computed(() => {
+      const pid = proyectoId.value
+      if (!pid) return []
+      return comandosStore.commandsByProject[pid] || []
+    })
+    const loadingComandos = computed(() => {
+      const pid = proyectoId.value
+      if (!pid) return false
+      return !!comandosStore.loadingByProject[pid]
+    })
 
     const executingCommands = ref(new Map())
     const packageScripts = ref([])
@@ -421,27 +429,15 @@ export default {
 
     watch([proyectoId, activeSessionId], () => {
       const pid = proyectoId.value
+      const sid = activeSessionId.value
       if (!pid) {
         comandosStore.clearCommands()
-        packageScripts.value = []
+        if (!sid) packageScripts.value = []
         return
       }
       comandosStore.loadCommands(pid)
+      if (sid) loadPackageScripts()
     }, { immediate: true })
-
-    watch(activeSessionId, () => {
-      if (activeSessionId.value) {
-        loadPackageScripts()
-      } else {
-        packageScripts.value = []
-      }
-    })
-
-    onMounted(() => {
-      if (activeSessionId.value) {
-        loadPackageScripts()
-      }
-    })
 
     return {
       activeSession,
