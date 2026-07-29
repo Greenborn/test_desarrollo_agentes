@@ -179,9 +179,8 @@ export default {
     const settings = useSettingsStore()
     const ws = useWorkspaceStore()
     const { sessions, archivedSessions, activeSessionId, creating, sessionStatus, pendingNotifications } = storeToRefs(chat)
-    const { sidebarCollapsed, sidebarWidth, centralPanelCollapsed, sidebarWidthPct, rightPanelCollapsed, sidebarChatTab } = storeToRefs(ui)
+    const { sidebarCollapsed, sidebarWidth, centralPanelCollapsed, sidebarWidthPct, rightPanelCollapsed } = storeToRefs(ui)
     const tab = ref('chats')
-    const stopTabSync = watch(sidebarChatTab, (v) => { tab.value = v; stopTabSync() })
     const { redmineUrl } = storeToRefs(settings)
     const { workspaces, selectedIds } = storeToRefs(ws)
     const { sidebarChatTabs } = useModuleRegistry()
@@ -241,6 +240,11 @@ export default {
 
     watch(sidebarChatTabOrder, () => buildTabs(), { immediate: true })
     watch(sidebarChatTabs, () => buildTabs(), { immediate: true })
+    watch(activeSessionId, (newId) => {
+      if (!newId) { tab.value = 'chats'; return }
+      const s = sessions.value.find(s => Number(s.id) === Number(newId)) || archivedSessions.value.find(s => Number(s.id) === Number(newId))
+      tab.value = s?.prefs?.sidebarChatTab || 'chats'
+    })
     const activeRegistryChatComponent = computed(() => {
       if (!sidebarChatTabs) return null
       const found = sidebarChatTabs.find(t => t.id === tab.value)
@@ -394,12 +398,12 @@ export default {
       const s = chat.sessions.find((s) => s.id === id) || chat.archivedSessions.find((s) => s.id === id)
       if (s && s.cwd) cmd.currentDir = s.cwd
       chat.loadMessages(id)
+      tab.value = s?.prefs?.sidebarChatTab || 'chats'
     }
 
     function selectChatTab(val) {
       tab.value = val
-      sidebarChatTab.value = val
-      ui.saveLayoutPrefs()
+      chat.saveSessionTabPref(chat.activeSessionId, val)
       if (val === 'archived') {
         chat.loadArchivedSessions()
       }

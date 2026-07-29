@@ -197,7 +197,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 ### `GET /api/chat/sessions`
 - **Auth:** Requerida
 - **Workspace:** Filtra por `workspace_id` de la sesión
-- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion, proyecto_color, id_ticket_redmine, workspace_id, priority_id, priority_name }] }`
+- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion, proyecto_color, id_ticket_redmine, workspace_id, priority_id, priority_name, prefs }] }`
 - **Descripción:** Lista las sesiones activas (no archivadas) del usuario.
 
 ### `POST /api/chat/sessions`
@@ -235,7 +235,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 ### `GET /api/chat/sessions/archived`
 - **Auth:** Requerida
 - **Workspace:** Filtra por `workspace_id` de la sesión
-- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion, proyecto_color, id_ticket_redmine, workspace_id, priority_id, priority_name }] }`
+- **Respuesta:** `{ sessions: [{ id, title, updated_at, cwd, proyecto_id, proyecto_descripcion, proyecto_color, id_ticket_redmine, workspace_id, priority_id, priority_name, prefs }] }`
 - **Descripción:** Lista únicamente las sesiones archivadas del usuario. Misma estructura que `GET /sessions` pero filtrando `archived = true`.
 
 ### `POST /api/chat/sessions/:id/archive`
@@ -263,6 +263,13 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - **Auth:** Requerida
 - **Respuesta:** `{ success: true, session: { id, title, updated_at, cwd, proyecto_id, id_ticket_redmine, workspace_id, proyecto_descripcion, proyecto_color, priority_id, priority_name, session_redmine_url } }`
 - **Descripción:** Clona una sesión existente incluyendo todos sus mensajes. La nueva sesión se crea con `archived: false` y timestamps actuales. Los mensajes se copian con sus timestamps originales.
+
+### `PUT /api/chat/sessions/:id/prefs`
+- **Auth:** Requerida
+- **Body:** `{ prefs: { sidebarChatTab?: string } }`
+- **Respuesta 200:** `{ success: true }`
+- **Respuesta 404:** `{ error: "Sesión no encontrada" }`
+- **Descripción:** Actualiza las preferencias de la sesión (JSON). Usado para recordar la pestaña activa del panel de chat por sesión.
 
 ---
 

@@ -104,7 +104,8 @@ router.get('/sessions', async (req, res) => {
         'cwd',
         'chat_sessions.proyecto_id',
         'id_ticket_redmine',
-        'chat_sessions.workspace_id'
+        'chat_sessions.workspace_id',
+        'prefs'
       );
     await enrichSessionsWithProyectosYTickets(sessions);
     const enriched = await enrichRedmineUrl(sessions);
@@ -682,7 +683,8 @@ router.get('/sessions/archived', async (req, res) => {
         'cwd',
         'chat_sessions.proyecto_id',
         'id_ticket_redmine',
-        'chat_sessions.workspace_id'
+        'chat_sessions.workspace_id',
+        'prefs'
       );
     await enrichSessionsWithProyectosYTickets(sessions);
     const enriched = await enrichRedmineUrl(sessions);
@@ -744,6 +746,7 @@ router.post('/sessions/:id/clone', async (req, res) => {
       proyecto_id: original.proyecto_id,
       id_ticket_redmine: original.id_ticket_redmine,
       workspace_id: original.workspace_id,
+      prefs: original.prefs,
       archived: false,
       created_at: db.fn.now(),
       updated_at: db.fn.now(),
@@ -773,7 +776,8 @@ router.post('/sessions/:id/clone', async (req, res) => {
         'cwd',
         'chat_sessions.proyecto_id',
         'id_ticket_redmine',
-        'chat_sessions.workspace_id'
+        'chat_sessions.workspace_id',
+        'prefs'
       )
       .first();
     if (!newSession) {
@@ -786,6 +790,26 @@ router.post('/sessions/:id/clone', async (req, res) => {
   } catch (err) {
     console.error('Error al clonar sesión:', err);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/sessions/:id/prefs', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const session = await db('chat_sessions')
+      .where({ id: req.params.id, user_id: req.session.userId })
+      .first();
+    if (!session) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+    const { prefs } = req.body;
+    await db('chat_sessions')
+      .where({ id: req.params.id })
+      .update({ prefs: prefs ? JSON.stringify(prefs) : null, updated_at: db.fn.now() });
+    res.json({ success: true });
+  } catch (err) {
+    console.log('Error al actualizar preferencias de sesión:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

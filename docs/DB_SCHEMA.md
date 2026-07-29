@@ -61,6 +61,7 @@ DB_REDMINE_DATA_SQLITE_PATH=../data/redmine_data.db         # proyectos y ticket
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `archived` | BOOLEAN | NOT NULL, DEFAULT `false` — indica si la sesión está archivada |
+| `prefs` | TEXT | nullable — JSON con preferencias de la sesión (pestaña activa, etc.) |
 
 ---
 

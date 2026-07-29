@@ -1041,6 +1041,30 @@ export const useChatStore = defineStore('chat', () => {
     return sid ? sessionTickets.value[sid] || null : null
   })
 
+  function getSessionPrefs(sessionId) {
+    if (!sessionId) return {}
+    const session = sessions.value.find(s => Number(s.id) === Number(sessionId)) || archivedSessions.value.find(s => Number(s.id) === Number(sessionId))
+    return session?.prefs || {}
+  }
+
+  async function saveSessionTabPref(sessionId, tabId) {
+    if (!sessionId) return
+    const session = sessions.value.find(s => Number(s.id) === Number(sessionId)) || archivedSessions.value.find(s => Number(s.id) === Number(sessionId))
+    if (!session) return
+    const prefs = { ...(session.prefs || {}), sidebarChatTab: tabId }
+    session.prefs = prefs
+    try {
+      await fetch(`${API}/chat/sessions/${sessionId}/prefs`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ prefs }),
+      })
+    } catch (err) {
+      console.error('Error al guardar preferencia de pestaña:', err)
+    }
+  }
+
   watch(activeSessionId, () => {
     saveUiState()
   })
@@ -1062,6 +1086,6 @@ export const useChatStore = defineStore('chat', () => {
     _terminalSessions, _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel, terminalId,
     _hasTerminal, openTerminal, closeTerminal, getTerminalCount, getTerminals,
     getTotalConcurrentSlots, maxTerminalsLimit,
-    saveUiState,
+    saveUiState, getSessionPrefs, saveSessionTabPref,
   }
 })
