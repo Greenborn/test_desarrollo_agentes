@@ -61,32 +61,6 @@
       {{ errorTmp }}
     </div>
 
-    <div class="modal fade" tabindex="-1" ref="modalConfig">
-      <div class="modal-dialog modal-sm">
-        <div class="modal-content" style="background: #16213e; color: #e0e0e0;">
-          <div class="modal-header" style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #374151;">
-            <h6 class="modal-title" style="font-size: 0.8rem;">Configurar Modelo</h6>
-            <button type="button" class="btn-close btn-close-white" style="font-size: 0.6rem;" @click="cerrarModalConfig"></button>
-          </div>
-          <form @submit.prevent="guardarConfig">
-            <div class="modal-body" style="padding: 0.5rem 0.75rem;">
-              <p class="small mb-2" style="color: #75AADB;">{{ selectedRow ? selectedRow.name : '' }}</p>
-              <div class="form-check">
-                <input type="checkbox" id="chkCommitModel" v-model="commitModelEnabled" class="form-check-input" style="cursor: pointer;" />
-                <label for="chkCommitModel" class="form-check-label small" style="font-size: 0.75rem; cursor: pointer;">Usar para commits</label>
-              </div>
-              <p class="small text-muted mt-2" style="font-size: 0.65rem;">Al activar esta opción, este modelo se usará para generar mensajes de commit en lugar de DeepSeek. Solo un modelo puede tener esta opción activa.</p>
-              <div v-if="errorModalConfig" class="small text-danger mt-1" style="font-size: 0.65rem;">{{ errorModalConfig }}</div>
-            </div>
-            <div class="modal-footer" style="padding: 0.4rem 0.75rem; border-top: 1px solid #374151;">
-              <button type="button" class="btn btn-sm btn-secondary py-0 px-2" style="font-size: 0.7rem;" @click="cerrarModalConfig">Cancelar</button>
-              <button type="submit" class="btn btn-sm py-0 px-2" style="font-size: 0.7rem; background: rgba(117, 170, 219, 0.15); color: #75AADB; border: 1px solid rgba(117, 170, 219, 0.3);" :disabled="guardandoConfig">{{ guardandoConfig ? 'Guardando...' : 'Guardar' }}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
     <div class="modal fade" tabindex="-1" ref="modalInstalar">
       <div class="modal-dialog modal-sm">
         <div class="modal-content" style="background: #16213e; color: #e0e0e0;">
@@ -126,6 +100,7 @@ import { Modal } from 'bootstrap'
 import TableEditor from '../../../components/TableEditor.vue'
 import { BtnConfig } from '../../../components/BtnConfig.js'
 import ConfirmModal from '../../../components/modals/ConfirmModal.vue'
+import OllamaConfigModal from './OllamaConfigModal.vue'
 import { useModalStore } from '../../../stores/modal.js'
 
 export default {
@@ -145,14 +120,9 @@ export default {
     const inputModelo = ref(null)
     const tableEditor = ref(null)
     let modalInstance = null
-    let modalConfigInstance = null
 
     const selectedRow = ref(null)
-    const commitModelEnabled = ref(false)
     const commitModelName = ref('')
-    const modalConfig = ref(null)
-    const guardandoConfig = ref(false)
-    const errorModalConfig = ref('')
 
     function formatearTamano(bytes) {
       if (!bytes) return '-'
@@ -342,51 +312,29 @@ export default {
 
     function abrirModalConfig() {
       if (!selectedRow.value) return
-      commitModelEnabled.value = commitModelName.value === selectedRow.value.name
-      errorModalConfig.value = ''
-      modalConfigInstance.show()
-    }
-
-    function cerrarModalConfig() {
-      modalConfigInstance.hide()
-    }
-
-    async function guardarConfig() {
-      guardandoConfig.value = true
-      errorModalConfig.value = ''
-      try {
-        const newModel = commitModelEnabled.value ? selectedRow.value.name : ''
-        const res = await fetch('/api/ollama/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ commitModel: newModel }),
-        })
-        const data = await res.json()
-        if (data.status) {
-          commitModelName.value = newModel
-          cerrarModalConfig()
-          statusMsg.value = newModel ? 'Modelo "' + newModel + '" configurado para commits' : 'Configuración de commits desactivada'
-          limpiarStatus()
-        } else {
-          errorModalConfig.value = data.error || 'Error al guardar configuración'
-        }
-      } catch (err) {
-        console.log('[OllamaTab] Error al guardar config:', err)
-        errorModalConfig.value = 'Error de conexión con el servidor'
-      } finally {
-        guardandoConfig.value = false
-      }
+      modal.open(OllamaConfigModal, {
+        modelName: selectedRow.value.name,
+        commitModelName: commitModelName.value,
+      }, {
+        title: 'Configurar Modelo',
+        onClose: (result) => {
+          if (result && result.commitModel !== undefined) {
+            commitModelName.value = result.commitModel
+            if (result.commitModel) {
+              statusMsg.value = 'Modelo "' + result.commitModel + '" configurado para commits'
+            } else {
+              statusMsg.value = 'Configuración de commits desactivada'
+            }
+            limpiarStatus()
+          }
+        },
+      })
     }
 
     onMounted(() => {
       const elInstalar = modalInstalar.value
       if (elInstalar) {
         modalInstance = new Modal(elInstalar)
-      }
-      const elConfig = modalConfig.value
-      if (elConfig) {
-        modalConfigInstance = new Modal(elConfig)
       }
       cargarModelos()
       cargarConfig()
@@ -396,10 +344,6 @@ export default {
       if (modalInstance) {
         modalInstance.dispose()
         modalInstance = null
-      }
-      if (modalConfigInstance) {
-        modalConfigInstance.dispose()
-        modalConfigInstance = null
       }
     })
 
@@ -417,11 +361,7 @@ export default {
       inputModelo,
       tableEditor,
       selectedRow,
-      commitModelEnabled,
       commitModelName,
-      modalConfig,
-      guardandoConfig,
-      errorModalConfig,
       tableData,
       tableConfig,
       formatearTamano,
@@ -434,8 +374,6 @@ export default {
       eliminarModelo,
       onRowSelected,
       abrirModalConfig,
-      cerrarModalConfig,
-      guardarConfig,
     }
   },
 }
