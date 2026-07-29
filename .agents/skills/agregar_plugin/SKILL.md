@@ -440,7 +440,49 @@ Crear `frontend/src/modules/<plugin_id>/components/<plugin_id>Tab.vue`.
 
 **Importante:** Si el componente necesita mostrar datos tabulares (listas, tablas, grids), debe usar el componente `TableEditor` en modo server-side (`lazy: true`). No usar `<table>` HTML nativo.
 
-Ejemplo con TableEditor para lista de datos:
+Ejemplo con TableEditor para lista de datos (usando el sistema de modales genérico):
+
+Primero crear el componente del modal de formulario en `frontend/src/modules/<plugin_id>/components/<plugin_id>FormModal.vue`:
+
+```vue
+<template>
+  <div class="d-flex flex-column">
+    <!-- Campos del formulario -->
+    <div v-if="errorMsg" class="small text-danger mb-2">{{ errorMsg }}</div>
+    <div class="d-flex justify-content-end mt-3 gap-2">
+      <button class="btn btn-sm btn-secondary" @click="$emit('cancel')">Cancelar</button>
+      <button class="btn btn-sm btn-primary" :disabled="guardando" @click="guardar">{{ guardando ? 'Guardando...' : 'Guardar' }}</button>
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  props: {
+    editando: { type: Object, default: null },
+  },
+  emits: ['close', 'cancel'],
+  data() {
+    return { guardando: false, errorMsg: '' }
+  },
+  methods: {
+    async guardar() {
+      this.guardando = true
+      try {
+        // Lógica de guardado
+        this.$emit('close')
+      } catch (err) {
+        this.errorMsg = 'Error al guardar'
+      } finally {
+        this.guardando = false
+      }
+    },
+  },
+}
+</script>
+```
+
+Luego en el componente tab, usar `useModalStore` para abrirlo:
 
 ```vue
 <template>
@@ -455,89 +497,30 @@ Ejemplo con TableEditor para lista de datos:
       @rowSelected="onRowSelected"
       @rowDoubleClick="onRowDblClick"
     />
-
-    <div class="modal fade" tabindex="-1" ref="modal">
-      <div class="modal-dialog modal-sm">
-        <div class="modal-content" style="background: #16213e; color: #e0e0e0;">
-          <div class="modal-header" style="padding: 0.4rem 0.75rem; border-bottom: 1px solid #374151;">
-            <h6 class="modal-title" style="font-size: 0.8rem;">{{ editando ? 'Editar' : 'Nuevo' }} <plugin_name></h6>
-            <button type="button" class="btn-close btn-close-white" style="font-size: 0.6rem;" @click="cerrarModal"></button>
-          </div>
-          <form @submit.prevent="guardar">
-            <div class="modal-body" style="padding: 0.5rem 0.75rem;">
-              <!-- Campos del formulario -->
-              <div v-if="errorModal" class="alert alert-danger py-1 small">{{ errorModal }}</div>
-            </div>
-            <div class="modal-footer" style="padding: 0.4rem 0.75rem; border-top: 1px solid #374151;">
-              <button type="button" class="btn btn-sm btn-secondary py-0 px-2" style="font-size: 0.7rem;" @click="cerrarModal">Cancelar</button>
-              <button type="submit" class="btn btn-sm py-0 px-2" style="font-size: 0.7rem; background: rgba(117, 170, 219, 0.15); color: #75AADB; border: 1px solid rgba(117, 170, 219, 0.3);" :disabled="cargando">{{ cargando ? 'Guardando...' : 'Guardar' }}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script>
-import { Modal } from 'bootstrap'
 import api from '../../api/axios'
 import TableEditor from '../../components/TableEditor.vue'
+import <plugin_id>FormModal from './<plugin_id>FormModal.vue'
+import { useModalStore } from '../../../stores/modal.js'
 
 export default {
   name: '<plugin_id>Tab',
   components: { TableEditor },
-  data() {
-    return {
-      selectedRow: null,
-      editando: null,
-      form: {},
-      errorModal: '',
-      cargando: false,
-      modalInstance: null,
-      apiEntidad: {
-        list: (params) => api.get('/api/<plugin_id>/list', { params }).then(r => r.data),
-        create: (data) => api.post('/api/<plugin_id>', data).then(r => r.data),
-        edit: (data) => api.put('/api/<plugin_id>/' + data.id, data).then(r => r.data),
-        delete: (data) => api.delete('/api/<plugin_id>/' + data.id).then(r => r.data),
-      },
+  setup() {
+    const modal = useModalStore()
+    // ... resto de la lógica
+
+    function abrirModal(row) {
+      modal.open(<plugin_id>FormModal, { editando: row }, {
+        title: row ? 'Editar' : 'Nuevo',
+        onClose: () => { /* refrescar datos */ },
+      })
     }
-  },
-  computed: {
-    tabConfig() {
-      return {
-        lazy: true,
-        selectionMode: 'single',
-        elementName: { singular: '<plugin_name>', gender: 'M' },
-        buttons: {
-          toolbar: [
-            { key: 'create', icon: 'bi bi-plus-lg', severity: 'btn-success', label: 'Nuevo',
-              onClick: () => this.abrirModal() },
-            { key: 'edit', icon: 'bi bi-pencil', severity: 'btn-warning', label: 'Editar',
-              isDisabled: () => !this.selectedRow, onClick: () => this.abrirModal(this.selectedRow) },
-            { key: 'delete', icon: 'bi bi-trash', severity: 'btn-danger', label: 'Eliminar',
-              isDisabled: () => !this.selectedRow, onClick: () => this.eliminar(this.selectedRow) },
-          ],
-          rowActions: [
-            { key: 'edit', icon: 'bi bi-pencil', severity: 'btn-warning', label: 'Editar',
-              onClick: (r) => this.abrirModal(r) },
-            { key: 'delete', icon: 'bi bi-trash', severity: 'btn-danger', label: 'Eliminar',
-              onClick: (r) => this.eliminar(r) },
-          ],
-        },
-      }
-    },
-  },
-  methods: {
-    onRowSelected(row) { this.selectedRow = row },
-    onRowDblClick(row) { if (row) this.abrirModal(row) },
-    abrirModal(row) { /* ... */ },
-    cerrarModal() { this.modalInstance.hide() },
-    async guardar() { /* ... */ },
-    async eliminar(row) { /* ... */ },
-  },
-  mounted() {
-    this.modalInstance = new Modal(this.$refs.modal)
+
+    return { abrirModal }
   },
 }
 </script>
@@ -577,7 +560,7 @@ Crear `frontend/src/modules/<plugin_id>/components/<plugin_id>View.vue`.
 
 **Importante:** Si la vista necesita mostrar datos tabulares, debe usar `TableEditor` igual que el componente tab (ver sección 7).
 
-Ejemplo con TableEditor:
+Ejemplo con TableEditor (usando el sistema de modales genérico, mismo patrón que la sección 7):
 
 ```vue
 <template>
@@ -592,52 +575,21 @@ Ejemplo con TableEditor:
       @rowSelected="onRowSelected"
       @rowDoubleClick="onRowDblClick"
     />
-
-    <div class="modal fade" tabindex="-1" ref="modal">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">{{ editando ? 'Editar' : 'Nuevo' }} <plugin_name></h5>
-            <button type="button" class="btn-close" @click="cerrarModal"></button>
-          </div>
-          <form @submit.prevent="guardar">
-            <div class="modal-body">
-              <div v-if="errorModal" class="alert alert-danger py-2">{{ errorModal }}</div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" @click="cerrarModal">Cancelar</button>
-              <button type="submit" class="btn btn-primary" :disabled="cargando">{{ cargando ? 'Guardando...' : 'Guardar' }}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script>
-import { Modal } from 'bootstrap'
 import api from '../../api/axios'
 import TableEditor from '../../components/TableEditor.vue'
+import <plugin_id>FormModal from './<plugin_id>FormModal.vue'
+import { useModalStore } from '../../../stores/modal.js'
 
 export default {
   name: '<plugin_id>View',
   components: { TableEditor },
-  data() {
-    return {
-      selectedRow: null,
-      editando: null,
-      form: {},
-      errorModal: '',
-      cargando: false,
-      modalInstance: null,
-      apiEntidad: {
-        list: (params) => api.get('/api/<plugin_id>/list', { params }).then(r => r.data),
-        create: (data) => api.post('/api/<plugin_id>', data).then(r => r.data),
-        edit: (data) => api.put('/api/<plugin_id>/' + data.id, data).then(r => r.data),
-        delete: (data) => api.delete('/api/<plugin_id>/' + data.id).then(r => r.data),
-      },
-    }
+  setup() {
+    const modal = useModalStore()
+    // ...
   },
 }
 </script>
@@ -831,7 +783,7 @@ Si el plugin tiene base de datos, agregar el esquema de la tabla en `docs/DB_SCH
 5. **Prohibido TypeScript** en cualquier parte del proyecto.
 6. **Prohibido `||` como fallback de parámetros:** Validar explícitamente cada argumento requerido y devolver error si falta.
 7. **Manejo de errores:** Todo `catch` debe registrar el error con `console.log`. Prohibido `catch {}` vacío.
-8. **Prohibido `alert()`:** Usar `modal.open(AlertModal, ...)` para notificaciones al usuario.
+8. **Sistema de modales genérico obligatorio:** Todos los modales (formularios, confirmaciones, notificaciones) deben abrirse mediante `useModalStore.open(Componente, props, opciones)`. El contenido del modal debe ser un componente separado que emita `close`/`cancel`. Prohibido usar `new Modal()` de Bootstrap directamente o incluir HTML de modales en el template del componente principal. Para confirmaciones simples usar `ConfirmModal`, para notificaciones usar `AlertModal`.
 9. **Formato `--nombre=valor` obligatorio:** Todos los parámetros de comandos deben usar flags con `--`. Prohibido argumentos posicionales (excepciones: `/git` y `/skill_editar`).
 10. **Usar `parseCommandArgs`** para parsear argumentos de comandos.
 11. **Usar `getUsedFlags`** para autocomplete de comandos.

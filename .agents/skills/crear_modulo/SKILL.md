@@ -136,7 +136,7 @@ export default router
 6. **Session-scoping obligatorio:** Si el tab depende de una sesión de chat activa, validar dentro del componente con `useChatStore().activeSessionId`.
 7. **Prohibido `||` como fallback de parámetros:** Validar explícitamente cada argumento requerido y devolver error si falta.
 8. **Manejo de errores:** Todo `catch` debe registrar el error con `console.log` (tanto frontend como backend). Prohibido `catch {}` vacío o silencioso.
-9. **Prohibido `alert()`:** Usar `modal.open(AlertModal, ...)` para notificaciones al usuario.
+9. **Sistema de modales genérico obligatorio:** Todos los modales (formularios, confirmaciones, notificaciones) deben abrirse mediante `useModalStore.open(Componente, props, opciones)`. El contenido del modal debe ser un componente separado que emita `close`/`cancel`. Prohibido usar `new Modal()` de Bootstrap directamente o incluir HTML de modales en el template del componente principal. Usar `ConfirmModal` para confirmaciones y `AlertModal` para notificaciones.
 10. **TableEditor para datos tabulares obligatorio:** Siempre que un componente del módulo necesite mostrar datos en forma de tabla (listas, grids, catálogos), debe usarse `TableEditor` con `lazy: true`. No usar `<table>` HTML nativo. `TableEditor` proporciona paginación server-side, ordenamiento, búsqueda global, columnas redimensionables/reordenables, y preferencias de columnas persistentes.
 
 ## Paneles disponibles
