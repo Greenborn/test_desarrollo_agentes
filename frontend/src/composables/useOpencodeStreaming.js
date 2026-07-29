@@ -619,78 +619,92 @@ export function useOpencodeStreaming() {
       chat.setOcStreaming(sessionId, false)
       if (sessionId) chat.setSessionStatus(sessionId, 'idle')
 
+      let repoUrl = ''
+      try {
+        const sess = chat.sessions.find(s => Number(s.id) === Number(sessionId))
+        const proyectoId = sess?.proyecto_id || null
+        let url_github = null
+        if (proyectoId) {
+          const repoRes = await fetch('/api/proyecto/repositorio/' + encodeURIComponent(proyectoId) + '?sessionId=' + sessionId, { credentials: 'include' })
+          const repoData = await repoRes.json()
+          url_github = repoData.url_github || null
+        }
+        if (!url_github) {
+          const remoteRes = await fetch('/api/command/git', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ command: 'remote get-url origin', sessionId }),
+          })
+          const remoteData = await remoteRes.json()
+          if (remoteData.success && remoteData.stdout) {
+            const remote = remoteData.stdout.trim().replace(/\.git$/, '')
+            if (/^git@/.test(remote)) {
+              const m = remote.match(/^git@([^:]+):(.+)$/)
+              if (m) url_github = 'https://' + m[1] + '/' + m[2]
+            } else if (/^https?:\/\//.test(remote)) {
+              url_github = remote
+            }
+          }
+        }
+        if (url_github) {
+          repoUrl = url_github.replace(/\/+$/, '')
+        }
+      } catch (err) {
+        console.error('Error al obtener URL del repositorio:', err.message)
+      }
+
+      const controlMsg = {
+        role: 'opencode_control',
+        controlData: {
+          controlId: 'commit-result-' + Date.now(),
+          controlType: 'commit_result',
+          message: translatedText || '(sin respuesta)',
+          repoUrl: repoUrl,
+          loading: false,
+          modo_envio: settings.defaultCommentModeCommit || 'encolar',
+        },
+        _key: 'control-' + Date.now(),
+      }
+
       if (isActiveSession(sessionId)) {
         const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
         if (idx >= 0) {
-          let repoUrl = ''
-          try {
-            const sess = chat.sessions.find(s => Number(s.id) === Number(sessionId))
-            const proyectoId = sess?.proyecto_id || null
-            let url_github = null
-            if (proyectoId) {
-              const repoRes = await fetch('/api/proyecto/repositorio/' + encodeURIComponent(proyectoId) + '?sessionId=' + sessionId, { credentials: 'include' })
-              const repoData = await repoRes.json()
-              url_github = repoData.url_github || null
-            }
-            if (!url_github) {
-              const remoteRes = await fetch('/api/command/git', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ command: 'remote get-url origin', sessionId }),
-              })
-              const remoteData = await remoteRes.json()
-              if (remoteData.success && remoteData.stdout) {
-                const remote = remoteData.stdout.trim().replace(/\.git$/, '')
-                if (/^git@/.test(remote)) {
-                  const m = remote.match(/^git@([^:]+):(.+)$/)
-                  if (m) url_github = 'https://' + m[1] + '/' + m[2]
-                } else if (/^https?:\/\//.test(remote)) {
-                  url_github = remote
-                }
-              }
-            }
-            if (url_github) {
-              repoUrl = url_github.replace(/\/+$/, '')
-            }
-          } catch (err) {
-            console.error('Error al obtener URL del repositorio:', err.message)
-          }
-
-          chat.messages[idx] = {
-            role: 'opencode_control',
-            controlData: {
-              controlId: 'commit-result-' + Date.now(),
-              controlType: 'commit_result',
-              message: translatedText || '(sin respuesta)',
-              repoUrl: repoUrl,
-              loading: false,
-              modo_envio: settings.defaultCommentModeCommit || 'encolar',
-            },
-            _key: 'control-' + Date.now(),
-          }
+          chat.messages[idx] = controlMsg
+        } else {
+          chat.pushMessage(controlMsg, sessionId)
         }
+      } else {
+        await chat._saveMessageToDb(sessionId, controlMsg)
+        chat.pendingNotifications.value[sessionId] = Date.now()
       }
     } catch (err) {
       console.error('Error al generar commit:', err.message)
       chat.setOcStreaming(sessionId, false)
       if (sessionId) chat.setSessionStatus(sessionId, 'idle')
 
+      const errorControlMsg = {
+        role: 'opencode_control',
+        controlData: {
+          controlId: 'commit-result-' + Date.now(),
+          controlType: 'commit_result',
+          message: '[Error al generar commit: ' + err.message + ']',
+          loading: false,
+          modo_envio: settings.defaultCommentModeCommit || 'encolar',
+        },
+        _key: 'control-' + Date.now(),
+      }
+
       if (isActiveSession(sessionId)) {
         const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
         if (idx >= 0) {
-          chat.messages[idx] = {
-            role: 'opencode_control',
-            controlData: {
-              controlId: 'commit-result-' + Date.now(),
-              controlType: 'commit_result',
-              message: '[Error al generar commit: ' + err.message + ']',
-              loading: false,
-              modo_envio: settings.defaultCommentModeCommit || 'encolar',
-            },
-            _key: 'control-' + Date.now(),
-          }
+          chat.messages[idx] = errorControlMsg
+        } else {
+          chat.pushMessage(errorControlMsg, sessionId)
         }
+      } else {
+        await chat._saveMessageToDb(sessionId, errorControlMsg)
+        chat.pendingNotifications.value[sessionId] = Date.now()
       }
     }
 

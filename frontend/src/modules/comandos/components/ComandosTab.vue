@@ -12,7 +12,7 @@
       <div v-if="loadingComandos" class="d-flex flex-column align-items-center justify-content-center text-secondary small py-2">
         <span>Cargando comandos personalizados…</span>
       </div>
-      <TableEditor v-else :data="commandsData" :config="commandsConfig" />
+      <TableEditor v-else id="comandos" :data="commandsData" :config="commandsConfig" />
     </template>
 
     <template v-if="scriptsRows.length > 0 || loadingPackageScripts">
@@ -23,7 +23,7 @@
       <div v-if="loadingPackageScripts" class="d-flex align-items-center justify-content-center text-secondary small py-2">
         <span>Cargando scripts…</span>
       </div>
-      <TableEditor v-else :data="scriptsData" :config="scriptsConfig" />
+      <TableEditor v-else id="scripts" :data="scriptsData" :config="scriptsConfig" />
     </template>
 
     <div v-if="comandos.length === 0 && scriptsRows.length === 0 && !loadingComandos && !loadingPackageScripts" class="d-flex flex-column align-items-center justify-content-center text-secondary small px-3 text-center py-3">

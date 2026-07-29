@@ -15,6 +15,7 @@
       <button v-if="hasSentComments" class="btn btn-sm btn-outline-secondary ms-auto py-0 px-2" style="font-size: 0.65rem;" @click="deleteSentComments">Limpiar enviados</button>
     </div>
     <TableEditor
+      id="comentarios"
       :data="tableData"
       :config="tableConfig"
       style="min-height: 0; flex: 1;"

@@ -1327,7 +1327,7 @@ watch(infiniteScroll, (v) => { if (v) nextTick(() => _setupInfiniteScroll()) })
 
 .te-header-row .te-th {
   position: sticky; top: 0; z-index: 2;
-  background: #f0f2f5; font-weight: 600; font-size: 1rem; padding: 0 10px 0 0; color: #2c3e50;
+  background: #f0f2f5; font-weight: 600; font-size: 0.8rem; padding: 0 10px 0 0; color: #2c3e50;
   border-bottom: 2px solid #d0d5dd; white-space: nowrap; user-select: none;
   border-right: 1px solid #dce0e6;
   &:last-child { border-right: none; }
@@ -1337,7 +1337,7 @@ watch(infiniteScroll, (v) => { if (v) nextTick(() => _setupInfiniteScroll()) })
 }
 .te-header-group-row .te-th {
   position: sticky; top: 0; z-index: 3;
-  background: #e2e8f0; font-weight: 700; font-size: 1rem; padding: 0 10px 0 0; color: #1e293b;
+  background: #e2e8f0; font-weight: 700; font-size: 0.8rem; padding: 0 10px 0 0; color: #1e293b;
   text-align: center;
   white-space: nowrap; user-select: none;
   border-right: 1px solid #dce0e6;
@@ -1405,7 +1405,7 @@ watch(infiniteScroll, (v) => { if (v) nextTick(() => _setupInfiniteScroll()) })
 .te-td {
   position: relative;
   box-sizing: border-box;
-  padding: 0.4rem 10px 0.4rem 0.75rem; font-size: 1rem; line-height: 1.45;
+  padding: 0.4rem 10px 0.4rem 0.75rem; font-size: 0.8rem; line-height: 1.45;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   border-bottom: 1px solid #f0f0f0; border-right: 1px solid #f0f0f0;
   &:last-child { border-right: none; }

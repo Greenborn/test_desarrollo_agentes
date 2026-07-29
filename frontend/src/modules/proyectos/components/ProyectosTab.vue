@@ -14,6 +14,7 @@
     </div>
     <div class="flex-grow-1" style="min-height: 0;">
       <TableEditor
+        id="proyectos"
         :data="tableData"
         :config="{
           selectionMode: 'single',

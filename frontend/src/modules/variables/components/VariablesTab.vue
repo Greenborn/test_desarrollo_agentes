@@ -12,6 +12,7 @@
     <button class="btn btn-sm btn-outline-argentina w-100 mb-2" style="font-size: 0.7rem;" @click.stop="agregarVariable">+ Agregar variable</button>
     <div class="flex-grow-1" style="min-height: 0;">
       <TableEditor
+        id="variables"
         :data="tableData"
         :config="tableConfig"
         @rowDoubleClick="onRowDblClick"

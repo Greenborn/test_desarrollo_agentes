@@ -22,6 +22,7 @@
 
     <div class="flex-grow-1 min-h-0">
       <TableEditor
+        id="tickets"
         :data="tableData"
         :config="tableConfig"
         @rowSelected="onRowSelected"
