@@ -1,6 +1,8 @@
 import db from '../config/db.js';
 import dbConfig from '../config/dbConfig.js';
+import dbGlobalSettings from '../config/dbGlobalSettings.js';
 import { decrypt } from './crypto.js';
+import ollamaService from './ollamaService.js';
 
 export async function getDeepSeekKey(workspaceId) {
   try {
@@ -40,7 +42,89 @@ export function normalizeMessages(messages) {
   });
 }
 
+export async function getOllamaCommitModel() {
+  try {
+    const row = await dbGlobalSettings('global_settings').where({ setting_key: 'ollama_commit_model' }).first();
+    return row && row.setting_value ? row.setting_value : null
+  } catch (err) {
+    console.log('[ollama] Error al leer ollama_commit_model:', err.message)
+    return null
+  }
+}
+
+async function* streamOllama(messages, systemPrompt, model) {
+  const body = {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...messages,
+    ],
+    stream: true,
+  }
+
+  const response = await fetch(`${ollamaService.baseUrl()}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Ollama API error ${response.status}: ${text}`)
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    let chunk
+    try {
+      const result = await reader.read()
+      if (result.done) break
+      chunk = result
+    } catch (err) {
+      console.log('[ollama] Error leyendo stream:', err.message)
+      break
+    }
+
+    buffer += decoder.decode(chunk.value, { stream: true })
+    const lines = buffer.split('\n')
+    const last = lines.pop()
+    buffer = last !== undefined ? last : ''
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      try {
+        const json = JSON.parse(trimmed)
+        if (json.done) {
+          yield { type: 'usage', prompt_tokens: 0, completion_tokens: json.eval_count || 0, total_tokens: json.eval_count || 0 }
+          continue
+        }
+        if (json.message && json.message.content) {
+          yield { type: 'response', content: json.message.content }
+        }
+      } catch (err) {
+        console.log('[ollama] Error al parsear chunk:', err.message)
+      }
+    }
+  }
+}
+
 export async function* streamChat(messages, workspaceId, customSystemPrompt = null, options = {}) {
+  const ollamaModel = await getOllamaCommitModel()
+  if (ollamaModel) {
+    const isRunning = await ollamaService.isRunning()
+    if (isRunning) {
+      console.log(`[ollama] Usando modelo local "${ollamaModel}" para chat`)
+      const systemPrompt = customSystemPrompt || await getSystemPrompt(workspaceId)
+      yield* streamOllama(messages, systemPrompt, ollamaModel)
+      return
+    }
+    console.log('[ollama] Ollama no está corriendo, usando DeepSeek como fallback')
+  }
+
   const apiKey = await getDeepSeekKey(workspaceId);
   if (!apiKey) throw new Error('DeepSeek API key no configurada');
 
@@ -73,50 +157,52 @@ export async function* streamChat(messages, workspaceId, customSystemPrompt = nu
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`DeepSeek API error ${response.status}: ${text}`);
+    const text = await response.text()
+    throw new Error(`DeepSeek API error ${response.status}: ${text}`)
   }
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
 
   while (true) {
-    let chunk;
+    let chunk
     try {
-      const result = await reader.read();
-      if (result.done) break;
-      chunk = result;
+      const result = await reader.read()
+      if (result.done) break
+      chunk = result
     } catch (err) {
-      console.log('Error leyendo stream DeepSeek:', err.message);
-      break;
+      console.log('[deepseek] Error leyendo stream:', err.message)
+      break
     }
 
-    buffer += decoder.decode(chunk.value, { stream: true });
-    const lines = buffer.split('\n');
-    const last = lines.pop();
-    buffer = last !== undefined ? last : '';
+    buffer += decoder.decode(chunk.value, { stream: true })
+    const lines = buffer.split('\n')
+    const last = lines.pop()
+    buffer = last !== undefined ? last : ''
 
     for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed === 'data: [DONE]') continue;
-      if (!trimmed.startsWith('data: ')) continue;
+      const trimmed = line.trim()
+      if (!trimmed || trimmed === 'data: [DONE]') continue
+      if (!trimmed.startsWith('data: ')) continue
 
       try {
-        const json = JSON.parse(trimmed.slice(6));
+        const json = JSON.parse(trimmed.slice(6))
         if (json.usage) {
-          yield { type: 'usage', prompt_tokens: json.usage.prompt_tokens || 0, completion_tokens: json.usage.completion_tokens || 0, total_tokens: json.usage.total_tokens || 0 };
-          continue;
+          yield { type: 'usage', prompt_tokens: json.usage.prompt_tokens || 0, completion_tokens: json.usage.completion_tokens || 0, total_tokens: json.usage.total_tokens || 0 }
+          continue
         }
-        const choice = json.choices ? json.choices[0] : null;
-        const delta = choice && choice.delta ? choice.delta : {};
+        const choice = json.choices ? json.choices[0] : null
+        const delta = choice && choice.delta ? choice.delta : {}
         if (delta.reasoning_content) {
-          yield { type: 'thinking', content: delta.reasoning_content };
+          yield { type: 'thinking', content: delta.reasoning_content }
         }
         if (delta.content) {
-          yield { type: 'response', content: delta.content };
+          yield { type: 'response', content: delta.content }
         }
-      } catch (err) { console.log('[deepseek] Error al parsear chunk SSE:', err.message); }
+      } catch (err) {
+        console.log('[deepseek] Error al parsear chunk SSE:', err.message)
+      }
     }
   }
 }
