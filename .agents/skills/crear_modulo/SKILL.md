@@ -137,6 +137,7 @@ export default router
 7. **Prohibido `||` como fallback de parámetros:** Validar explícitamente cada argumento requerido y devolver error si falta.
 8. **Manejo de errores:** Todo `catch` debe registrar el error con `console.log` (tanto frontend como backend). Prohibido `catch {}` vacío o silencioso.
 9. **Prohibido `alert()`:** Usar `modal.open(AlertModal, ...)` para notificaciones al usuario.
+10. **TableEditor para datos tabulares obligatorio:** Siempre que un componente del módulo necesite mostrar datos en forma de tabla (listas, grids, catálogos), debe usarse `TableEditor` con `lazy: true`. No usar `<table>` HTML nativo. `TableEditor` proporciona paginación server-side, ordenamiento, búsqueda global, columnas redimensionables/reordenables, y preferencias de columnas persistentes.
 
 ## Paneles disponibles
 

@@ -436,14 +436,119 @@ flag2: { required: false },   // si es opcional
 
 ## 7. Generar componente tab (si aplica)
 
-Crear `frontend/src/modules/<plugin_id>/components/<plugin_id>Tab.vue`:
+Crear `frontend/src/modules/<plugin_id>/components/<plugin_id>Tab.vue`.
+
+**Importante:** Si el componente necesita mostrar datos tabulares (listas, tablas, grids), debe usar el componente `TableEditor` en modo server-side (`lazy: true`). No usar `<table>` HTML nativo.
+
+Ejemplo con TableEditor para lista de datos:
 
 ```vue
 <template>
   <div class="p-2" style="height:100%;display:flex;flex-direction:column;">
     <h6 class="mb-2"><tab_label></h6>
 
-    <!-- Contenido del tab -->
+    <TableEditor
+      ref="table"
+      id="<plugin_id>"
+      :api="apiEntidad"
+      :config="tabConfig"
+      @rowSelected="onRowSelected"
+      @rowDoubleClick="onRowDblClick"
+    />
+
+    <div class="modal fade" tabindex="-1" ref="modal">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content" style="background: #16213e; color: #e0e0e0;">
+          <div class="modal-header" style="padding: 0.4rem 0.75rem; border-bottom: 1px solid #374151;">
+            <h6 class="modal-title" style="font-size: 0.8rem;">{{ editando ? 'Editar' : 'Nuevo' }} <plugin_name></h6>
+            <button type="button" class="btn-close btn-close-white" style="font-size: 0.6rem;" @click="cerrarModal"></button>
+          </div>
+          <form @submit.prevent="guardar">
+            <div class="modal-body" style="padding: 0.5rem 0.75rem;">
+              <!-- Campos del formulario -->
+              <div v-if="errorModal" class="alert alert-danger py-1 small">{{ errorModal }}</div>
+            </div>
+            <div class="modal-footer" style="padding: 0.4rem 0.75rem; border-top: 1px solid #374151;">
+              <button type="button" class="btn btn-sm btn-secondary py-0 px-2" style="font-size: 0.7rem;" @click="cerrarModal">Cancelar</button>
+              <button type="submit" class="btn btn-sm py-0 px-2" style="font-size: 0.7rem; background: rgba(117, 170, 219, 0.15); color: #75AADB; border: 1px solid rgba(117, 170, 219, 0.3);" :disabled="cargando">{{ cargando ? 'Guardando...' : 'Guardar' }}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { Modal } from 'bootstrap'
+import api from '../../api/axios'
+import TableEditor from '../../components/TableEditor.vue'
+
+export default {
+  name: '<plugin_id>Tab',
+  components: { TableEditor },
+  data() {
+    return {
+      selectedRow: null,
+      editando: null,
+      form: {},
+      errorModal: '',
+      cargando: false,
+      modalInstance: null,
+      apiEntidad: {
+        list: (params) => api.get('/api/<plugin_id>/list', { params }).then(r => r.data),
+        create: (data) => api.post('/api/<plugin_id>', data).then(r => r.data),
+        edit: (data) => api.put('/api/<plugin_id>/' + data.id, data).then(r => r.data),
+        delete: (data) => api.delete('/api/<plugin_id>/' + data.id).then(r => r.data),
+      },
+    }
+  },
+  computed: {
+    tabConfig() {
+      return {
+        lazy: true,
+        selectionMode: 'single',
+        elementName: { singular: '<plugin_name>', gender: 'M' },
+        buttons: {
+          toolbar: [
+            { key: 'create', icon: 'bi bi-plus-lg', severity: 'btn-success', label: 'Nuevo',
+              onClick: () => this.abrirModal() },
+            { key: 'edit', icon: 'bi bi-pencil', severity: 'btn-warning', label: 'Editar',
+              isDisabled: () => !this.selectedRow, onClick: () => this.abrirModal(this.selectedRow) },
+            { key: 'delete', icon: 'bi bi-trash', severity: 'btn-danger', label: 'Eliminar',
+              isDisabled: () => !this.selectedRow, onClick: () => this.eliminar(this.selectedRow) },
+          ],
+          rowActions: [
+            { key: 'edit', icon: 'bi bi-pencil', severity: 'btn-warning', label: 'Editar',
+              onClick: (r) => this.abrirModal(r) },
+            { key: 'delete', icon: 'bi bi-trash', severity: 'btn-danger', label: 'Eliminar',
+              onClick: (r) => this.eliminar(r) },
+          ],
+        },
+      }
+    },
+  },
+  methods: {
+    onRowSelected(row) { this.selectedRow = row },
+    onRowDblClick(row) { if (row) this.abrirModal(row) },
+    abrirModal(row) { /* ... */ },
+    cerrarModal() { this.modalInstance.hide() },
+    async guardar() { /* ... */ },
+    async eliminar(row) { /* ... */ },
+  },
+  mounted() {
+    this.modalInstance = new Modal(this.$refs.modal)
+  },
+}
+</script>
+```
+
+**Si el componente NO necesita CRUD** y solo muestra información simple sin tabla de datos, se puede usar un template más liviano sin TableEditor:
+
+```vue
+<template>
+  <div class="p-2" style="height:100%;display:flex;flex-direction:column;">
+    <h6 class="mb-2"><tab_label></h6>
     <div class="flex-grow-1">
       <p class="text-muted small">Contenido de <plugin_name></p>
     </div>
@@ -454,12 +559,7 @@ Crear `frontend/src/modules/<plugin_id>/components/<plugin_id>Tab.vue`:
 export default {
   name: '<plugin_id>Tab',
   data() {
-    return {
-      cargando: false,
-    }
-  },
-  methods: {
-    // --- Lógica del componente ---
+    return { cargando: false }
   },
 }
 </script>
@@ -473,30 +573,77 @@ Si `<tiene_ruta>` = `Si`:
 
 ### 8.1 Crear vista Vue
 
-Crear `frontend/src/modules/<plugin_id>/components/<plugin_id>View.vue`:
+Crear `frontend/src/modules/<plugin_id>/components/<plugin_id>View.vue`.
+
+**Importante:** Si la vista necesita mostrar datos tabulares, debe usar `TableEditor` igual que el componente tab (ver sección 7).
+
+Ejemplo con TableEditor:
 
 ```vue
 <template>
   <div class="container py-4">
     <h1 class="mb-4"><plugin_name></h1>
 
-    <div>
-      <p class="text-muted">Contenido de <plugin_name></p>
+    <TableEditor
+      ref="table"
+      id="<plugin_id>"
+      :api="apiEntidad"
+      :config="tableConfig"
+      @rowSelected="onRowSelected"
+      @rowDoubleClick="onRowDblClick"
+    />
+
+    <div class="modal fade" tabindex="-1" ref="modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">{{ editando ? 'Editar' : 'Nuevo' }} <plugin_name></h5>
+            <button type="button" class="btn-close" @click="cerrarModal"></button>
+          </div>
+          <form @submit.prevent="guardar">
+            <div class="modal-body">
+              <div v-if="errorModal" class="alert alert-danger py-2">{{ errorModal }}</div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" @click="cerrarModal">Cancelar</button>
+              <button type="submit" class="btn btn-primary" :disabled="cargando">{{ cargando ? 'Guardando...' : 'Guardar' }}</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
+import { Modal } from 'bootstrap'
+import api from '../../api/axios'
+import TableEditor from '../../components/TableEditor.vue'
+
 export default {
   name: '<plugin_id>View',
+  components: { TableEditor },
   data() {
     return {
+      selectedRow: null,
+      editando: null,
+      form: {},
+      errorModal: '',
       cargando: false,
+      modalInstance: null,
+      apiEntidad: {
+        list: (params) => api.get('/api/<plugin_id>/list', { params }).then(r => r.data),
+        create: (data) => api.post('/api/<plugin_id>', data).then(r => r.data),
+        edit: (data) => api.put('/api/<plugin_id>/' + data.id, data).then(r => r.data),
+        delete: (data) => api.delete('/api/<plugin_id>/' + data.id).then(r => r.data),
+      },
     }
   },
 }
 </script>
 ```
+
+Si no necesita datos tabulares, se puede usar un template simple:
 
 ### 8.2 Agregar ruta en Vue Router
 
@@ -690,6 +837,7 @@ Si el plugin tiene base de datos, agregar el esquema de la tabla en `docs/DB_SCH
 11. **Usar `getUsedFlags`** para autocomplete de comandos.
 12. **Session-scoping obligatorio:** Si el tab depende de una sesión de chat activa, validar con `useChatStore().activeSessionId`.
 13. **Sin stores dedicadas en el módulo:** Usar stores Pinia existentes o `ref()` locales. Si se necesita store nueva, crearla en `frontend/src/stores/`.
+14. **TableEditor para datos tabulares obligatorio:** Siempre que el componente del tab o la vista necesite mostrar datos en forma de tabla (listas, grids, catálogos), debe usarse el componente `TableEditor` con `lazy: true` (server-side loading). No usar `<table>` HTML nativo. El `TableEditor` proporciona de fábrica: paginación, ordenamiento por columnas, búsqueda global, columnas redimensionables y reordenables por drag & drop, selección de filas, botones de toolbar/acciones, y preferencias de columnas persistentes por usuario.
 
 ---
 
