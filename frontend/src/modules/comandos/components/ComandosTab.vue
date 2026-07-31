@@ -373,11 +373,11 @@ export default {
     })
 
     const commandsConfig = computed(() => ({
-      hideToolbar: true,
+      hideToolbarEnd: true,
       hideRefresh: true,
       hideCsvExport: true,
       showPaginator: false,
-      selectionMode: null,
+      selectionMode: 'single',
       buttons: {
         rowActions: [
           new BtnConfig({ key: 'ejecutar', icon: 'bi bi-play-fill', severity: 'btn-outline-success', label: '▶ Ejecutar', onClick: (row) => ejecutarComando(row) }),
@@ -414,11 +414,11 @@ export default {
     }))
 
     const scriptsConfig = computed(() => ({
-      hideToolbar: true,
+      hideToolbarEnd: true,
       hideRefresh: true,
       hideCsvExport: true,
       showPaginator: false,
-      selectionMode: null,
+      selectionMode: 'single',
       buttons: {
         rowActions: [
           new BtnConfig({ key: 'ejecutar', icon: 'bi bi-play-fill', severity: 'btn-outline-success', label: '▶ Ejecutar', onClick: (row) => ejecutarNpmScript(row._packagePath, row._scriptName, row.command) }),
@@ -459,5 +459,10 @@ export default {
 <style scoped>
 .comandos-list {
   background: #16213e;
+}
+
+.comandos-list :deep(.te-wrapper) {
+  height: auto;
+  grid-template-rows: auto auto auto;
 }
 </style>

@@ -76,8 +76,8 @@ export default {
     }))
 
     const tableConfig = computed(() => ({
-      hideToolbar: true,
-      selectionMode: null,
+      hideToolbarEnd: true,
+      selectionMode: 'single',
       striped: true,
       valueFormatters: {
         ticket_redmine_id: (row) => `#${row.ticket_redmine_id}`,

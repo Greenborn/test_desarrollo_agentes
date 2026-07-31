@@ -1,19 +1,11 @@
 import { Router } from 'express';
 import { getRedmineToken, getRedmineUrl } from '../services/redmine.js';
+import { slugify } from '../utils/slugify.js';
 import db from '../config/db.js';
 import dbRedmineComentarios from '../config/dbRedmineComentarios.js';
 import dbRedmineData from '../config/dbRedmineData.js';
 
 const router = Router();
-
-function slugify(text) {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, '')
-    .replace(/ /g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '');
-}
 
 function toDateTime(dateStr) {
   if (!dateStr) return null;

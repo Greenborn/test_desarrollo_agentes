@@ -1399,6 +1399,98 @@ Endpoint base: `http://localhost:4099/api/documentacion`
 
 ---
 
+## Gestión Interna (`/api/gestion`)
+
+Módulo centralizado para integración con el sistema de gestión interno. Endpoints montados automáticamente desde `backend/src/modules/gestion/`.
+
+**Autenticación dual:** Sesión activa (cookie `session_token`) para uso desde frontend, o header `X-Internal-Key` para llamadas entre servicios internos. La clave interna se configura vía `INTERNAL_API_KEY` en `.env` (default: `internal_gestor_key`).
+
+### `POST /api/gestion/test`
+- **Auth:** Sesión o X-Internal-Key
+- **Body (opcional):** `{ workspace_id?: number }`
+- **Descripción:** Prueba la conexión con el sistema de gestión interno usando las credenciales configuradas en Settings (`gestion_url`, `gestion_api_user`, `gestion_api_password`). Intenta autenticarse y devuelve el resultado.
+- **Respuesta 200 (éxito):**
+```json
+{ "success": true, "message": "Conexión exitosa al sistema de gestión interna.", "requestLog": { "method": "POST", "url": "...", "statusCode": 200 } }
+```
+- **Respuesta 200 (error):**
+```json
+{ "success": false, "message": "Error de conexión: ...", "requestLog": { "method": "POST", "url": "...", "statusCode": 401 } }
+```
+- **Respuesta 200 (no configurado):**
+```json
+{ "success": false, "message": "Gestión interna no configurada. Configure gestion_url, gestion_api_user y gestion_api_password en Settings." }
+```
+
+### `POST /api/gestion/login`
+- **Auth:** Sesión o X-Internal-Key
+- **Body (opcional):** `{ workspace_id?: number }`
+- **Descripción:** Obtiene las credenciales del workspace, se autentica contra el sistema de gestión interna y devuelve el token Bearer. No almacena el token.
+- **Respuesta 200 (éxito):**
+```json
+{ "success": true, "token": "eyJ...", "requestLog": { "method": "POST", "url": "...", "statusCode": 200 } }
+```
+- **Respuesta 200 (error):**
+```json
+{ "success": false, "message": "...", "requestLog": { ... } }
+```
+
+### `POST /api/gestion/upload`
+- **Auth:** Sesión o X-Internal-Key
+- **Body:** `{ nombre_original: string, mime_type: string, base64: string, workspace_id?: number }`
+- **Descripción:** Autentica contra el sistema de gestión interno y sube un archivo codificado en base64. Realiza login automáticamente antes de subir.
+- **Respuesta 200 (éxito):**
+```json
+{ "success": true, "data": { "id": 1, "nombre_original": "backup_12345.zip", ... }, "requestLogs": [...] }
+```
+- **Respuesta 200 (error):**
+```json
+{ "success": false, "message": "...", "requestLog": { ... } }
+```
+
+### `GET /api/gestion/status`
+- **Auth:** Sesión o X-Internal-Key
+- **Query:** `?workspace_id=N` (opcional)
+- **Descripción:** Indica si el workspace tiene configuradas las credenciales de gestión interna.
+- **Respuesta 200:**
+```json
+{ "configured": true, "url": "https://gestion.ejemplo.com" }
+```
+
+### `GET /api/gestion/proyectos`
+- **Auth:** Sesión o X-Internal-Key
+- **Query:** `?workspace_id=N` (opcional)
+- **Descripción:** Se autentica contra el sistema de gestión interno (login automático para obtener token) y consulta `GET {gestionUrl}/api/proyectos?page=N&pageSize=100&sortField=&sortDir=asc&search=` para obtener la lista de proyectos **ya presentes** en el sistema de gestión, iterando páginas hasta recuperarlos todos. La respuesta real del servicio es `{ status, data: { rows: [...], total, page, pageSize } }`. Cada proyecto se enriquece con su `slug` (usa el `slug` que ya trae el servicio, o si no lo trae, lo genera desde `nombre`/`name`/`descripcion` con normalización de acentos). El extractor soporta `rows`, array directo, `{ data: [...] }` (Laravel) o `{ items }`. Se usa para conocer qué proyectos locales ya están exportados.
+- **Respuesta 200 (éxito):**
+```json
+{
+  "success": true,
+  "proyectos": [
+    { "id": 1, "nombre": "Proyecto Ágil", "descripcion": "...", "slug": "proyecto_agil" }
+  ],
+  "requestLog": { "method": "GET", "url": "...", "statusCode": 200 }
+}
+```
+- **Respuesta 200 (error):**
+```json
+{ "success": false, "message": "Gestión interna no configurada. Configure gestion_url, gestion_api_user y gestion_api_password en Settings." }
+```
+
+### `POST /api/gestion/proyectos/exportar`
+- **Auth:** Sesión o X-Internal-Key
+- **Body:** `{ proyecto: { id, descripcion?, color?, url_github?, workspace_id? }, workspace_id?: number }`
+- **Descripción:** Exporta un proyecto local al sistema de gestión interno. Realiza login automático y envía `POST {gestionUrl}/api/proyectos` con el payload `{ nombre, slug, descripcion, color, workspace_id, url_github, despliegue_config }`. El `slug` se toma de `proyecto.id` (identificador local del proyecto). El `nombre` se toma de `proyecto.nombre` si existe, o se deriva legible desde el slug.
+- **Respuesta 200 (éxito):**
+```json
+{ "success": true, "data": { "id": 1, "nombre": "...", "slug": "..." }, "requestLog": { "method": "POST", "url": "...", "statusCode": 200 } }
+```
+- **Respuesta 200 (error):**
+```json
+{ "success": false, "message": "Error al exportar proyecto a gestión interna", "requestLog": { "method": "POST", "url": "...", "statusCode": 422 } }
+```
+
+---
+
 ## Skills (`/api/skills`)
 
 Endpoints para gestionar skills del proyecto (archivos `.agents/skills/[name]/SKILL.md`).

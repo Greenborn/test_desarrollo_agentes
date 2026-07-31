@@ -36,21 +36,41 @@
     <template v-else-if="isCodeFile">
       <div class="preview-header small text-muted px-2 py-1 flex-shrink-0 text-truncate d-flex align-items-center justify-content-between">
         <span class="text-truncate">{{ fileName }}</span>
-        <span>
-          <button v-if="canCopy" class="btn btn-sm btn-outline-secondary border-0 py-0" style="font-size: 0.65rem;" @click="copyToClipboard" title="Copiar contenido">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 2px;"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg> Copiar
-          </button>
+        <span class="d-flex align-items-center gap-1">
+          <template v-if="editing">
+            <span v-if="saving" class="text-muted small" style="font-size: 0.6rem;">Guardando...</span>
+            <span v-else-if="saved" class="text-success small" style="font-size: 0.6rem;">✓ Guardado</span>
+            <button class="btn btn-sm btn-outline-success border-0 py-0" style="font-size: 0.65rem;" @click="saveFile" :disabled="saving">Guardar</button>
+            <button class="btn btn-sm btn-outline-secondary border-0 py-0" style="font-size: 0.65rem;" @click="cancelEdit" :disabled="saving">Cancelar</button>
+          </template>
+          <template v-else>
+            <button v-if="!isTooLarge" class="btn btn-sm btn-outline-info border-0 py-0" style="font-size: 0.65rem;" @click="startEdit" title="Editar archivo">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 2px;"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10z"/></svg> Editar
+            </button>
+            <button v-if="canCopy" class="btn btn-sm btn-outline-secondary border-0 py-0" style="font-size: 0.65rem;" @click="copyToClipboard" title="Copiar contenido">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 2px;"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg> Copiar
+            </button>
+          </template>
           <span class="badge bg-secondary ms-1" style="font-size: 0.6rem;">código</span>
         </span>
       </div>
-      <div class="preview-content code-preview flex-grow-1 overflow-y-auto px-0 py-0" style="min-height: 0;">
+      <div class="preview-content code-preview flex-grow-1 overflow-hidden px-0 py-0 position-relative" style="min-height: 0;">
         <div v-if="loading" class="d-flex align-items-center justify-content-center text-secondary small py-4">
           <span>Cargando vista previa…</span>
         </div>
         <div v-else-if="error" class="text-danger small py-2 px-2">
           {{ error }}
         </div>
-        <pre v-else class="code-pre m-0"><code class="hljs" v-html="highlightedCode"></code></pre>
+        <div v-else class="code-editor-wrapper h-100">
+          <pre ref="highlightLayer" class="code-pre m-0 h-100" :class="{ 'pe-none': editing }"><code class="hljs" v-html="highlightedCode"></code></pre>
+          <textarea v-if="editing"
+            class="code-textarea"
+            v-model="content"
+            @scroll="syncTextareaScroll"
+            spellcheck="false"
+            wrap="off"
+          ></textarea>
+        </div>
       </div>
     </template>
     <template v-else-if="isCsv">
@@ -115,12 +135,32 @@
         </div>
       </template>
     </template>
+    <template v-else-if="isImage">
+      <div class="preview-header small text-muted px-2 py-1 flex-shrink-0 text-truncate d-flex align-items-center justify-content-between">
+        <span class="text-truncate">{{ fileName }}</span>
+        <span>
+          <button class="btn btn-sm btn-outline-secondary border-0 py-0" style="font-size: 0.65rem;" @click="loadPreview" title="Recargar vista previa">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 2px;"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/></svg> Recargar
+          </button>
+        </span>
+      </div>
+      <div v-if="imageLoading" class="d-flex align-items-center justify-content-center flex-grow-1 text-secondary small">
+        Cargando imagen…
+      </div>
+      <div v-else-if="imageError" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-danger small px-3 text-center">
+        <span>{{ imageError }}</span>
+        <button class="btn btn-sm btn-outline-secondary mt-2" @click="loadPreview">Reintentar</button>
+      </div>
+      <div v-else class="d-flex align-items-center justify-content-center flex-grow-1 overflow-auto p-2" style="min-height: 0; background: #0d1117;">
+        <img :src="imageSrc" :alt="fileName" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;" />
+      </div>
+    </template>
     <template v-else>
       <div class="preview-header small text-muted px-2 py-1 flex-shrink-0 text-truncate">
         {{ fileName }}
       </div>
       <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
-        <span>Vista previa solo disponible para archivos .md, código y .csv</span>
+        <span>Vista previa solo disponible para archivos de texto, código, CSV e imágenes</span>
       </div>
     </template>
   </div>
@@ -178,6 +218,10 @@ export default {
     const loading = ref(false)
     const error = ref(null)
 
+    const imageSrc = ref(null)
+    const imageLoading = ref(false)
+    const imageError = ref(null)
+
     const maxSizeKb = computed(() => {
       return parseInt(settings.codeFileMaxSizeKb, 10) || 100
     })
@@ -220,6 +264,13 @@ export default {
       return props.filePath ? props.filePath.toLowerCase().endsWith('.csv') : false
     })
 
+    const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif', 'tiff', 'tif']
+    const isImage = computed(() => {
+      if (!props.filePath) return false
+      const ext = fileExtension.value
+      return IMAGE_EXTENSIONS.includes(ext)
+    })
+
     const detectedLanguage = computed(() => {
       if (isEnv.value) return 'plaintext'
       const ext = fileExtension.value
@@ -235,6 +286,56 @@ export default {
       navigator.clipboard.writeText(content.value).catch(err => {
         console.error('Error al copiar al portapapeles:', err)
       })
+    }
+
+    const editing = ref(false)
+    const saving = ref(false)
+    const saved = ref(false)
+    const originalContent = ref('')
+    const highlightLayer = ref(null)
+
+    function startEdit() {
+      originalContent.value = content.value
+      editing.value = true
+    }
+
+    function cancelEdit() {
+      content.value = originalContent.value
+      editing.value = false
+      saving.value = false
+      saved.value = false
+    }
+
+    async function saveFile() {
+      saving.value = true
+      saved.value = false
+      try {
+        const res = await fetch('/api/command/write-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ path: props.filePath, content: content.value }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          originalContent.value = content.value
+          saved.value = true
+          setTimeout(() => { saved.value = false }, 2000)
+        } else {
+          console.error('Error al guardar archivo:', data.error || 'Error desconocido')
+        }
+      } catch (err) {
+        console.error('Error al guardar archivo:', err.message)
+      } finally {
+        saving.value = false
+      }
+    }
+
+    function syncTextareaScroll(e) {
+      if (highlightLayer.value) {
+        highlightLayer.value.scrollTop = e.target.scrollTop
+        highlightLayer.value.scrollLeft = e.target.scrollLeft
+      }
     }
 
     const modal = useModalStore()
@@ -319,6 +420,27 @@ export default {
         }
         return
       }
+      if (isImage.value) {
+        imageLoading.value = true
+        imageError.value = null
+        imageSrc.value = null
+        try {
+          const res = await fetch(`/api/command/read-file-base64?path=${encodeURIComponent(props.filePath)}`, {
+            credentials: 'include',
+          })
+          const data = await res.json()
+          if (data.success) {
+            imageSrc.value = `data:${data.mime};base64,${data.base64}`
+          } else {
+            imageError.value = data.error || 'Error al leer la imagen'
+          }
+        } catch (err) {
+          imageError.value = err.message || 'Error de conexión'
+        } finally {
+          imageLoading.value = false
+        }
+        return
+      }
       if (!isMarkdown.value && !isCodeFile.value) {
         content.value = ''
         error.value = null
@@ -344,10 +466,16 @@ export default {
     }
 
     watch(() => props.filePath, () => {
+      editing.value = false
+      saving.value = false
+      saved.value = false
+      imageSrc.value = null
+      imageLoading.value = false
+      imageError.value = null
       loadPreview()
     })
 
-    return { content, loading, error, fileName, isMarkdown, isCodeFile, isCsv, canCopy, copyToClipboard, isTooLarge, maxSizeKb, highlightedCode, loadPreview, csvLoading, csvError, csvDelimiter, csvQuoteChar, csvHasHeader, csvColumns, csvRows, csvTotalRows, csvPreviewRows, reparseCsv, openCsvDetail }
+    return { content, loading, error, fileName, isMarkdown, isCodeFile, isCsv, isImage, imageSrc, imageLoading, imageError, canCopy, copyToClipboard, isTooLarge, maxSizeKb, highlightedCode, loadPreview, csvLoading, csvError, csvDelimiter, csvQuoteChar, csvHasHeader, csvColumns, csvRows, csvTotalRows, csvPreviewRows, reparseCsv, openCsvDetail, editing, saving, saved, highlightLayer, startEdit, cancelEdit, saveFile, syncTextareaScroll }
   },
 }
 </script>
@@ -377,6 +505,7 @@ export default {
 .code-pre {
   font-size: 0.7rem;
   line-height: 1.5;
+  tab-size: 2;
 }
 .code-pre :deep(.hljs) {
   background: transparent;
@@ -412,5 +541,39 @@ export default {
 }
 .csv-table-wrapper tbody tr:hover {
   background: rgba(117, 170, 219, 0.06);
+}
+.code-editor-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+.code-editor-wrapper .code-pre {
+  overflow: auto;
+}
+.code-editor-wrapper .code-pre.pe-none {
+  pointer-events: none;
+}
+.code-textarea {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color: transparent;
+  caret-color: #d1d5db;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  padding: 8px;
+  overflow: auto;
+  white-space: pre;
+  tab-size: 2;
+  margin: 0;
+}
+.code-textarea::selection {
+  background: rgba(117, 170, 219, 0.3);
 }
 </style>

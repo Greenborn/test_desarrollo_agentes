@@ -3,7 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { login, uploadFile, getGestionCredentials } from '../services/gestionApi.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXPORTS_DIR = path.resolve(__dirname, '../../exports');
@@ -87,20 +86,32 @@ router.post('/backup', async (req, res) => {
     const requestLogs = [];
     if (upload) {
       try {
-        const creds = await getGestionCredentials(wsId);
-        if (creds) {
-          const loginResult = await login(creds.gestionUrl, creds.username, creds.password);
-          requestLogs.push(loginResult.requestLog);
-          const fileBase64 = fs.readFileSync(zipPath, { encoding: 'base64' });
-          const uploadFileResult = await uploadFile(creds.gestionUrl, loginResult.token, zipName, 'application/zip', fileBase64);
-          requestLogs.push(uploadFileResult.requestLog);
-          uploadResult = uploadFileResult.data;
+        const internalKey = process.env.INTERNAL_API_KEY || 'internal_gestor_key';
+        const fileBase64 = fs.readFileSync(zipPath, { encoding: 'base64' });
+        const backendPort = process.env.PORT || 4000;
+        const uploadRes = await fetch(`http://localhost:${backendPort}/api/gestion/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-Key': internalKey,
+          },
+          body: JSON.stringify({
+            nombre_original: zipName,
+            mime_type: 'application/zip',
+            base64: fileBase64,
+            workspace_id: wsId,
+          }),
+        });
+        const uploadData = await uploadRes.json();
+        if (uploadData.success) {
+          uploadResult = uploadData.data;
+          if (uploadData.requestLogs) requestLogs.push(...uploadData.requestLogs);
         } else {
-          uploadError = 'Credenciales de gestión interna no configuradas';
+          uploadError = uploadData.message || 'Error al subir a gestión interna';
+          if (uploadData.requestLog) requestLogs.push(uploadData.requestLog);
         }
       } catch (uploadErr) {
         uploadError = uploadErr.message;
-        if (uploadErr.requestLog) requestLogs.push(uploadErr.requestLog);
         console.log('[backup] Error al subir a gestión:', uploadErr.message);
       }
     }

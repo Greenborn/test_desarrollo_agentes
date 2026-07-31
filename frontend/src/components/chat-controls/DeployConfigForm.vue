@@ -40,6 +40,7 @@
           style="max-width: 160px; background: #0d1b2a; border: 1px solid #374151; color: #e0e0e0;"
         >
           <option value="backend">Backend (nodemon)</option>
+          <option value="backend-dev">Backend (npm run dev)</option>
           <option value="frontend">Frontend (npm run dev)</option>
         </select>
         <button
@@ -59,7 +60,7 @@
           ✕
         </button>
       </div>
-      <div v-if="sp.showCustom" class="d-flex align-items-center gap-2 ms-1">
+      <div v-if="sp.showCustom || sp.type === 'backend-dev'" class="d-flex align-items-center gap-2 ms-1">
         <input
           v-model="sp.command"
           type="text"
@@ -113,7 +114,12 @@ export default {
   emits: ['confirm'],
   setup(props, { emit }) {
     function mapInitial(sp) {
-      return { cwd: sp.cwd || '', type: sp.type || 'backend', command: sp.command || '', showCustom: !!sp.command }
+      let type = sp.type || 'backend';
+      let command = sp.command || '';
+      if (type === 'backend' && command === 'npm run dev') {
+        type = 'backend-dev';
+      }
+      return { cwd: sp.cwd || '', type, command, showCustom: !!command }
     }
     const subprojects = ref(
       props.initialSubprojects && props.initialSubprojects.length > 0
@@ -160,10 +166,14 @@ export default {
       }
       const result = {
         subprojects: subprojects.value.map(sp => {
-          const entry = { cwd: sp.cwd.trim(), type: sp.type }
-          if (sp.command && sp.command.trim()) {
-            entry.command = sp.command.trim()
+          let type = sp.type
+          let command = sp.command?.trim() || ''
+          if (type === 'backend-dev') {
+            type = 'backend'
+            command = command || 'npm run dev'
           }
+          const entry = { cwd: sp.cwd.trim(), type }
+          if (command) entry.command = command
           return entry
         }),
       }

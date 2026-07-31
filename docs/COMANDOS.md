@@ -39,6 +39,8 @@ El texto que no comienza con `/` se ignora al presionar Enter.
 
 | Comando | Descripción | Uso |
 |---|---|---|
+| `/gestion_test` | Prueba la conexión con el sistema de gestión interno configurado en Settings (gestion_url, gestion_api_user, gestion_api_password) | `/gestion_test` |
+| `/gestion_exportar_proyectos` | Exporta proyectos locales al sistema de gestión interno. Abre un modal con switches para seleccionar cuáles exportar. Los proyectos ya presentes en gestión se muestran deshabilitados. `--workspace_id` opcional (default: workspace principal de la sesión) | `/gestion_exportar_proyectos [--workspace_id=<id>]` |
 | `/redmine_test_conexion` | Prueba la conexión a la instancia de Redmine configurada | `/redmine_test_conexion` |
 | `/redmine_listar_proyectos` | Lista proyectos disponibles en Redmine (solo lectura) | `/redmine_listar_proyectos` |
 | `/redmine_importar_proyectos` | Importa proyectos de Redmine a la base de datos local. Usar `--all` para importar todos, `--id` para uno específico por ID de Redmine, o `--slug` para importar por slug | `/redmine_importar_proyectos --all \| --id=<redmine_id> \| --slug=<slug>` |

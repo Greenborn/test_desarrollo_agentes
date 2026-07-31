@@ -1,30 +1,7 @@
 <template>
   <div class="h-100 d-flex flex-column" style="min-height: 0;">
-    <div class="d-flex align-items-center gap-2 px-2 py-1 flex-shrink-0 border-bottom border-secondary">
+    <div class="px-2 py-1 flex-shrink-0 border-bottom border-secondary">
       <span class="small fw-semibold text-light" style="font-size: 0.75rem;">Modelos Ollama</span>
-      <button
-        class="btn btn-sm py-0 px-2"
-        style="font-size: 0.7rem; background: rgba(117, 170, 219, 0.15); color: #75AADB; border: 1px solid rgba(117, 170, 219, 0.3);"
-        :disabled="!selectedRow"
-        @click="abrirModalConfig"
-      >Configurar</button>
-      <button
-        class="btn btn-sm py-0 px-2"
-        style="font-size: 0.7rem; background: rgba(117, 170, 219, 0.15); color: #75AADB; border: 1px solid rgba(117, 170, 219, 0.3);"
-        @click="abrirModalInstalar"
-      >+ Instalar</button>
-      <button
-        v-if="commitModelName"
-        class="btn btn-sm py-0 px-2"
-        style="font-size: 0.7rem; color: #ef4444; background: none; border: 1px solid rgba(239, 68, 68, 0.3);"
-        @click="resetearCommitModel"
-      >Reset</button>
-      <button
-        class="btn btn-sm py-0 px-1 ms-auto"
-        style="font-size: 0.7rem; color: #6b7280; background: none; border: none; line-height: 1;"
-        @click="cargarModelos"
-        :disabled="cargando"
-      >↻</button>
     </div>
 
     <div v-if="cargando && modelos.length === 0" class="flex-grow-1 d-flex align-items-center justify-content-center">
@@ -175,22 +152,56 @@ export default {
 
     const tableConfig = computed(() => ({
       selectionMode: 'single',
-      hideToolbar: true,
-      hideRefresh: true,
+      hideToolbarEnd: true,
       hideCsvExport: true,
       showPaginator: false,
       striped: false,
       infiniteScroll: false,
-      rowActions: [
-        new BtnConfig({
-          key: 'delete',
-          icon: 'bi bi-trash',
-          severity: 'btn-outline-danger',
-          label: '🗑',
-          onClick: (row) => confirmarEliminar(row._raw),
-          isDisabled: (row) => eliminando.value === row._raw.name,
-        }),
-      ],
+      buttons: {
+        toolbar: [
+          new BtnConfig({
+            key: 'configurar',
+            icon: 'bi bi-gear',
+            severity: 'btn-outline-primary',
+            label: 'Configurar',
+            onClick: abrirModalConfig,
+            isDisabled: () => !selectedRow.value,
+          }),
+          new BtnConfig({
+            key: 'instalar',
+            icon: 'bi bi-plus-lg',
+            severity: 'btn-outline-primary',
+            label: 'Instalar',
+            onClick: abrirModalInstalar,
+          }),
+          new BtnConfig({
+            key: 'reset',
+            icon: 'bi bi-arrow-counterclockwise',
+            severity: 'btn-outline-danger',
+            label: 'Reset',
+            isVisible: () => !!commitModelName.value,
+            onClick: resetearCommitModel,
+          }),
+          new BtnConfig({
+            key: 'refresh',
+            icon: 'bi bi-arrow-clockwise',
+            severity: 'btn-outline-secondary',
+            label: '',
+            onClick: cargarModelos,
+            isDisabled: () => cargando.value,
+          }),
+        ],
+        rowActions: [
+          new BtnConfig({
+            key: 'delete',
+            icon: 'bi bi-trash',
+            severity: 'btn-outline-danger',
+            label: '🗑',
+            onClick: (row) => row && confirmarEliminar(row._raw),
+            isDisabled: (row) => !row || eliminando.value === row._raw.name,
+          }),
+        ],
+      },
     }))
 
     function limpiarStatus() {

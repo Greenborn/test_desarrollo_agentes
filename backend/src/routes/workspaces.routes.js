@@ -5,6 +5,7 @@ import dbUserSettings from '../config/dbUserSettings.js';
 import dbWorkspaceEnvironments from '../config/dbWorkspaceEnvironments.js';
 import dbRedmineData from '../config/dbRedmineData.js';
 import opencode from '../services/opencode.js';
+import { slugify } from '../utils/slugify.js';
 
 const router = Router();
 const PW_URL = `http://localhost:${process.env.SERVICIO_PLAYWRIGHT_PORT || 4098}`;
@@ -15,16 +16,6 @@ function authGuard(req, res) {
     return false;
   }
   return true;
-}
-
-function slugify(text, id) {
-  const base = text
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, '')
-    .replace(/ /g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '');
-  return base + '_' + id;
 }
 
 router.get('/', async (req, res) => {
@@ -48,7 +39,7 @@ router.post('/', async (req, res) => {
 
     const hex = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#75AADB';
     const [insertId] = await db('workspaces').insert({ name, color: hex });
-    const slug = slugify(name, insertId);
+    const slug = slugify(name) + '_' + insertId;
     await db('workspaces').where({ id: insertId }).update({ slug });
 
     const defaultSettings = await dbConfig('settings').where({ workspace_id: 1 });
@@ -96,7 +87,7 @@ router.put('/:id', async (req, res) => {
 
     const updates = { name };
     if (ws.name !== name) {
-      updates.slug = slugify(name, ws.id);
+      updates.slug = slugify(name) + '_' + ws.id;
     }
     if (color !== undefined) {
       if (!/^#[0-9a-fA-F]{6}$/.test(color)) {

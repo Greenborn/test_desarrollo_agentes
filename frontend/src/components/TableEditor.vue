@@ -1,6 +1,6 @@
 <template>
   <div class="te-wrapper">
-    <div v-if="!props.config?.hideToolbar" class="te-toolbar">
+    <div v-if="!props.config?.hideToolbar || actionButtons.length" class="te-toolbar">
       <div class="te-toolbar-start">
         <template v-for="btn in buttonGroups.toolbar" :key="btn.key">
           <button v-if="btn.isVisible()"
@@ -12,8 +12,21 @@
             {{ btn.getLabel() }}
           </button>
         </template>
+        <template v-if="actionButtons.length">
+          <span v-if="buttonGroups.toolbar.length" class="text-muted mx-1" style="opacity:0.3">|</span>
+          <template v-for="btn in actionButtons" :key="btn.key">
+            <button v-if="btn.isVisible()"
+              :class="['btn', 'btn-sm', btn.severity, btn.class]"
+              :disabled="btn.isDisabled() || !selectedRow"
+              :data-help="btn.helpKey"
+              @click="btn.onClick(selectedRow)">
+              <i v-if="btn.icon" :class="btn.icon + ' me-1'"></i>
+              {{ btn.getLabel() }}
+            </button>
+          </template>
+        </template>
       </div>
-      <div class="te-toolbar-end">
+      <div v-if="!hideToolbarEnd" class="te-toolbar-end">
         <div class="dropdown d-inline-block me-2">
           <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
             data-bs-toggle="dropdown" title="Columnas">
@@ -46,7 +59,6 @@
       <table class="te-table" :class="{ 'te-striped': striped }">
         <colgroup>
           <col v-if="selectionMode !== null" :style="{ width: selectionColWidth }" />
-          <col v-if="actionButtons.length" :style="{ width: actionColWidth }" />
           <col v-for="col of visibleColumns" :key="col.field"
             :style="{ width: columnWidths[col.field] }" :data-field="col.field" />
           <col class="te-col-filler" />
@@ -58,17 +70,6 @@
                 <input v-if="selectionMode === 'multiple'" type="checkbox" :checked="isAllSelected"
                   @change="_toggleSelectAll" />
               </th>
-              <th v-if="actionButtons.length" class="te-th te-th-acts" :rowspan="2" :style="{ width: columnWidths['__actions__'] }">
-                  <div class="te-th-content">
-                    <span class="te-th-label">Acciones</span>
-                  </div>
-                  <div class="te-resize-handle"
-                    :class="{ 'te-resizing-active': _resizingField === '__actions__' }"
-                    draggable="false"
-                    @pointerdown.stop="_onResizeStart($event, '__actions__')"
-                    @dblclick.stop="_onResizeDblClick($event, '__actions__')"
-                    @click.stop />
-                </th>
               <template v-for="hcol of columnGroupHeaders" :key="hcol._key">
                 <th v-if="hcol._type === 'group'" :colspan="hcol._span" class="te-th te-th-group">
                   <div class="te-th-content">
@@ -130,17 +131,6 @@
               <input v-if="selectionMode === 'multiple'" type="checkbox" :checked="isAllSelected"
                 @change="_toggleSelectAll" />
             </th>
-            <th v-if="actionButtons.length" class="te-th te-th-acts" :style="{ width: columnWidths['__actions__'] }">
-              <div class="te-th-content">
-                <span class="te-th-label">Acciones</span>
-              </div>
-              <div class="te-resize-handle"
-                :class="{ 'te-resizing-active': _resizingField === '__actions__' }"
-                draggable="false"
-                @pointerdown.stop="_onResizeStart($event, '__actions__')"
-                @dblclick.stop="_onResizeDblClick($event, '__actions__')"
-                @click.stop />
-            </th>
             <th v-for="col of visibleColumns" :key="col.field"
               :data-field="col.field"
               :style="{ width: columnWidths[col.field] }"
@@ -178,7 +168,6 @@
           </tr>
           <tr v-if="showFilterRow" class="te-filter-row">
             <td v-if="selectionMode !== null" class="te-td" />
-            <td v-if="actionButtons.length" class="te-td" :style="{ width: columnWidths['__actions__'] }" />
             <td v-for="col of visibleColumns" :key="'f-' + col.field" class="te-td"
               :style="{ width: columnWidths[col.field] }"
               @dragenter.prevent="_onDragEnter($event, col.field)"
@@ -208,20 +197,6 @@
               <input v-if="selectionMode === 'multiple'" type="checkbox" :checked="_isSelected(row)"
                 @change="_toggleRowSelection(row)" />
               <input v-else type="radio" :checked="selectedRow === row" @change="_selectSingle(row)" />
-            </td>
-            <td v-if="actionButtons.length" class="te-td te-td-acts" :style="{ width: columnWidths['__actions__'] }">
-              <div class="te-actions-wrap">
-                <template v-for="btn of actionButtons" :key="btn.key">
-                  <button v-if="btn.isVisible()"
-                    :class="['btn', 'btn-sm', btn.severity, btn.class]"
-                    :disabled="btn.isDisabled()"
-                    :data-help="btn.helpKey"
-                    @click.stop="btn.onClick(row)">
-                    <i v-if="btn.icon" :class="btn.icon + ' me-1'"></i>
-                    {{ btn.getLabel() }}
-                  </button>
-                </template>
-              </div>
             </td>
             <td v-for="col of visibleColumns" :key="col.field"
               :class="['te-td', col.css, stylingRowClass, {
@@ -322,7 +297,6 @@ async function _savePersistedConfig() {
   const key = _getPrefKey()
   if (!key) return
   const fields = visibleColumns.value.map(c => c.field)
-  if (actionButtons.value.length) fields.push('__actions__')
   const cw = {}
   for (const f of fields) cw[f] = columnWidths.value[f] || '15rem'
   const ord = columnOrder.value.length ? columnOrder.value : fields
@@ -377,7 +351,7 @@ const resizableColumns = ref(true)
 const reorderableColumns = ref(true)
 const showFilterRow = ref(false)
 const selectionColWidth = ref('3rem')
-const actionColWidth = ref('auto')
+const hideToolbarEnd = ref(false)
 const columnWidths = ref({})
 const columnOrder = ref([])
 
@@ -419,7 +393,6 @@ const visibleColumns = computed(() => {
 const totalColspan = computed(() => {
   let n = visibleColumns.value.length + 1
   if (selectionMode.value !== null) n++
-  if (actionButtons.value.length) n++
   return n
 })
 
@@ -560,7 +533,7 @@ function applyConfig() {
   if (props.config?.resizableColumns != null) resizableColumns.value = props.config.resizableColumns
   if (props.config?.reorderableColumns != null) reorderableColumns.value = props.config.reorderableColumns
   if (props.config?.selectionColWidth) selectionColWidth.value = props.config.selectionColWidth
-  if (props.config?.actionColWidth) actionColWidth.value = props.config.actionColWidth
+  if (props.config?.hideToolbarEnd != null) hideToolbarEnd.value = props.config.hideToolbarEnd
   if (props.config?.buttons) {
     for (const k of Object.keys(buttonGroups.value)) {
       if (props.config.buttons[k]) {
@@ -1149,10 +1122,6 @@ async function _processData(data) {
       const w = parseFloat(widths[col.field])
       columnWidths.value[col.field] = w ? Math.max(100, w) + 'px' : '15rem'
     }
-    if (actionButtons.value.length) {
-      const w = parseFloat(widths['__actions__'])
-      columnWidths.value['__actions__'] = w ? Math.max(100, w) + 'px' : 'auto'
-    }
     columnOrder.value = saved?.columnOrder || []
     availableColumns.value = [...selectedColumns.value]
   }
@@ -1412,8 +1381,6 @@ watch(infiniteScroll, (v) => { if (v) nextTick(() => _setupInfiniteScroll()) })
 }
 .te-th { position: relative; box-sizing: border-box; overflow: hidden; }
 .te-td-sel, .te-th-sel { text-align: center; min-width: 2rem; }
-.te-actions-wrap { display: block; }
-.te-actions-wrap > * { margin-right: 0.25rem; }
 .te-empty { text-align: center; color: #999; padding: 2rem; border-right: none; }
 .te-color-badge {
   display: inline-block; padding: 0.1rem 0.5rem; border-radius: 4px;

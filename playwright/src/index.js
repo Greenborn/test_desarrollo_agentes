@@ -20,7 +20,7 @@ if (!PORT) {
 let db = null;
 try {
   const sqlitePath = process.env.DB_PLAYWRIGHT_SQLITE_PATH
-    ? path.resolve(__dirname, '../../', process.env.DB_PLAYWRIGHT_SQLITE_PATH)
+    ? path.resolve(__dirname, '../../backend/', process.env.DB_PLAYWRIGHT_SQLITE_PATH)
     : path.resolve(__dirname, '../../data/playwright.db');
 
   db = knex({
