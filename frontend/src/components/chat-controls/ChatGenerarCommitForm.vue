@@ -22,6 +22,14 @@
       </div>
 
     </div>
+    <ProjectCommandToggle
+      :label="runCommandLabel"
+      :enabled="runCommandEnabled"
+      :command-id="runCommandId"
+      :commands="commands"
+      @update:enabled="onRunCommandEnabled"
+      @update:command-id="onRunCommandId"
+    />
     <button class="btn btn-sm btn-success align-self-end" :disabled="!selectedModel" @click="confirm">
       Generar Commit
     </button>
@@ -30,8 +38,10 @@
 
 <script>
 import { ref, computed } from 'vue'
+import ProjectCommandToggle from './ProjectCommandToggle.vue'
 
 export default {
+  components: { ProjectCommandToggle },
   props: {
     models: { type: Array, default: () => [] },
     modelValue: { type: String, default: '' },
@@ -39,8 +49,12 @@ export default {
     thinkingValue: { type: String, default: '' },
     temperatureOptions: { type: Array, default: () => [] },
     temperatureValue: { type: String, default: '' },
+    runCommandEnabled: { type: Boolean, default: false },
+    runCommandId: { type: [Number, String], default: '' },
+    commands: { type: Array, default: () => [] },
+    runCommandLabel: { type: String, default: 'Ejecutar comando del proyecto al generar' },
   },
-  emits: ['confirm'],
+  emits: ['confirm', 'update:runCommandEnabled', 'update:runCommandId'],
   setup(props, { emit }) {
     const selectedModel = ref(props.modelValue || '')
     const selectedThinking = ref(props.thinkingValue || '')
@@ -58,6 +72,15 @@ export default {
       }
     }
 
+    function onRunCommandEnabled(val) {
+      emit('update:runCommandEnabled', val)
+      if (!val) emit('update:runCommandId', '')
+    }
+
+    function onRunCommandId(id) {
+      emit('update:runCommandId', id)
+    }
+
     function confirm() {
       if (!selectedModel.value) return
       emit('confirm', {
@@ -65,10 +88,15 @@ export default {
         thinking: showThinking.value ? selectedThinking.value : '',
         mode: 'Plan',
         temperature: selectedTemperature.value,
+        runCommandEnabled: props.runCommandEnabled,
+        runCommandId: props.runCommandId,
       })
     }
 
-    return { selectedModel, selectedThinking, selectedTemperature, showThinking, onModelChange, confirm }
+    return {
+      selectedModel, selectedThinking, selectedTemperature, showThinking, onModelChange, confirm,
+      onRunCommandEnabled, onRunCommandId,
+    }
   },
 }
 </script>

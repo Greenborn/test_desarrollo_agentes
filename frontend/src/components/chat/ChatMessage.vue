@@ -8,7 +8,7 @@
       <pre v-else class="mb-0" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;">{{ msg.content }}</pre>
     </div>
     <div v-else-if="msg.role === 'opencode_control'" class="d-block w-100 rounded-3 p-3 text-start" style="background: #1a2744; border: 1px solid #75AADB; color: #e0e0e0;">
-      <ChatGenerarCommitForm v-if="parsedControl && parsedControl.controlType === 'generar_commit_form'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :temperatureOptions="parsedControl.temperatureOptions || []" :temperatureValue="parsedControl.temperatureValue || ''" :modeValue="parsedControl.modeValue || 'Plan'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <ChatGenerarCommitForm v-if="parsedControl && parsedControl.controlType === 'generar_commit_form'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :temperatureOptions="parsedControl.temperatureOptions || []" :temperatureValue="parsedControl.temperatureValue || ''" :modeValue="parsedControl.modeValue || 'Plan'" :run-command-enabled="runCommandEnabled" :run-command-id="runCommandId" :commands="projectCommands" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" @update:run-command-enabled="onRunCommandEnabled" @update:run-command-id="onRunCommandId" />
       <ChatOpencodeForm v-else-if="parsedControl && parsedControl.controlType === 'opencode_form'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :temperatureOptions="parsedControl.temperatureOptions || []" :temperatureValue="parsedControl.temperatureValue || ''" :modeValue="parsedControl.modeValue || 'Build'" :placeholder="parsedControl.placeholder || ''" :rows="parsedControl.rows || 3" :prefill="parsedControl.prefill || ''" :sessionId="String(parsedControl.sessionId ?? '')" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <ChatControlFollowup v-else-if="parsedControl && parsedControl.controlType === 'followup'" :models="parsedControl.models || []" :modelValue="parsedControl.modelValue || ''" :thinkingOptions="parsedControl.thinkingOptions || []" :thinkingValue="parsedControl.thinkingValue || ''" :placeholder="parsedControl.placeholder || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <template v-else-if="parsedControl && parsedControl.controlType === 'select'">
@@ -26,7 +26,7 @@
       <DescripcionInputControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_input'" :placeholder="parsedControl.placeholder || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DescripcionResultControl v-else-if="parsedControl && parsedControl.controlType === 'descripcion_result'" :description="parsedControl.description || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <DescripcionResultControl v-else-if="parsedControl && parsedControl.controlType === 'refinar_result'" :description="parsedControl.description || ''" :loading="parsedControl.loading || false" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
-      <CommitResultControl v-else-if="parsedControl && parsedControl.controlType === 'commit_result'" :message="parsedControl.message || ''" :loading="parsedControl.loading || false" :modoEnvioInicial="parsedControl.modo_envio || settings.defaultCommentModeCommit || 'encolar'" :repoUrl="parsedControl.repoUrl || ''" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
+      <CommitResultControl v-else-if="parsedControl && parsedControl.controlType === 'commit_result'" :message="parsedControl.message || ''" :loading="parsedControl.loading || false" :modoEnvioInicial="parsedControl.modo_envio || settings.defaultCommentModeCommit || 'encolar'" :repoUrl="parsedControl.repoUrl || ''" :run-command-enabled="runCommandEnabled" :run-command-id="runCommandId" :commands="projectCommands" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" @update:run-command-enabled="onRunCommandEnabled" @update:run-command-id="onRunCommandId" />
       <ChatComandoEditControl v-else-if="parsedControl && parsedControl.controlType === 'comando_edit'" :mode="parsedControl.mode || 'create'" :label="parsedControl.label || ''" :descripcion="parsedControl.descripcion || ''" :comando="parsedControl.comando || ''" :ocultarEjecucion="parsedControl.ocultar_ejecucion === true" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <RedmineCommentsSendControl v-else-if="parsedControl && parsedControl.controlType === 'redmine_comments_send'" :comentarios_ids="parsedControl.comentarios_ids || []" :ticket_redmine_id="parsedControl.ticket_redmine_id || 0" :mensaje="parsedControl.mensaje || ''" :cantidad="parsedControl.cantidad || 0" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
       <AmbientesDiffCommentControl v-else-if="parsedControl && parsedControl.controlType === 'ambientes_diff_comment'" :message="parsedControl.message || ''" :sourceEnv="parsedControl.sourceEnv || ''" :targetEnv="parsedControl.targetEnv || ''" :modoEnvioInicial="parsedControl.modo_envio || settings.defaultCommentModeDiff || 'encolar'" @confirm="(val) => $emit('control-confirm', { controlId: parsedControl.controlId, value: val })" />
@@ -153,6 +153,9 @@ import PeticionResultDisplay from '../peticiones/PeticionResultDisplay.vue'
 import NavegadorIniciarForm from '../chat-controls/NavegadorIniciarForm.vue'
 import CrearProyectoRedmineControl from '../projects/CrearProyectoRedmineControl.vue'
 import { useSettingsStore } from '../../stores/settings.js'
+import { useChatStore } from '../../stores/chat.js'
+import { useComandosPersonalizadosStore } from '../../stores/comandosPersonalizados.js'
+import { watch, computed } from 'vue'
 
 let counter = 0
 
@@ -163,6 +166,71 @@ export default {
     rawMsgKeys: { type: Set, default: () => new Set() },
   },
   emits: ['control-confirm', 'contextmenu'],
+  setup(props) {
+    const chat = useChatStore()
+    const comandosStore = useComandosPersonalizadosStore()
+
+    const sessionId = computed(() => {
+      return chat.activeSessionId
+    })
+
+    const isCommitControl = computed(() => {
+      let ctrl = props.msg.controlData
+      if (!ctrl && typeof props.msg.content === 'string') {
+        try {
+          ctrl = JSON.parse(props.msg.content)
+        } catch (e) {
+          ctrl = null
+        }
+      }
+      const type = ctrl?.controlType
+      return type === 'commit_result' || type === 'generar_commit_form'
+    })
+
+    const proyectoId = computed(() => {
+      const sid = sessionId.value
+      if (!sid) return null
+      const session = chat.sessions.find(s => Number(s.id) === Number(sid))
+      return session?.proyecto_id || null
+    })
+
+    const projectCommands = computed(() => {
+      const pid = proyectoId.value
+      if (!pid) return []
+      return comandosStore.commandsByProject[pid] || []
+    })
+
+    const runCommandEnabled = computed(() => {
+      const sid = sessionId.value
+      if (!sid) return false
+      return !!chat.getSessionPrefs(sid).commitRunCommandEnabled
+    })
+
+    const runCommandId = computed(() => {
+      const sid = sessionId.value
+      if (!sid) return ''
+      return chat.getSessionPrefs(sid).commitRunCommandId || ''
+    })
+
+    watch([isCommitControl, proyectoId], ([isCommit, pid]) => {
+      if (isCommit && pid) comandosStore.loadCommands(pid)
+    })
+
+    function onRunCommandEnabled(val) {
+      const sid = sessionId.value
+      if (!sid) return
+      chat.saveSessionPref(sid, 'commitRunCommandEnabled', !!val)
+      if (!val) chat.saveSessionPref(sid, 'commitRunCommandId', '')
+    }
+
+    function onRunCommandId(id) {
+      const sid = sessionId.value
+      if (!sid) return
+      chat.saveSessionPref(sid, 'commitRunCommandId', id)
+    }
+
+    return { sessionId, isCommitControl, proyectoId, projectCommands, runCommandEnabled, runCommandId, onRunCommandEnabled, onRunCommandId }
+  },
   computed: {
     settings() {
       return useSettingsStore()

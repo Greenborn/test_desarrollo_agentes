@@ -253,7 +253,7 @@ export function useControlHandlers(api) {
       } else if (value.action === 'retry') {
         await regenerateCommit(controlId, controlMsg)
       } else if (value.action === 'confirm') {
-        await executeCommit(controlId, controlMsg, value.message, value.addComment, value.modo_envio)
+        await executeCommit(controlId, controlMsg, value.message, value.addComment, value.modo_envio, value.runCommandEnabled, value.runCommandId)
       }
       return
     } else if (controlType === 'ambientes_diff_comment') {
@@ -1811,6 +1811,22 @@ export function useControlHandlers(api) {
         origen,
         destino,
       )
+
+      if (value.runCommandEnabled && value.runCommandId) {
+        const cmdRes = await runProjectCommand(chat.activeSessionId, value.runCommandId)
+        const lines = ['--- Ejecutando comando del proyecto ---']
+        if (cmdRes.output) lines.push('', cmdRes.output)
+        if (cmdRes.exitCode === 0) {
+          lines.push('', '✓ Comando del proyecto ejecutado correctamente.')
+        } else {
+          lines.push('', '✗ El comando del proyecto finalizó con código ' + (cmdRes.exitCode === null ? 'desconocido' : cmdRes.exitCode) + '.')
+        }
+        chat.pushMessage({
+          role: 'result',
+          content: lines.join('\n'),
+          _key: 'cmd-result-' + Date.now(),
+        }, chat.activeSessionId)
+      }
     }
   }
 
@@ -1856,7 +1872,56 @@ export function useControlHandlers(api) {
     await deepseekStreamCommit(sessionId, prompt, systemPrompt)
   }
 
-  async function executeCommit(controlId, controlMsg, message, addComment, modo_envio) {
+  async function runProjectCommand(sessionId, commandId) {
+    if (!sessionId || !commandId) return { output: '', exitCode: null }
+    try {
+      const res = await fetch(`/api/comandos-personalizados/${commandId}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ sessionId }),
+      })
+      if (!res.ok || !res.body) {
+        const errData = await res.json().catch(() => ({}))
+        return { output: 'Error al ejecutar comando: ' + (errData.error || res.statusText), exitCode: null }
+      }
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let output = ''
+      let exitCode = null
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed || trimmed === 'data: [DONE]') continue
+          if (!trimmed.startsWith('data: ')) continue
+          try {
+            const json = JSON.parse(trimmed.slice(6))
+            if (json.type === 'stdout' || json.type === 'stderr') {
+              output += json.content
+            } else if (json.type === 'exit') {
+              exitCode = json.code
+            } else if (json.type === 'error') {
+              output += (output ? '\n' : '') + '[Error: ' + json.content + ']'
+            }
+          } catch (err) {
+            console.error('Error parseando SSE de comando del proyecto:', err.message)
+          }
+        }
+      }
+      return { output: output.trim(), exitCode }
+    } catch (err) {
+      console.error('Error al ejecutar comando del proyecto:', err.message)
+      return { output: 'Error al ejecutar comando: ' + err.message, exitCode: null }
+    }
+  }
+
+  async function executeCommit(controlId, controlMsg, message, addComment, modo_envio, runCommandEnabled, runCommandId) {
     const sessionId = chat.activeSessionId
     const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
     if (idx >= 0) {
@@ -2044,6 +2109,17 @@ export function useControlHandlers(api) {
             console.error('Error al encolar comentario:', err.message)
             resultLines.push('', '✗ Error al encolar comentario: ' + err.message)
           }
+        }
+      }
+
+      if (runCommandEnabled && runCommandId) {
+        resultLines.push('', '--- Ejecutando comando del proyecto ---')
+        const cmdRes = await runProjectCommand(sessionId, runCommandId)
+        if (cmdRes.output) resultLines.push('', cmdRes.output)
+        if (cmdRes.exitCode === 0) {
+          resultLines.push('', '✓ Comando del proyecto ejecutado correctamente.')
+        } else {
+          resultLines.push('', '✗ El comando del proyecto finalizó con código ' + (cmdRes.exitCode === null ? 'desconocido' : cmdRes.exitCode) + '.')
         }
       }
 

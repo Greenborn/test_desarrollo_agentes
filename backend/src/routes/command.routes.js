@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import fs from 'fs';
+import fsp from 'fs/promises';
 import path from 'path';
 import { execSync, spawn } from 'child_process';
 import db from '../config/db.js';
@@ -1057,38 +1058,45 @@ router.post('/open-in-explorer', async (req, res) => {
 
 const EXCLUDE_DIRS = new Set(['node_modules', '.git', '.opencode', 'vendor', '.cache', 'dist', 'build'])
 
-function scanPackageJsonScripts(baseDir, maxDepth = 3) {
+async function scanPackageJsonScripts(baseDir, maxDepth = 3) {
   const results = []
-  function walk(dir, depth) {
+  async function walk(dir, depth) {
     if (depth > maxDepth) return
     let entries
     try {
-      entries = fs.readdirSync(dir, { withFileTypes: true })
+      entries = await fsp.readdir(dir, { withFileTypes: true })
     } catch (err) { console.log('[command] Error al leer directorio:', err.message); return; }
+
+    const subdirs = []
+    const reads = []
     for (const entry of entries) {
       if (EXCLUDE_DIRS.has(entry.name)) continue
       if (entry.name === 'package.json' && entry.isFile()) {
-        try {
-          const content = fs.readFileSync(path.join(dir, entry.name), 'utf-8')
-          const json = JSON.parse(content)
-          if (json.scripts && typeof json.scripts === 'object') {
-            const relativePath = path.relative(baseDir, dir) || '.'
-            const scripts = Object.entries(json.scripts)
-              .filter(([, cmd]) => cmd && typeof cmd === 'string' && cmd.trim())
-              .map(([name, command]) => ({ name, command: command.trim() }))
-            if (scripts.length > 0) {
-              results.push({ relativePath, scripts })
+        reads.push((async () => {
+          try {
+            const content = await fsp.readFile(path.join(dir, entry.name), 'utf-8')
+            const json = JSON.parse(content)
+            if (json.scripts && typeof json.scripts === 'object') {
+              const relativePath = path.relative(baseDir, dir) || '.'
+              const scripts = Object.entries(json.scripts)
+                .filter(([, cmd]) => cmd && typeof cmd === 'string' && cmd.trim())
+                .map(([name, command]) => ({ name, command: command.trim() }))
+              if (scripts.length > 0) {
+                results.push({ relativePath, scripts })
+              }
             }
-          }
-        } catch (err) { console.log('[command] Error al parsear package.json:', err.message); }
+          } catch (err) { console.log('[command] Error al parsear package.json:', err.message); }
+        })())
         continue
       }
       if (entry.isDirectory()) {
-        walk(path.join(dir, entry.name), depth + 1)
+        subdirs.push(walk(path.join(dir, entry.name), depth + 1))
       }
     }
+    await Promise.all(reads)
+    await Promise.all(subdirs)
   }
-  walk(baseDir, 0)
+  await walk(baseDir, 0)
   return results.sort((a, b) => a.relativePath.localeCompare(b.relativePath))
 }
 
@@ -1101,7 +1109,7 @@ router.get('/package-json-scripts', async (req, res) => {
       const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first()
       if (session && session.cwd) cwd = session.cwd
     }
-    const packages = scanPackageJsonScripts(cwd)
+    const packages = await scanPackageJsonScripts(cwd)
     res.json({ packages })
   } catch (err) {
     console.log('Error al escanear package.json scripts:', err.message)

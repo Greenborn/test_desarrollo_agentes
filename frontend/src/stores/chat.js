@@ -1048,10 +1048,14 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function saveSessionTabPref(sessionId, tabId) {
-    if (!sessionId) return
+    await saveSessionPref(sessionId, 'sidebarChatTab', tabId)
+  }
+
+  async function saveSessionPref(sessionId, key, value) {
+    if (!sessionId || !key) return
     const session = sessions.value.find(s => Number(s.id) === Number(sessionId)) || archivedSessions.value.find(s => Number(s.id) === Number(sessionId))
     if (!session) return
-    const prefs = { ...(session.prefs || {}), sidebarChatTab: tabId }
+    const prefs = { ...(session.prefs || {}), [key]: value }
     session.prefs = prefs
     try {
       await fetch(`${API}/chat/sessions/${sessionId}/prefs`, {
@@ -1061,7 +1065,7 @@ export const useChatStore = defineStore('chat', () => {
         body: JSON.stringify({ prefs }),
       })
     } catch (err) {
-      console.error('Error al guardar preferencia de pestaña:', err)
+      console.error('Error al guardar preferencia de sesión:', err)
     }
   }
 
@@ -1086,6 +1090,6 @@ export const useChatStore = defineStore('chat', () => {
     _terminalSessions, _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel, terminalId,
     _hasTerminal, openTerminal, closeTerminal, getTerminalCount, getTerminals,
     getTotalConcurrentSlots, maxTerminalsLimit,
-    saveUiState, getSessionPrefs, saveSessionTabPref,
+    saveUiState, getSessionPrefs, saveSessionTabPref, saveSessionPref,
   }
 })

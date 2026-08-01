@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function createDb(envVar, defaultRelPath) {
   const dbPath = process.env[envVar]
-    ? path.resolve(__dirname, '../../../../', process.env[envVar])
+    ? path.resolve(__dirname, '../../../', process.env[envVar])
     : path.resolve(__dirname, defaultRelPath);
   return knex({
     client: 'better-sqlite3',

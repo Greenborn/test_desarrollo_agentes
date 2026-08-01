@@ -14,6 +14,14 @@
         <input type="checkbox" v-model="addComment" class="form-check-input" style="cursor: pointer;" />
         Agregar comentario al ticket
       </label>
+      <ProjectCommandToggle
+        :label="runCommandLabel"
+        :enabled="runCommandEnabled"
+        :command-id="runCommandId"
+        :commands="commands"
+        @update:enabled="onRunCommandEnabled"
+        @update:command-id="onRunCommandId"
+      />
       <div class="d-flex align-items-center gap-2 mb-2">
         <label class="small text-light-emphasis mb-0" style="color: #9ca3af; font-size: 0.8rem;">Modo envío:</label>
         <select v-model="modoEnvio" class="form-select form-select-sm bg-dark text-light border-secondary font-monospace" style="width: auto;">
@@ -42,22 +50,44 @@
 
 <script>
 import { ref } from 'vue'
+import ProjectCommandToggle from './ProjectCommandToggle.vue'
 
 export default {
+  components: { ProjectCommandToggle },
   props: {
     message: { type: String, required: true },
     loading: { type: Boolean, default: false },
     modoEnvioInicial: { type: String, default: 'encolar' },
     repoUrl: { type: String, default: '' },
+    runCommandEnabled: { type: Boolean, default: false },
+    runCommandId: { type: [Number, String], default: '' },
+    commands: { type: Array, default: () => [] },
+    runCommandLabel: { type: String, default: 'Ejecutar comando del proyecto después del commit' },
   },
-  emits: ['confirm'],
+  emits: ['confirm', 'update:runCommandEnabled', 'update:runCommandId'],
   setup(props, { emit }) {
     const editedMessage = ref(props.message)
     const addComment = ref(true)
     const modoEnvio = ref(props.modoEnvioInicial || 'encolar')
 
+    function onRunCommandEnabled(val) {
+      emit('update:runCommandEnabled', val)
+      if (!val) emit('update:runCommandId', '')
+    }
+
+    function onRunCommandId(id) {
+      emit('update:runCommandId', id)
+    }
+
     function confirmar() {
-      emit('confirm', { action: 'confirm', message: editedMessage.value, addComment: addComment.value, modo_envio: modoEnvio.value })
+      emit('confirm', {
+        action: 'confirm',
+        message: editedMessage.value,
+        addComment: addComment.value,
+        modo_envio: modoEnvio.value,
+        runCommandEnabled: props.runCommandEnabled,
+        runCommandId: props.runCommandId,
+      })
     }
 
     function reintentar() {
@@ -68,7 +98,7 @@ export default {
       emit('confirm', null)
     }
 
-    return { editedMessage, addComment, modoEnvio, confirmar, reintentar, cancelar }
+    return { editedMessage, addComment, modoEnvio, confirmar, reintentar, cancelar, onRunCommandEnabled, onRunCommandId }
   },
 }
 </script>

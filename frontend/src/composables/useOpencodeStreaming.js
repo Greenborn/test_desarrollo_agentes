@@ -658,16 +658,18 @@ export function useOpencodeStreaming() {
         console.error('Error al obtener URL del repositorio:', err.message)
       }
 
+      const controlData = {
+        controlId: 'commit-result-' + Date.now(),
+        controlType: 'commit_result',
+        message: translatedText || '(sin respuesta)',
+        repoUrl: repoUrl,
+        loading: false,
+        modo_envio: settings.defaultCommentModeCommit || 'encolar',
+      }
       const controlMsg = {
         role: 'opencode_control',
-        controlData: {
-          controlId: 'commit-result-' + Date.now(),
-          controlType: 'commit_result',
-          message: translatedText || '(sin respuesta)',
-          repoUrl: repoUrl,
-          loading: false,
-          modo_envio: settings.defaultCommentModeCommit || 'encolar',
-        },
+        content: JSON.stringify(controlData),
+        controlData,
         _key: 'control-' + Date.now(),
       }
 
@@ -680,7 +682,7 @@ export function useOpencodeStreaming() {
         }
       } else {
         await chat._saveMessageToDb(sessionId, controlMsg)
-        chat.pendingNotifications.value[sessionId] = Date.now()
+        chat.pendingNotifications[sessionId] = Date.now()
       }
 
       chat.clearOcStreamCache(sessionId)
@@ -689,15 +691,17 @@ export function useOpencodeStreaming() {
       chat.setOcStreaming(sessionId, false)
       if (sessionId) chat.setSessionStatus(sessionId, 'idle')
 
+      const errorControlData = {
+        controlId: 'commit-result-' + Date.now(),
+        controlType: 'commit_result',
+        message: '[Error al generar commit: ' + err.message + ']',
+        loading: false,
+        modo_envio: settings.defaultCommentModeCommit || 'encolar',
+      }
       const errorControlMsg = {
         role: 'opencode_control',
-        controlData: {
-          controlId: 'commit-result-' + Date.now(),
-          controlType: 'commit_result',
-          message: '[Error al generar commit: ' + err.message + ']',
-          loading: false,
-          modo_envio: settings.defaultCommentModeCommit || 'encolar',
-        },
+        content: JSON.stringify(errorControlData),
+        controlData: errorControlData,
         _key: 'control-' + Date.now(),
       }
 
@@ -710,7 +714,7 @@ export function useOpencodeStreaming() {
         }
       } else {
         await chat._saveMessageToDb(sessionId, errorControlMsg)
-        chat.pendingNotifications.value[sessionId] = Date.now()
+        chat.pendingNotifications[sessionId] = Date.now()
       }
 
       chat.clearOcStreamCache(sessionId)
