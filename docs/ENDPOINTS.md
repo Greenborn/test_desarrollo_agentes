@@ -25,7 +25,6 @@ Endpoints del orquestador `api_gestor_servicios`. Los endpoints operativos (`/se
   "services": [
     { "name": "backend", "port": 4000, "running": true },
     { "name": "playwright", "port": 4098, "running": true },
-    { "name": "documental", "port": 4099, "running": false },
     { "name": "gastos", "port": 4100, "running": true },
     { "name": "memoria", "port": 4101, "running": true },
     { "name": "procesos_consola", "port": 3575, "running": true }
@@ -36,7 +35,7 @@ Endpoints del orquestador `api_gestor_servicios`. Los endpoints operativos (`/se
 
 ### `POST /api/gestor/services/:name/restart`
 - **Auth:** GESTOR_API_KEY
-- **Params:** `name` — nombre del servicio (`backend`, `playwright`, `documental`, `gastos`, `memoria`, `procesos_consola`)
+- **Params:** `name` — nombre del servicio (`backend`, `playwright`, `gastos`, `memoria`, `procesos_consola`)
 - **Respuesta 200:** `{ success: true, message: "Servicio \"backend\" reiniciado", running: true }`
 - **Respuesta 404:** `{ error: "Servicio \"...\" no encontrado" }`
 - **Descripción:** Mata el proceso del servicio y lo vuelve a spawnear.
@@ -284,7 +283,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - **Auth:** Requerida
 - **Body:** `{ key: string, value: string, workspace_id?: number }` — si no se envía `workspace_id`, usa el primary
 - Si `key === "deepseek_key"` o `key === "gestion_api_user"` o `key === "gestion_api_password"` se encripta con AES-256-CBC antes de almacenar
-- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `gestion_url`, `gestion_api_user`, `gestion_api_password`, `system_prompt`, `documentacion_prompt_*`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `screen_resolutions`, `request_response_max_size_kb`, `terminal_max_terminals`
+- Keys soportadas: `deepseek_key`, `redmine_token`, `redmine_url`, `gestion_url`, `gestion_api_user`, `gestion_api_password`, `system_prompt`, `ticket_descripcion_prompt`, `deteccion_funcionalidades_prompt`, `code_file_extensions`, `code_file_max_size_kb`, `screen_resolutions`, `request_response_max_size_kb`, `terminal_max_terminals`
 - **Respuesta:** `{ success: true }`
 
 ### `GET /api/settings/global`
@@ -1109,71 +1108,6 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
   - `data: {"type":"error","content":"..."}` — error de ejecución
   - `data: [DONE]` — fin del stream
 - **Nota:** Si el cliente cierra la conexión, el proceso hijo recibe SIGTERM.
-
----
-
-## Documentación — Notas (`api_documental`, puerto `4099`)
-
-Endpoint base: `http://localhost:4099/api/documentacion`
-
-### `GET /api/documentacion/notas/:proyectoId`
-- **Auth:** No (servicio interno)
-- **Path params:** `proyectoId` (string, requerido)
-- **Descripción:** Lista todas las notas de documentación de un proyecto. Devuelve solo metadatos (id, clave, id_ticket, created_at, updated_at), sin el contenido.
-- **Respuesta 200:** `[{ id, clave, id_ticket, created_at, updated_at }]`
-- **Respuesta 400:** `{ error: "proyectoId requerido" }`
-
-### `GET /api/documentacion/notas/:proyectoId/:clave`
-- **Auth:** No (servicio interno)
-- **Path params:** `proyectoId` (string), `clave` (string)
-- **Descripción:** Obtiene una nota de documentación completa por su clave, incluyendo el contenido (`valor`).
-- **Respuesta 200:** `{ id, id_proyecto, clave, valor, id_ticket, created_at, updated_at }`
-- **Respuesta 404:** `{ error: "Nota no encontrada" }`
-
-### `POST /api/documentacion/notas`
-- **Auth:** No (servicio interno)
-- **Body (JSON):**
-  ```json
-  {
-    "id_proyecto": "PROY-001",
-    "clave": "nombre_de_la_nota",
-    "valor": "contenido de la nota (max 16384 caracteres)",
-    "id_ticket": 1234
-  }
-  ```
-- **Descripción:** Crea una nueva nota de documentación.
-- **Campos requeridos:** `id_proyecto`, `clave`, `valor`
-- **Campos opcionales:** `id_ticket` — si se omite, la nota se crea como documentación general (sin asociación a ticket)
-- **Restricciones:** `valor` ≤ 16384 caracteres; la combinación `(id_proyecto, clave)` debe ser única.
-- **Respuesta 201:** `{ id, id_proyecto, clave, valor, id_ticket, created_at, updated_at }`
-- **Respuesta 400:** Error de validación (campo faltante, valor muy largo)
-- **Respuesta 409:** `{ error: "Ya existe una nota con esa clave en el proyecto" }`
-
-### `PUT /api/documentacion/notas/:id`
-- **Auth:** No (servicio interno)
-- **Path params:** `id` (number)
-- **Body (JSON):**
-  ```json
-  {
-    "clave": "nombre_de_la_nota",
-    "valor": "contenido actualizado (max 16384 caracteres)",
-    "id_ticket": 1234
-  }
-  ```
-- **Descripción:** Actualiza una nota existente.
-- **Campos requeridos:** `clave`, `valor`
-- **Campos opcionales:** `id_ticket` — si se omite, la nota se marca como documentación general (id_ticket = null)
-- **Restricciones:** `valor` ≤ 16384 caracteres; la combinación `(id_proyecto, clave)` debe ser única.
-- **Respuesta 200:** `{ id, id_proyecto, clave, valor, id_ticket, created_at, updated_at }`
-- **Respuesta 404:** `{ error: "Nota no encontrada" }`
-- **Respuesta 409:** `{ error: "Ya existe una nota con esa clave en el proyecto" }`
-
-### `DELETE /api/documentacion/notas/:id`
-- **Auth:** No (servicio interno)
-- **Path params:** `id` (number)
-- **Descripción:** Elimina una nota de documentación.
-- **Respuesta 200:** `{ success: true }`
-- **Respuesta 404:** `{ error: "Nota no encontrada" }`
 
 ---
 

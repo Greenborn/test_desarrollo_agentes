@@ -518,7 +518,6 @@ Composable que orquesta el streaming de OpenCode para diferentes casos de uso. U
 | `opencodeStreamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature)` | Prompt genérico. Crea un mensaje `opencode_stream` en el chat, actualiza en vivo el contenido y al finalizar lo convierte a `opencode_result`. |
 | `deepseekStreamCommit(sessionId, prompt, systemPrompt)` | Envía prompt + systemPrompt a `/api/chat/refine` (DeepSeek directo), streamea la respuesta en vivo, y al finalizar muestra `commit_result` (control) con la URL del repo. Usado por `/dev_generar_commit`. |
 | `opencodeStreamPromptTestingNotes(sessionId, prompt, provider, model, thinking, mode, temperature, origen, destino)` | Prompt para generar notas de testing. Muestra el resultado como `ambientes_diff_comment` (control). |
-| `opencodeStreamPromptDocUpdate(sessionId, prompt, provider, model, thinking, mode, temperature, proyectoId, tipo)` | Prompt para actualizar documentación. Al finalizar, guarda la respuesta en la documentación del proyecto vía `PUT /api/documentacion/:tipo/:proyectoId`. |
 | `opencodeStreamDescripcion(sessionId, prompt, provider, model, thinking, mode, temperature, ticket)` | Prompt para generar/mejorar descripciones de tickets. Muestra el resultado como `descripcion_result` (control). |
 | `opencodeStreamDescripcionFollowup(sessionId, userPrompt, ticket, temperature, descripcionData)` | Continuación de una generación de descripción. Envía un mensaje de seguimiento al mismo modelo/configuración. |
 
@@ -632,7 +631,6 @@ Los mensajes relacionados con OpenCode usan roles especiales en `chat_messages`:
    - Reemplaza el mensaje `opencode_stream` por `opencode_result`.
    - Muestra el resultado final.
    - Para commits: envía a `/api/chat/refine` para acortar el mensaje.
-   - Para documentación: guarda en el proyecto con `PUT /api/documentacion/:tipo/:proyectoId`.
 6. El usuario puede finalizar explícitamente con `POST /api/opencode/finish`, que detiene el servidor.
 
 ---

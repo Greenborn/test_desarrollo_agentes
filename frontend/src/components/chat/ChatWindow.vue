@@ -83,7 +83,7 @@ export default {
       ocStreaming, ocChunk, ocThinking, streamSessionId, streamingConsole, terminalContent,
       fetchGitBranch, _getProyectoId, resolveInput, addMessage, isActiveSession,
       opencodeStreamPrompt, opencodeStreamPromptCommit, opencodeStreamPromptTestingNotes,
-      opencodeStreamPromptDocUpdate, opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
+      opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
       getAgentTerminalContent, clearAgentTerminalContent,
     } = streamingApi
 
@@ -135,7 +135,6 @@ export default {
       opencodeStreamPrompt: streamingApi.opencodeStreamPrompt,
       opencodeStreamPromptCommit: streamingApi.opencodeStreamPromptCommit,
       opencodeStreamPromptTestingNotes: streamingApi.opencodeStreamPromptTestingNotes,
-      opencodeStreamPromptDocUpdate: streamingApi.opencodeStreamPromptDocUpdate,
       opencodeStreamDescripcion: streamingApi.opencodeStreamDescripcion,
       opencodeStreamDescripcionFollowup: streamingApi.opencodeStreamDescripcionFollowup,
       fetchGitBranch: streamingApi.fetchGitBranch,

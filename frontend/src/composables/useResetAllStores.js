@@ -18,7 +18,6 @@ import { useProjectVariablesStore } from '../stores/projectVariables.js'
 import { useComandosPersonalizadosStore } from '../stores/comandosPersonalizados.js'
 import { useTicketFormStore } from '../stores/ticketForm.js'
 import { useAttachmentsStore } from '../stores/attachments.js'
-import { useDocumentacionNotasStore } from '../stores/documentacionNotas.js'
 
 export async function resetAllStores() {
   const stores = [
@@ -42,7 +41,6 @@ export async function resetAllStores() {
     useComandosPersonalizadosStore,
     useTicketFormStore,
     useAttachmentsStore,
-    useDocumentacionNotasStore,
   ]
 
   for (const useStore of stores) {

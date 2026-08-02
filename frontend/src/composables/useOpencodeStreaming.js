@@ -5,13 +5,6 @@ import { useGitStore } from '../stores/git.js'
 import { useSettingsStore } from '../stores/settings.js'
 import { useProjectVariables } from './useProjectVariables.js'
 
-const DOC_LABELS = {
-  base_datos: 'Base de Datos',
-  subproyectos: 'Subproyectos',
-  endpoints: 'Endpoints',
-  web_sockets: 'WebSockets',
-  funcionalidades: 'Funcionalidades',
-}
 
 export function useOpencodeStreaming() {
   const chat = useChatStore()
@@ -1082,120 +1075,13 @@ export function useOpencodeStreaming() {
     })
   }
 
-  async function opencodeStreamPromptDocUpdate(sessionId, prompt, provider, model, thinking, mode, temperature, proyectoId, tipo) {
-    const sd = _ensureStreamData(sessionId)
-    sd.text = ''
-    sd.thinking = ''
-    sd.streaming = true
-    ocStreaming.value = true
-    streamSessionId.value = sessionId
-    terminalContent.value = ''
-    clearTerminalContentForSession(sessionId)
-    if (isActiveSession(sessionId)) {
-      ocChunk.value = ''
-      ocThinking.value = ''
-    }
-    if (sessionId) chat.setSessionStatus(sessionId, 'executing')
-    chat.setOcStreaming(sessionId, true)
-
-    const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
-    streamMsg._key = 'stream-' + Date.now()
-
-    const callbacks = makeStreamCallbacks(sd, sessionId, streamMsg._key)
-
-    await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
-      ...callbacks,
-      onControl(control) {
-        const controlMsg = {
-          role: 'opencode_control',
-          content: JSON.stringify(control),
-          controlData: control,
-          _key: 'control-' + Date.now(),
-        }
-        chat._saveMessageToDb(sessionId, controlMsg)
-        if (isActiveSession(sessionId)) {
-          chat.pushMessage(controlMsg)
-        } else {
-          chat.pendingNotifications[sessionId] = Date.now()
-        }
-      },
-      async onDone(json, fullText) {
-        sd.streaming = false
-        _ocStreamData.value[String(sessionId)] = sd
-        ocStreaming.value = false
-        chat.setOcStreaming(sessionId, false)
-        chat.clearOcStreamCache(sessionId)
-        if (sessionId) chat.setSessionStatus(sessionId, 'idle')
-        const fullResponse = json.fullResponse || fullText || '(sin respuesta)'
-        const thinking = json.thinking || sd.thinking || null
-        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse, thinking })
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) {
-            chat.messages[idx].streaming = false
-            chat.messages[idx].role = 'opencode_result'
-            chat.messages[idx].content = fullResponse
-            chat.messages[idx].thinking = thinking
-          }
-
-          try {
-            const label = DOC_LABELS[tipo] || tipo
-            const res = await fetch(`/api/documentacion/${tipo}/${encodeURIComponent(proyectoId)}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ data: fullResponse }),
-            })
-            if (!res.ok) {
-              const errData = await res.json()
-              throw new Error(errData.error || 'Error al guardar documentación')
-            }
-            chat.pushMessage({
-              role: 'result',
-              content: `Documentación de ${label} actualizada correctamente para el proyecto "${proyectoId}".`,
-              _key: 'result-' + Date.now(),
-            })
-          } catch (err) {
-            console.error('Error al guardar documentación:', err.message)
-            chat.pushMessage({
-              role: 'result',
-              content: 'Error al guardar documentación: ' + err.message,
-              _key: 'result-' + Date.now(),
-            })
-          }
-        } else {
-          chat.pendingNotifications[sessionId] = Date.now()
-        }
-      },
-      onError(msg) {
-        sd.streaming = false
-        _ocStreamData.value[String(sessionId)] = sd
-        ocStreaming.value = false
-        chat.setOcStreaming(sessionId, false)
-        chat.clearOcStreamCache(sessionId)
-        if (sessionId) chat.setSessionStatus(sessionId, 'error')
-        chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) {
-            chat.messages[idx].content = '[Error: ' + msg + ']'
-            chat.messages[idx].streaming = false
-          }
-        } else {
-          chat.pendingNotifications[sessionId] = Date.now()
-        }
-      },
-    })
-  }
-
   return {
     ocStreaming, ocChunk, ocThinking, streamSessionId, streamingConsole, terminalContent,
     isActiveSession, _getProyectoId, resolveInput, fetchGitBranch, addMessage,
     _syncStreamData, getTerminalContentForSession, clearTerminalContentForSession,
     getAgentTerminalContent, clearAgentTerminalContent,
     opencodeStreamPrompt, opencodeStreamPromptCommit, deepseekStreamCommit,
-    opencodeStreamPromptTestingNotes, opencodeStreamPromptDocUpdate,
+    opencodeStreamPromptTestingNotes,
     opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
-    DOC_LABELS,
   }
 }

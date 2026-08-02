@@ -299,8 +299,6 @@ Todo comando que forme parte del ecosistema de desarrollo (funcionalidades, docu
 |---|---|---|---|---|
 | `/dev_funcionalidad_crear` | funcionalidad | crear | — | Wizard nueva funcionalidad |
 | `/dev_funcionalidad_listar` | funcionalidad | listar | — | Listar funcionalidades |
-| `/dev_documento_listar` | documento | listar | — | Obtener documentación del proyecto |
-| `/dev_documento_actualizar` | documento | actualizar | — | Actualizar documentación con OpenCode |
 | `/dev_opencode_iniciar` | opencode | iniciar | — | Iniciar sesión OpenCode |
 | `/dev_opencode_finalizar` | opencode | finalizar | — | Finalizar sesión OpenCode |
 | `/dev_generar_commit` | git | generar | commit | Generar mensaje de commit |
@@ -451,8 +449,6 @@ Los siguientes comandos usan `chatStore.activeSessionId` dentro de `execute()` y
 | `/chat_ticket_comentar` | `commands/chatTicketComentar.js` |
 | `/despliegue_*` | `commands/despliegue.js` |
 | `/deteccion_funcionalidades` | `commands/deteccionFuncionalidades.js` |
-| `/dev_documentacion_all` | `commands/documentacionAll.js` |
-| `/dev_documentacion_update` | `commands/documentacionUpdate.js` |
 | `/dev_funcionalidad_crear` | `commands/nuevaFuncionalidad.js` |
 | `/dev_funcionalidades_listar` | `commands/funcionalidadesListar.js` |
 | `/dev_generar_commit` | `commands/generarCommit.js` |

@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Migrar las 6 pestañas built-in de `SidebarRight.vue` al sistema de módulos auto-registrables, siguiendo el patrón establecido por `documentacion` y `skills`.
+Migrar las 6 pestañas built-in de `SidebarRight.vue` al sistema de módulos auto-registrables, siguiendo el patrón establecido por `skills`.
 
 **Estado: COMPLETADO** — Las 6 pestañas ya son módulos independientes en `frontend/src/modules/`.
 
@@ -15,7 +15,6 @@ Migrar las 6 pestañas built-in de `SidebarRight.vue` al sistema de módulos aut
 | 3 | `casos_prueba` | `frontend/src/modules/casos_prueba/` | 8 |
 | 4 | `variables` | `frontend/src/modules/variables/` | 30 |
 | 5 | `comandos` | `frontend/src/modules/comandos/` | 40 |
-| 6 | `documentacion` | `frontend/src/modules/documentacion/` | 50 |
 | 7 | `capturas` | `frontend/src/modules/capturas/` | 60 |
 | 8 | `skills` | `frontend/src/modules/skills/` | 100 |
 

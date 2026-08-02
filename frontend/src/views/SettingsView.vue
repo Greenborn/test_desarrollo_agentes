@@ -306,65 +306,6 @@
         </div>
       </div>
 
-      <div class="col" v-if="cardHasVisible(['base de datos', 'subproyectos', 'endpoints', 'websockets', 'funcionalidades'])">
-        <div class="card bg-dark border-secondary h-100">
-          <div class="card-header bg-dark border-secondary py-2 px-3">
-            <h6 class="mb-0 fw-semibold">Prompts de Documentación</h6>
-          </div>
-          <div class="card-body d-flex flex-column gap-3">
-            <div v-if="matches('base de datos')">
-              <label class="form-label small mb-1">Base de Datos</label>
-              <textarea
-                class="form-control font-monospace bg-dark text-light border-secondary"
-                rows="3"
-                v-model="docBdInput"
-              ></textarea>
-              <button class="btn btn-sm mt-1 btn-argentina" @click="saveDoc('base_datos')">Guardar Prompt</button>
-            </div>
-
-            <div v-if="matches('subproyectos')">
-              <label class="form-label small mb-1">Subproyectos</label>
-              <textarea
-                class="form-control font-monospace bg-dark text-light border-secondary"
-                rows="3"
-                v-model="docSubInput"
-              ></textarea>
-              <button class="btn btn-sm mt-1 btn-argentina" @click="saveDoc('subproyectos')">Guardar Prompt</button>
-            </div>
-
-            <div v-if="matches('endpoints')">
-              <label class="form-label small mb-1">Endpoints</label>
-              <textarea
-                class="form-control font-monospace bg-dark text-light border-secondary"
-                rows="3"
-                v-model="docEndpointsInput"
-              ></textarea>
-              <button class="btn btn-sm mt-1 btn-argentina" @click="saveDoc('endpoints')">Guardar Prompt</button>
-            </div>
-
-            <div v-if="matches('websockets')">
-              <label class="form-label small mb-1">WebSockets</label>
-              <textarea
-                class="form-control font-monospace bg-dark text-light border-secondary"
-                rows="3"
-                v-model="docWsInput"
-              ></textarea>
-              <button class="btn btn-sm mt-1 btn-argentina" @click="saveDoc('web_sockets')">Guardar Prompt</button>
-            </div>
-
-            <div v-if="matches('funcionalidades')">
-              <label class="form-label small mb-1">Funcionalidades</label>
-              <textarea
-                class="form-control font-monospace bg-dark text-light border-secondary"
-                rows="3"
-                v-model="docFuncInput"
-              ></textarea>
-              <button class="btn btn-sm mt-1 btn-argentina" @click="saveDoc('funcionalidades')">Guardar Prompt</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div class="col" v-if="cardHasVisible(['codigo extensiones archivos code_file', 'intervalo reproduccion navegador', 'limite respuesta peticion http', 'limite terminales', 'resoluciones pantalla resolucion'])">
         <div class="card bg-dark border-secondary h-100">
           <div class="card-header bg-dark border-secondary py-2 px-3">
@@ -598,14 +539,6 @@ export default {
     const showGestionApiUser = ref(false)
     const showGestionApiPassword = ref(false)
     const promptInput = ref('')
-    const docBdInput = ref('')
-    const docSubInput = ref('')
-    const docEndpointsInput = ref('')
-    const docWsInput = ref('')
-    const docFuncInput = ref('')
-    const showKey = ref(false)
-    const showRedmineToken = ref(false)
-    const searchTerm = ref('')
     const descripcionPromptInput = ref('')
     const refinarPromptInput = ref('')
     const deteccionPromptInput = ref('')
@@ -654,22 +587,6 @@ export default {
       if (!searchTerm.value) return true
       const term = searchTerm.value.toLowerCase()
       return labels.some(label => label.toLowerCase().includes(term))
-    }
-
-    const DOC_INPUTS = {
-      base_datos: docBdInput,
-      subproyectos: docSubInput,
-      endpoints: docEndpointsInput,
-      web_sockets: docWsInput,
-      funcionalidades: docFuncInput,
-    }
-
-    const DOC_STORE_MAP = {
-      base_datos: 'documentacionPromptBaseDatos',
-      subproyectos: 'documentacionPromptSubproyectos',
-      endpoints: 'documentacionPromptEndpoints',
-      web_sockets: 'documentacionPromptWebSockets',
-      funcionalidades: 'documentacionPromptFuncionalidades',
     }
 
     onMounted(async () => {
@@ -768,12 +685,6 @@ export default {
     watch(() => settings.codeFileMaxSizeKb, (val) => {
       codeMaxSizeInput.value = val
     }, { immediate: true })
-
-    for (const [key, refName] of Object.entries(DOC_STORE_MAP)) {
-      watch(() => settings[refName], (val) => {
-        DOC_INPUTS[key].value = val
-      }, { immediate: true })
-    }
 
     watch(() => settings.skillRepositoryUrl, (val) => {
       skillRepoUrlInput.value = val
@@ -923,11 +834,6 @@ export default {
     function savePrompt() {
       settings.clearFeedback()
       settings.save('system_prompt', promptInput.value, selectedWId.value)
-    }
-
-    function saveDoc(tipo) {
-      settings.clearFeedback()
-      settings.save('documentacion_prompt_' + tipo, DOC_INPUTS[tipo].value, selectedWId.value)
     }
 
     function saveDescripcionPrompt() {
@@ -1162,8 +1068,7 @@ export default {
       keyInput, redmineTokenInput, redmineUrlInput,
       gestionUrlInput, gestionApiUserInput, gestionApiPasswordInput,
       showGestionApiUser, showGestionApiPassword,
-      promptInput, docBdInput, docSubInput,
-      docEndpointsInput, docWsInput, docFuncInput, descripcionPromptInput, refinarPromptInput,
+      promptInput, descripcionPromptInput, refinarPromptInput,
       deteccionPromptInput,
       codeExtensionsInput, codeMaxSizeInput,
       showKey, showRedmineToken, searchTerm, repoAcronimoInput,
@@ -1180,7 +1085,7 @@ export default {
       deleteEnvIndex,
       saveKey, saveRedmineToken, saveRedmineUrl,
       saveGestionUrl, saveGestionApiUser, saveGestionApiPassword,
-      savePrompt, saveDoc,
+      savePrompt,
       saveDescripcionPrompt, saveRefinarPrompt, saveDeteccionPrompt, saveCodeConfig, saveRepoAcronimo,
       saveLocale, savePriorityColor, saveReplayInterval, saveRequestResponseMaxSize,
       saveBrowserStealth, saveBrowserUaChrome, saveBrowserUaFirefox,

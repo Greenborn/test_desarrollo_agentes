@@ -11,11 +11,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const gestionApiUser = ref('')
   const gestionApiPassword = ref('')
   const systemPrompt = ref('')
-  const documentacionPromptBaseDatos = ref('')
-  const documentacionPromptSubproyectos = ref('')
-  const documentacionPromptEndpoints = ref('')
-  const documentacionPromptWebSockets = ref('')
-  const documentacionPromptFuncionalidades = ref('')
   const ticketDescripcionPrompt = ref('')
   const ticketRefinarPrompt = ref('')
   const deteccionFuncionalidadesPrompt = ref('')
@@ -66,11 +61,6 @@ export const useSettingsStore = defineStore('settings', () => {
       gestionApiUser.value = keys.gestion_api_user ? keys.gestion_api_user : ''
       gestionApiPassword.value = keys.gestion_api_password ? keys.gestion_api_password : ''
       systemPrompt.value = keys.system_prompt ? keys.system_prompt : ''
-      documentacionPromptBaseDatos.value = keys.documentacion_prompt_base_datos || ''
-      documentacionPromptSubproyectos.value = keys.documentacion_prompt_subproyectos || ''
-      documentacionPromptEndpoints.value = keys.documentacion_prompt_endpoints || ''
-      documentacionPromptWebSockets.value = keys.documentacion_prompt_web_sockets || ''
-      documentacionPromptFuncionalidades.value = keys.documentacion_prompt_funcionalidades || ''
       ticketDescripcionPrompt.value = keys.ticket_descripcion_prompt || ''
       ticketRefinarPrompt.value = keys.ticket_refinar_prompt || ''
       deteccionFuncionalidadesPrompt.value = keys.deteccion_funcionalidades_prompt || ''
@@ -134,11 +124,6 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'gestion_api_user': gestionApiUser.value = value; break
       case 'gestion_api_password': gestionApiPassword.value = value; break
       case 'system_prompt': systemPrompt.value = value; break
-      case 'documentacion_prompt_base_datos': documentacionPromptBaseDatos.value = value; break
-      case 'documentacion_prompt_subproyectos': documentacionPromptSubproyectos.value = value; break
-      case 'documentacion_prompt_endpoints': documentacionPromptEndpoints.value = value; break
-      case 'documentacion_prompt_web_sockets': documentacionPromptWebSockets.value = value; break
-      case 'documentacion_prompt_funcionalidades': documentacionPromptFuncionalidades.value = value; break
       case 'ticket_descripcion_prompt': ticketDescripcionPrompt.value = value; break
       case 'ticket_refinar_prompt': ticketRefinarPrompt.value = value; break
       case 'deteccion_funcionalidades_prompt': deteccionFuncionalidadesPrompt.value = value; break
@@ -182,11 +167,6 @@ export const useSettingsStore = defineStore('settings', () => {
     gestionApiUser.value = ''
     gestionApiPassword.value = ''
     systemPrompt.value = ''
-    documentacionPromptBaseDatos.value = ''
-    documentacionPromptSubproyectos.value = ''
-    documentacionPromptEndpoints.value = ''
-    documentacionPromptWebSockets.value = ''
-    documentacionPromptFuncionalidades.value = ''
     ticketDescripcionPrompt.value = ''
     ticketRefinarPrompt.value = ''
     deteccionFuncionalidadesPrompt.value = ''
@@ -218,9 +198,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return { deepseekKey, redmineToken, redmineUrl, gestionUrl, gestionApiUser, gestionApiPassword, systemPrompt, repoAcronimo,
            locale, screenResolutions,
-           documentacionPromptBaseDatos, documentacionPromptSubproyectos,
-           documentacionPromptEndpoints, documentacionPromptWebSockets,
-           documentacionPromptFuncionalidades, ticketDescripcionPrompt, ticketRefinarPrompt,
+           ticketDescripcionPrompt, ticketRefinarPrompt,
            deteccionFuncionalidadesPrompt, codeFileExtensions, codeFileMaxSizeKb,
            priorityColorLow, priorityColorNormal, priorityColorHigh, priorityColorUrgent, priorityColorImmediate,
             skillRepositoryUrl, terminalMaxTerminals, executionMode, maxConcurrentProcesses,

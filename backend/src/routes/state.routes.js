@@ -10,9 +10,6 @@ import dbProjectVariables from '../config/dbProjectVariables.js';
 import dbCommandHistory from '../config/dbCommandHistory.js';
 import dbGastos from '../config/dbGastos.js';
 import dbPlaywright from '../config/dbPlaywright.js';
-import dbDocContent from '../config/dbDocContent.js';
-import dbDocNotas from '../config/dbDocNotas.js';
-import dbDocEscaneo from '../config/dbDocEscaneo.js';
 import dbFuncionalidades from '../config/dbFuncionalidades.js';
 import dbRedmineComentarios from '../config/dbRedmineComentarios.js';
 import dbRedmineData from '../config/dbRedmineData.js';
@@ -34,14 +31,6 @@ const TABLE_DB_MAP = {
   playwright_console_logs: dbPlaywright,
   playwright_events: dbPlaywright,
   playwright_event_recordings: dbPlaywright,
-  documentacion_base_datos: dbDocContent,
-  documentacion_subproyectos: dbDocContent,
-  documentacion_endpoints: dbDocContent,
-  documentacion_web_sockets: dbDocContent,
-  documentacion_funcionalidades: dbDocContent,
-  documentacion_notas: dbDocNotas,
-  documentacion_escaneo: dbDocEscaneo,
-  documentacion_archivo: dbDocEscaneo,
   funcionalidades: dbFuncionalidades,
   redmine_comentarios: dbRedmineComentarios,
   proyectos: dbRedmineData,

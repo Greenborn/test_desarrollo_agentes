@@ -34,6 +34,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 - **Sistema de comandos extensible:** usar `useCommandRegistry.js` para registrar comandos via `register({ name, category, description, usage, execute })`. No agregar nuevos comandos fuera del registry.
 - **Módulos auto-registrables:** seguir el sistema descrito en `frontend/src/modules/` y `backend/src/modules/`. Ver sección "Sistema de Módulos" más abajo.
 - **Espacios de trabajo (workspaces):** tabla `workspaces` con id y name. La selección activa se guarda como array en la sesión (`req.session.workspaceIds`). Settings, chat_sessions, proyectos y tickets se filtran por los workspaces seleccionados (IN). Al cambiar/seleccionar workspaces se detienen procesos OpenCode y navegador si se deseleccionó alguno.
+- **Prohibido reiniciar servicios sin autorización humana:** ningún servicio (backend, api_gestor_servicios, api_memoria, api_gastos, api_procesos_consola, playwright, etc.) puede reiniciarse, detenerse o lanzarse sin autorización explícita del usuario. Antes de reiniciar un servicio, siempre solicitar confirmación humana.
 - **Prohibido `alert()` en el frontend:** toda notificación al usuario debe mostrarse mediante el sistema de modales personalizado (`AppModal.vue` + `stores/modal.js`). Usar `AlertModal.vue` para notificaciones simples de una línea. Cualquier `alert()` existente debe reemplazarse por un modal apropiado.
 - **Prohibido usar librerías externas para funcionalidades simples de frontend:** tareas como drag & drop, tooltips, modales simples, tabs, acordeones, etc. deben implementarse con HTML/CSS/JS nativo o con Bootstrap 5 (ya disponible). No agregar dependencias nuevas como SortableJS, vue-draggable, ni similares para funcionalidades que el estándar web resuelve.
 
@@ -64,7 +65,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 │       ├── config/dbTemplates.js  # Conexión Knex → templates.db
 │       ├── config/dbProjectVariables.js  # Conexión Knex → project_variables.db
 │       ├── routes/        # 25 rutas (auth, chat, settings, workspaces, command, opencode, navegador,
-│       │                  #   funcionalidad, proyecto, documentacion, gastos, redmine, tickets, despliegue,
+│       │                  #   funcionalidad, proyecto, gastos, redmine, tickets, despliegue,
 │       │                  #   templates, environments, playwrightLogs, state, gestor, comandosPersonalizados,
 │       │                  #   proxy, archivos, db, procesos, playwright)
 │       ├── services/      # crypto, deepseek, devInstanceManager, frontendWsServer, gestorClient,
@@ -143,13 +144,6 @@ npm run build             # Build producción
 
 ```bash
 npm run dev               # Iniciar servidor con --watch (puerto 4100)
-npm start                 # Iniciar servidor en producción
-```
-
-### API Documental (`api_documental/`)
-
-```bash
-npm run dev               # Iniciar servidor con --watch (puerto 4099)
 npm start                 # Iniciar servidor en producción
 ```
 

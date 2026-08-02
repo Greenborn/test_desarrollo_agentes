@@ -38,11 +38,6 @@ const serviceConfig = {
     cwd: path.resolve(__dirname, '../../playwright'),
     port: process.env.SERVICIO_PLAYWRIGHT_PORT,
   },
-  documental: {
-    script: '../../api_documental/src/index.js',
-    cwd: path.resolve(__dirname, '../../api_documental'),
-    port: process.env.SERVICIO_DOCUMENTAL_PORT,
-  },
   gastos: {
     script: '../../api_gastos/src/index.js',
     cwd: path.resolve(__dirname, '../../api_gastos'),

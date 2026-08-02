@@ -26,7 +26,7 @@ export function useControlHandlers(api) {
 
   const {
     opencodeStreamPrompt, opencodeStreamPromptCommit, deepseekStreamCommit,
-    opencodeStreamPromptTestingNotes, opencodeStreamPromptDocUpdate,
+    opencodeStreamPromptTestingNotes,
     opencodeStreamDescripcion, opencodeStreamDescripcionFollowup,
     fetchGitBranch, _getProyectoId, resolveInput, isActiveSession, addMessage,
     ocStreaming, ocChunk, ocThinking, streamSessionId,
@@ -37,7 +37,6 @@ export function useControlHandlers(api) {
   let commitData = { prompt: '', provider: '', model: '', thinking: '', mode: '', temperature: '' }
   let testingNotesSetupData = { provider: '', model: '', thinking: '', mode: 'Plan', temperature: '' }
   let testingNotesData = { prompt: '', provider: '', model: '', thinking: '', mode: '', temperature: '', origen: '', destino: '' }
-  let docUpdateData = { provider: '', model: '', thinking: '', mode: '', temperature: '' }
   let descripcionData = { provider: '', model: '', thinking: '', mode: 'Plan', temperature: '' }
   const descripcionUserInput = ref('')
   let repoCrearRamaData = { proyectoId: '', ticketRedmineId: '', baseBranch: '', repoAcronimo: '' }
@@ -52,8 +51,6 @@ export function useControlHandlers(api) {
       await handleOpencodeSetup(controlId, value, controlMsg)
     } else if (stepType === 'ambientes_diff_testing_setup') {
       await handleAmbientesDiffTestingSetup(controlId, value, controlMsg)
-    } else if (stepType === 'documentacion_update') {
-      await handleDocumentacionUpdate(controlId, value, controlMsg)
     } else if (stepType === 'deteccion_model_setup') {
       const subStepType = controlMsg.controlData.subStepType
       if (subStepType === 'model') {
@@ -992,119 +989,6 @@ export function useControlHandlers(api) {
         role: 'opencode_confirmed',
         content: typeof value === 'object' ? JSON.stringify(value) : String(value),
         _key: 'confirmed-' + Date.now(),
-      }
-    }
-  }
-
-  async function handleDocumentacionUpdate(controlId, value, controlMsg) {
-    const subStepType = controlMsg.controlData.subStepType
-
-    if (subStepType === 'provider') {
-      docUpdateData.provider = value
-      docUpdateData.proyectoId = controlMsg.controlData.proyectoId || ''
-      docUpdateData.docType = controlMsg.controlData.docType || ''
-      await ocStore.select('provider', value)
-      ocStore.selectedProvider = value
-      const models = ocStore.getModelsForProvider(value)
-      chat.pushMessage({
-        role: 'opencode_control',
-        controlData: {
-          controlId: 'model-' + Date.now(),
-          controlType: 'select',
-          stepType: 'documentacion_update',
-          subStepType: 'model',
-          options: models,
-          placeholder: 'Selecciona modelo...',
-          preselect: ocStore.savedModel || '',
-        },
-        _key: 'control-' + Date.now(),
-      })
-    } else if (subStepType === 'model') {
-      docUpdateData.model = value
-      await ocStore.select('model', value)
-      ocStore.selectedModel = value
-      if (ocStore.modelSupportsReasoning(docUpdateData.provider, value)) {
-        chat.pushMessage({
-          role: 'opencode_control',
-          controlData: {
-            controlId: 'thinking-' + Date.now(),
-            controlType: 'select',
-            stepType: 'documentacion_update',
-            subStepType: 'thinking',
-            options: ocStore.thinkingOptions,
-            placeholder: 'Selecciona nivel de pensamiento...',
-            preselect: ocStore.savedThinking || 'medium',
-          },
-          _key: 'control-' + Date.now(),
-        })
-      } else {
-        const fakeMsg = { controlData: { subStepType: 'thinking' } }
-        await handleDocumentacionUpdate(null, null, fakeMsg)
-      }
-    } else if (subStepType === 'thinking') {
-      docUpdateData.thinking = value
-      await ocStore.select('thinking', value)
-      ocStore.selectedThinking = value
-      const fakeMsg = { controlData: { subStepType: 'mode' } }
-      await handleDocumentacionUpdate(null, null, fakeMsg)
-    } else if (subStepType === 'mode') {
-      docUpdateData.mode = 'Plan'
-      await ocStore.select('mode', 'Plan')
-      ocStore.selectedMode = 'Plan'
-
-      try {
-        const tipos = docUpdateData.docType === 'all'
-          ? ['base_datos', 'subproyectos', 'endpoints', 'web_sockets', 'funcionalidades']
-          : [docUpdateData.docType]
-        const settingsRes = await fetch('/api/settings', { credentials: 'include' })
-        const settingsKeys = await settingsRes.json()
-
-        const DOC_LABELS = {
-          base_datos: 'Base de Datos',
-          subproyectos: 'Subproyectos',
-          endpoints: 'Endpoints',
-          web_sockets: 'WebSockets',
-          funcionalidades: 'Funcionalidades',
-        }
-
-        for (const tipo of tipos) {
-          const promptKey = 'documentacion_prompt_' + tipo
-          const defaultPrompt = 'Analiza el proyecto actual y documenta la información correspondiente a ' + (DOC_LABELS[tipo] || tipo) + '. Proporciona una descripción detallada que permita a otros agentes de IA entender su propósito y alcance.'
-          const prompt = settingsKeys[promptKey] || defaultPrompt
-
-          chat.pushMessage({
-            role: 'opencode_info',
-            content: '📋 Prompt a enviar a OpenCode:\n\n```\n' + prompt + '\n```',
-            _key: 'preview-' + Date.now(),
-          })
-
-          await opencodeStreamPromptDocUpdate(
-            chat.activeSessionId,
-            prompt,
-            docUpdateData.provider,
-            docUpdateData.model,
-            docUpdateData.thinking,
-            docUpdateData.mode,
-            docUpdateData.temperature || ocStore.selectedTemperature || '',
-            docUpdateData.proyectoId,
-            tipo,
-          )
-        }
-
-        if (docUpdateData.docType === 'all') {
-          chat.pushMessage({
-            role: 'result',
-            content: 'Documentación completada para todos los tipos.',
-            _key: 'result-' + Date.now(),
-          })
-        }
-      } catch (err) {
-        console.error('Error al obtener prompt de documentación:', err.message)
-        chat.pushMessage({
-          role: 'result',
-          content: 'Error al obtener prompt de documentación: ' + err.message,
-          _key: 'result-' + Date.now(),
-        })
       }
     }
   }

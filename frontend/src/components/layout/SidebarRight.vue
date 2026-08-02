@@ -29,14 +29,12 @@ import { watch, ref, computed, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiStore } from '../../stores/ui.js'
 import { useChatStore } from '../../stores/chat.js'
-import { useDocumentacionNotasStore } from '../../stores/documentacionNotas.js'
 import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
 import { sortTabs } from '../../utils/sortTabs.js'
 export default {
   setup() {
     const ui = useUiStore()
     const chat = useChatStore()
-    const docNotasStore = useDocumentacionNotasStore()
     const { rightPanelCollapsed, rightPanelWidth, centralPanelCollapsed, sidebarWidthPct, sidebarCollapsed, sidebarRightTab, sidebarRightTabOrder } = storeToRefs(ui)
     const { activeSessionId, sessions } = storeToRefs(chat)
     const { sidebarRightTabs } = useModuleRegistry()
@@ -147,11 +145,6 @@ export default {
       if (newId) {
         selectTab('variables')
       }
-      if (!newId) {
-        docNotasStore.clearNotas()
-        return
-      }
-      docNotasStore.loadNotas(newId)
     })
 
     return {

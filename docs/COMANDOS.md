@@ -129,8 +129,6 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 |---|---|---|
 | `/dev_funcionalidad_crear` | Inicia el wizard para relevar y desarrollar una nueva funcionalidad. Requiere un proyecto asignado con `/chat_set_proyecto` | `/dev_funcionalidad_crear` |
 | `/dev_funcionalidad_listar` | Lista funcionalidades del proyecto de la sesión o del especificado | `/dev_funcionalidad_listar [--id=<id_proyecto>]` |
-| `/dev_documento_listar` | Obtiene toda la documentación de un proyecto. Si no se especifica, usa el de la sesión actual | `/dev_documento_listar [--id=<id_proyecto>]` |
-| `/dev_documento_actualizar` | Actualiza la documentación del proyecto usando OpenCode para el tipo indicado | `/dev_documento_actualizar --tipo=<tipo>` |
 | `/chat_set_workspace` | Asigna un espacio de trabajo (workspace) a la sesión actual. Usa Tab para autocompletar con los workspaces disponibles | `/chat_set_workspace --id=<workspace_id>` |
 | `/dev_opencode_iniciar` | Inicia una sesión OpenCode: abre el CLI interactivo en una terminal dentro del directorio del proyecto asociado a la sesión. | `/dev_opencode_iniciar` |
 | `/dev_generar_commit` | Genera un mensaje de commit de los cambios realizados. Obtiene el diff de Git y contexto del ticket, y usa DeepSeek directamente para generar la propuesta. En el resultado (antes de confirmar) hay un switch para ejecutar un comando personalizado del proyecto tras un commit exitoso (p. ej. un script de despliegue). La elección del switch y el comando seleccionado se guardan como preferencias de la sesión de chat. | `/dev_generar_commit` |
@@ -193,27 +191,7 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 
 | Comando | Descripción | Uso |
 |---|---|---|
-| `/deteccion_funcionalidades` | Obtiene el listado de archivos de código del proyecto filtrado por extensiones configurables, los resume uno por uno vía DeepSeek y entrega el JSON completo con descripciones. Por defecto reutiliza el último escaneo de la sesión (si existe), sobrescribiendo sus archivos. Con `--escaneo-id` reutiliza un escaneo específico. | `/deteccion_funcionalidades [--escaneo-id=<id>]` |
-
----
-
----
-
-## Documentación (Notas)
-
-| Comando | Descripción | Uso |
-|---------|-------------|-----|
-| `/doc_nota_listar` | Lista todas las notas de documentación del proyecto. Si no se especifica proyecto, usa el de la sesión actual | `/doc_nota_listar [--proyecto-id=<id>]` |
-| `/doc_nota_crear` | Crea una nota de documentación. Si hay ticket vinculado a la sesión se asocia automáticamente; si no, la nota se crea como documentación general | `/doc_nota_crear --clave=<key> --valor=<text> [--proyecto-id=<id>]` |
-| `/doc_nota_ver` | Muestra el contenido completo de una nota de documentación | `/doc_nota_ver --clave=<key> [--proyecto-id=<id>]` |
-| `/doc_nota_editar` | Actualiza el contenido de una nota de documentación existente | `/doc_nota_editar --clave=<key> [--valor=<text>] [--proyecto-id=<id>]` |
-| `/doc_nota_eliminar` | Elimina una nota de documentación | `/doc_nota_eliminar --clave=<key> [--proyecto-id=<id>]` |
-
-Las notas de documentación se gestionan desde:
-- **Panel lateral derecho** → pestaña **Documentación**: lista de claves (izquierda) y editor de texto (derecha), con columnas redimensionables y persistencia de ancho.
-- **Chat**: mediante los comandos `/doc_nota_*` listados arriba.
-
-Cada nota se guarda en la tabla `documentacion_notas` y está asociada a un proyecto. Opcionalmente puede asociarse a un ticket de Redmine (si no, es documentación general). El contenido está limitado a 16KB.
+| `/deteccion_funcionalidades` | Obtiene el listado de archivos de código del proyecto filtrado por extensiones configurables, los resume uno por uno vía DeepSeek y entrega el JSON completo con descripciones. | `/deteccion_funcionalidades` |
 
 ---
 

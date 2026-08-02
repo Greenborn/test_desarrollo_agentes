@@ -10,7 +10,6 @@ import opencodeRoutes from './routes/opencode.routes.js';
 import navegadorRoutes from './routes/navegador.routes.js';
 import funcionalidadRoutes from './routes/funcionalidad.routes.js';
 import proyectoRoutes from './routes/proyecto.routes.js';
-import documentacionRoutes from './routes/documentacion.routes.js';
 import gastosRoutes from './routes/gastos.routes.js';
 import redmineRoutes from './routes/redmine.routes.js';
 import ticketsRoutes from './routes/tickets.routes.js';
@@ -45,9 +44,6 @@ import dbFiles from './config/dbFiles.js';
 import dbRedmineData from './config/dbRedmineData.js';
 import dbGastos from './config/dbGastos.js';
 import dbPlaywright from './config/dbPlaywright.js';
-import dbDocContent from './config/dbDocContent.js';
-import dbDocNotas from './config/dbDocNotas.js';
-import dbDocEscaneo from './config/dbDocEscaneo.js';
 import dbFuncionalidades from './config/dbFuncionalidades.js';
 import dbRedmineComentarios from './config/dbRedmineComentarios.js';
 import { runMigrations } from './config/dbFactory.js';
@@ -71,7 +67,6 @@ app.use('/api/opencode', opencodeRoutes);
 app.use('/api/navegador', navegadorRoutes);
 app.use('/api', funcionalidadRoutes);
 app.use('/api', proyectoRoutes);
-app.use('/api/documentacion', documentacionRoutes);
 app.use('/api/gastos', gastosRoutes);
 app.use('/api/redmine', redmineRoutes);
 app.use('/api/tickets', ticketsRoutes);
@@ -125,9 +120,6 @@ async function start() {
       command_history: dbCommandHistory,
       gastos: dbGastos,
       playwright: dbPlaywright,
-      documentacion_content: dbDocContent,
-      documentacion_notas: dbDocNotas,
-      documentacion_escaneo: dbDocEscaneo,
       funcionalidades: dbFuncionalidades,
       redmine_comentarios: dbRedmineComentarios,
     });

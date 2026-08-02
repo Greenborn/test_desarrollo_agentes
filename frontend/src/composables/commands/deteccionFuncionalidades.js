@@ -1,7 +1,6 @@
 import { reactive } from 'vue'
 import { useCommandRegistry } from '../useCommandRegistry.js'
 import { useOpencodeStore } from '../../stores/opencode.js'
-import { parseCommandArgs } from '../parseCommandArgs.js'
 
 const { register } = useCommandRegistry()
 
@@ -30,23 +29,6 @@ function resetState() {
   deteccionState.processed = 0
 }
 
-let batch = []
-
-async function flushBatch() {
-  if (batch.length === 0) return
-  const items = batch.splice(0)
-  try {
-    await fetch('/api/documentacion/archivo/batch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ items }),
-    })
-  } catch (err) {
-    console.error('Error al guardar batch de archivos:', err)
-  }
-}
-
 function flattenFiles(node) {
   const files = []
   if (node.type === 'file') {
@@ -62,17 +44,14 @@ function flattenFiles(node) {
 
 let _deteccionTree = null
 let _deteccionFiles = []
-let _deteccionEscaneoId = null
 let _deteccionSessionId = null
 let _deteccionChatStore = null
 
 export async function startDeteccionProcessing(sessionId, chatStore, model, thinking) {
   _deteccionAbort = false
-  batch = []
 
   const tree = _deteccionTree
   const files = _deteccionFiles
-  const escaneoId = _deteccionEscaneoId
 
   deteccionState.running = true
   deteccionState.total = files.length
@@ -131,42 +110,6 @@ export async function startDeteccionProcessing(sessionId, chatStore, model, thin
         _key: 'desc-' + Date.now(),
       }, sessionId)
     }
-
-    if (escaneoId) {
-      for (const r of reads) {
-        const ext = r.file.name.includes('.') ? r.file.name.split('.').pop() : null
-        batch.push({
-          escaneo_id: escaneoId,
-          nombre: r.file.name,
-          ruta: r.file.path,
-          tipo: r.file.type || 'file',
-          extension: ext,
-          tamano: r.file.size || null,
-          descripcion: r.file.description || null,
-        })
-      }
-      await flushBatch()
-    }
-  }
-
-  if (escaneoId && batch.length > 0) {
-    await flushBatch()
-  }
-
-  if (escaneoId) {
-    try {
-      await fetch(`/api/documentacion/escaneo/${escaneoId}/finalizar`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          total_archivos: files.length,
-          archivos_procesados: deteccionState.processed + (_deteccionAbort ? 0 : 1),
-        }),
-      })
-    } catch (err) {
-      console.error('Error al finalizar escaneo en DB:', err)
-    }
   }
 
   if (_deteccionAbort) {
@@ -191,12 +134,8 @@ register({
   name: '/deteccion_funcionalidades',
   category: 'Detección',
   description: 'Analiza archivos de código del proyecto y genera descripciones vía DeepSeek. Permite elegir modelo y nivel de pensamiento.',
-  usage: '/deteccion_funcionalidades [--escaneo-id=&lt;id&gt;]',
+  usage: '/deteccion_funcionalidades',
   async execute(args, { chatStore, sessionId }) {
-    const { params } = parseCommandArgs(args, {
-      'escaneo-id': { required: false },
-    })
-
     if (!sessionId) {
       throw new Error('Primero debe iniciar una sesión de chat.')
     }
@@ -225,38 +164,6 @@ register({
       _deteccionFiles = flattenFiles(data.tree)
       _deteccionSessionId = sessionId
       _deteccionChatStore = chatStore
-
-      let escaneoId = params['escaneo-id'] ? parseInt(params['escaneo-id'], 10) : null
-      if (!escaneoId) {
-        try {
-          const ultimoRes = await fetch('/api/documentacion/escaneo/ultimo/' + sessionId, { credentials: 'include' })
-          const ultimoData = await ultimoRes.json()
-          escaneoId = ultimoData.id
-        } catch (err) {
-          console.error('Error al obtener último escaneo:', err)
-        }
-      }
-      if (escaneoId) {
-        try {
-          await fetch('/api/documentacion/archivo/por-escaneo/' + escaneoId, { method: 'DELETE', credentials: 'include' })
-        } catch (err) {
-          console.error('Error al limpiar archivos previos del escaneo:', err)
-        }
-      } else {
-        try {
-          const escRes = await fetch('/api/documentacion/escaneo/iniciar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ session_id: sessionId }),
-          })
-          const escData = await escRes.json()
-          escaneoId = escData.id
-        } catch (err) {
-          console.error('Error al iniciar escaneo en DB:', err)
-        }
-      }
-      _deteccionEscaneoId = escaneoId
 
       chatStore.pushMessage({
         role: 'result',
