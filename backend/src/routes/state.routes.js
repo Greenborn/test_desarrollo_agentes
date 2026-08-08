@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import os from 'os';
 import db from '../config/db.js';
 import dbComandos from '../config/dbComandos.js';
 import dbConfig from '../config/dbConfig.js';
@@ -186,6 +187,25 @@ router.post('/import', async (req, res) => {
   }
 
   res.json({ success: true });
+});
+
+router.get('/system', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    res.json({
+      totalMem,
+      freeMem,
+      usedMem,
+      usedPercent: totalMem > 0 ? Math.round((usedMem / totalMem) * 100) : 0,
+      loadAvg: os.loadavg(),
+    });
+  } catch (err) {
+    console.log('[state:system] Error al leer métricas del sistema:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.get('/ui', async (req, res) => {

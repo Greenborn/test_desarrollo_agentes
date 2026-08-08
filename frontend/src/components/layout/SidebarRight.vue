@@ -29,12 +29,14 @@ import { watch, ref, computed, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiStore } from '../../stores/ui.js'
 import { useChatStore } from '../../stores/chat.js'
+import { useActiveComponentsStore } from '../../stores/activeComponents.js'
 import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
 import { sortTabs } from '../../utils/sortTabs.js'
 export default {
   setup() {
     const ui = useUiStore()
     const chat = useChatStore()
+    const ac = useActiveComponentsStore()
     const { rightPanelCollapsed, rightPanelWidth, centralPanelCollapsed, sidebarWidthPct, sidebarCollapsed, sidebarRightTab, sidebarRightTabOrder } = storeToRefs(ui)
     const { activeSessionId, sessions } = storeToRefs(chat)
     const { sidebarRightTabs } = useModuleRegistry()
@@ -44,7 +46,12 @@ export default {
 
     function buildTabs() {
       if (!sidebarRightTabs) { localTabs.value = []; return }
-      localTabs.value = sortTabs([...sidebarRightTabs], sidebarRightTabOrder.value)
+      const all = sortTabs([...sidebarRightTabs], sidebarRightTabOrder.value)
+      localTabs.value = all.filter(t => ac.isActive('sidebarRight', t.id))
+      if (tab.value && localTabs.value.length && !localTabs.value.find(t => t.id === tab.value)) {
+        tab.value = localTabs.value[0].id
+        sidebarRightTab.value = tab.value
+      }
     }
 
     function saveTabOrder(ids) {
@@ -110,6 +117,7 @@ export default {
 
     watch(sidebarRightTabs, () => buildTabs(), { immediate: true })
     watch(sidebarRightTabOrder, () => buildTabs())
+    watch(() => ac.activeConfig, () => buildTabs(), { deep: true })
 
     function onResizeStart(e) {
       const resizeHandle = e.currentTarget

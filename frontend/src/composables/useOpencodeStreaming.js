@@ -83,7 +83,7 @@ export function useOpencodeStreaming() {
       block += '\n└──────────────\n'
       return block
     }
-    function flash() { chat.flashLed(sessionId) }
+    function flash() { chat.flashLed(sessionId); chat.touchActivity(sessionId) }
     return {
       onChunk(content) { sd.text += content; updateText(); flash() },
       onThinking(content) { sd.thinking += content; updateThinking(); flash() },
@@ -452,8 +452,10 @@ export function useOpencodeStreaming() {
 
         const thinking = json.thinking || sd.thinking || null
         await chat._saveMessageToDb(sessionId, { role: 'opencode_result', content, thinking })
+        chat.touchActivity(sessionId)
         if (!isActiveSession(sessionId)) {
           chat.pendingNotifications[sessionId] = Date.now()
+          chat.triggerAlert(sessionId)
           return
         }
 
@@ -478,6 +480,7 @@ export function useOpencodeStreaming() {
         chat.clearOcStreamCache(sessionId)
         if (sessionId) chat.setSessionStatus(sessionId, 'error')
         chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
+        chat.touchActivity(sessionId)
         if (isActiveSession(sessionId)) {
           const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
           if (idx >= 0) {
@@ -487,6 +490,7 @@ export function useOpencodeStreaming() {
           }
         } else {
           chat.pendingNotifications[sessionId] = Date.now()
+          chat.triggerAlert(sessionId)
         }
       },
     })

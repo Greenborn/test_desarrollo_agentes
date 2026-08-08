@@ -18,7 +18,6 @@
         :data="tableData"
         :config="{
           selectionMode: 'single',
-          hideToolbar: true,
           hideRefresh: true,
           hideCsvExport: true,
           showPaginator: false,

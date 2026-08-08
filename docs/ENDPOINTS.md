@@ -429,6 +429,15 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - **Descripción:** Abre la carpeta en el explorador de archivos del sistema. Si `path` es un archivo, abre la carpeta contenedora. Usa `xdg-open` (Linux), `open` (macOS) o `explorer` (Windows).
 - **Respuesta:** `{ success: true, path: string }`
 
+### `POST /api/command/rename`
+- **Auth:** Requerida
+- **Body:** `{ path: string (requerido), newName: string (requerido) }`
+- **Descripción:** Renombra un archivo o directorio. Computa el destino como `dirname(path)/newName`. Valida que la ruta origen exista, que el nuevo nombre no sea igual al actual y que el destino no exista ya.
+- **Respuesta 200 (éxito):** `{ success: true, path: string (nueva ruta), oldPath: string }`
+- **Respuesta 400:** `{ success: false, error: "..." }` (campos requeridos, destino igual al origen)
+- **Respuesta 404:** `{ success: false, error: "La ruta '...' no existe" }`
+- **Respuesta 409:** `{ success: false, error: "Ya existe una ruta con el nombre '...'" }`
+
 ---
 
 ## OpenCode (`/api/opencode`)
@@ -1245,6 +1254,20 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 ---
 
 ## Estado de Base de Datos (`/api/state`)
+
+### `GET /api/state/system`
+- **Auth:** Requerida
+- **Descripción:** Devuelve métricas de memoria RAM del sistema anfitrión y carga promedio de CPU. Usado por el indicador de RAM disponible de la barra superior.
+- **Respuesta 200:**
+```json
+{
+  "totalMem": 16764043264,
+  "freeMem": 8234512384,
+  "usedMem": 8529530880,
+  "usedPercent": 51,
+  "loadAvg": [0.25, 0.3, 0.28]
+}
+```
 
 ### `GET /api/state/export`
 - **Auth:** Requerida

@@ -5,6 +5,7 @@ import { useWorkspaceStore } from './workspace.js'
 import { useSettingsStore } from './settings.js'
 import { useOpencodeStore } from './opencode.js'
 import wsClient from '../services/wsClient.js'
+import { playAlertBeep } from '../utils/audio.js'
 
 const API = '/api'
 const SESSION_KEY = 'oc_active_session_id'
@@ -15,6 +16,7 @@ export const useChatStore = defineStore('chat', () => {
   const activeSessionId = ref(null)
   const messages = ref([])
   const creating = ref(false)
+  const suppressWorkspaceReset = ref(false)
   const executingCount = ref(0)
   const _sessionCmdCount = ref({})
   const _streamingSessions = ref({})
@@ -31,6 +33,8 @@ export const useChatStore = defineStore('chat', () => {
   const _ocSessionStreamCache = ref({})
   const ledFlash = ref({})
   const ledFlashTimers = {}
+  const ledAlert = ref({})
+  const lastActivity = ref({})
   const _cmdStreamingSessions = ref({})
   const _cmdSessionStreamCache = ref({})
   const _cmdPendingSave = ref({})
@@ -274,20 +278,19 @@ export const useChatStore = defineStore('chat', () => {
   function _pushNewSessionSetup(session) {
     const workspaceStore = useWorkspaceStore()
     const wsOptions = (workspaceStore.workspaces || []).map(w => ({
-      label: w.name,
-      value: String(w.id),
+      id: w.id,
+      name: w.name,
     }))
     if (wsOptions.length > 0) {
       pushMessage({
         role: 'opencode_control',
         controlData: {
           controlId: 'setup-ws-' + Date.now(),
-          controlType: 'select',
-          stepType: 'new_session_workspace',
-          question: '1. Selecciona espacio de trabajo:',
-          options: wsOptions,
-          placeholder: 'Selecciona espacio de trabajo...',
-          preselect: String(session.workspace_id || wsOptions[0]?.value || ''),
+          controlType: 'new_session_setup',
+          stepType: 'new_session_setup',
+          question: 'Configura la nueva sesión:',
+          workspaces: wsOptions,
+          preselect: String(session.workspace_id || wsOptions[0]?.id || ''),
         },
         _key: 'ctrl-setup-ws-' + Date.now(),
       })
@@ -491,6 +494,8 @@ export const useChatStore = defineStore('chat', () => {
     }
     messages.value = []
     clearPendingNotification(sessionId)
+    clearAlert(sessionId)
+    touchActivity(sessionId)
     loadingMore.value = false
     hasMoreMessages.value = true
     oldestMessageId.value = null
@@ -1027,6 +1032,42 @@ export const useChatStore = defineStore('chat', () => {
     }, 250)
   }
 
+  function touchActivity(sessionId) {
+    if (!sessionId) return
+    lastActivity.value[sessionId] = Date.now()
+  }
+
+  function triggerAlert(sessionId) {
+    if (!sessionId) return
+    if (Number(sessionId) === Number(activeSessionId.value)) return
+    if (ledAlert.value[sessionId]) return
+    ledAlert.value[sessionId] = true
+    playAlertBeep()
+  }
+
+  function clearAlert(sessionId) {
+    if (sessionId) delete ledAlert.value[sessionId]
+  }
+
+  const INACTIVITY_MS = 60000
+  setInterval(() => {
+    const now = Date.now()
+    const candidates = new Set()
+    Object.keys(_terminalSessions.value).forEach(k => {
+      if (Array.isArray(_terminalSessions.value[k]) && _terminalSessions.value[k].length > 0) candidates.add(String(k))
+    })
+    Object.keys(_ocStreamingSessions.value).forEach(k => {
+      if (_ocStreamingSessions.value[k]) candidates.add(String(k))
+    })
+    candidates.forEach(sid => {
+      if (Number(sid) === Number(activeSessionId.value)) return
+      const last = lastActivity.value[sid]
+      if (!last) return
+      if (now - last >= INACTIVITY_MS) triggerAlert(sid)
+    })
+  }, 5000)
+
+
   function setSessionTicket(sessionId, ticket) {
     if (!sessionId) return
     sessionTickets.value[sessionId] = ticket
@@ -1087,6 +1128,8 @@ export const useChatStore = defineStore('chat', () => {
     registerCmdPendingSave, consumeCmdPendingSave, hasCmdPendingSave,
     sessionTickets, activeSessionTicket, setSessionTicket, clearSessionTicket,
     _saveMessageToDb, clearPendingNotification, ledFlash, flashLed, showTerminal,
+    ledAlert, lastActivity, triggerAlert, clearAlert, touchActivity,
+    suppressWorkspaceReset,
     _terminalSessions, _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel, terminalId,
     _hasTerminal, openTerminal, closeTerminal, getTerminalCount, getTerminals,
     getTotalConcurrentSlots, maxTerminalsLimit,

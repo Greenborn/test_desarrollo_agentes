@@ -167,7 +167,10 @@ export default {
           return
         }
         if (msg.type === 'data' && terminal) {
-          if (props.sessionId) chat.flashLed(props.sessionId)
+          if (props.sessionId) {
+            chat.flashLed(props.sessionId)
+            chat.touchActivity(props.sessionId)
+          }
           accumulatedOutput += msg.data
           terminal.write(msg.data)
         } else if (msg.type === 'exit' && terminal) {

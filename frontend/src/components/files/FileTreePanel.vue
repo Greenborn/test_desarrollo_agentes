@@ -14,11 +14,12 @@
       <div class="tree-header small text-muted px-2 py-1 flex-shrink-0 text-truncate" :title="tree.path">
         {{ tree.name }}
       </div>
-      <div class="tree-scroll overflow-y-auto flex-grow-1" style="min-height: 0;">
+      <div ref="scrollRef" class="tree-scroll overflow-y-auto flex-grow-1" style="min-height: 0;" @scroll="onScroll">
+        <div class="tree-virtual-spacer" :style="{ height: topPad + 'px' }"></div>
         <div
-          v-for="item in flatTree"
+          v-for="item in visibleItems"
           :key="item.node.path"
-           class="tree-node d-flex align-items-center py-0"
+          class="tree-node d-flex align-items-center"
           :class="{
             'tree-directory': item.node.type === 'directory',
             'tree-selected': item.node.type === 'file' && selectedFile === item.node.path,
@@ -43,6 +44,7 @@
           </span>
           <span class="tree-name text-truncate small">{{ item.node.name }}</span>
         </div>
+        <div class="tree-virtual-spacer" :style="{ height: bottomPad + 'px' }"></div>
       </div>
     </div>
 
@@ -56,6 +58,7 @@
       <div class="context-menu-divider"></div>
       <div v-if="ctxMenu.type === 'directory'" class="context-menu-item" @click="openInExplorer">📂 Abrir carpeta</div>
       <div v-else class="context-menu-item" @click="openInExplorer">📂 Abrir carpeta contenedora</div>
+      <div class="context-menu-item" @click="openRenameModal">✏️ Renombrar</div>
       <div class="context-menu-divider"></div>
       <div v-if="ctxMenu.type === 'directory'" class="context-menu-item text-danger" @click="confirmDeleteDirectory">🗑️ Eliminar directorio</div>
       <div v-else class="context-menu-item text-danger" @click="confirmDeleteFile">🗑️ Eliminar archivo</div>
@@ -64,17 +67,21 @@
 </template>
 
 <script>
-import { computed, ref, reactive, watch, onBeforeUnmount, nextTick } from 'vue'
+import { computed, ref, reactive, watch, onBeforeUnmount, onMounted, nextTick } from 'vue'
 import { useModalStore } from '../../stores/modal.js'
 import { useFileTreeStore } from '../../stores/fileTree.js'
 import { useComponentContextMenu } from '../../composables/useComponentContextMenu.js'
 import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
 import FileEditorModal from './FileEditorModal.vue'
+import RenameModal from './RenameModal.vue'
 import CsvViewerModal from './CsvViewerModal.vue'
 import ImageViewerModal from './ImageViewerModal.vue'
 import AlertModal from '../modals/AlertModal.vue'
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'bmp'])
+
+const ROW_HEIGHT = 24
+const VIRTUAL_BUFFER = 10
 
 const FILE_ICONS = {
   js: '\u{1F4D1}',
@@ -122,9 +129,30 @@ export default {
     const error = computed(() => props.sessionId ? fileTreeStore.getError(props.sessionId) : null)
     const flatTree = computed(() => props.sessionId ? fileTreeStore.getFlatTree(props.sessionId) : [])
 
+    const scrollRef = ref(null)
+    const scrollTop = ref(0)
+    const viewportHeight = ref(0)
+    const totalRows = computed(() => flatTree.value.length)
+    const startIndex = computed(() => {
+      const from = Math.floor(scrollTop.value / ROW_HEIGHT) - VIRTUAL_BUFFER
+      return Math.max(0, from)
+    })
+    const endIndex = computed(() => {
+      const count = Math.ceil(viewportHeight.value / ROW_HEIGHT) + VIRTUAL_BUFFER * 2
+      return Math.min(totalRows.value, startIndex.value + count)
+    })
+    const visibleItems = computed(() => flatTree.value.slice(startIndex.value, endIndex.value))
+    const topPad = computed(() => startIndex.value * ROW_HEIGHT)
+    const bottomPad = computed(() => (totalRows.value - endIndex.value) * ROW_HEIGHT)
+
+    function onScroll() {
+      const el = scrollRef.value
+      if (el) scrollTop.value = el.scrollTop
+    }
+
     const imagePreviews = reactive({})
     const loadingImages = new Set()
-    const IMAGE_PREVIEW_CONCURRENCY = 3
+    const IMAGE_PREVIEW_CONCURRENCY = 5
     let imagePreviewQueue = []
     let imagePreviewActive = 0
 
@@ -240,6 +268,17 @@ export default {
 
     function closeCtxMenu() {
       ctxMenu.value.show = false
+    }
+
+    function openRenameModal() {
+      const filePath = ctxMenu.value.path
+      const currentName = filePath.split('/').pop() || filePath
+      closeCtxMenu()
+      modal.open(
+        RenameModal,
+        { path: filePath, currentName, sessionId: props.sessionId },
+        { title: 'Renombrar' }
+      )
     }
 
     function copyRelativePath() {
@@ -383,17 +422,14 @@ export default {
       }
     }
 
-    onBeforeUnmount(() => {
-      if (clickTimer) clearTimeout(clickTimer)
-    })
-
-    watch(() => props.sessionId, (newId) => {
-      if (newId) fileTreeStore.fetchTree(newId)
-    }, { immediate: true })
-
     const imagePreviewsQueued = new Set()
 
-    watch(flatTree, (items) => {
+    function updateViewportHeight() {
+      const el = scrollRef.value
+      if (el) viewportHeight.value = el.clientHeight
+    }
+
+    watch(visibleItems, (items) => {
       if (!items) return
       for (const item of items) {
         if (item.node.type === 'file' && isImageFile(item.node.name)) {
@@ -406,13 +442,30 @@ export default {
       }
     }, { immediate: true, deep: false })
 
+    onBeforeUnmount(() => {
+      if (clickTimer) clearTimeout(clickTimer)
+      if (scrollRef.value) scrollRef.value.removeEventListener('resize', updateViewportHeight)
+      window.removeEventListener('resize', updateViewportHeight)
+    })
+
+    watch(() => props.sessionId, (newId) => {
+      scrollTop.value = 0
+      if (newId) fileTreeStore.fetchTree(newId)
+    }, { immediate: true })
+
+    onMounted(() => {
+      updateViewportHeight()
+      window.addEventListener('resize', updateViewportHeight)
+    })
+
     return {
       tree, loading, error, flatTree, selectedFile, ctxMenu, fileTreeStore,
       imagePreviews, isImageFile,
+      visibleItems, topPad, bottomPad, scrollRef, onScroll,
       getFileIcon, reloadTree, handleToggleDirectory, handleIsExpanded,
       handleSelectFile, handleFileClick, openFile,
       menuRef, onContextMenu, closeCtxMenu, copyRelativePath, copyFullPath, copyComponentRef, copyName, copyFileContent,
-      openInExplorer, confirmDeleteFile, confirmDeleteDirectory, deleteDirectory, deleteFile,
+      openInExplorer, openRenameModal, confirmDeleteFile, confirmDeleteDirectory, deleteDirectory, deleteFile,
     }
   },
 }
@@ -431,10 +484,15 @@ export default {
 }
 .tree-node {
   cursor: default;
-  line-height: 1.8;
+  height: 24px;
+  line-height: 24px;
   white-space: nowrap;
   transition: background 0.1s;
   user-select: none;
+}
+.tree-virtual-spacer {
+  width: 1px;
+  flex-shrink: 0;
 }
 .tree-node:hover {
   background: rgba(117, 170, 219, 0.08);

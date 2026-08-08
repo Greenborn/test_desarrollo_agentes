@@ -337,6 +337,8 @@ export default {
     async function onTerminalExit({ code, output, terminalId }) {
       const sid = activeSessionId.value
       if (!sid || !terminalId) return
+      chat.touchActivity(sid)
+      chat.triggerAlert(sid)
 
       const pending = chat.consumeCmdPendingSave(sid)
       if (!pending) return

@@ -8,6 +8,7 @@
       <span v-if="selectedWorkspaces.length === 0" class="text-muted small">Agent Orchestrator</span>
     </a>
     <LayoutControls />
+    <RamIndicator v-if="user" />
     <TicketInfoBar v-if="user" class="flex-grow-1" />
     <div class="dropdown" v-if="user" ref="userMenuDropdown">
       <button class="btn btn-dark dropdown-toggle" data-bs-toggle="dropdown" type="button">
@@ -40,12 +41,13 @@ import { contrastTextColor } from '../../utils/color.js'
 import wsClient from '../../services/wsClient.js'
 import TicketInfoBar from '../chat/TicketInfoBar.vue'
 import LayoutControls from './LayoutControls.vue'
+import RamIndicator from './RamIndicator.vue'
 import HelpContent from '../help/HelpModal.vue'
 import WorkspaceSwitcherModal from '../modals/WorkspaceSwitcherModal.vue'
 import SettingsView from '../../views/SettingsView.vue'
 
 export default {
-  components: { TicketInfoBar, LayoutControls },
+  components: { TicketInfoBar, LayoutControls, RamIndicator },
   setup() {
     const auth = useAuthStore()
     const cmdStore = useCommandStore()

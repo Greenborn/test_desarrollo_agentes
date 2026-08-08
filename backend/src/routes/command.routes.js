@@ -140,9 +140,32 @@ const ALWAYS_SKIP_DIRS = new Set([
   '.pnpm', '.yarn',
 ])
 
-function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeBytes, maxDepth = 0, currentDepth = 0) {
+async function _buildChildren(dirPath, entries, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth) {
+  let filtered = entries.filter((e) => e.name !== '.' && e.name !== '..')
+  filtered = filtered.filter((e) => !(e.isDirectory() && ALWAYS_SKIP_DIRS.has(e.name)))
+  if (useGitignore) {
+    filtered = filtered.filter((e) => {
+      if (showHidden && e.name.startsWith('.')) return true
+      return !matchesGitignore(e, dirPath, patterns)
+    })
+  }
+  return Promise.all(filtered.map(async (e) => {
+    const fullPath = path.join(dirPath, e.name)
+    try {
+      if (e.isDirectory()) {
+        return await _buildDirNode(fullPath, e.name, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth + 1)
+      }
+      return await _buildFileNode(fullPath, e.name, maxSizeBytes)
+    } catch (err) {
+      console.log(`Error al procesar ${fullPath}: ${err.message}`)
+      return { name: e.name, type: 'error', error: err.message, path: fullPath }
+    }
+  }))
+}
+
+async function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeBytes, maxDepth = 0, currentDepth = 0) {
   const name = path.basename(dirPath) || dirPath
-  const stat = fs.statSync(dirPath)
+  const stat = await fsp.stat(dirPath)
   const node = { name, type: stat.isDirectory() ? 'directory' : 'file', path: dirPath }
   if (stat.isDirectory()) {
     if (maxDepth > 0 && currentDepth >= maxDepth) {
@@ -154,27 +177,8 @@ function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeByt
       patterns = parentPatterns.concat(loadGitignore(dirPath))
     }
     try {
-      const entries = fs.readdirSync(dirPath, { withFileTypes: true })
-      let filtered = entries.filter((e) => e.name !== '.' && e.name !== '..')
-      filtered = filtered.filter((e) => !(e.isDirectory() && ALWAYS_SKIP_DIRS.has(e.name)))
-      if (useGitignore) {
-        filtered = filtered.filter((e) => {
-          if (showHidden && e.name.startsWith('.')) return true
-          return !matchesGitignore(e, dirPath, patterns)
-        })
-      }
-      node.children = filtered.map((e) => {
-        const fullPath = path.join(dirPath, e.name)
-        try {
-          if (e.isDirectory()) {
-            return _buildDirNode(fullPath, e.name, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth + 1)
-          }
-          return _buildFileNode(fullPath, e.name, maxSizeBytes)
-        } catch (err) {
-          console.log(`Error al procesar ${fullPath}: ${err.message}`)
-          return { name: e.name, type: 'error', error: err.message, path: fullPath }
-        }
-      })
+      const entries = await fsp.readdir(dirPath, { withFileTypes: true })
+      node.children = await _buildChildren(dirPath, entries, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth)
     } catch (err) {
       console.log(`Error al leer directorio ${dirPath}: ${err.message}`)
       node.children = []
@@ -187,34 +191,15 @@ function buildTree(dirPath, parentPatterns, useGitignore, showHidden, maxSizeByt
   return node
 }
 
-function _buildDirNode(dirPath, name, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth) {
+async function _buildDirNode(dirPath, name, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth) {
   const node = { name, type: 'directory', path: dirPath }
   if (maxDepth > 0 && currentDepth >= maxDepth) {
     node.children = []
     return node
   }
   try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
-    let filtered = entries.filter((e) => e.name !== '.' && e.name !== '..')
-    filtered = filtered.filter((e) => !(e.isDirectory() && ALWAYS_SKIP_DIRS.has(e.name)))
-    if (useGitignore) {
-      filtered = filtered.filter((e) => {
-        if (showHidden && e.name.startsWith('.')) return true
-        return !matchesGitignore(e, dirPath, patterns)
-      })
-    }
-    node.children = filtered.map((e) => {
-      const fullPath = path.join(dirPath, e.name)
-      try {
-        if (e.isDirectory()) {
-          return _buildDirNode(fullPath, e.name, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth + 1)
-        }
-        return _buildFileNode(fullPath, e.name, maxSizeBytes)
-      } catch (err) {
-        console.log(`Error al procesar ${fullPath}: ${err.message}`)
-        return { name: e.name, type: 'error', error: err.message, path: fullPath }
-      }
-    })
+    const entries = await fsp.readdir(dirPath, { withFileTypes: true })
+    node.children = await _buildChildren(dirPath, entries, patterns, useGitignore, showHidden, maxSizeBytes, maxDepth, currentDepth)
   } catch (err) {
     console.log(`Error al leer directorio ${dirPath}: ${err.message}`)
     node.children = []
@@ -223,10 +208,10 @@ function _buildDirNode(dirPath, name, patterns, useGitignore, showHidden, maxSiz
   return node
 }
 
-function _buildFileNode(dirPath, name, maxSizeBytes) {
+async function _buildFileNode(dirPath, name, maxSizeBytes) {
   const node = { name, type: 'file', path: dirPath }
   if (maxSizeBytes) {
-    const stat = fs.statSync(dirPath)
+    const stat = await fsp.stat(dirPath)
     node.size = stat.size
     if (stat.size > maxSizeBytes) node.skipped = true
   }
@@ -287,7 +272,7 @@ router.get('/arbol-directorios', async (req, res) => {
       return res.status(400).json({ success: false, error: `'${targetDir}' no es un directorio` });
     }
     const maxSizeBytes = maxSizeKb > 0 ? maxSizeKb * 1024 : 0;
-    const tree = buildTree(targetDir, [], useGitignore, showHidden, maxSizeBytes || undefined, depth);
+    const tree = await buildTree(targetDir, [], useGitignore, showHidden, maxSizeBytes || undefined, depth);
 
     if (codeExtensions) {
       const extensions = codeExtensions.split(',').map((s) => s.trim().replace(/^\./, '')).filter(Boolean)
@@ -999,6 +984,35 @@ router.post('/delete-file', async (req, res) => {
     res.json({ success: true, path: filePath });
   } catch (err) {
     console.log('Error en delete-file:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/rename', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    if (!req.body || !req.body.path) {
+      return res.status(400).json({ success: false, error: 'El campo path es requerido' });
+    }
+    if (!req.body || !req.body.newName) {
+      return res.status(400).json({ success: false, error: 'El campo newName es requerido' });
+    }
+    const sourcePath = req.body.path;
+    const newName = req.body.newName;
+    if (!fs.existsSync(sourcePath)) {
+      return res.status(404).json({ success: false, error: `La ruta '${sourcePath}' no existe` });
+    }
+    const targetPath = path.join(path.dirname(sourcePath), newName);
+    if (targetPath === sourcePath) {
+      return res.status(400).json({ success: false, error: 'El nuevo nombre es igual al actual' });
+    }
+    if (fs.existsSync(targetPath)) {
+      return res.status(409).json({ success: false, error: `Ya existe una ruta con el nombre '${newName}'` });
+    }
+    fs.renameSync(sourcePath, targetPath);
+    res.json({ success: true, path: targetPath, oldPath: sourcePath });
+  } catch (err) {
+    console.log('Error en rename:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });

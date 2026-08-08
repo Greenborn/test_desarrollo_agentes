@@ -18,12 +18,14 @@
 import { ref, computed, watch, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiStore } from '../../stores/ui.js'
+import { useActiveComponentsStore } from '../../stores/activeComponents.js'
 import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
 import { sortTabs } from '../../utils/sortTabs.js'
 
 export default {
   setup() {
     const ui = useUiStore()
+    const ac = useActiveComponentsStore()
     const { devPanelTab, devPanelTabOrder } = storeToRefs(ui)
     const tab = ref('instancias')
     const stopTabSync = watch(devPanelTab, (v) => { tab.value = v; stopTabSync() })
@@ -35,7 +37,12 @@ export default {
 
     function buildTabs() {
       if (!devPanelTabs) { localTabs.value = []; return }
-      localTabs.value = sortTabs([...devPanelTabs], devPanelTabOrder.value)
+      const all = sortTabs([...devPanelTabs], devPanelTabOrder.value)
+      localTabs.value = all.filter(t => ac.isActive('devPanel', t.id))
+      if (localTabs.value.length && !localTabs.value.find(t => t.id === tab.value)) {
+        tab.value = localTabs.value[0].id
+        devPanelTab.value = tab.value
+      }
     }
 
     const activeTabComponent = computed(() => {
@@ -87,6 +94,7 @@ export default {
 
     watch(devPanelTabs, () => buildTabs(), { immediate: true })
     watch(devPanelTabOrder, () => buildTabs())
+    watch(() => ac.activeConfig, () => buildTabs(), { deep: true })
 
     return {
       tab,

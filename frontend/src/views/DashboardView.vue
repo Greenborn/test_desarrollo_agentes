@@ -97,7 +97,7 @@ export default {
     }
 
     watch(() => JSON.stringify(auth.getWorkspaceIds()), async (newVal, oldVal) => {
-      if (newVal && newVal !== oldVal) {
+      if (newVal && newVal !== oldVal && !chat.suppressWorkspaceReset) {
         await resetAllStores()
         chat.stopAllExecutions()
         load()

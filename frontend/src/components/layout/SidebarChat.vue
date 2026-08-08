@@ -420,6 +420,7 @@ export default {
     }
 
     function getSessionStatus(id) {
+      if (chat.ledAlert?.[id]) return 'alert'
       if (chat.ledFlash?.[id]) return 'flash'
       return sessionStatus.value[id] || 'idle'
     }
@@ -699,6 +700,16 @@ export default {
   border-color: #22c55e;
   box-shadow: 0 0 8px 1px #22c55e;
 }
+.session-icon-led.alert {
+  background-color: #eab308;
+  border-color: #eab308;
+  box-shadow: 0 0 8px 1px #eab308;
+  animation: led-alert-blink 1s step-end infinite;
+}
+@keyframes led-alert-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
 .session-icon-led.archived {
   background-color: #000;
   border-color: #4b5563;
@@ -920,6 +931,12 @@ export default {
   background-color: #22c55e;
   border-color: #22c55e;
   box-shadow: 0 0 6px 1px #22c55e;
+}
+.session-nav-led.alert {
+  background-color: #eab308;
+  border-color: #eab308;
+  box-shadow: 0 0 6px 1px #eab308;
+  animation: led-alert-blink 1s step-end infinite;
 }
 .session-nav-led.archived {
   background-color: #000;
