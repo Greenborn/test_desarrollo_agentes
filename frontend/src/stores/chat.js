@@ -10,6 +10,19 @@ import { playAlertBeep } from '../utils/audio.js'
 const API = '/api'
 const SESSION_KEY = 'oc_active_session_id'
 
+function parsePrefs(prefs) {
+  if (!prefs) return {}
+  if (typeof prefs === 'string') {
+    try {
+      return JSON.parse(prefs)
+    } catch (err) {
+      console.error('Error al parsear prefs de sesión:', err)
+      return {}
+    }
+  }
+  return prefs
+}
+
 export const useChatStore = defineStore('chat', () => {
   const sessions = ref([])
   const archivedSessions = ref([])
@@ -219,7 +232,7 @@ export const useChatStore = defineStore('chat', () => {
         }
         return
       }
-      sessions.value = data.sessions
+      sessions.value = data.sessions.map(s => ({ ...s, prefs: parsePrefs(s.prefs) }))
 
       if (reloadMessages) {
         const savedId = sessionStorage.getItem(SESSION_KEY)
@@ -759,7 +772,7 @@ export const useChatStore = defineStore('chat', () => {
         }
         return
       }
-      archivedSessions.value = data.sessions
+      archivedSessions.value = data.sessions.map(s => ({ ...s, prefs: parsePrefs(s.prefs) }))
     } catch (err) {
       console.error('Error al cargar sesiones archivadas:', err)
     }
@@ -1085,7 +1098,7 @@ export const useChatStore = defineStore('chat', () => {
   function getSessionPrefs(sessionId) {
     if (!sessionId) return {}
     const session = sessions.value.find(s => Number(s.id) === Number(sessionId)) || archivedSessions.value.find(s => Number(s.id) === Number(sessionId))
-    return session?.prefs || {}
+    return parsePrefs(session?.prefs)
   }
 
   async function saveSessionTabPref(sessionId, tabId) {
@@ -1096,7 +1109,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!sessionId || !key) return
     const session = sessions.value.find(s => Number(s.id) === Number(sessionId)) || archivedSessions.value.find(s => Number(s.id) === Number(sessionId))
     if (!session) return
-    const prefs = { ...(session.prefs || {}), [key]: value }
+    const prefs = { ...parsePrefs(session.prefs), [key]: value }
     session.prefs = prefs
     try {
       await fetch(`${API}/chat/sessions/${sessionId}/prefs`, {

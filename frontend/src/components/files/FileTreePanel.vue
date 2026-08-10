@@ -11,8 +11,14 @@
       <button class="btn btn-sm btn-outline-secondary ms-2 mt-1" @click="reloadTree">Reintentar</button>
     </div>
     <div v-else class="d-flex flex-column h-100">
-      <div class="tree-header small text-muted px-2 py-1 flex-shrink-0 text-truncate" :title="tree.path">
-        {{ tree.name }}
+      <div class="tree-header small text-muted px-2 py-1 flex-shrink-0 d-flex align-items-center">
+        <span class="text-truncate" :title="tree.path">{{ tree.name }}</span>
+        <button
+          class="btn btn-sm btn-outline-secondary ms-auto border-0 py-0 tree-refresh-btn"
+          title="Actualizar listado de archivos y directorios"
+          :disabled="loading"
+          @click="reloadTree"
+        >⟳</button>
       </div>
       <div ref="scrollRef" class="tree-scroll overflow-y-auto flex-grow-1" style="min-height: 0;" @scroll="onScroll">
         <div class="tree-virtual-spacer" :style="{ height: topPad + 'px' }"></div>
@@ -481,6 +487,15 @@ export default {
 .tree-header {
   border-bottom: 1px solid #374151;
   white-space: nowrap;
+  min-height: 26px;
+}
+.tree-refresh-btn {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.tree-refresh-btn:hover:not(:disabled) {
+  color: #e0e0e0;
 }
 .tree-node {
   cursor: default;

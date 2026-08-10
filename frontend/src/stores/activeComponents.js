@@ -41,6 +41,18 @@ export const useActiveComponentsStore = defineStore('activeComponents', () => {
     loadedSessionId.value = sessionId
   }
 
+  async function applyToAll() {
+    const cfg = { ...activeConfig.value }
+    const all = [...chat.sessions, ...chat.archivedSessions]
+    for (const session of all) {
+      try {
+        await chat.saveSessionPref(session.id, 'activeComponents', cfg)
+      } catch (err) {
+        console.error('[activeComponents] Error al aplicar configuración a todas las sesiones:', err)
+      }
+    }
+  }
+
   async function toggle(panel, tabId, value) {
     const sessionId = chat.activeSessionId
     if (!sessionId) return
@@ -58,5 +70,5 @@ export const useActiveComponentsStore = defineStore('activeComponents', () => {
     loadForSession(id)
   })
 
-  return { allTabs, isActive, toggle, loadForSession, activeConfig }
+  return { allTabs, isActive, toggle, loadForSession, applyToAll, activeConfig }
 })

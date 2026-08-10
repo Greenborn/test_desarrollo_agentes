@@ -4,6 +4,16 @@
       <span class="text-white-50" style="font-size: 0.7rem;">Componentes activos por sesión</span>
     </div>
     <div class="overflow-y-auto flex-grow-1 px-2" style="min-height: 0;">
+      <div class="d-flex justify-content-center pb-2">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary w-100"
+          :disabled="!activeSessionId"
+          @click="applyToAll"
+        >
+          Aplicar a todas las sesiones
+        </button>
+      </div>
       <div v-if="!activeSessionId" class="text-center text-white-50 py-3" style="font-size: 0.7rem;">
         Seleccione una sesión de chat
       </div>
@@ -63,7 +73,11 @@ export default {
       store.toggle(item.panel, item.tabId, event.target.checked)
     }
 
-    return { activeSessionId, items, onToggle }
+    function applyToAll() {
+      store.applyToAll()
+    }
+
+    return { activeSessionId, items, onToggle, applyToAll }
   },
 }
 </script>
