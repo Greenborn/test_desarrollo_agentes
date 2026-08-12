@@ -151,6 +151,7 @@
     <div v-if="tab === 'chats'" class="context-menu-item" @click="archiveFromCtxMenu">&#128451; Archivar</div>
     <div v-if="tab === 'archived'" class="context-menu-item" @click="unarchiveFromCtxMenu">&#128194; Desarchivar</div>
     <div class="context-menu-item" @click="cloneFromCtxMenu">&#128203; Clonar sesión</div>
+    <div class="context-menu-item" @click="copyPathFromCtxMenu">&#128279; Copiar path</div>
     <div class="context-menu-divider"></div>
     <div class="context-menu-item text-danger" @click="deleteFromCtxMenu">&times; Eliminar</div>
   </div>
@@ -164,6 +165,8 @@ import { useCommandStore } from '../../stores/command.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useModalStore } from '../../stores/modal.js'
+import AlertModal from '../modals/AlertModal.vue'
 import { contrastTextColor } from '../../utils/color.js'
 import ServiciosPanel from '../services/ServiciosPanel.vue'
 import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
@@ -178,6 +181,7 @@ export default {
     const ui = useUiStore()
     const settings = useSettingsStore()
     const ws = useWorkspaceStore()
+    const modal = useModalStore()
     const { sessions, archivedSessions, activeSessionId, creating, sessionStatus, pendingNotifications } = storeToRefs(chat)
     const { sidebarCollapsed, sidebarWidth, centralPanelCollapsed, sidebarWidthPct, rightPanelCollapsed } = storeToRefs(ui)
     const tab = ref('chats')
@@ -324,6 +328,23 @@ export default {
       const session = ctxMenu.session
       closeSessionCtxMenu()
       if (session) chat.deleteSession(session.id)
+    }
+
+    function copyPathFromCtxMenu() {
+      const session = ctxMenu.session
+      closeSessionCtxMenu()
+      if (!session) return
+      const path = session.cwd || session.session_path || ''
+      if (!path) {
+        modal.open(AlertModal, { message: 'La sesión no tiene un path asociado.' }, { title: 'Copiar path' })
+        return
+      }
+      navigator.clipboard.writeText(path).then(() => {
+        modal.open(AlertModal, { message: `Path copiado: ${path}` }, { title: 'Copiar path' })
+      }).catch((err) => {
+        console.error('Error copiando path al portapapeles:', err)
+        modal.open(AlertModal, { message: 'No se pudo copiar el path.' }, { title: 'Copiar path' })
+      })
     }
 
     const showWorkspaceBadges = computed(() => selectedIds.value.length > 1)
