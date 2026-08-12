@@ -1,10 +1,15 @@
 <template>
   <div class="h-100 d-flex flex-column" style="min-height: 0;">
-    <div class="d-flex align-items-center px-2 py-1 flex-shrink-0 border-bottom border-secondary">
+    <div class="d-flex align-items-center justify-content-between px-2 py-1 flex-shrink-0 border-bottom border-secondary">
       <label class="d-flex align-items-center gap-1 small text-secondary" style="font-size: 0.7rem; cursor: pointer;">
         <input type="checkbox" v-model="filterBySession" class="form-check-input m-0" style="cursor: pointer; width: 14px; height: 14px;" />
         Solo sesión actual
       </label>
+      <span v-if="activeSessionId" class="slot-badge" :class="slotUsage.available === 0 ? 'slot-full' : ''">
+        Slots: {{ slotUsage.used }}/{{ slotUsage.total }}
+        <template v-if="slotUsage.available > 0"> · {{ slotUsage.available }} libre</template>
+        <template v-else> · sin cupo</template>
+      </span>
     </div>
 
     <div v-if="!activeSessionId" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-secondary small px-3 text-center">
@@ -56,6 +61,12 @@ export default {
     const { activeSessionId } = storeToRefs(chat)
 
     const filterBySession = ref(true)
+
+    const slotUsage = computed(() => {
+      const sid = activeSessionId.value
+      if (!sid) return { used: 0, total: chat.maxTerminalsLimit, available: chat.maxTerminalsLimit }
+      return chat.getTerminalSlotUsage(sid)
+    })
 
     const displayTerminals = computed(() => {
       if (filterBySession.value) {
@@ -128,6 +139,7 @@ export default {
     return {
       activeSessionId,
       filterBySession,
+      slotUsage,
       displayTerminals,
       cerrarTerminal,
       getWorkspaceName,
@@ -169,5 +181,18 @@ export default {
 .terminal-info {
   line-height: 1.3;
   color: #6b7280;
+}
+.slot-badge {
+  font-size: 0.6rem;
+  padding: 1px 8px;
+  border-radius: 8px;
+  color: #75AADB;
+  background: rgba(117, 170, 219, 0.12);
+  border: 1px solid rgba(117, 170, 219, 0.3);
+}
+.slot-full {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.3);
 }
 </style>

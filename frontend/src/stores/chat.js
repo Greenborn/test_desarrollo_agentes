@@ -6,6 +6,8 @@ import { useSettingsStore } from './settings.js'
 import { useOpencodeStore } from './opencode.js'
 import wsClient from '../services/wsClient.js'
 import { playAlertBeep } from '../utils/audio.js'
+import { useModalStore } from './modal.js'
+import AlertModal from '../components/modals/AlertModal.vue'
 
 const API = '/api'
 const SESSION_KEY = 'oc_active_session_id'
@@ -98,6 +100,21 @@ export const useChatStore = defineStore('chat', () => {
     return terminals ? terminals.length : 0
   }
 
+  function getTerminalSlotUsage(sid) {
+    const total = maxTerminalsLimit.value
+    const used = getTerminalCount(sid)
+    const available = Math.max(0, total - used)
+    return { used, total, available }
+  }
+
+  function canCreateTerminal(sid) {
+    const terminals = _getSessionTerminals(sid)
+    const hasUnnamed = terminals.some(t => !t.terminalId)
+    const limitReached = terminals.length >= maxTerminalsLimit.value
+    const ok = !limitReached || hasUnnamed
+    return { ok, hasUnnamed, ...getTerminalSlotUsage(sid) }
+  }
+
   function getTerminals(sid) {
     return _getSessionTerminals(sid) || []
   }
@@ -123,21 +140,17 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const terminals = _terminalSessions.value[sid]
+    const limitReached = terminals.length >= maxTerminalsLimit.value
 
     if (!hasData) {
-      if (terminals.length >= maxTerminalsLimit.value) {
-        const oldest = terminals.shift()
-        if (oldest.terminalId) {
-          fetch(`/api/procesos/terminal/${oldest.terminalId}`, {
-            method: 'DELETE',
-            credentials: 'include',
-          }).catch(err => console.error('Error al eliminar terminal antiguo:', err.message))
-        }
+      if (limitReached) {
+        _notifyTerminalLimit(sid)
+        return { ok: false, reason: 'max', ...getTerminalSlotUsage(sid) }
       }
       const entry = { _key: _genTerminalKey(), terminalId: null, cwd: '', initCommand: '', label: 'terminal' }
       terminals.push(entry)
       flashLed(sid)
-      return
+      return { ok: true }
     }
 
     if (config.terminalId) {
@@ -147,7 +160,7 @@ export const useChatStore = defineStore('chat', () => {
         if (config.initCommand !== undefined) existing.initCommand = config.initCommand
         if (config.label !== undefined) existing.label = config.label
         flashLed(sid)
-        return
+        return { ok: true }
       }
       const unnamed = terminals.find(t => !t.terminalId)
       if (unnamed) {
@@ -156,7 +169,7 @@ export const useChatStore = defineStore('chat', () => {
         if (config.initCommand !== undefined) unnamed.initCommand = config.initCommand
         if (config.label !== undefined) unnamed.label = config.label
         flashLed(sid)
-        return
+        return { ok: true }
       }
     }
 
@@ -167,8 +180,13 @@ export const useChatStore = defineStore('chat', () => {
         if (config.initCommand !== undefined) unnamed.initCommand = config.initCommand
         if (config.label !== undefined) unnamed.label = config.label
         flashLed(sid)
-        return
+        return { ok: true }
       }
+    }
+
+    if (limitReached) {
+      _notifyTerminalLimit(sid)
+      return { ok: false, reason: 'max', ...getTerminalSlotUsage(sid) }
     }
 
     const newTerminal = {
@@ -179,18 +197,16 @@ export const useChatStore = defineStore('chat', () => {
       label: config.label || 'terminal',
     }
 
-    if (terminals.length >= maxTerminalsLimit.value) {
-      const oldest = terminals.shift()
-      if (oldest.terminalId) {
-        fetch(`/api/procesos/terminal/${oldest.terminalId}`, {
-          method: 'DELETE',
-          credentials: 'include',
-        }).catch(err => console.error('Error al eliminar terminal por límite:', err.message))
-      }
-    }
-
     terminals.push(newTerminal)
     flashLed(sid)
+    return { ok: true }
+  }
+
+  function _notifyTerminalLimit(sid) {
+    const { used, total } = getTerminalSlotUsage(sid)
+    console.log(`[terminales] Límite de terminales alcanzado (${used}/${total}) para sesión ${sid}`)
+    const modal = useModalStore()
+    modal.open(AlertModal, { message: `Límite de terminales alcanzado: ${used}/${total} terminales activas. Cierre una terminal antes de abrir una nueva.` }, { title: 'Aviso' })
   }
 
   function closeTerminal(terminalId) {
@@ -1144,7 +1160,7 @@ export const useChatStore = defineStore('chat', () => {
     ledAlert, lastActivity, triggerAlert, clearAlert, touchActivity,
     suppressWorkspaceReset,
     _terminalSessions, _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel, terminalId,
-    _hasTerminal, openTerminal, closeTerminal, getTerminalCount, getTerminals,
+    _hasTerminal, openTerminal, closeTerminal, getTerminalCount, getTerminalSlotUsage, canCreateTerminal, getTerminals,
     getTotalConcurrentSlots, maxTerminalsLimit,
     saveUiState, getSessionPrefs, saveSessionTabPref, saveSessionPref,
   }

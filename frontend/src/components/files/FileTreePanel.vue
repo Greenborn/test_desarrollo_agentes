@@ -448,10 +448,28 @@ export default {
       }
     }, { immediate: true, deep: false })
 
+    let resizeObserver = null
+
+    function attachResizeObserver() {
+      detachResizeObserver()
+      const el = scrollRef.value
+      if (!el) return
+      resizeObserver = new ResizeObserver(() => {
+        updateViewportHeight()
+      })
+      resizeObserver.observe(el)
+    }
+
+    function detachResizeObserver() {
+      if (resizeObserver) {
+        resizeObserver.disconnect()
+        resizeObserver = null
+      }
+    }
+
     onBeforeUnmount(() => {
       if (clickTimer) clearTimeout(clickTimer)
-      if (scrollRef.value) scrollRef.value.removeEventListener('resize', updateViewportHeight)
-      window.removeEventListener('resize', updateViewportHeight)
+      detachResizeObserver()
     })
 
     watch(() => props.sessionId, (newId) => {
@@ -459,9 +477,17 @@ export default {
       if (newId) fileTreeStore.fetchTree(newId)
     }, { immediate: true })
 
+    watch(() => loading.value, async () => {
+      if (!loading.value) {
+        await nextTick()
+        updateViewportHeight()
+        attachResizeObserver()
+      }
+    })
+
     onMounted(() => {
       updateViewportHeight()
-      window.addEventListener('resize', updateViewportHeight)
+      attachResizeObserver()
     })
 
     return {

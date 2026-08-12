@@ -790,6 +790,7 @@ Si el plugin tiene base de datos, agregar el esquema de la tabla en `docs/DB_SCH
 12. **Session-scoping obligatorio:** Si el tab depende de una sesión de chat activa, validar con `useChatStore().activeSessionId`.
 13. **Sin stores dedicadas en el módulo:** Usar stores Pinia existentes o `ref()` locales. Si se necesita store nueva, crearla en `frontend/src/stores/`.
 14. **TableEditor para datos tabulares obligatorio:** Siempre que el componente del tab o la vista necesite mostrar datos en forma de tabla (listas, grids, catálogos), debe usarse el componente `TableEditor` con `lazy: true` (server-side loading). No usar `<table>` HTML nativo. El `TableEditor` proporciona de fábrica: paginación, ordenamiento por columnas, búsqueda global, columnas redimensionables y reordenables por drag & drop, selección de filas, botones de toolbar/acciones, y preferencias de columnas persistentes por usuario.
+15. **Configuración de activación automática (Componentes Activos):** Cualquier tab nuevo del plugin en `sidebarRight` o `devPanel` se autointegra al panel "Componentes Activos" (vía `stores/activeComponents.js`, que agrega `sidebarRightTabs` y `devPanelTabs` del registry). Aparece activo por defecto y es activable/desactivable por sesión, sin configuración manual. **No añadir registro manual** ni tocar `ComponentesActivosTab.vue` ni `activeComponents.js`; solo verificar que el tab aparezca en la lista y que su switch funcione. Elegir `priority` acorde a las existentes del panel.
 
 ---
 
@@ -804,6 +805,7 @@ Ejecutar los siguientes pasos en orden y **confirmar cada resultado**:
 | 3 | `cd backend && npm run dev` (probar inicio) | Servidor inicia sin errores |
 | 4 | `curl -s http://localhost:4000/api/<plugin_id>/list` (si hay backend) | `200` o `401` (requiere auth) |
 | 5 | Navegar al tab en el panel correspondiente | Tab visible con el label correcto |
+| 6 | Abrir el panel "Componentes Activos" | El nuevo tab de `sidebarRight`/`devPanel` aparece en la lista y su switch permite activarlo/desactivarlo |
 | 6 | Escribir `/help` en el chat (si hay comandos) | Comandos listados bajo categoría correcta |
 | 7 | Escribir `/<comando> --flag=valor` (si hay comandos) | Comando ejecutado sin errores |
 | 8 | Navegar a `<ruta_path>` (si hay ruta) | Vista se renderiza correctamente |

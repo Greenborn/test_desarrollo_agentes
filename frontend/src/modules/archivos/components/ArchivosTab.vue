@@ -121,6 +121,7 @@ export default {
 }
 .archivos-tree-panel {
   min-width: 80px;
+  height: 100%;
 }
 .archivos-splitter {
   width: 6px;

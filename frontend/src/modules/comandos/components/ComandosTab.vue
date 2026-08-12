@@ -37,7 +37,9 @@ import { watch, ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useComandosPersonalizadosStore } from '../../../stores/comandosPersonalizados.js'
+import { useModalStore } from '../../../stores/modal.js'
 import TableEditor from '../../../components/TableEditor.vue'
+import AlertModal from '../../../components/modals/AlertModal.vue'
 import { BtnConfig } from '@/components/BtnConfig'
 
 export default {
@@ -45,6 +47,7 @@ export default {
   setup() {
     const chat = useChatStore()
     const comandosStore = useComandosPersonalizadosStore()
+    const modal = useModalStore()
     const { activeSessionId, sessions } = storeToRefs(chat)
 
     const activeSession = computed(() => {
@@ -99,9 +102,20 @@ export default {
       }
     }
 
+    function checkTerminalSlot(sid) {
+      const check = chat.canCreateTerminal(sid)
+      if (!check.ok) {
+        console.log(`[comandos] Límite de terminales alcanzado (${check.used}/${check.total})`)
+        modal.open(AlertModal, { message: `Límite de terminales alcanzado: ${check.used}/${check.total} terminales activas. Cierre una terminal antes de ejecutar un comando.` }, { title: 'Aviso' })
+        return false
+      }
+      return true
+    }
+
     async function ejecutarComando(c) {
       const sid = activeSessionId.value
       if (!sid || executingCommands.value.has(c.id)) return
+      if (!checkTerminalSlot(sid)) return
       const esOculto = c.ocultar_ejecucion ? true : false
       const abortController = new AbortController()
       executingCommands.value.set(c.id, { abortController, terminalId: null })
@@ -197,6 +211,7 @@ export default {
     async function ejecutarNpmScript(pkgDir, scriptName, scriptCommand) {
       const sid = activeSessionId.value
       if (!sid || executingScripts.value.has(pkgDir + '/' + scriptName)) return
+      if (!checkTerminalSlot(sid)) return
       const abortController = new AbortController()
       executingScripts.value.set(pkgDir + '/' + scriptName, { abortController, terminalId: null })
       const streamKey = 'stream-npm-' + Date.now()

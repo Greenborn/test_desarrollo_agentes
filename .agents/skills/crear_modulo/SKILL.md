@@ -138,6 +138,7 @@ export default router
 8. **Manejo de errores:** Todo `catch` debe registrar el error con `console.log` (tanto frontend como backend). Prohibido `catch {}` vacío o silencioso.
 9. **Sistema de modales genérico obligatorio:** Todos los modales (formularios, confirmaciones, notificaciones) deben abrirse mediante `useModalStore.open(Componente, props, opciones)`. El contenido del modal debe ser un componente separado que emita `close`/`cancel`. Prohibido usar `new Modal()` de Bootstrap directamente o incluir HTML de modales en el template del componente principal. Usar `ConfirmModal` para confirmaciones y `AlertModal` para notificaciones.
 10. **TableEditor para datos tabulares obligatorio:** Siempre que un componente del módulo necesite mostrar datos en forma de tabla (listas, grids, catálogos), debe usarse `TableEditor` con `lazy: true`. No usar `<table>` HTML nativo. `TableEditor` proporciona paginación server-side, ordenamiento, búsqueda global, columnas redimensionables/reordenables, y preferencias de columnas persistentes.
+11. **Configuración de activación automática (Componentes Activos):** Cualquier tab nuevo que el módulo registre en `sidebarRight` o `devPanel` se autointegra al panel "Componentes Activos" (vía `stores/activeComponents.js`, que agrega `sidebarRightTabs` y `devPanelTabs` del registry). Aparece activo por defecto y es activable/desactivable por sesión, sin configuración manual. **No añadir código de registro manual** ni tocar `ComponentesActivosTab.vue` ni `activeComponents.js`; solo verificar que el tab aparezca en la lista y que su switch funcione. Elegir `priority` acorde a las existentes del panel (orden izquierda→derecha).
 
 ## Paneles disponibles
 
@@ -203,6 +204,7 @@ Ejecutar los siguientes comandos en orden y **confirmar que cada uno devuelva el
 |---|---------|-------------------|
 | 1 | `npm run build` (desde `frontend/`) | `✓ built in Xs` sin errores. Los chunks de tabs aparecen como archivos separados en `dist/assets/` |
 | 2 | Inspeccionar panel correspondiente | El tab aparece renderizado con el id y label declarados en el manifest |
+| 3 | Abrir el panel "Componentes Activos" | El nuevo tab de `sidebarRight`/`devPanel` aparece en la lista y su switch permite activarlo/desactivarlo |
 | 3 | Escribir `/help` en el chat | El comando aparece listado bajo la categoría definida |
 | 4 | Escribir `/nombre_comando` en el chat | El comando se ejecuta y devuelve resultado sin errores |
 | 5 | Probar autocompletado del comando con Tab | Las sugerencias aparecen correctamente según las flags definidas |

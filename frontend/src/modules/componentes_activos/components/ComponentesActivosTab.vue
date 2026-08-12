@@ -47,6 +47,11 @@ import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useActiveComponentsStore } from '../../../stores/activeComponents.js'
 
+// La lista de componentes es dinámica: se construye a partir de `store.allTabs`,
+// que agrega todos los tabs registrados en `sidebarRightTabs` y `devPanelTabs`
+// del module registry (ver stores/activeComponents.js). Cualquier tab nuevo que
+// un módulo registre en `sidebarRight` o `devPanel` aparece aquí automáticamente
+// y es activable/desactivable por sesión, sin configuración manual adicional.
 const PANEL_LABELS = {
   devPanel: 'Panel Inferior',
   sidebarRight: 'Panel Lateral Derecho',
