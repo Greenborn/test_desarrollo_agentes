@@ -1479,22 +1479,34 @@ Endpoints del módulo Interfaz Remota. Al iniciar el backend se intenta conectar
 
 ### `GET /api/interfaz-remota/status`
 - **Auth:** Requerida
-- **Descripción:** Devuelve el estado del intento de login al servicio de gestión interna realizado al iniciar el backend.
+- **Descripción:** Devuelve el estado del intento de login al servicio de gestión interna y el estado de la conexión WebSocket (Socket.IO), ambos realizados al iniciar el backend. El WebSocket se conecta a `wss://<url-gestion>/socket.io/?EIO=4&transport=websocket` y se reconecta automáticamente.
 - **Respuesta 200:**
 ```json
 {
-  "attempted": true,
-  "success": true,
-  "configured": true,
-  "token": "jwt-token",
-  "url": "https://gestion-interna.example.com",
-  "message": "Login exitoso en gestión interna.",
-  "requestLog": { "method": "POST", "url": "...", "statusCode": 200 },
-  "checkedAt": "2026-08-14T10:00:00.000Z"
+  "login": {
+    "attempted": true,
+    "success": true,
+    "configured": true,
+    "token": "jwt-token",
+    "url": "https://gestion-interna.example.com",
+    "message": "Login exitoso en gestión interna.",
+    "requestLog": { "method": "POST", "url": "...", "statusCode": 200 },
+    "checkedAt": "2026-08-14T10:00:00.000Z"
+  },
+  "ws": {
+    "attempted": true,
+    "connected": true,
+    "url": "wss://gestion-interna.example.com/socket.io/?EIO=4&transport=websocket",
+    "message": "WebSocket conectado al servicio de gestión interna.",
+    "error": null,
+    "connectedAt": "2026-08-14T10:00:05.000Z",
+    "lastCheckAt": "2026-08-14T10:00:05.000Z"
+  }
 }
 ```
-- Si gestión interna no está configurada: `{ "attempted": true, "success": false, "configured": false, "token": null, "url": null, "message": "Gestión interna no configurada.", "checkedAt": "..." }`
-- Si el login falla: `{ "attempted": true, "success": false, "configured": true, "token": null, "url": "...", "message": "<error>", "requestLog": { ... }, "checkedAt": "..." }`
+- Si gestión interna no está configurada: `login` con `{ "attempted": true, "success": false, "configured": false, "message": "Gestión interna no configurada." }` y `ws` con `{ "attempted": false, "connected": false }`
+- Si el login falla: `login` con `{ "attempted": true, "success": false, "configured": true, "message": "<error>", "requestLog": { ... } }`
+- Si el WebSocket no logra conectarse: `ws` con `{ "attempted": true, "connected": false, "message": "No se pudo conectar el WebSocket.", "error": "<error>" }`
 
 ---
 

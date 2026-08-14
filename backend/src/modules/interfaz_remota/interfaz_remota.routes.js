@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getInterfazRemotaLoginState } from './interfaz_remota.service.js';
+import { getInterfazRemotaStatus } from './interfaz_remota.service.js';
 
 const router = Router();
 
@@ -13,8 +13,8 @@ function authGuard(req, res) {
 
 router.get('/status', (req, res) => {
   if (!authGuard(req, res)) return;
-  const state = getInterfazRemotaLoginState();
-  res.json({ ...state });
+  const state = getInterfazRemotaStatus();
+  res.json(state);
 });
 
 export default router;

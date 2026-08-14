@@ -48,7 +48,7 @@ import dbFuncionalidades from './config/dbFuncionalidades.js';
 import dbRedmineComentarios from './config/dbRedmineComentarios.js';
 import { runMigrations } from './config/dbFactory.js';
 import { fetchAllSessionRepos } from './services/gitFetchService.js';
-import { initInterfazRemotaLogin } from './modules/interfaz_remota/interfaz_remota.service.js';
+import { initInterfazRemotaLogin, stopInterfazRemotaWs } from './modules/interfaz_remota/interfaz_remota.service.js';
 
 const PORT = process.env.PORT;
 if (!PORT) {
@@ -154,17 +154,20 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('exit', () => {
   stopComandosPersonalizados();
+  stopInterfazRemotaWs();
   devInstanceManager.stopAll();
   opencode.stopAllServers();
 });
 process.on('SIGTERM', () => {
   stopComandosPersonalizados();
+  stopInterfazRemotaWs();
   devInstanceManager.stopAll();
   opencode.stopAllServers();
   process.exit(0);
 });
 process.on('SIGINT', () => {
   stopComandosPersonalizados();
+  stopInterfazRemotaWs();
   devInstanceManager.stopAll();
   opencode.stopAllServers();
   process.exit(0);
