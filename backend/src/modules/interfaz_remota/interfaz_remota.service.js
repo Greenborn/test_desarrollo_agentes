@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client';
 import { login, getGestionCredentials } from '../gestion/gestion.service.js';
+import db from '../../config/db.js';
 
 const ANNOUNCE_INTERVAL_MS = 45000;
 
@@ -49,6 +50,43 @@ function resetWsState() {
     lastCheckAt: new Date().toISOString(),
     announce: null,
   };
+}
+
+const SESSION_FIELDS = [
+  'chat_sessions.id',
+  'title',
+  'chat_sessions.updated_at',
+  'cwd',
+  'chat_sessions.proyecto_id',
+  'id_ticket_redmine',
+  'chat_sessions.workspace_id',
+  'prefs',
+];
+
+async function handleChatSessionsRequest(ack) {
+  const respond = (payload) => {
+    if (typeof ack === 'function') {
+      ack(payload);
+    } else {
+      console.log('[interfaz_remota] chatSessions sin callback ack:', JSON.stringify(payload).slice(0, 120));
+    }
+  };
+  try {
+    const [activas, archivadas] = await Promise.all([
+      db('chat_sessions')
+        .where('chat_sessions.archived', false)
+        .orderBy('chat_sessions.updated_at', 'desc')
+        .select(SESSION_FIELDS),
+      db('chat_sessions')
+        .where('chat_sessions.archived', true)
+        .orderBy('chat_sessions.updated_at', 'desc')
+        .select(SESSION_FIELDS),
+    ]);
+    respond({ success: true, data: { activas, archivadas } });
+  } catch (err) {
+    console.log('[interfaz_remota] Error al consultar sesiones de chat:', err.message);
+    respond({ success: false, error: err.message ? err.message : 'Error al consultar sesiones de chat.' });
+  }
 }
 
 function emitAnnounce() {
@@ -152,6 +190,10 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
 
   socket.on('desarrollo:status', (payload) => {
     console.log('[interfaz_remota] desarrollo:status recibido:', JSON.stringify(payload).slice(0, 120));
+  });
+
+  socket.on('interfaz-remota:chatSessions', (payload, ack) => {
+    handleChatSessionsRequest(ack);
   });
 }
 

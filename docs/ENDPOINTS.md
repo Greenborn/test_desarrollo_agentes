@@ -1526,6 +1526,26 @@ Endpoints del módulo Interfaz Remota. Al iniciar el backend se intenta conectar
 - **Descripción:** Deshabilita la conexión: desconecta el socket, detiene los reintentos y el heartbeat de announce, y limpia el estado de login. Devuelve el estado completo igual que `GET /status`.
 - **Respuesta 200:** mismo objeto que `GET /status` con `enabled: false`
 
+### Pseudoendpoint socket.io `interfaz-remota:chatSessions`
+- **Auth:** Vía conexión socket.io (token del login en `auth.token`)
+- **Descripción:** Pseudoendpoint request/response sobre WebSocket (no HTTP). La gestión interna emite el evento `interfaz-remota:chatSessions` (con callback ack) para consultar las sesiones de chat actuales del sistema. Devuelve todas las sesiones (sin filtrar por usuario ni workspace) agrupadas por estado en `activas` y `archivadas`.
+- **Request:** `socket.emit('interfaz-remota:chatSessions', ack)`
+- **Respuesta (ack):**
+```json
+{
+  "success": true,
+  "data": {
+    "activas": [
+      { "id": 1, "title": "...", "updated_at": "...", "cwd": "...", "proyecto_id": null, "id_ticket_redmine": null, "workspace_id": 1, "prefs": null }
+    ],
+    "archivadas": []
+  }
+}
+```
+- Los campos por sesión son los mismos que `GET /api/chat/sessions` (`id, title, updated_at, cwd, proyecto_id, id_ticket_redmine, workspace_id, prefs`).
+- En caso de error: `{ "success": false, "error": "<mensaje>" }`
+- Si no se provee callback ack, la respuesta se registra solo en consola (no se envía).
+
 ---
 
 ## Notas

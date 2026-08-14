@@ -278,8 +278,13 @@ export default {
           if (listRes.ok) {
             const list = await listRes.json()
             if (list.length > 0) {
-              const existing = list.find((t) => t.status === 'active' && t.cmd === props.initCommand)
-                || list.find((t) => t.cmd === props.initCommand)
+              // Las instancias de opencode siempre crean un terminal nuevo (storage aislado
+              // vía XDG_DATA_HOME) y nunca deben reutilizarse para evitar que se solapen.
+              const isOpenCode = props.initCommand.includes('opencode')
+              const existing = isOpenCode
+                ? null
+                : (list.find((t) => t.status === 'active' && t.cmd === props.initCommand)
+                  || list.find((t) => t.cmd === props.initCommand))
               if (existing) {
                 currentTerminalId = existing.terminalId
                 return currentTerminalId

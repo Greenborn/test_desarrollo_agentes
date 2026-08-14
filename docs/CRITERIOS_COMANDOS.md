@@ -299,7 +299,7 @@ Todo comando que forme parte del ecosistema de desarrollo (funcionalidades, docu
 |---|---|---|---|---|
 | `/dev_funcionalidad_crear` | funcionalidad | crear | — | Wizard nueva funcionalidad |
 | `/dev_funcionalidad_listar` | funcionalidad | listar | — | Listar funcionalidades |
-| `/dev_opencode_iniciar` | opencode | iniciar | — | Iniciar sesión OpenCode |
+| `/dev_opencode_iniciar` | opencode | iniciar | — | Iniciar sesión OpenCode (nueva instancia aislada, no reutiliza) |
 | `/dev_opencode_finalizar` | opencode | finalizar | — | Finalizar sesión OpenCode |
 | `/dev_generar_commit` | git | generar | commit | Generar mensaje de commit |
 | `/dev_git_crear_rama` | git | crear | rama | Crear rama desde proyecto y ticket |

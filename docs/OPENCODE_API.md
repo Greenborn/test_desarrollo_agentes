@@ -590,7 +590,7 @@ Los mensajes relacionados con OpenCode usan roles especiales en `chat_messages`:
 
 ### Inicio
 
-1. Usuario ejecuta `/dev_opencode_iniciar` o hace clic en "Iniciar OpenCode" en la barra de ticket.
+1. Usuario ejecuta `/dev_opencode_iniciar` o hace clic en "Iniciar OpenCode" en la barra de ticket. La ejecución del TUI abre una **instancia nueva aislada** (storage propio vía `XDG_DATA_HOME` bajo `~/.local/share/opencode/instances/<id>/`, sembrando `auth.json` desde el data dir por defecto), de modo que varias instancias no se solapan; el terminal nunca se reutiliza.
 2. El comando llama a `opencodeStore.start(sessionId)` → `GET /api/opencode/start?sessionId=X`.
 3. El backend inicia (o reusa) un servidor `opencode serve` en el `cwd` de la sesión.
 4. El backend consulta `GET /config/providers` y devuelve los proveedores disponibles.

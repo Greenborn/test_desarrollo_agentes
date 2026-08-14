@@ -175,7 +175,15 @@ export default {
           }
         }
 
-        chatStore.openTerminal({ cwd, initCommand: 'opencode', label: 'OpenCode', sessionId })
+        const instanceId = `oc-${sessionId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        const initCommand =
+          `SRC="$HOME/.local/share/opencode/auth.json";` +
+          `D="$HOME/.local/share/opencode/instances/${instanceId}";` +
+          `mkdir -p "$D/opencode";` +
+          `[ -f "$SRC" ] && cp "$SRC" "$D/opencode/auth.json";` +
+          `XDG_DATA_HOME="$D" opencode`
+
+        chatStore.openTerminal({ cwd, initCommand, label: 'OpenCode', sessionId })
 
         return `✅ OpenCode iniciado en: ${cwd}`
       },
