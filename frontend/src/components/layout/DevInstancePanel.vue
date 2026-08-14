@@ -18,6 +18,7 @@
 import { ref, computed, watch, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUiStore } from '../../stores/ui.js'
+import { useChatStore } from '../../stores/chat.js'
 import { useActiveComponentsStore } from '../../stores/activeComponents.js'
 import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
 import { sortTabs } from '../../utils/sortTabs.js'
@@ -25,10 +26,16 @@ import { sortTabs } from '../../utils/sortTabs.js'
 export default {
   setup() {
     const ui = useUiStore()
+    const chat = useChatStore()
     const ac = useActiveComponentsStore()
-    const { devPanelTab, devPanelTabOrder } = storeToRefs(ui)
+    const { devPanelTabOrder } = storeToRefs(ui)
     const tab = ref('instancias')
-    const stopTabSync = watch(devPanelTab, (v) => { tab.value = v; stopTabSync() })
+
+    function restoreTab() {
+      const prefs = chat.getSessionPrefs(chat.activeSessionId)
+      tab.value = prefs?.devPanelTab || 'instancias'
+    }
+    watch(() => chat.activeSessionId, restoreTab)
     const { devPanelTabs } = useModuleRegistry()
 
     const localTabs = shallowRef([])
@@ -41,7 +48,7 @@ export default {
       localTabs.value = all.filter(t => ac.isActive('devPanel', t.id))
       if (localTabs.value.length && !localTabs.value.find(t => t.id === tab.value)) {
         tab.value = localTabs.value[0].id
-        devPanelTab.value = tab.value
+        if (chat.activeSessionId) chat.saveSessionPref(chat.activeSessionId, 'devPanelTab', tab.value)
       }
     }
 
@@ -53,8 +60,7 @@ export default {
 
     function selectDevTab(val) {
       tab.value = val
-      devPanelTab.value = val
-      ui.saveLayoutPrefs()
+      if (chat.activeSessionId) chat.saveSessionPref(chat.activeSessionId, 'devPanelTab', val)
     }
 
     function saveTabOrder(ids) {

@@ -37,7 +37,7 @@ export default {
     const ui = useUiStore()
     const chat = useChatStore()
     const ac = useActiveComponentsStore()
-    const { rightPanelCollapsed, rightPanelWidth, centralPanelCollapsed, sidebarWidthPct, sidebarCollapsed, sidebarRightTab, sidebarRightTabOrder } = storeToRefs(ui)
+    const { rightPanelCollapsed, rightPanelWidth, centralPanelCollapsed, sidebarWidthPct, sidebarCollapsed, sidebarRightTabOrder } = storeToRefs(ui)
     const { activeSessionId, sessions } = storeToRefs(chat)
     const { sidebarRightTabs } = useModuleRegistry()
     const localTabs = shallowRef([])
@@ -50,7 +50,7 @@ export default {
       localTabs.value = all.filter(t => ac.isActive('sidebarRight', t.id))
       if (tab.value && localTabs.value.length && !localTabs.value.find(t => t.id === tab.value)) {
         tab.value = localTabs.value[0].id
-        sidebarRightTab.value = tab.value
+        if (chat.activeSessionId) chat.saveSessionPref(chat.activeSessionId, 'sidebarRightTab', tab.value)
       }
     }
 
@@ -59,7 +59,12 @@ export default {
       ui.saveLayoutPrefs()
     }
     const tab = ref('comentarios')
-    const stopTabSync = watch(sidebarRightTab, (v) => { tab.value = v; stopTabSync() })
+
+    function restoreTab() {
+      const prefs = chat.getSessionPrefs(chat.activeSessionId)
+      tab.value = prefs?.sidebarRightTab || 'comentarios'
+    }
+    watch(() => chat.activeSessionId, restoreTab)
 
     const activeSession = computed(() => {
       return sessions.value.find(s => s.id === activeSessionId.value) || null
@@ -81,8 +86,7 @@ export default {
 
     function selectTab(val) {
       tab.value = val
-      sidebarRightTab.value = val
-      ui.saveLayoutPrefs()
+      if (chat.activeSessionId) chat.saveSessionPref(chat.activeSessionId, 'sidebarRightTab', val)
     }
 
     function onDragStart(index, e) {

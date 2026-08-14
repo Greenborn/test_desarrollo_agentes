@@ -54,6 +54,9 @@ export const useChatStore = defineStore('chat', () => {
   const _cmdSessionStreamCache = ref({})
   const _cmdPendingSave = ref({})
   const _terminalSessions = ref({})
+  const _lastLoadedSession = ref(null)
+  let _loadMessagesToken = 0
+  let _messagesAbortController = null
   const maxTerminalsLimit = computed(() => {
     try {
       const s = useSettingsStore()
@@ -513,7 +516,27 @@ export const useChatStore = defineStore('chat', () => {
     }, 1000)
   }
 
-  async function loadMessages(sessionId) {
+  async function loadMessages(sessionId, options = {}) {
+    if (!sessionId) return
+    const { force = false } = options
+    // Si la sesión ya está cargada y sigue activa, evitar limpiar y refetchear
+    // (evita flicker y peticiones redundantes al hacer clic en la misma sesión).
+    if (
+      !force &&
+      _lastLoadedSession.value &&
+      Number(_lastLoadedSession.value) === Number(sessionId) &&
+      Number(activeSessionId.value) === Number(sessionId)
+    ) {
+      return
+    }
+    _lastLoadedSession.value = sessionId
+    const token = ++_loadMessagesToken
+    // Cancela cualquier carga de mensajes anterior aún en vuelo: no debe
+    // bloquear ni pisar el estado de la sesión recién seleccionada.
+    if (_messagesAbortController) {
+      _messagesAbortController.abort()
+      _messagesAbortController = null
+    }
     activeSessionId.value = sessionId
     const session = sessions.value.find(s => Number(s.id) === Number(sessionId))
     if (session && session.cwd) {
@@ -541,9 +564,13 @@ export const useChatStore = defineStore('chat', () => {
       currentChunk.value = ''
       currentThinking.value = ''
     }
+    const ac = new AbortController()
+    _messagesAbortController = ac
     try {
-      const res = await fetch(`${API}/chat/sessions/${sessionId}/messages?limit=50`, { credentials: 'include' })
+      const res = await fetch(`${API}/chat/sessions/${sessionId}/messages?limit=50`, { credentials: 'include', signal: ac.signal })
       const data = await res.json()
+      // Respuesta obsoleta (se inició una carga más nueva): descartarla.
+      if (token !== _loadMessagesToken) return
       if (data.error) {
         console.error('Error al cargar mensajes:', data.error)
         return
@@ -587,7 +614,14 @@ export const useChatStore = defineStore('chat', () => {
         })
       }
     } catch (err) {
+      // Si la petición fue abortada por una carga más nueva, es un flujo
+      // esperado y manejado: la carga nueva se encarga de la sesión actual.
+      if (err.name === 'AbortError' && token !== _loadMessagesToken) return
       console.error('Error al cargar mensajes:', err)
+    } finally {
+      if (_messagesAbortController === ac) {
+        _messagesAbortController = null
+      }
     }
   }
 
@@ -1102,6 +1136,35 @@ export const useChatStore = defineStore('chat', () => {
     sessionTickets.value[sessionId] = ticket
   }
 
+  const _ticketPromises = {}
+
+  async function loadTicketInfo(sessionId, options = {}) {
+    if (!sessionId) return null
+    const { force = false } = options
+    // Deduplica el fetch: si ya hay una carga en curso para esta sesión,
+    // los llamadores esperan la misma promesa (evita peticiones duplicadas).
+    if (!force && _ticketPromises[sessionId]) {
+      return _ticketPromises[sessionId]
+    }
+    const p = (async () => {
+      try {
+        const res = await fetch(`${API}/tickets/session/${sessionId}`, { credentials: 'include' })
+        const data = await res.json()
+        if (data.ticket) {
+          setSessionTicket(sessionId, data.ticket)
+          return data.ticket
+        }
+        return null
+      } catch (err) {
+        console.error('Error al cargar info del ticket:', err)
+        return null
+      }
+    })()
+    _ticketPromises[sessionId] = p
+    p.finally(() => { delete _ticketPromises[sessionId] })
+    return p
+  }
+
   function clearSessionTicket(sessionId) {
     if (sessionId) delete sessionTickets.value[sessionId]
   }
@@ -1156,6 +1219,7 @@ export const useChatStore = defineStore('chat', () => {
     setCmdStreaming, updateCmdStreamCache, clearCmdStreamCache,
     registerCmdPendingSave, consumeCmdPendingSave, hasCmdPendingSave,
     sessionTickets, activeSessionTicket, setSessionTicket, clearSessionTicket,
+    loadTicketInfo,
     _saveMessageToDb, clearPendingNotification, ledFlash, flashLed, showTerminal,
     ledAlert, lastActivity, triggerAlert, clearAlert, touchActivity,
     suppressWorkspaceReset,

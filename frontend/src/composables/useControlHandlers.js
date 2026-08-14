@@ -407,7 +407,7 @@ export function useControlHandlers(api) {
               _key: 'result-' + Date.now(),
             }
           }
-          chat.loadMessages(chat.activeSessionId)
+          chat.loadMessages(chat.activeSessionId, { force: true })
         } else {
           const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
           if (idx >= 0) {

@@ -24,7 +24,8 @@ export async function login(gestionUrl, username, password) {
   const url = `${gestionUrl.replace(/\/+$/, '')}/api/auth/login`;
   const { response: res, requestLog } = await apiRequest('POST', url, { 'Content-Type': 'application/json' }, JSON.stringify({ username, password }));
   const data = await parseJsonOrThrow(res, requestLog, 'login');
-  if (!data.status || !data.data?.token) {
+  const ok = data.status === true || data.success === true;
+  if (!ok || !data.data?.token) {
     const errMsg = data.error || 'Error al autenticar en gestión interna';
     throw Object.assign(new Error(errMsg), { requestLog });
   }

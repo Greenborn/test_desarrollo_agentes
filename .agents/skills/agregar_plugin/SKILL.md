@@ -440,37 +440,42 @@ Crear `frontend/src/modules/<plugin_id>/components/<plugin_id>Tab.vue`.
 
 **Importante:** Si el componente necesita mostrar datos tabulares (listas, tablas, grids), debe usar el componente `TableEditor` en modo server-side (`lazy: true`). No usar `<table>` HTML nativo.
 
-Ejemplo con TableEditor para lista de datos (usando el sistema de modales genérico):
+Ejemplo con TableEditor para lista de datos (usando `vue-greenborn-modal-manager`):
 
-Primero crear el componente del modal de formulario en `frontend/src/modules/<plugin_id>/components/<plugin_id>FormModal.vue`:
+Primero crear el componente del modal de formulario en `frontend/src/modules/<plugin_id>/components/<plugin_id>FormModal.vue`. Recibe `parametros` (con la fila en `editando` y las claves reservadas `_modal_cod`, `_config_modal`), se auto-oculta con `ocultar_modal`:
 
 ```vue
 <template>
-  <div class="d-flex flex-column">
+  <form @submit.prevent="guardar">
     <!-- Campos del formulario -->
     <div v-if="errorMsg" class="small text-danger mb-2">{{ errorMsg }}</div>
     <div class="d-flex justify-content-end mt-3 gap-2">
-      <button class="btn btn-sm btn-secondary" @click="$emit('cancel')">Cancelar</button>
-      <button class="btn btn-sm btn-primary" :disabled="guardando" @click="guardar">{{ guardando ? 'Guardando...' : 'Guardar' }}</button>
+      <button type="button" class="btn btn-secondary" @click="cancelar">Cancelar</button>
+      <button type="submit" class="btn btn-primary" :disabled="guardando">{{ guardando ? 'Guardando...' : 'Guardar' }}</button>
     </div>
-  </div>
+  </form>
 </template>
 
 <script>
+import { useModal } from 'vue-greenborn-modal-manager'
+
 export default {
+  name: '<plugin_id>FormModal',
   props: {
-    editando: { type: Object, default: null },
+    parametros: { type: Object, default: () => ({}) },
   },
-  emits: ['close', 'cancel'],
   data() {
-    return { guardando: false, errorMsg: '' }
+    return { editando: this.parametros.editando, guardando: false, errorMsg: '' }
   },
   methods: {
+    ocultar() { useModal().ocultar_modal(this.parametros._modal_cod) },
+    cancelar() { this.ocultar() },
     async guardar() {
       this.guardando = true
       try {
         // Lógica de guardado
-        this.$emit('close')
+        this.ocultar()
+        this.parametros._onSaved?.()
       } catch (err) {
         this.errorMsg = 'Error al guardar'
       } finally {
@@ -482,7 +487,7 @@ export default {
 </script>
 ```
 
-Luego en el componente tab, usar `useModalStore` para abrirlo:
+Luego en el componente tab, usar `useModal()` para abrirlo:
 
 ```vue
 <template>
@@ -503,24 +508,22 @@ Luego en el componente tab, usar `useModalStore` para abrirlo:
 <script>
 import api from '../../api/axios'
 import TableEditor from '../../components/TableEditor.vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 import <plugin_id>FormModal from './<plugin_id>FormModal.vue'
-import { useModalStore } from '../../../stores/modal.js'
 
 export default {
   name: '<plugin_id>Tab',
   components: { TableEditor },
-  setup() {
-    const modal = useModalStore()
-    // ... resto de la lógica
-
-    function abrirModal(row) {
-      modal.open(<plugin_id>FormModal, { editando: row }, {
-        title: row ? 'Editar' : 'Nuevo',
-        onClose: () => { /* refrescar datos */ },
-      })
-    }
-
-    return { abrirModal }
+  methods: {
+    abrirModal(row) {
+      const { mostrar_modal } = useModal()
+      mostrar_modal(
+        <plugin_id>FormModal,
+        row ? 'Editar' : 'Nuevo',
+        { editando: row, _onSaved: () => this.$refs.table.refresh() },
+        { size: 'md' }
+      )
+    },
   },
 }
 </script>
@@ -560,7 +563,7 @@ Crear `frontend/src/modules/<plugin_id>/components/<plugin_id>View.vue`.
 
 **Importante:** Si la vista necesita mostrar datos tabulares, debe usar `TableEditor` igual que el componente tab (ver sección 7).
 
-Ejemplo con TableEditor (usando el sistema de modales genérico, mismo patrón que la sección 7):
+Ejemplo con TableEditor (usando `vue-greenborn-modal-manager`, mismo patrón que la sección 7):
 
 ```vue
 <template>
@@ -581,15 +584,22 @@ Ejemplo con TableEditor (usando el sistema de modales genérico, mismo patrón q
 <script>
 import api from '../../api/axios'
 import TableEditor from '../../components/TableEditor.vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 import <plugin_id>FormModal from './<plugin_id>FormModal.vue'
-import { useModalStore } from '../../../stores/modal.js'
 
 export default {
   name: '<plugin_id>View',
   components: { TableEditor },
-  setup() {
-    const modal = useModalStore()
-    // ...
+  methods: {
+    abrirModal(row) {
+      const { mostrar_modal } = useModal()
+      mostrar_modal(
+        <plugin_id>FormModal,
+        row ? 'Editar' : 'Nuevo',
+        { editando: row, _onSaved: () => this.$refs.table.refresh() },
+        { size: 'md' }
+      )
+    },
   },
 }
 </script>
@@ -783,7 +793,7 @@ Si el plugin tiene base de datos, agregar el esquema de la tabla en `docs/DB_SCH
 5. **Prohibido TypeScript** en cualquier parte del proyecto.
 6. **Prohibido `||` como fallback de parámetros:** Validar explícitamente cada argumento requerido y devolver error si falta.
 7. **Manejo de errores:** Todo `catch` debe registrar el error con `console.log`. Prohibido `catch {}` vacío.
-8. **Sistema de modales genérico obligatorio:** Todos los modales (formularios, confirmaciones, notificaciones) deben abrirse mediante `useModalStore.open(Componente, props, opciones)`. El contenido del modal debe ser un componente separado que emita `close`/`cancel`. Prohibido usar `new Modal()` de Bootstrap directamente o incluir HTML de modales en el template del componente principal. Para confirmaciones simples usar `ConfirmModal`, para notificaciones usar `AlertModal`.
+8. **Sistema de modales obligatorio (`vue-greenborn-modal-manager`):** Todos los modales (formularios, confirmaciones, notificaciones) se abren con `useModal()` del paquete `vue-greenborn-modal-manager`: `mostrar_modal(Componente, titulo, parametros, config)` para formularios, `mostrar_confirm(...)` para confirmaciones y `mostrar_alerta(texto)` para notificaciones. El contenido del modal debe ser un componente separado (body) que reciba `parametros` y se auto-oculte con `ocultar_modal(parametros._modal_cod)`. Prohibido usar `new Modal()` de Bootstrap directamente o incluir HTML de modales en el template del componente principal. El `<ModalContainer />` ya está montado en la raíz de la app.
 9. **Formato `--nombre=valor` obligatorio:** Todos los parámetros de comandos deben usar flags con `--`. Prohibido argumentos posicionales (excepciones: `/git` y `/skill_editar`).
 10. **Usar `parseCommandArgs`** para parsear argumentos de comandos.
 11. **Usar `getUsedFlags`** para autocomplete de comandos.

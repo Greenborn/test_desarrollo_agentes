@@ -531,6 +531,9 @@ export default {
     const { workspaces } = storeToRefs(wsStore)
 
     const keyInput = ref('')
+    const showKey = ref(false)
+    const showRedmineToken = ref(false)
+    const searchTerm = ref('')
     const redmineTokenInput = ref('')
     const redmineUrlInput = ref('')
     const gestionUrlInput = ref('')

@@ -15,6 +15,8 @@ export const useGitStore = defineStore('git', () => {
   const gitZoom = ref(100)
   const chatZoom = ref(100)
   const loading = ref(false)
+  const _repoRequestToken = ref(0)
+  const _repoLoadingSession = ref(null)
 
   function getCurrentBranch(sessionId) {
     if (!sessionId) return null
@@ -28,6 +30,12 @@ export const useGitStore = defineStore('git', () => {
       cwd.value = ''
       return
     }
+    // Evita relanzar una carga ya en curso para la misma sesión.
+    if (_repoLoadingSession.value && String(_repoLoadingSession.value) === String(sessionId) && loading.value) {
+      return
+    }
+    _repoLoadingSession.value = sessionId
+    const token = ++_repoRequestToken.value
     loading.value = true
     try {
       const verifyRes = await fetch(`${API}/command/git-verify`, {
@@ -37,6 +45,7 @@ export const useGitStore = defineStore('git', () => {
         body: JSON.stringify({ sessionId }),
       })
       const verifyData = await verifyRes.json()
+      if (token !== _repoRequestToken.value) return
 
       if (!verifyData.isRepo) {
         isGitRepo.value = false
@@ -54,6 +63,7 @@ export const useGitStore = defineStore('git', () => {
         body: JSON.stringify({ sessionId, maxCount: 100 }),
       })
       const structData = await structRes.json()
+      if (token !== _repoRequestToken.value) return
 
       if (structData.success) {
         structuredCommits.value = structData.commits
@@ -63,10 +73,14 @@ export const useGitStore = defineStore('git', () => {
         tags.value = structData.tags || []
       }
     } catch (err) {
+      if (token !== _repoRequestToken.value) return
       console.error('Error al obtener datos del repositorio:', err)
       isGitRepo.value = false
     } finally {
-      loading.value = false
+      if (token === _repoRequestToken.value) {
+        loading.value = false
+        _repoLoadingSession.value = null
+      }
     }
   }
 

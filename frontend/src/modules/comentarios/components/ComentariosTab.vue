@@ -160,6 +160,7 @@ export default {
     })
 
     return {
+      activeSession,
       sessionWithTicket,
       comments,
       loading,

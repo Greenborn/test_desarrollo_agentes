@@ -48,6 +48,7 @@ import dbFuncionalidades from './config/dbFuncionalidades.js';
 import dbRedmineComentarios from './config/dbRedmineComentarios.js';
 import { runMigrations } from './config/dbFactory.js';
 import { fetchAllSessionRepos } from './services/gitFetchService.js';
+import { initInterfazRemotaLogin } from './modules/interfaz_remota/interfaz_remota.service.js';
 
 const PORT = process.env.PORT;
 if (!PORT) {
@@ -137,6 +138,7 @@ async function start() {
     }
     console.log(`Server listening on port ${PORT}`);
     fetchAllSessionRepos();
+    initInterfazRemotaLogin();
   });
 }
 

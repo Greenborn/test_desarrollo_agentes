@@ -6,7 +6,10 @@
     <span>Sin proyecto asignado a esta sesión</span>
   </div>
   <div v-else class="comandos-list flex-grow-1 overflow-y-auto px-2 py-1">
-    <button class="btn btn-sm btn-outline-argentina w-100 mb-2" style="font-size: 0.7rem;" @click.stop="crearComando">+ Crear comando</button>
+    <div class="d-flex gap-2 mb-2">
+      <button class="btn btn-sm btn-outline-argentina flex-grow-1" style="font-size: 0.7rem;" @click.stop="crearComando">+ Crear comando</button>
+      <button class="btn btn-sm btn-outline-secondary flex-shrink-0" style="font-size: 0.7rem;" title="Recargar listados" @click.stop="recargar">↻</button>
+    </div>
 
     <template v-if="comandos.length > 0 || loadingComandos">
       <div v-if="loadingComandos" class="d-flex flex-column align-items-center justify-content-center text-secondary small py-2">
@@ -41,6 +44,9 @@ import { useModalStore } from '../../../stores/modal.js'
 import TableEditor from '../../../components/TableEditor.vue'
 import AlertModal from '../../../components/modals/AlertModal.vue'
 import { BtnConfig } from '@/components/BtnConfig'
+import wsClient from '../../../services/wsClient'
+
+const SCRIPTS_NS = 'scripts_cache'
 
 export default {
   components: { TableEditor },
@@ -79,18 +85,36 @@ export default {
       }
     }
 
-    async function loadPackageScripts() {
+    async function loadPackageScripts(force = false) {
       const sid = activeSessionId.value
       if (!sid) {
         packageScripts.value = []
         return
       }
+      const key = String(sid)
       loadingPackageScripts.value = true
       try {
+        if (!force) {
+          try {
+            const mem = await wsClient.send('memoria:get', { namespace: SCRIPTS_NS, key })
+            if (mem.value) {
+              packageScripts.value = mem.value
+              return
+            }
+          } catch (err) {
+            console.log('[comandos] Caché de scripts no disponible, consultando backend:', err.message)
+          }
+        }
         const res = await fetch(`/api/command/package-json-scripts?sessionId=${sid}`, { credentials: 'include' })
         if (res.ok) {
           const data = await res.json()
-          packageScripts.value = data.packages || []
+          const packages = data.packages || []
+          packageScripts.value = packages
+          try {
+            await wsClient.send('memoria:set', { namespace: SCRIPTS_NS, key, value: packages })
+          } catch (err) {
+            console.log('[comandos] Error al guardar caché de scripts:', err.message)
+          }
         } else {
           packageScripts.value = []
         }
@@ -100,6 +124,13 @@ export default {
       } finally {
         loadingPackageScripts.value = false
       }
+    }
+
+    function recargar() {
+      const pid = proyectoId.value
+      const sid = activeSessionId.value
+      if (pid) comandosStore.loadCommands(pid, { force: true })
+      if (sid) loadPackageScripts(true)
     }
 
     function checkTerminalSlot(sid) {
@@ -466,6 +497,7 @@ export default {
       scriptsData,
       scriptsConfig,
       crearComando,
+      recargar,
     }
   },
 }

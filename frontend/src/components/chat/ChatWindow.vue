@@ -119,16 +119,8 @@ export default {
       if (!activeSessionId.value) return
       const session = sessions.value.find(s => Number(s.id) === Number(activeSessionId.value))
       if (!session?.id_ticket_redmine) return
-      try {
-        const res = await fetch(`/api/tickets/session/${activeSessionId.value}`, { credentials: 'include' })
-        const data = await res.json()
-        if (data.ticket) {
-          ticketInfo.value = data.ticket
-          chat.setSessionTicket(activeSessionId.value, data.ticket)
-        }
-      } catch (err) {
-        console.error('Error al cargar info del ticket:', err)
-      }
+      const ticket = await chat.loadTicketInfo(activeSessionId.value)
+      if (ticket) ticketInfo.value = ticket
     }
 
     const { onControlConfirm } = useControlHandlers({

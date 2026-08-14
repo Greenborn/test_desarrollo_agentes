@@ -66,7 +66,7 @@ export default {
   components: { JsonTreeView },
   props: {
     variable: { type: Object, required: true },
-    proyectoId: { type: Number, default: null },
+    proyectoId: { type: [Number, String], default: null },
     modalId: { type: [Number, String], default: null },
   },
   setup(props) {

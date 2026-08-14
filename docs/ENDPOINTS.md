@@ -1473,6 +1473,31 @@ Endpoints para gestionar skills del proyecto (archivos `.agents/skills/[name]/SK
 
 ---
 
+## Interfaz Remota (`/api/interfaz-remota`)
+
+Endpoints del módulo Interfaz Remota. Al iniciar el backend se intenta conectar con el servicio de gestión interna (login y obtención de token); el resultado se almacena en memoria y se expone a través del endpoint de estado.
+
+### `GET /api/interfaz-remota/status`
+- **Auth:** Requerida
+- **Descripción:** Devuelve el estado del intento de login al servicio de gestión interna realizado al iniciar el backend.
+- **Respuesta 200:**
+```json
+{
+  "attempted": true,
+  "success": true,
+  "configured": true,
+  "token": "jwt-token",
+  "url": "https://gestion-interna.example.com",
+  "message": "Login exitoso en gestión interna.",
+  "requestLog": { "method": "POST", "url": "...", "statusCode": 200 },
+  "checkedAt": "2026-08-14T10:00:00.000Z"
+}
+```
+- Si gestión interna no está configurada: `{ "attempted": true, "success": false, "configured": false, "token": null, "url": null, "message": "Gestión interna no configurada.", "checkedAt": "..." }`
+- Si el login falla: `{ "attempted": true, "success": false, "configured": true, "token": null, "url": "...", "message": "<error>", "requestLog": { ... }, "checkedAt": "..." }`
+
+---
+
 ## Notas
 
 - Todas las rutas protegidas devuelven `401 { error: "Sesión no válida" }` si no hay sesión
