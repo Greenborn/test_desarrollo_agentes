@@ -1,5 +1,7 @@
-import WebSocket from 'ws';
+import { io } from 'socket.io-client';
 import { login, getGestionCredentials } from '../gestion/gestion.service.js';
+
+const ANNOUNCE_INTERVAL_MS = 45000;
 
 let loginState = {
   attempted: false,
@@ -20,10 +22,21 @@ let wsState = {
   error: null,
   connectedAt: null,
   lastCheckAt: null,
+  announce: null,
 };
 
-let ws = null;
+let socket = null;
 let wsReconnectTimer = null;
+let announceTimer = null;
+let enabled = true;
+
+const announceId = 'sistema-desarrollo-greenborn';
+const announceNombre = 'Sistema de desarrollo';
+const announceDetalles = {
+  version: process.env.npm_package_version || '1.0.0',
+  backend: 'agent-orchestrator-backend',
+  puerto: process.env.PORT || null,
+};
 
 function resetWsState() {
   wsState = {
@@ -34,11 +47,48 @@ function resetWsState() {
     error: null,
     connectedAt: null,
     lastCheckAt: new Date().toISOString(),
+    announce: null,
   };
 }
 
-export function connectInterfazRemotaWs(gestionUrl) {
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+function emitAnnounce() {
+  if (!socket || !socket.connected) {
+    console.log('[interfaz_remota] No se puede anunciar: socket no conectado.');
+    return;
+  }
+  socket.emit('desarrollo:announce', {
+    id: announceId,
+    nombre: announceNombre,
+    detalles: announceDetalles,
+  }, (resp) => {
+    if (resp && resp.success) {
+      wsState.announce = resp.data || null;
+      wsState.message = 'Sistema anunciado en gestión interna.';
+      console.log('[interfaz_remota] desarrollo:announce OK, sistemas conectados:', resp.data ? resp.data.cantidad : 0);
+    } else {
+      wsState.announce = null;
+      const msg = resp && resp.error ? resp.error : 'Sin ACK de announce';
+      wsState.message = 'Error al anunciar sistema.';
+      console.log('[interfaz_remota] desarrollo:announce falló:', msg);
+    }
+  });
+}
+
+function scheduleAnnounce() {
+  if (announceTimer) {
+    clearInterval(announceTimer);
+  }
+  announceTimer = setInterval(() => {
+    emitAnnounce();
+  }, ANNOUNCE_INTERVAL_MS);
+}
+
+export function connectInterfazRemotaWs(gestionUrl, token) {
+  if (!enabled) {
+    console.log('[interfaz_remota] Conexión deshabilitada, no se conecta.');
+    return;
+  }
+  if (socket) {
     return;
   }
 
@@ -48,64 +98,60 @@ export function connectInterfazRemotaWs(gestionUrl) {
   }
 
   const baseUrl = gestionUrl.replace(/\/+$/, '');
-  const isHttps = baseUrl.startsWith('https:');
-  const wsUrl = `${isHttps ? 'wss' : 'ws'}://${baseUrl.replace(/^https?:\/\//, '')}/socket.io/?EIO=4&transport=websocket`;
+  const socketUrl = baseUrl.replace(/^https?:\/\//, '');
+  const isSecure = baseUrl.startsWith('https:');
 
   resetWsState();
-  wsState.url = wsUrl;
+  wsState.url = baseUrl;
 
-  let opened = false;
   try {
-    ws = new WebSocket(wsUrl, { rejectUnauthorized: true });
+    socket = io(isSecure ? `https://${socketUrl}` : `http://${socketUrl}`, {
+      path: '/socket.io',
+      transports: ['websocket'],
+      auth: { token },
+      reconnection: true,
+      reconnectionDelay: 5000,
+      reconnectionAttempts: Infinity,
+    });
   } catch (err) {
-    wsState.error = err.message ? err.message : 'Error al crear conexión WebSocket.';
-    wsState.message = 'Error al conectar WebSocket.';
-    console.log('[interfaz_remota] Error al crear WebSocket:', err.message);
+    wsState.error = err.message ? err.message : 'Error al crear conexión socket.io.';
+    wsState.message = 'Error al conectar socket.io.';
+    console.log('[interfaz_remota] Error al crear socket.io:', err.message);
     scheduleWsRetry();
     return;
   }
 
-  const openTimeout = setTimeout(() => {
-    if (!opened) {
-      wsState.error = 'Timeout de conexión WebSocket.';
-      wsState.message = 'No se pudo conectar el WebSocket.';
-      console.log('[interfaz_remota] WebSocket timeout');
-      try { ws.terminate(); } catch (err) { console.log('[interfaz_remota] error al terminar ws:', err.message); }
-    }
-  }, 8000);
-
-  ws.on('open', () => {
-    opened = true;
-    clearTimeout(openTimeout);
+  socket.on('connect', () => {
     wsState.connected = true;
     wsState.connectedAt = new Date().toISOString();
-    wsState.message = 'WebSocket conectado al servicio de gestión interna.';
+    wsState.message = 'Socket conectado al servicio de gestión interna.';
     wsState.error = null;
-    console.log('[interfaz_remota] WebSocket conectado:', wsUrl);
+    console.log('[interfaz_remota] socket.io conectado:', socket.id);
+    emitAnnounce();
+    scheduleAnnounce();
   });
 
-  ws.on('message', (data) => {
-    console.log('[interfaz_remota] WebSocket message:', data.toString().slice(0, 80));
-  });
-
-  ws.on('close', (code, reason) => {
-    clearTimeout(openTimeout);
-    const wasConnected = wsState.connected;
+  socket.on('disconnect', (reason) => {
     wsState.connected = false;
     wsState.connectedAt = null;
-    wsState.message = 'Conexión WebSocket cerrada.';
-    console.log(`[interfaz_remota] WebSocket cerrado (code ${code})${reason ? ': ' + reason : ''}`);
-    if (wasConnected || opened) {
-      scheduleWsRetry();
+    wsState.announce = null;
+    wsState.message = `Conexión socket.io cerrada (${reason}).`;
+    console.log('[interfaz_remota] socket.io desconectado:', reason);
+    if (announceTimer) {
+      clearInterval(announceTimer);
+      announceTimer = null;
     }
   });
 
-  ws.on('error', (err) => {
-    clearTimeout(openTimeout);
+  socket.on('connect_error', (err) => {
     wsState.connected = false;
-    wsState.error = err.message ? err.message : 'Error WebSocket.';
-    wsState.message = 'Error en la conexión WebSocket.';
-    console.log('[interfaz_remota] Error WebSocket:', err.message || err.code);
+    wsState.error = err.message ? err.message : 'Error socket.io.';
+    wsState.message = 'Error en la conexión socket.io.';
+    console.log('[interfaz_remota] socket.io connect_error:', err.message);
+  });
+
+  socket.on('desarrollo:status', (payload) => {
+    console.log('[interfaz_remota] desarrollo:status recibido:', JSON.stringify(payload).slice(0, 120));
   });
 }
 
@@ -114,8 +160,8 @@ function scheduleWsRetry() {
     clearTimeout(wsReconnectTimer);
   }
   wsReconnectTimer = setTimeout(() => {
-    if (loginState.configured && loginState.url) {
-      connectInterfazRemotaWs(loginState.url);
+    if (loginState.configured && loginState.url && loginState.token) {
+      connectInterfazRemotaWs(loginState.url, loginState.token);
     }
   }, 5000);
 }
@@ -129,14 +175,18 @@ export function stopInterfazRemotaWs() {
     clearTimeout(wsReconnectTimer);
     wsReconnectTimer = null;
   }
-  if (ws) {
+  if (announceTimer) {
+    clearInterval(announceTimer);
+    announceTimer = null;
+  }
+  if (socket) {
     try {
-      ws.removeAllListeners();
-      ws.terminate();
+      socket.removeAllListeners();
+      socket.disconnect();
     } catch (err) {
-      console.log('[interfaz_remota] error al cerrar WebSocket:', err.message);
+      console.log('[interfaz_remota] error al cerrar socket.io:', err.message);
     }
-    ws = null;
+    socket = null;
   }
   wsState = {
     attempted: false,
@@ -146,6 +196,7 @@ export function stopInterfazRemotaWs() {
     error: null,
     connectedAt: null,
     lastCheckAt: null,
+    announce: null,
   };
 }
 
@@ -180,7 +231,7 @@ export async function initInterfazRemotaLogin() {
     loginState.message = 'Login exitoso en gestión interna.';
     console.log('[interfaz_remota] Login exitoso en gestión interna.');
 
-    connectInterfazRemotaWs(creds.gestionUrl);
+    connectInterfazRemotaWs(creds.gestionUrl, result.token);
   } catch (err) {
     loginState.success = false;
     loginState.message = err.message ? err.message : 'Error al conectar con gestión interna.';
@@ -195,8 +246,31 @@ export function getInterfazRemotaLoginState() {
   return loginState;
 }
 
+export function getInterfazRemotaEnabled() {
+  return enabled;
+}
+
+export function setInterfazRemotaEnabled(value) {
+  enabled = value === true || value === 'true' || value === '1' || value === 1;
+  if (!enabled) {
+    stopInterfazRemotaWs();
+    loginState.attempted = false;
+    loginState.success = false;
+    loginState.token = null;
+    loginState.message = 'Conexión deshabilitada por el usuario.';
+    loginState.checkedAt = new Date().toISOString();
+  }
+  return enabled;
+}
+
+export function enableInterfazRemota() {
+  enabled = true;
+  return initInterfazRemotaLogin();
+}
+
 export function getInterfazRemotaStatus() {
   return {
+    enabled,
     login: loginState,
     ws: wsState,
   };

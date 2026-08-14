@@ -10,6 +10,12 @@
       <button class="btn btn-sm btn-outline-argentina flex-grow-1" style="font-size: 0.7rem;" @click.stop="crearComando">+ Crear comando</button>
       <button class="btn btn-sm btn-outline-secondary flex-shrink-0" style="font-size: 0.7rem;" title="Recargar listados" @click.stop="recargar">↻</button>
     </div>
+    <div class="d-flex align-items-center gap-2 mb-2 px-1">
+      <div class="form-check form-switch m-0">
+        <input class="form-check-input" type="checkbox" role="switch" :checked="scriptsEnabled" @change="onToggleScripts($event)" />
+      </div>
+      <span class="text-muted" style="font-size: 0.7rem;">Consultar scripts npm</span>
+    </div>
 
     <template v-if="comandos.length > 0 || loadingComandos">
       <div v-if="loadingComandos" class="d-flex flex-column align-items-center justify-content-center text-secondary small py-2">
@@ -78,6 +84,20 @@ export default {
     const loadingPackageScripts = ref(false)
     const executingScripts = ref(new Map())
 
+    const scriptsEnabled = computed(() => !!chat.getSessionPrefs(activeSessionId.value)?.buscarScriptsNpm)
+
+    function onToggleScripts(e) {
+      const sid = activeSessionId.value
+      if (!sid) return
+      const val = e.target.checked
+      chat.saveSessionPref(sid, 'buscarScriptsNpm', val)
+      if (!val) {
+        packageScripts.value = []
+      } else {
+        loadPackageScripts(true)
+      }
+    }
+
     function _updateStreamMsg(streamKey, content) {
       const idx = chat.messages.findIndex(m => m._key === streamKey)
       if (idx >= 0) {
@@ -130,7 +150,7 @@ export default {
       const pid = proyectoId.value
       const sid = activeSessionId.value
       if (pid) comandosStore.loadCommands(pid, { force: true })
-      if (sid) loadPackageScripts(true)
+      if (sid && scriptsEnabled.value) loadPackageScripts(true)
     }
 
     function checkTerminalSlot(sid) {
@@ -482,7 +502,7 @@ export default {
         return
       }
       comandosStore.loadCommands(pid)
-      if (sid) loadPackageScripts()
+      if (sid && scriptsEnabled.value) loadPackageScripts()
     }, { immediate: true })
 
     return {
@@ -496,6 +516,8 @@ export default {
       commandsConfig,
       scriptsData,
       scriptsConfig,
+      scriptsEnabled,
+      onToggleScripts,
       crearComando,
       recargar,
     }

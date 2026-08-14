@@ -1475,14 +1475,15 @@ Endpoints para gestionar skills del proyecto (archivos `.agents/skills/[name]/SK
 
 ## Interfaz Remota (`/api/interfaz-remota`)
 
-Endpoints del módulo Interfaz Remota. Al iniciar el backend se intenta conectar con el servicio de gestión interna (login y obtención de token); el resultado se almacena en memoria y se expone a través del endpoint de estado.
+Endpoints del módulo Interfaz Remota. Al iniciar el backend se intenta conectar con el servicio de gestión interna (login y obtención de token). Tras el login, el backend se conecta por socket.io-client (`socket.io-client@4.8+`) al socket del sistema de gestión interna y se **anuncia** emitiendo el evento `desarrollo:announce`, de modo que el panel admin de gestión interna (`/#/admin/desarrollo`) muestre el sistema de desarrollo como conectado. El anuncio se repite periódicamente (heartbeat ~45s) y se re-emite al reconectar. El estado se almacena en memoria y se expone a través del endpoint de estado.
 
 ### `GET /api/interfaz-remota/status`
 - **Auth:** Requerida
-- **Descripción:** Devuelve el estado del intento de login al servicio de gestión interna y el estado de la conexión WebSocket (Socket.IO), ambos realizados al iniciar el backend. El WebSocket se conecta a `wss://<url-gestion>/socket.io/?EIO=4&transport=websocket` y se reconecta automáticamente.
+- **Descripción:** Devuelve el estado del intento de login al servicio de gestión interna, el estado de la conexión socket.io y si la conexión está habilitada. El login y la conexión se intentan al iniciar el backend (si la conexión está habilitada). El socket se conecta a `<url-gestion>` con path `/socket.io`, `transports: ['websocket']` y `auth.token` = token SSO/local obtenido en el login.
 - **Respuesta 200:**
 ```json
 {
+  "enabled": true,
   "login": {
     "attempted": true,
     "success": true,
@@ -1496,17 +1497,34 @@ Endpoints del módulo Interfaz Remota. Al iniciar el backend se intenta conectar
   "ws": {
     "attempted": true,
     "connected": true,
-    "url": "wss://gestion-interna.example.com/socket.io/?EIO=4&transport=websocket",
-    "message": "WebSocket conectado al servicio de gestión interna.",
+    "url": "https://gestion-interna.example.com",
+    "message": "Sistema anunciado en gestión interna.",
     "error": null,
     "connectedAt": "2026-08-14T10:00:05.000Z",
-    "lastCheckAt": "2026-08-14T10:00:05.000Z"
+    "lastCheckAt": "2026-08-14T10:00:05.000Z",
+    "announce": {
+      "conectado": true,
+      "cantidad": 1,
+      "sistemas": [
+        { "id": "sistema-desarrollo-greenborn", "nombre": "Sistema de desarrollo", "proyecto": "", "detalles": {}, "conectadoDesde": "2026-08-14T10:00:05.000Z" }
+      ]
+    }
   }
 }
 ```
 - Si gestión interna no está configurada: `login` con `{ "attempted": true, "success": false, "configured": false, "message": "Gestión interna no configurada." }` y `ws` con `{ "attempted": false, "connected": false }`
 - Si el login falla: `login` con `{ "attempted": true, "success": false, "configured": true, "message": "<error>", "requestLog": { ... } }`
-- Si el WebSocket no logra conectarse: `ws` con `{ "attempted": true, "connected": false, "message": "No se pudo conectar el WebSocket.", "error": "<error>" }`
+- Si el socket no logra conectarse: `ws` con `{ "attempted": true, "connected": false, "message": "Error en la conexión socket.io.", "error": "<error>" }`
+
+### `POST /api/interfaz-remota/enable`
+- **Auth:** Requerida
+- **Descripción:** Habilita la conexión y vuelve a realizar el login al servicio de gestión interna, se reconecta el socket y se re-anuncia (si estaba deshabilitada). Devuelve el estado completo igual que `GET /status`.
+- **Respuesta 200:** mismo objeto que `GET /status` con `enabled: true`
+
+### `POST /api/interfaz-remota/disable`
+- **Auth:** Requerida
+- **Descripción:** Deshabilita la conexión: desconecta el socket, detiene los reintentos y el heartbeat de announce, y limpia el estado de login. Devuelve el estado completo igual que `GET /status`.
+- **Respuesta 200:** mismo objeto que `GET /status` con `enabled: false`
 
 ---
 
