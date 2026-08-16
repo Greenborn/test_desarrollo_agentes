@@ -27,6 +27,11 @@
           <span class="text-secondary small">Login servicio de gestión interna</span>
         </div>
         <p class="mb-1" :class="loginMessageClass">{{ loginStatusMessage }}</p>
+        <div v-if="!login.success && login.requestLog" class="text-danger small mb-1">
+          <i class="bi bi-server me-1"></i>
+          Respuesta del servidor: {{ login.requestLog.method }} {{ login.requestLog.statusCode }}
+          <code class="ms-1">{{ login.requestLog.url }}</code>
+        </div>
         <div v-if="login.checkedAt" class="text-secondary small mb-3">
           Verificado: {{ login.checkedAt }}
         </div>
@@ -36,6 +41,10 @@
           <span class="text-secondary small">WebSocket</span>
         </div>
         <p class="mb-1" :class="wsMessageClass">{{ wsStatusMessage }}</p>
+        <div v-if="ws.error" class="text-danger small mb-1">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          Motivo: {{ ws.error }}
+        </div>
         <div v-if="login.url" class="text-secondary small">
           URL: <code>{{ login.url }}</code>
         </div>
@@ -94,12 +103,58 @@
         </div>
       </div>
     </div>
+    <div class="card border-0 mt-3" style="background: #1e2b1e;">
+      <div class="card-body p-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="text-light">Log de mensajes io del WebSocket</span>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge" :class="sseConnected ? 'bg-success' : 'bg-danger'">
+              {{ sseConnected ? 'En vivo' : 'Desconectado' }}
+            </span>
+            <button class="btn btn-sm btn-outline-secondary" @click="toggleIoLogDetail">
+              <i :class="['bi', 'me-1', showIoLogDetail ? 'bi-chevron-up' : 'bi-chevron-down']"></i>
+              {{ showIoLogDetail ? 'Ocultar' : 'Ver' }} log
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" @click="clearIoLog" :disabled="ioLog.length === 0">
+              <i class="bi bi-trash me-1"></i>
+              Limpiar
+            </button>
+          </div>
+        </div>
+
+        <div v-if="!showIoLogDetail && ioLog.length > 0" class="text-secondary small">
+          {{ ioLog.length }} mensaje(s) registrado(s). Pulsa "Ver log" para detallarlos.
+        </div>
+
+        <div v-if="showIoLogDetail" class="io-log-box">
+          <div v-if="ioLog.length === 0" class="text-secondary small p-2">
+            Sin mensajes io registrados todavía.
+          </div>
+          <div
+            v-for="entry in ioLog"
+            :key="entry.id"
+            class="io-log-entry"
+          >
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge" :class="entry.direction === 'in' ? 'bg-info' : 'bg-warning'">
+                {{ entry.direction === 'in' ? 'IN' : 'OUT' }}
+              </span>
+              <code class="small">{{ entry.event }}</code>
+              <span class="text-secondary small ms-auto">{{ formatTs(entry.ts) }}</span>
+            </div>
+            <pre class="io-log-payload mb-0">{{ JSON.stringify(entry.data, null, 2) }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { settingGet, settingSet } from '../../../services/settingService.js'
+
+const IO_LOG_MAX = 200
 
 const ENABLED_KEY = 'interfaz_remota_enabled'
 
@@ -113,6 +168,10 @@ export default {
     const showTestDetail = ref(false)
     const state = ref({ login: {}, ws: {} })
     const enabled = ref(true)
+    const ioLog = ref([])
+    const showIoLogDetail = ref(false)
+    const sseConnected = ref(false)
+    let eventSource = null
 
     async function loadStatus() {
       loading.value = true
@@ -120,6 +179,9 @@ export default {
         const res = await fetch('/api/interfaz-remota/status', { credentials: 'include' })
         const data = await res.json()
         state.value = { login: data.login || {}, ws: data.ws || {} }
+        if (Array.isArray(data.ioLog) && data.ioLog.length > 0) {
+          ioLog.value = data.ioLog.slice(-IO_LOG_MAX)
+        }
         if (typeof data.enabled === 'boolean') enabled.value = data.enabled
       } catch (err) {
         console.log('InterfazRemotaTab: error al consultar estado de conexión a gestión interna:', err.message)
@@ -198,9 +260,71 @@ export default {
       }
     }
 
+    function setupEventSource() {
+      if (eventSource) {
+        eventSource.close()
+        eventSource = null
+      }
+      eventSource = new EventSource('/api/interfaz-remota/events')
+      eventSource.onopen = () => {
+        sseConnected.value = true
+      }
+      eventSource.onmessage = (event) => {
+        let msg
+        try {
+          msg = JSON.parse(event.data)
+        } catch (err) {
+          console.log('InterfazRemotaTab: error al parsear mensaje SSE:', err.message)
+          return
+        }
+        if (msg.type === 'snapshot') {
+          if (Array.isArray(msg.ioLog) && msg.ioLog.length > 0) {
+            ioLog.value = msg.ioLog.slice(-IO_LOG_MAX)
+          }
+          return
+        }
+        if (msg.type === 'io' && msg.entry) {
+          ioLog.value.push(msg.entry)
+          if (ioLog.value.length > IO_LOG_MAX) {
+            ioLog.value = ioLog.value.slice(ioLog.value.length - IO_LOG_MAX)
+          }
+        }
+      }
+      eventSource.onerror = (event) => {
+        sseConnected.value = false
+        console.log('InterfazRemotaTab: error de conexión SSE del log io:', event.type)
+      }
+    }
+
+    function toggleIoLogDetail() {
+      showIoLogDetail.value = !showIoLogDetail.value
+    }
+
+    function clearIoLog() {
+      ioLog.value = []
+    }
+
+    function formatTs(ts) {
+      if (!ts) return ''
+      try {
+        return new Date(ts).toLocaleTimeString('es-ES', { hour12: false })
+      } catch (err) {
+        console.log('InterfazRemotaTab: error al formatear timestamp:', err.message)
+        return String(ts)
+      }
+    }
+
     onMounted(async () => {
       await loadEnabledPref()
       await loadStatus()
+      setupEventSource()
+    })
+
+    onUnmounted(() => {
+      if (eventSource) {
+        eventSource.close()
+        eventSource = null
+      }
     })
 
     const login = computed(() => state.value.login)
@@ -255,9 +379,11 @@ export default {
     const wsStatusMessage = computed(() => {
       const s = ws.value
       if (!enabled.value) return 'WebSocket deshabilitado.'
-      if (s.message) return s.message
       if (s.connected) return 'Conexión WebSocket activa con el servicio de gestión interna.'
-      return 'No hay conexión WebSocket activa.'
+      if (s.message) return s.message
+      return s.error
+        ? `No hay conexión WebSocket activa. Motivo: ${s.error}`
+        : 'No hay conexión WebSocket activa.'
     })
 
     const wsMessageClass = computed(() => {
@@ -271,6 +397,8 @@ export default {
       testing, testResult, showTestDetail,
       loginStatusLabel, loginBadgeClass, loginStatusMessage, loginMessageClass,
       wsStatusLabel, wsBadgeClass, wsStatusMessage, wsMessageClass,
+      ioLog, showIoLogDetail, sseConnected,
+      toggleIoLogDetail, clearIoLog, formatTs,
     }
   },
 }
@@ -279,5 +407,31 @@ export default {
 <style scoped>
 .interfaz-remota-container {
   min-height: 0;
+}
+
+.io-log-box {
+  max-height: 320px;
+  overflow: auto;
+  background: #142114;
+  border-radius: 4px;
+  padding: 8px;
+  border: 1px solid #2b442b;
+}
+
+.io-log-entry {
+  border-bottom: 1px solid #2b442b;
+  padding: 6px 2px;
+}
+
+.io-log-entry:last-child {
+  border-bottom: none;
+}
+
+.io-log-payload {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #9fd9a0;
+  font-size: 0.72rem;
+  margin-top: 4px;
 }
 </style>

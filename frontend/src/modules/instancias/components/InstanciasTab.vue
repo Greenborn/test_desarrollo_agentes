@@ -183,19 +183,30 @@ export default {
       return devProcesses.value.filter(p => p.sessionId === activeSessionId.value)
     })
 
+    // Tope de líneas por proceso para acotar el coste de render del <pre> y del
+    // join/split. Sin este límite, logs que crecen sin fin re-renderizan un
+    // nodo de texto gigante en cada polling (devInstance.fetchLogs cada 1.5s),
+    // que es una de las causas de bloqueo del main thread al montar/ver esta tab.
+    const MAX_LOG_LINES = 500
+
+    function sliceLogLines(lines) {
+      if (!Array.isArray(lines)) return []
+      return lines.length > MAX_LOG_LINES ? lines.slice(-MAX_LOG_LINES) : lines
+    }
+
     const displayText = computed(() => {
       const names = devStore.processNames
       if (names.length === 0) return ''
 
       if (selectedProcess.value) {
-        const lines = devLogsMap.value[selectedProcess.value]
-        return lines ? lines.join('\n') : ''
+        const lines = sliceLogLines(devLogsMap.value[selectedProcess.value])
+        return lines.length ? lines.join('\n') : ''
       }
 
       const combined = []
       for (const name of names) {
-        const lines = devLogsMap.value[name]
-        if (lines && lines.length) {
+        const lines = sliceLogLines(devLogsMap.value[name])
+        if (lines.length) {
           combined.push(`── ${name} ──`)
           combined.push(...lines)
         }

@@ -1,11 +1,11 @@
-import { defineAsyncComponent } from 'vue'
+import { defineAsyncTab } from '../../utils/asyncTab.js'
 
 export default {
   id: 'tickets',
   name: 'Tickets',
   tabs: {
     devPanel: [
-      { id: 'tickets', label: 'Tickets', component: defineAsyncComponent(() => import('./components/TicketsTab.vue')), priority: 30 },
+      { id: 'tickets', label: 'Tickets', component: defineAsyncTab(() => import('./components/TicketsTab.vue')), priority: 30 },
     ],
   },
 }

@@ -3,6 +3,7 @@ import { login, getGestionCredentials } from '../gestion/gestion.service.js';
 import db from '../../config/db.js';
 
 const ANNOUNCE_INTERVAL_MS = 45000;
+const IO_LOG_MAX = 200;
 
 let loginState = {
   attempted: false,
@@ -31,6 +32,10 @@ let wsReconnectTimer = null;
 let announceTimer = null;
 let enabled = true;
 
+let ioLog = [];
+let ioLogIdCounter = 0;
+const sseSubscribers = new Set();
+
 const announceId = 'sistema-desarrollo-greenborn';
 const announceNombre = 'Sistema de desarrollo';
 const announceDetalles = {
@@ -52,6 +57,59 @@ function resetWsState() {
   };
 }
 
+function safeSerialize(value) {
+  try {
+    return JSON.stringify(value);
+  } catch (err) {
+    return JSON.stringify(String(value));
+  }
+}
+
+function appendIoLog(direction, event, data) {
+  ioLogIdCounter += 1;
+  let payload = null;
+  try {
+    payload = JSON.parse(safeSerialize(data));
+  } catch (err) {
+    payload = String(data);
+  }
+  const entry = {
+    id: ioLogIdCounter,
+    ts: new Date().toISOString(),
+    direction,
+    event,
+    data: payload,
+  };
+  ioLog.push(entry);
+  if (ioLog.length > IO_LOG_MAX) {
+    ioLog = ioLog.slice(ioLog.length - IO_LOG_MAX);
+  }
+  broadcastIoLog(entry);
+  console.log(`[interfaz_remota] io ${direction} "${event}":`, safeSerialize(data).slice(0, 200));
+}
+
+function broadcastIoLog(entry) {
+  if (sseSubscribers.size === 0) return;
+  const frame = `data: ${JSON.stringify({ type: 'io', entry })}\n\n`;
+  for (const res of sseSubscribers) {
+    try {
+      res.write(frame);
+    } catch (err) {
+      console.log('[interfaz_remota] error al enviar log io por SSE:', err.message);
+      sseSubscribers.delete(res);
+    }
+  }
+}
+
+export function subscribeIoEvents(res) {
+  sseSubscribers.add(res);
+  return () => sseSubscribers.delete(res);
+}
+
+export function getInterfazRemotaIoLog() {
+  return ioLog;
+}
+
 const SESSION_FIELDS = [
   'chat_sessions.id',
   'title',
@@ -68,17 +126,25 @@ async function queryChatSessions() {
     db('chat_sessions')
       .where('chat_sessions.archived', false)
       .orderBy('chat_sessions.updated_at', 'desc')
+      .limit(200)
       .select(SESSION_FIELDS),
     db('chat_sessions')
       .where('chat_sessions.archived', true)
       .orderBy('chat_sessions.updated_at', 'desc')
+      .limit(200)
       .select(SESSION_FIELDS),
   ]);
   console.log(`[interfaz_remota] chatSessions respondidas: ${activas.length} activas, ${archivadas.length} archivadas`);
   return { activas, archivadas };
 }
 
-async function handleChatSessionsRequest(ack) {
+// Serializa las peticiones de sesiones de chat por socket. Evita que múltiples
+// ACK concurrentes (reintentos del lado gestión interna, usuarios, etc.) lancen
+// consultas DB duplicadas simultáneas que bloquean el event loop y disparan el
+// ping timeout -> reconexión del socket.
+let chatSessionQueue = Promise.resolve();
+
+function handleChatSessionsRequest(ack) {
   const respond = (payload) => {
     if (typeof ack === 'function') {
       ack(payload);
@@ -86,13 +152,15 @@ async function handleChatSessionsRequest(ack) {
       console.log('[interfaz_remota] chatSessions sin callback ack:', JSON.stringify(payload).slice(0, 120));
     }
   };
-  try {
-    const data = await queryChatSessions();
-    respond({ success: true, data });
-  } catch (err) {
-    console.log('[interfaz_remota] Error al consultar sesiones de chat:', err.message);
-    respond({ success: false, error: err.message ? err.message : 'Error al consultar sesiones de chat.' });
-  }
+  chatSessionQueue = chatSessionQueue.then(async () => {
+    try {
+      const data = await queryChatSessions();
+      respond({ success: true, data });
+    } catch (err) {
+      console.log('[interfaz_remota] Error al consultar sesiones de chat:', err.message);
+      respond({ success: false, error: err.message ? err.message : 'Error al consultar sesiones de chat.' });
+    }
+  });
 }
 
 export async function testChatSessions() {
@@ -165,6 +233,8 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
       auth: { token },
       reconnection: true,
       reconnectionDelay: 5000,
+      reconnectionDelayMax: 15000,
+      timeout: 20000,
       reconnectionAttempts: Infinity,
     });
   } catch (err) {
@@ -212,6 +282,14 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
     const cb = typeof ack === 'function' ? ack : (typeof payload === 'function' ? payload : null);
     handleChatSessionsRequest(cb);
   });
+
+  socket.onAny((event, ...args) => {
+    appendIoLog('in', event, args.length === 1 ? args[0] : args);
+  });
+
+  socket.onAnyOutgoing((event, ...args) => {
+    appendIoLog('out', event, args.length === 1 ? args[0] : args);
+  });
 }
 
 function scheduleWsRetry() {
@@ -257,6 +335,8 @@ export function stopInterfazRemotaWs() {
     lastCheckAt: null,
     announce: null,
   };
+  ioLog = [];
+  ioLogIdCounter = 0;
 }
 
 export async function initInterfazRemotaLogin() {
@@ -332,5 +412,6 @@ export function getInterfazRemotaStatus() {
     enabled,
     login: loginState,
     ws: wsState,
+    ioLog,
   };
 }

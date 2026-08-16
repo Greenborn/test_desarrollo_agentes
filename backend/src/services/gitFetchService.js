@@ -15,6 +15,34 @@ function execAsync(cmd, opts = {}) {
   });
 }
 
+const CONCURRENCY = 5;
+
+async function fetchOne(dir) {
+  try {
+    const { stdout } = await execAsync('git rev-parse --show-toplevel', {
+      cwd: dir,
+      encoding: 'utf-8',
+      timeout: 5000,
+    });
+    const rootPath = stdout.trim();
+
+    console.log(`[git-fetch] Ejecutando git fetch en: ${rootPath}`);
+    await execAsync('git fetch', {
+      cwd: rootPath,
+      encoding: 'utf-8',
+      timeout: 30000,
+      env: { ...process.env, GIT_PAGER: 'cat', PAGER: 'cat' },
+    });
+    console.log(`[git-fetch] ✓ ${rootPath}`);
+  } catch (err) {
+    if (err.status === 128 || (err.stderr && err.stderr.toString().includes('not a git repository'))) {
+      console.log(`[git-fetch] ✗ ${dir} no es un repositorio git`);
+    } else {
+      console.log(`[git-fetch] ✗ Error en ${dir}: ${err.message}`);
+    }
+  }
+}
+
 export async function fetchAllSessionRepos() {
   console.log('[git-fetch] Iniciando actualización de repositorios de sesiones de chat...');
   try {
@@ -30,31 +58,17 @@ export async function fetchAllSessionRepos() {
       return;
     }
 
-    for (const dir of dirs) {
-      try {
-        const { stdout } = await execAsync('git rev-parse --show-toplevel', {
-          cwd: dir,
-          encoding: 'utf-8',
-          timeout: 5000,
-        });
-        const rootPath = stdout.trim();
-
-        console.log(`[git-fetch] Ejecutando git fetch en: ${rootPath}`);
-        await execAsync('git fetch', {
-          cwd: rootPath,
-          encoding: 'utf-8',
-          timeout: 30000,
-          env: { ...process.env, GIT_PAGER: 'cat', PAGER: 'cat' },
-        });
-        console.log(`[git-fetch] ✓ ${rootPath}`);
-      } catch (err) {
-        if (err.status === 128 || (err.stderr && err.stderr.toString().includes('not a git repository'))) {
-          console.log(`[git-fetch] ✗ ${dir} no es un repositorio git`);
-        } else {
-          console.log(`[git-fetch] ✗ Error en ${dir}: ${err.message}`);
+    let i = 0;
+    const workers = Array.from(
+      { length: Math.min(CONCURRENCY, dirs.length) },
+      async () => {
+        while (i < dirs.length) {
+          const dir = dirs[i++];
+          await fetchOne(dir);
         }
       }
-    }
+    );
+    await Promise.all(workers);
 
     console.log('[git-fetch] Actualización completada.');
   } catch (err) {

@@ -168,6 +168,7 @@ import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useModalStore } from '../../stores/modal.js'
 import AlertModal from '../modals/AlertModal.vue'
 import { contrastTextColor } from '../../utils/color.js'
+import { copyToClipboard } from '../../utils/clipboard.js'
 import ServiciosPanel from '../services/ServiciosPanel.vue'
 import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
 import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
@@ -339,7 +340,7 @@ export default {
         modal.open(AlertModal, { message: 'La sesión no tiene un path asociado.' }, { title: 'Copiar path' })
         return
       }
-      navigator.clipboard.writeText(path).then(() => {
+      copyToClipboard(path).then(() => {
         modal.open(AlertModal, { message: `Path copiado: ${path}` }, { title: 'Copiar path' })
       }).catch((err) => {
         console.error('Error copiando path al portapapeles:', err)

@@ -65,7 +65,7 @@
       </div>
       <div v-else class="p-2">
         <div
-          v-for="(log, i) in filteredLogs"
+          v-for="(log, i) in displayedLogs"
           :key="log.id || i"
           class="network-entry rounded"
           :class="{ expanded: expandedId === log.id, failed: log.status_code === null }"
@@ -145,6 +145,16 @@ export default {
         (parseInt(rangeFilter.value.split('x')[0], 10) + 1) * 100
       ]
       return networkLogs.value.filter(log => log.status_code !== null && log.status_code >= min && log.status_code < max)
+    })
+
+    // Tope de filas renderizadas: renderizar todas sin límite hace que cada
+    // polling (cada 3s) re-renderice una lista creciente sin fin, bloqueando el
+    // main thread al interactuar con esta pestaña.
+    const MAX_LOG_ROWS = 300
+
+    const displayedLogs = computed(() => {
+      if (filteredLogs.value.length <= MAX_LOG_ROWS) return filteredLogs.value
+      return filteredLogs.value.slice(-MAX_LOG_ROWS)
     })
 
     function setRangeFilter(range) {
@@ -232,6 +242,7 @@ export default {
       rangeFilter,
       specificCodes,
       filteredLogs,
+      displayedLogs,
       setRangeFilter,
       methodClass,
       statusClass,

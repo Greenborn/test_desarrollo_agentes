@@ -44,6 +44,25 @@ function stripAnsi(str) {
     .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
 }
 
+// Caché LRU simple por contenido: durante el streaming, cada chunk muta el
+// mensaje activo y dispara re-renders de la ventana visible. Memoizar parseMarkdown
+// evita re-ejecutar el parsing regex pesado para los mensajes visibles cuyo
+// contenido no cambió. Se acota el tamaño para no crecer sin límite.
+const MARKDOWN_CACHE_LIMIT = 200
+const markdownCache = new Map()
+
+function parseMarkdownCached(text) {
+  const cached = markdownCache.get(text)
+  if (cached !== undefined) return cached
+  const html = parseMarkdown(text)
+  if (markdownCache.size >= MARKDOWN_CACHE_LIMIT) {
+    const oldestKey = markdownCache.keys().next().value
+    markdownCache.delete(oldestKey)
+  }
+  markdownCache.set(text, html)
+  return html
+}
+
 function parseMarkdown(text) {
   if (!text) return ''
 
@@ -210,7 +229,7 @@ export default {
     parsedHtml() {
       if (this.parsedJson) return ''
       try {
-        return parseMarkdown(this.text)
+        return parseMarkdownCached(this.text)
       } catch (e) {
         console.log('ChatFormatter: markdown parse error, falling back to plain text', e)
         return ''

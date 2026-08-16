@@ -168,8 +168,70 @@
 
 <script>
 import { ref, watch, computed } from 'vue'
-import hljs from 'highlight.js'
+import hljs from 'highlight.js/lib/core'
 import 'highlight.js/styles/atom-one-dark.css'
+// Registro selectivo de lenguajes: importar `highlight.js` completo embebe ~190
+// grammars en el chunk de ArchivosTab (~1 MB), que se evalúa en el main thread al
+// abrir la pestaña por primera vez y congela la UI. Con lib/core + registro
+// explícito solo se cargan los lenguajes del mapa EXT_TO_LANG.
+import javascript from 'highlight.js/lib/languages/javascript'
+import typescript from 'highlight.js/lib/languages/typescript'
+import xml from 'highlight.js/lib/languages/xml'
+import python from 'highlight.js/lib/languages/python'
+import php from 'highlight.js/lib/languages/php'
+import java from 'highlight.js/lib/languages/java'
+import ruby from 'highlight.js/lib/languages/ruby'
+import go from 'highlight.js/lib/languages/go'
+import rust from 'highlight.js/lib/languages/rust'
+import c from 'highlight.js/lib/languages/c'
+import cpp from 'highlight.js/lib/languages/cpp'
+import csharp from 'highlight.js/lib/languages/csharp'
+import swift from 'highlight.js/lib/languages/swift'
+import kotlin from 'highlight.js/lib/languages/kotlin'
+import scala from 'highlight.js/lib/languages/scala'
+import bash from 'highlight.js/lib/languages/bash'
+import perl from 'highlight.js/lib/languages/perl'
+import lua from 'highlight.js/lib/languages/lua'
+import r from 'highlight.js/lib/languages/r'
+import css from 'highlight.js/lib/languages/css'
+import scss from 'highlight.js/lib/languages/scss'
+import less from 'highlight.js/lib/languages/less'
+import sql from 'highlight.js/lib/languages/sql'
+import yaml from 'highlight.js/lib/languages/yaml'
+import json from 'highlight.js/lib/languages/json'
+import markdown from 'highlight.js/lib/languages/markdown'
+import ini from 'highlight.js/lib/languages/ini'
+import dockerfile from 'highlight.js/lib/languages/dockerfile'
+import plaintext from 'highlight.js/lib/languages/plaintext'
+hljs.registerLanguage('javascript', javascript)
+hljs.registerLanguage('typescript', typescript)
+hljs.registerLanguage('xml', xml)
+hljs.registerLanguage('python', python)
+hljs.registerLanguage('php', php)
+hljs.registerLanguage('java', java)
+hljs.registerLanguage('ruby', ruby)
+hljs.registerLanguage('go', go)
+hljs.registerLanguage('rust', rust)
+hljs.registerLanguage('c', c)
+hljs.registerLanguage('cpp', cpp)
+hljs.registerLanguage('csharp', csharp)
+hljs.registerLanguage('swift', swift)
+hljs.registerLanguage('kotlin', kotlin)
+hljs.registerLanguage('scala', scala)
+hljs.registerLanguage('bash', bash)
+hljs.registerLanguage('perl', perl)
+hljs.registerLanguage('lua', lua)
+hljs.registerLanguage('r', r)
+hljs.registerLanguage('css', css)
+hljs.registerLanguage('scss', scss)
+hljs.registerLanguage('less', less)
+hljs.registerLanguage('sql', sql)
+hljs.registerLanguage('yaml', yaml)
+hljs.registerLanguage('json', json)
+hljs.registerLanguage('markdown', markdown)
+hljs.registerLanguage('ini', ini)
+hljs.registerLanguage('dockerfile', dockerfile)
+hljs.registerLanguage('plaintext', plaintext)
 import ChatFormatter from '../chat/ChatFormatter.vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useModalStore } from '../../stores/modal.js'

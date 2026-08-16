@@ -1,4 +1,4 @@
-import { defineAsyncComponent } from 'vue'
+import { defineAsyncTab } from '../../utils/asyncTab.js'
 
 export default {
   id: 'procesos_segundo_plano',
@@ -8,7 +8,7 @@ export default {
       {
         id: 'procesos_segundo_plano',
         label: 'Segundo Plano',
-        component: defineAsyncComponent(() => import('./components/SegundoPlanoTab.vue')),
+        component: defineAsyncTab(() => import('./components/SegundoPlanoTab.vue')),
         priority: 70,
       },
     ],

@@ -178,28 +178,13 @@ export function useOpencodeStreaming() {
 
     const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
     streamMsg._key = 'stream-' + Date.now()
+    // Referencia reactiva O(1); evita findIndex O(n) en el bucle SSE de refine.
+    const streamRef = chat.messages[chat.messages.length - 1]
+
+    const callbacks = makeStreamCallbacks(sd, sessionId, streamMsg._key)
 
     await ocStore.streamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature, {
-      onChunk(content) {
-        sd.text += content
-        _ocStreamData.value[String(sessionId)] = sd
-        if (isActiveSession(sessionId)) ocChunk.value = sd.text
-        chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamMsg._key)
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) chat.messages[idx].content = sd.text
-        }
-      },
-      onThinking(content) {
-        sd.thinking += content
-        _ocStreamData.value[String(sessionId)] = sd
-        if (isActiveSession(sessionId)) ocThinking.value = sd.thinking
-        chat.updateOcStreamCache(sessionId, sd.text, sd.thinking, streamMsg._key)
-        if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) chat.messages[idx].thinking = sd.thinking
-        }
-      },
+      ...callbacks,
       onControl(control) {
         const controlMsg = {
           role: 'opencode_control',
@@ -225,24 +210,31 @@ export function useOpencodeStreaming() {
         const thinking = json.thinking || sd.thinking || null
         chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: fullResponse, thinking })
         if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) {
-            chat.messages[idx].streaming = false
-            chat.messages[idx].role = 'opencode_result'
-            chat.messages[idx].content = fullResponse
-            chat.messages[idx].thinking = thinking
+          for (let i = chat.messages.length - 1; i >= 0; i--) {
+            const m = chat.messages[i]
+            if (m.controlData && m.controlData.controlType === 'descripcion_result') {
+              chat.messages[i] = {
+                role: 'result',
+                content: m.controlData.description || '(descripción anterior)',
+                _key: 'old-result-' + Date.now(),
+              }
+              break
+            }
           }
-          chat.pushMessage({
-            role: 'opencode_control',
-            controlData: {
-              controlId: 'descripcion-result-' + Date.now(),
-              controlType: 'descripcion_result',
-              description: fullResponse,
-              loading: false,
-              ticket,
-            },
-            _key: 'control-' + Date.now(),
-          })
+          const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (streamIdx >= 0) {
+            chat.messages[streamIdx] = {
+              role: 'opencode_control',
+              controlData: {
+                controlId: 'descripcion-result-' + Date.now(),
+                controlType: 'descripcion_result',
+                description: fullResponse,
+                loading: false,
+                ticket,
+              },
+              _key: 'control-' + Date.now(),
+            }
+          }
         } else {
           chat.pendingNotifications[sessionId] = Date.now()
         }
@@ -256,10 +248,10 @@ export function useOpencodeStreaming() {
         if (sessionId) chat.setSessionStatus(sessionId, 'error')
         chat._saveMessageToDb(sessionId, { role: 'opencode_result', content: `[Error: ${msg}]` })
         if (isActiveSession(sessionId)) {
-          const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-          if (idx >= 0) {
-            chat.messages[idx].content = '[Error: ' + msg + ']'
-            chat.messages[idx].streaming = false
+          const streamIdx = chat.messages.findIndex((m) => m._key === streamMsg._key)
+          if (streamIdx >= 0) {
+            chat.messages[streamIdx].content = '[Error: ' + msg + ']'
+            chat.messages[streamIdx].streaming = false
           }
         } else {
           chat.pendingNotifications[sessionId] = Date.now()
@@ -539,6 +531,8 @@ export function useOpencodeStreaming() {
   async function deepseekStreamCommit(sessionId, prompt, systemPrompt) {
     const streamMsg = await addMessage('opencode_stream', '', { streaming: true })
     streamMsg._key = 'stream-' + Date.now()
+    // Referencia reactiva O(1); evita findIndex O(n) en cada chunk de streaming.
+    const streamRef = chat.messages[chat.messages.length - 1]
     chat.updateOcStreamCache(sessionId, '', null, streamMsg._key)
 
     if (sessionId) chat.setSessionStatus(sessionId, 'executing')
@@ -546,11 +540,8 @@ export function useOpencodeStreaming() {
 
     try {
       chat.updateOcStreamCache(sessionId, 'Generando propuesta...', null, streamMsg._key)
-      if (isActiveSession(sessionId)) {
-        const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-        if (idx >= 0) {
-          chat.messages[idx].content = 'Generando propuesta...'
-        }
+      if (isActiveSession(sessionId) && streamRef) {
+        streamRef.content = 'Generando propuesta...'
       }
 
       const generatedText = await _callRefine(sessionId, prompt, systemPrompt)
@@ -560,11 +551,8 @@ export function useOpencodeStreaming() {
       }
 
       chat.updateOcStreamCache(sessionId, 'Traduciendo a español...', null, streamMsg._key)
-      if (isActiveSession(sessionId)) {
-        const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-        if (idx >= 0) {
-          chat.messages[idx].content = 'Traduciendo a español...'
-        }
+      if (isActiveSession(sessionId) && streamRef) {
+        streamRef.content = 'Traduciendo a español...'
       }
 
       const translateSystem = 'Sos un traductor especializado en commits técnicos. Traducí el siguiente mensaje de commit al español, preservando nombres de archivos, funciones, variables y términos técnicos. Devolvé ÚNICAMENTE el mensaje traducido, sin explicaciones, sin texto adicional.'
@@ -602,11 +590,8 @@ export function useOpencodeStreaming() {
             if (j.type === 'response') {
               translatedText += j.content
               chat.updateOcStreamCache(sessionId, translatedText, null, streamMsg._key)
-              if (isActiveSession(sessionId)) {
-                const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-                if (idx >= 0) {
-                  chat.messages[idx].content = translatedText
-                }
+              if (isActiveSession(sessionId) && streamRef) {
+                streamRef.content = translatedText
               }
             } else if (j.type === 'error') {
               throw new Error(j.content)
@@ -861,11 +846,8 @@ export function useOpencodeStreaming() {
                   _ocStreamData.value[String(sessionId)] = sd
                   if (isActiveSession(sessionId)) ocChunk.value = localRefineChunk
                   chat.updateOcStreamCache(sessionId, localRefineChunk, sd.thinking, streamMsg._key)
-                  if (isActiveSession(sessionId)) {
-                    const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
-                    if (idx >= 0) {
-                      chat.messages[idx].content = refinedText
-                    }
+                  if (isActiveSession(sessionId) && streamRef) {
+                    streamRef.content = refinedText
                   }
                 } else if (j.type === 'thinking') {
                   localRefineThinking += j.content

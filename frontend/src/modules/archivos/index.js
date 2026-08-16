@@ -1,11 +1,11 @@
-import { defineAsyncComponent } from 'vue'
+import { defineAsyncTab } from '../../utils/asyncTab.js'
 
 export default {
   id: 'archivos',
   name: 'Archivos',
   tabs: {
     sidebarRight: [
-      { id: 'archivos', label: 'Archivos', component: defineAsyncComponent(() => import('./components/ArchivosTab.vue')), priority: 5 },
+      { id: 'archivos', label: 'Archivos', component: defineAsyncTab(() => import('./components/ArchivosTab.vue')), priority: 5 },
     ],
   },
 }

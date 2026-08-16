@@ -1,4 +1,4 @@
-import { defineAsyncComponent } from 'vue'
+import { defineAsyncTab } from '../../utils/asyncTab.js'
 
 export default {
   id: 'interfaz_remota',
@@ -8,7 +8,7 @@ export default {
       {
         id: 'interfaz_remota',
         label: 'Interfaz Remota',
-        component: defineAsyncComponent(() => import('./components/InterfazRemotaTab.vue')),
+        component: defineAsyncTab(() => import('./components/InterfazRemotaTab.vue')),
         priority: 70,
       },
     ],

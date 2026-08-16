@@ -40,7 +40,7 @@
       </div>
       <div v-else class="p-2">
         <div
-          v-for="(log, i) in filteredLogs"
+          v-for="(log, i) in displayedLogs"
           :key="log.id || i"
           class="console-entry d-flex align-items-start gap-2 px-2 py-1 rounded"
           :class="{ expanded: expandedId === log.id }"
@@ -79,11 +79,21 @@ export default {
     const ALL_TYPES = ['log', 'warn', 'error', 'info', 'debug']
     const typeFilters = ref(new Set(ALL_TYPES))
 
+    // Tope de filas renderizadas: renderizar todas las filas sin límite hace que
+    // cada polling (cada 3s) re-renderice una lista creciente sin fin, bloqueando
+    // el main thread al interactuar con esta pestaña.
+    const MAX_LOG_ROWS = 300
+
     const filteredLogs = computed(() => {
       if (typeFilters.value.size === 0 || typeFilters.value.size === ALL_TYPES.length) {
         return consoleLogs.value
       }
       return consoleLogs.value.filter(log => typeFilters.value.has(log.type))
+    })
+
+    const displayedLogs = computed(() => {
+      if (filteredLogs.value.length <= MAX_LOG_ROWS) return filteredLogs.value
+      return filteredLogs.value.slice(-MAX_LOG_ROWS)
     })
 
     function toggleTypeFilter(type) {
@@ -154,6 +164,7 @@ export default {
       ALL_TYPES,
       typeFilters,
       filteredLogs,
+      displayedLogs,
       toggleTypeFilter,
       setAllTypes,
       typeClass,

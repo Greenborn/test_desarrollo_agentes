@@ -417,7 +417,12 @@ export default {
 
     let resizeObserver = null
 
-    watch(messages, () => scrollToBottom(false), { deep: true })
+    // Evitar el deep watcher sobre todos los messages: en streaming se muta
+    // content/thinking del mensaje activo por cada chunk (chat.js:190,200), y un
+    // watch deep recorre el array completo O(n) en cada chunk. El scroll durante
+    // streaming ya lo cubren currentChunk/ocChunk; aquí solo reaccionamos a la
+    // adición/eliminación de mensajes (cambio de longitud).
+    watch(() => messages.value.length, () => scrollToBottom(false))
     watch([currentChunk, ocChunk], () => scrollToBottom(false))
 
     watch(activeSessionId, (newId, oldId) => {

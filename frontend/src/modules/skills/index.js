@@ -1,4 +1,4 @@
-import { defineAsyncComponent } from 'vue'
+import { defineAsyncTab } from '../../utils/asyncTab.js'
 import skillEditarCommand from './commands/skillEditar.js'
 
 export default {
@@ -6,7 +6,7 @@ export default {
   name: 'Skills',
   tabs: {
     sidebarRight: [
-      { id: 'skills', label: 'Skills', component: defineAsyncComponent(() => import('./components/SkillsTab.vue')), priority: 100 },
+      { id: 'skills', label: 'Skills', component: defineAsyncTab(() => import('./components/SkillsTab.vue')), priority: 100 },
     ],
   },
   commands: [

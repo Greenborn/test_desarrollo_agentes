@@ -21,5 +21,25 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      // Precargan los chunks de los imports dinámicos (tabs) para que, al hacer
+      // clic en una pestaña, el módulo ya esté descargado/parseado y el montaje
+      // no bloquee el main thread con la descarga+eval del chunk.
+      modulePreload: {
+        polyfill: false,
+      },
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/highlight.js')) {
+              return 'highlight'
+            }
+            if (id.includes('node_modules')) {
+              return 'vendor'
+            }
+          },
+        },
+      },
+    },
   }
 })

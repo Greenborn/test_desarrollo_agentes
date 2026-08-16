@@ -4,6 +4,8 @@ import {
   setInterfazRemotaEnabled,
   enableInterfazRemota,
   testChatSessions,
+  getInterfazRemotaIoLog,
+  subscribeIoEvents,
 } from './interfaz_remota.service.js';
 
 const router = Router();
@@ -20,6 +22,36 @@ router.get('/status', (req, res) => {
   if (!authGuard(req, res)) return;
   const state = getInterfazRemotaStatus();
   res.json(state);
+});
+
+router.get('/events', (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  res.write(`retry: 3000\n\n`);
+  res.write(`data: ${JSON.stringify({ type: 'snapshot', ioLog: getInterfazRemotaIoLog() })}\n\n`);
+
+  const unsubscribe = subscribeIoEvents(res);
+
+  req.on('close', () => {
+    unsubscribe();
+    try {
+      res.end();
+    } catch (err) {
+      console.log('[interfaz_remota] error al cerrar stream SSE:', err.message);
+    }
+  });
+
+  req.on('error', (err) => {
+    console.log('[interfaz_remota] error en stream SSE:', err.message);
+    unsubscribe();
+  });
 });
 
 router.post('/enable', async (req, res) => {

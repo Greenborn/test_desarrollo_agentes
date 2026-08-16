@@ -35,16 +35,41 @@ export function useChatVirtualScroll(messages, { windowSize = 30, overscan = 5 }
   }
 
   let offsets = []
+  let offsetsLength = -1
+  let rAFPending = false
+  // Indica si hay cambios de altura pendientes de aplicar (callbacks de
+  // ResizeObserver). Si los cambios solo afectan a mensajes fuera de la ventana
+  // visible, se reconstruyen offsets de forma perezosa al volver a necesitarlos.
+  let dirtyHeights = false
 
   function rebuildOffsets() {
     const arr = messages.value || []
-    offsets = new Array(arr.length + 1)
+    const len = arr.length
+    // Si no hubo cambio de longitud ni cambios de altura pendientes, no hay nada
+    // que recalcular: evita reconstrucciones O(n) innecesarias.
+    if (len === offsetsLength && !dirtyHeights) return
+    offsets = new Array(len + 1)
     offsets[0] = 0
-    for (let i = 0; i < arr.length; i++) {
+    for (let i = 0; i < len; i++) {
       const key = msgKey(arr[i])
       const h = key != null && heights.has(key) ? heights.get(key) : estimateFor(arr[i])
       offsets[i + 1] = offsets[i] + h
     }
+    offsetsLength = len
+    dirtyHeights = false
+  }
+
+  // Acumula cambios de altura (callbacks de ResizeObserver) y reconstruye los
+  // offsets una sola vez por frame. Durante el streaming un mensaje crece de
+  // altura en cada chunk; sin este batch cada callback recorrería O(n).
+  function scheduleRebuildOffsets() {
+    dirtyHeights = true
+    if (rAFPending) return
+    rAFPending = true
+    requestAnimationFrame(() => {
+      rAFPending = false
+      rebuildOffsets()
+    })
   }
 
   function offsetBefore(idx) {
@@ -76,6 +101,10 @@ export function useChatVirtualScroll(messages, { windowSize = 30, overscan = 5 }
 
   function reset() {
     heights.clear()
+    // Fuerza reconstrucción aunque la longitud no haya cambiado: tras limpiar
+    // heights, los offsets basados en alturas anteriores quedan obsoletos.
+    offsetsLength = -1
+    dirtyHeights = true
     rebuildOffsets()
     isNearBottom.value = true
     const len = messages.value ? messages.value.length : 0
@@ -120,7 +149,7 @@ export function useChatVirtualScroll(messages, { windowSize = 30, overscan = 5 }
         const h = entry.contentRect ? entry.contentRect.height : node.offsetHeight
         if (heights.get(key) !== h) {
           heights.set(key, h)
-          rebuildOffsets()
+          scheduleRebuildOffsets()
         }
       }
     })

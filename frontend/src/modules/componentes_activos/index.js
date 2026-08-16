@@ -1,4 +1,4 @@
-import { defineAsyncComponent } from 'vue'
+import { defineAsyncTab } from '../../utils/asyncTab.js'
 
 export default {
   id: 'componentes_activos',
@@ -8,7 +8,7 @@ export default {
       {
         id: 'componentes_activos',
         label: 'Componentes Activos',
-        component: defineAsyncComponent(() => import('./components/ComponentesActivosTab.vue')),
+        component: defineAsyncTab(() => import('./components/ComponentesActivosTab.vue')),
         priority: 40,
       },
     ],
