@@ -128,6 +128,7 @@ const SKILLS_AGENT_MIN_WIDTH = 120
 const SKILLS_EDITOR_MIN_WIDTH = 120
 
 export default {
+  name: 'SkillsTab',
   components: { ChatFormatter, AlertModal },
   setup() {
     const chat = useChatStore()

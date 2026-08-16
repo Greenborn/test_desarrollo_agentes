@@ -119,6 +119,10 @@
               <i class="bi bi-trash me-1"></i>
               Limpiar
             </button>
+            <button class="btn btn-sm btn-outline-secondary" @click="copyIoLog" :disabled="ioLog.length === 0">
+              <i class="bi me-1" :class="copied ? 'bi-check-lg' : 'bi-clipboard'"></i>
+              {{ copied ? 'Copiado' : 'Copiar' }}
+            </button>
           </div>
         </div>
 
@@ -153,6 +157,7 @@
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { settingGet, settingSet } from '../../../services/settingService.js'
+import { copyToClipboard } from '../../../utils/clipboard.js'
 
 const IO_LOG_MAX = 200
 
@@ -171,6 +176,8 @@ export default {
     const ioLog = ref([])
     const showIoLogDetail = ref(false)
     const sseConnected = ref(false)
+    const copied = ref(false)
+    let copyTimer = null
     let eventSource = null
 
     async function loadStatus() {
@@ -304,6 +311,27 @@ export default {
       ioLog.value = []
     }
 
+    function copyIoLog() {
+      const text = ioLog.value
+        .map((entry) => {
+          const dir = entry.direction === 'in' ? 'IN ' : 'OUT'
+          return `${formatTs(entry.ts)} [${dir}] ${entry.event}\n${JSON.stringify(entry.data, null, 2)}`
+        })
+        .join('\n\n')
+      copyToClipboard(text)
+        .then(() => {
+          copied.value = true
+          if (copyTimer) clearTimeout(copyTimer)
+          copyTimer = setTimeout(() => {
+            copied.value = false
+            copyTimer = null
+          }, 1500)
+        })
+        .catch((err) => {
+          console.log('InterfazRemotaTab: error al copiar el log io:', err.message)
+        })
+    }
+
     function formatTs(ts) {
       if (!ts) return ''
       try {
@@ -321,6 +349,10 @@ export default {
     })
 
     onUnmounted(() => {
+      if (copyTimer) {
+        clearTimeout(copyTimer)
+        copyTimer = null
+      }
       if (eventSource) {
         eventSource.close()
         eventSource = null
@@ -397,8 +429,8 @@ export default {
       testing, testResult, showTestDetail,
       loginStatusLabel, loginBadgeClass, loginStatusMessage, loginMessageClass,
       wsStatusLabel, wsBadgeClass, wsStatusMessage, wsMessageClass,
-      ioLog, showIoLogDetail, sseConnected,
-      toggleIoLogDetail, clearIoLog, formatTs,
+      ioLog, showIoLogDetail, sseConnected, copied,
+      toggleIoLogDetail, clearIoLog, copyIoLog, formatTs,
     }
   },
 }

@@ -15,9 +15,17 @@
         @dragend="onDragEnd">{{ t.label }}</button>
     </div>
 
-    <template v-for="t in localTabs" :key="t.id">
-      <component :is="t.component" v-if="t.component && tab === t.id" />
-    </template>
+    <!-- KeepAlive keyed por tab: los tabs ya visitados quedan montados en caché,
+         evitando el remontaje completo (setup + watch immediate + onMounted +
+         montaje de TableEditor/loadData) en cada clic, que es la causa del
+         bloqueo del main thread al intercambiar pestañas. -->
+    <!-- Excluimos las tabs que gestionan recursos externos con onUnmounted
+         (InterfazRemota mantiene un EventSource SSE; Skills finaliza el agente)
+         para que sigan remontándose frescas y su limpieza se ejecute al cambiar
+         de pestaña. -->
+    <KeepAlive :max="6" :exclude="['InterfazRemotaTab', 'SkillsTab']">
+      <component :is="activeComponent" v-if="activeComponent" :key="tab" />
+    </KeepAlive>
     <div class="sidebar-right-resize-handle" @mousedown.prevent="onResizeStart">
       <div class="sidebar-right-resize-handle-bar"></div>
     </div>
@@ -58,6 +66,10 @@ export default {
       sidebarRightTabOrder.value = ids
       ui.saveLayoutPrefs()
     }
+    const activeComponent = computed(() => {
+      const found = localTabs.value.find(t => t.id === tab.value)
+      return found ? found.component : null
+    })
     const tab = ref('comentarios')
 
     function restoreTab() {
@@ -164,6 +176,7 @@ export default {
       rightPanelWidth,
       sidebarStyle,
       tab,
+      activeComponent,
       selectTab,
       activeSessionId,
       localTabs,
