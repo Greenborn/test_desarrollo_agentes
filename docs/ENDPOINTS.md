@@ -173,6 +173,30 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 
 ---
 
+## Interfaz Remota (`/api/interfaz-remota`)
+
+### `GET /api/interfaz-remota/status`
+- **Auth:** Requerida
+- **Respuesta:** `{ enabled: boolean, login: {...}, ws: {...} }`
+- **Descripción:** Estado de la conexión con el servicio de gestión interna (login HTTP y WebSocket socket.io).
+
+### `POST /api/interfaz-remota/enable`
+- **Auth:** Requerida
+- **Descripción:** Habilita la conexión y realiza el login a gestión interna. Devuelve el estado actualizado.
+
+### `POST /api/interfaz-remota/disable`
+- **Auth:** Requerida
+- **Descripción:** Deshabilita la conexión y cierra el WebSocket. Devuelve el estado actualizado.
+
+### `POST /api/interfaz-remota/test/chat-sessions`
+- **Auth:** Requerida
+- **Body:** ninguno
+- **Descripción:** Prueba el pseudoendpoint de sesiones de chat (`interfaz-remota:chatSessions`). Invoca directamente la misma lógica que el handler de socket.io que responde a la gestión interna cuando ésta solicita las sesiones de chat de este sistema, sin depender del WebSocket.
+- **Respuesta 200:** `{ success: true, data: { activas: [{ id, title, updated_at, cwd, proyecto_id, id_ticket_redmine, workspace_id, prefs }], archivadas: [...] }, checkedAt: "..." }`
+- **Respuesta 500:** `{ success: false, error: "...", checkedAt: "..." }`
+
+---
+
 ## Autenticación (`/api/auth`)
 
 ### `GET /api/auth/me`

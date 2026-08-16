@@ -63,6 +63,21 @@ const SESSION_FIELDS = [
   'prefs',
 ];
 
+async function queryChatSessions() {
+  const [activas, archivadas] = await Promise.all([
+    db('chat_sessions')
+      .where('chat_sessions.archived', false)
+      .orderBy('chat_sessions.updated_at', 'desc')
+      .select(SESSION_FIELDS),
+    db('chat_sessions')
+      .where('chat_sessions.archived', true)
+      .orderBy('chat_sessions.updated_at', 'desc')
+      .select(SESSION_FIELDS),
+  ]);
+  console.log(`[interfaz_remota] chatSessions respondidas: ${activas.length} activas, ${archivadas.length} archivadas`);
+  return { activas, archivadas };
+}
+
 async function handleChatSessionsRequest(ack) {
   const respond = (payload) => {
     if (typeof ack === 'function') {
@@ -72,20 +87,21 @@ async function handleChatSessionsRequest(ack) {
     }
   };
   try {
-    const [activas, archivadas] = await Promise.all([
-      db('chat_sessions')
-        .where('chat_sessions.archived', false)
-        .orderBy('chat_sessions.updated_at', 'desc')
-        .select(SESSION_FIELDS),
-      db('chat_sessions')
-        .where('chat_sessions.archived', true)
-        .orderBy('chat_sessions.updated_at', 'desc')
-        .select(SESSION_FIELDS),
-    ]);
-    respond({ success: true, data: { activas, archivadas } });
+    const data = await queryChatSessions();
+    respond({ success: true, data });
   } catch (err) {
     console.log('[interfaz_remota] Error al consultar sesiones de chat:', err.message);
     respond({ success: false, error: err.message ? err.message : 'Error al consultar sesiones de chat.' });
+  }
+}
+
+export async function testChatSessions() {
+  try {
+    const data = await queryChatSessions();
+    return { success: true, data, checkedAt: new Date().toISOString() };
+  } catch (err) {
+    console.log('[interfaz_remota] Error al testear pseudoendpoint de sesiones de chat:', err.message);
+    return { success: false, error: err.message ? err.message : 'Error al consultar sesiones de chat.', checkedAt: new Date().toISOString() };
   }
 }
 
@@ -145,7 +161,7 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
   try {
     socket = io(isSecure ? `https://${socketUrl}` : `http://${socketUrl}`, {
       path: '/socket.io',
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       auth: { token },
       reconnection: true,
       reconnectionDelay: 5000,
@@ -193,7 +209,8 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
   });
 
   socket.on('interfaz-remota:chatSessions', (payload, ack) => {
-    handleChatSessionsRequest(ack);
+    const cb = typeof ack === 'function' ? ack : (typeof payload === 'function' ? payload : null);
+    handleChatSessionsRequest(cb);
   });
 }
 

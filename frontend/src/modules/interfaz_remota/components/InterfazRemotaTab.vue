@@ -51,6 +51,49 @@
 
       </div>
     </div>
+
+    <div class="card border-0 mt-3" style="background: #1e2b1e;">
+      <div class="card-body p-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="text-light">Testing</span>
+          <button class="btn btn-sm btn-primary" @click="runChatSessionsTest" :disabled="testing">
+            <span v-if="testing" class="spinner-border spinner-border-sm me-1" role="status"></span>
+            <i class="bi bi-chat-square-text me-1"></i>
+            Probar pseudoendpoint de sesiones de chat
+          </button>
+        </div>
+
+        <div v-if="testResult">
+          <div class="d-flex align-items-center mb-2">
+            <span class="badge me-2" :class="testResult.success ? 'bg-success' : 'bg-danger'">
+              {{ testResult.success ? 'Éxito' : 'Error' }}
+            </span>
+            <span class="text-secondary small">
+              {{ testResult.checkedAt ? 'Probado: ' + testResult.checkedAt : '' }}
+            </span>
+          </div>
+
+          <div v-if="testResult.success" class="text-secondary small mb-2">
+            <template v-if="testResult.data">
+              {{ testResult.data.activas.length }} activa(s), {{ testResult.data.archivadas.length }} archivada(s)
+            </template>
+          </div>
+
+          <div v-else class="text-danger small mb-2">
+            {{ testResult.error || 'Error al probar el pseudoendpoint.' }}
+          </div>
+
+          <button
+            class="btn btn-sm btn-outline-secondary mb-2"
+            @click="showTestDetail = !showTestDetail"
+          >
+            <i :class="['bi', 'me-1', showTestDetail ? 'bi-chevron-up' : 'bi-chevron-down']"></i>
+            {{ showTestDetail ? 'Ocultar' : 'Ver' }} detalle JSON
+          </button>
+          <pre v-if="showTestDetail" class="small mb-0" style="max-height: 300px; overflow: auto; background: #142114; border-radius: 4px; padding: 8px; color: #9fd9a0;">{{ JSON.stringify(testResult, null, 2) }}</pre>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -65,6 +108,9 @@ export default {
   setup() {
     const loading = ref(true)
     const toggling = ref(false)
+    const testing = ref(false)
+    const testResult = ref(null)
+    const showTestDetail = ref(false)
     const state = ref({ login: {}, ws: {} })
     const enabled = ref(true)
 
@@ -127,6 +173,28 @@ export default {
         console.log('InterfazRemotaTab: error al cambiar estado de conexión:', err.message)
       } finally {
         toggling.value = false
+      }
+    }
+
+    async function runChatSessionsTest() {
+      testing.value = true
+      showTestDetail.value = false
+      try {
+        const res = await fetch('/api/interfaz-remota/test/chat-sessions', {
+          method: 'POST',
+          credentials: 'include',
+        })
+        const data = await res.json()
+        testResult.value = data
+      } catch (err) {
+        console.log('InterfazRemotaTab: error al probar pseudoendpoint de sesiones de chat:', err.message)
+        testResult.value = {
+          success: false,
+          error: 'No se pudo invocar el pseudoendpoint de sesiones de chat.',
+          checkedAt: new Date().toISOString(),
+        }
+      } finally {
+        testing.value = false
       }
     }
 
@@ -199,7 +267,8 @@ export default {
 
     return {
       loading, toggling, enabled, login, ws,
-      toggleEnabled,
+      toggleEnabled, runChatSessionsTest,
+      testing, testResult, showTestDetail,
       loginStatusLabel, loginBadgeClass, loginStatusMessage, loginMessageClass,
       wsStatusLabel, wsBadgeClass, wsStatusMessage, wsMessageClass,
     }

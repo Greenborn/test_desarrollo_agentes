@@ -3,6 +3,7 @@ import {
   getInterfazRemotaStatus,
   setInterfazRemotaEnabled,
   enableInterfazRemota,
+  testChatSessions,
 } from './interfaz_remota.service.js';
 
 const router = Router();
@@ -36,6 +37,16 @@ router.post('/disable', (req, res) => {
   if (!authGuard(req, res)) return;
   setInterfazRemotaEnabled(false);
   res.json(getInterfazRemotaStatus());
+});
+
+router.post('/test/chat-sessions', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const result = await testChatSessions();
+  if (!result.success) {
+    res.status(500).json(result);
+    return;
+  }
+  res.json(result);
 });
 
 export default router;

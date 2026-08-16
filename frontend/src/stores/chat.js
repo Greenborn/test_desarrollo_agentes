@@ -654,12 +654,14 @@ export const useChatStore = defineStore('chat', () => {
         } else {
           hasMoreMessages.value = false
         }
+        return mapped.length
       }
     } catch (err) {
       console.error('Error al cargar más mensajes:', err)
     } finally {
       loadingMore.value = false
     }
+    return 0
   }
 
   async function sendMessage(sessionId, message) {

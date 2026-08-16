@@ -13,7 +13,9 @@
           <div v-if="!loadingMore && !hasMoreMessages && messages.length > 50" class="text-center text-muted small py-1">
             — Todos los mensajes cargados —
           </div>
-          <ChatMessage v-for="m in messages.filter(Boolean)" :key="m.id ?? m._key" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
+          <div :style="{ height: topPad + 'px' }"></div>
+          <ChatMessage v-for="m in visibleMessages" :key="m.id ?? m._key" :ref="(el) => setMsgEl(m, el)" :msg="m" :raw-msg-keys="rawMsgKeys" @control-confirm="onControlConfirm" @contextmenu="onContextMenu" />
+          <div :style="{ height: bottomPad + 'px' }"></div>
           <template v-for="ts in terminalSessions" :key="ts.sid + '-' + ts._key">
             <XtermTerminal v-show="ts.isActive" :label="ts.label" :cwd="ts.cwd" :init-command="ts.initCommand" :session-id="ts.sid" :terminal-id="ts.terminalId" @close="onTerminalClose" @terminal-ready="onTerminalReady" @exit="onTerminalExit" />
           </template>
@@ -52,6 +54,7 @@ import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
 import { useConsoleLogStream } from '../../composables/useConsoleLogStream.js'
 import { useNetworkLogStream } from '../../composables/useNetworkLogStream.js'
 import { useChatScroll } from '../../composables/useChatScroll.js'
+import { useChatVirtualScroll } from '../../composables/useChatVirtualScroll.js'
 import { useOpencodeStreaming } from '../../composables/useOpencodeStreaming.js'
 import { useControlHandlers } from '../../composables/useControlHandlers.js'
 import ChatMessage from './ChatMessage.vue'
@@ -76,7 +79,8 @@ export default {
     const { find } = useCommandRegistry()
     const { activeSessionId, messages, streaming, currentChunk, currentThinking, sessions, loadingMore, hasMoreMessages } = storeToRefs(chat)
 
-    const { messagesContainer, _isNearBottom, scrollToBottom, checkNearBottom } = useChatScroll()
+    const { messagesContainer, _isNearBottom, scrollToBottom } = useChatScroll()
+    const vs = useChatVirtualScroll(messages)
 
     const streamingApi = useOpencodeStreaming()
     const {
@@ -393,13 +397,16 @@ export default {
       }
     }
 
-    function onScrollLoadMore() {
+    async function onScrollLoadMore() {
       const el = messagesContainer.value
       if (!el) return
-      _isNearBottom.value = checkNearBottom()
+      vs.setContainer(el)
+      vs.onScroll()
+      _isNearBottom.value = vs.isNearBottom.value
       if (el.scrollTop === 0 && !loadingMore.value && hasMoreMessages.value && activeSessionId.value) {
         const oldScrollHeight = el.scrollHeight
-        chat.loadMoreMessages(activeSessionId.value)
+        const added = await chat.loadMoreMessages(activeSessionId.value)
+        vs.shiftAfterPrepend(added || 0)
         nextTick(() => {
           if (messagesContainer.value) {
             messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight - oldScrollHeight
@@ -419,6 +426,7 @@ export default {
         ocStore.setSessionShowTerminal(oldId, showAgentTerminal.value)
       }
       if (newId) {
+        vs.reset()
         ocStore.activateSession(newId)
         ocStreaming.value = chat.getIsOcStreaming(newId)
         streamingConsole.value = false
@@ -450,9 +458,16 @@ export default {
 
     onMounted(async () => {
       if (messagesContainer.value) {
+        vs.setContainer(messagesContainer.value)
+        vs.reset()
         resizeObserver = new ResizeObserver(() => {
-          if (messagesContainer.value && _isNearBottom.value) {
-            messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+          if (messagesContainer.value) {
+            vs.setContainer(messagesContainer.value)
+            vs.onScroll()
+            _isNearBottom.value = vs.isNearBottom.value
+            if (_isNearBottom.value) {
+              messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+            }
           }
         })
         resizeObserver.observe(messagesContainer.value)
@@ -484,6 +499,10 @@ export default {
     return {
       chat, activeSessionId, messages, streaming, currentChunk, currentThinking,
       sessions, loadingMore, hasMoreMessages, input, gitStore, ocStore,
+      visibleMessages: vs.visibleMessages,
+      topPad: vs.topPad,
+      bottomPad: vs.bottomPad,
+      setMsgEl: vs.setMsgEl,
       ocStreaming, terminalContent, sessionCwd, terminalSessions, onTerminalClose, onTerminalReady, onTerminalExit,
       ticketInfo, ocMaximized, isOcSessionActive,
       deteccionState, abortDeteccion,
