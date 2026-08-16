@@ -1,9 +1,24 @@
 import { io } from 'socket.io-client';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { login, getGestionCredentials } from '../gestion/gestion.service.js';
 import db from '../../config/db.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const ANNOUNCE_INTERVAL_MS = 45000;
 const IO_LOG_MAX = 200;
+const FILE_LOG_PATH = path.resolve(__dirname, '../../../logs/interfaz_remota.log');
+
+function fileLog(msg) {
+  try {
+    const line = `[${new Date().toISOString()}] ${msg}\n`;
+    fs.appendFileSync(FILE_LOG_PATH, line);
+  } catch (err) {
+    console.log('[interfaz_remota] error al escribir log a archivo:', err.message);
+  }
+}
 
 let loginState = {
   attempted: false,
@@ -118,7 +133,6 @@ const SESSION_FIELDS = [
   'chat_sessions.proyecto_id',
   'id_ticket_redmine',
   'chat_sessions.workspace_id',
-  'prefs',
 ];
 
 async function queryChatSessions() {
@@ -146,6 +160,7 @@ let chatSessionQueue = Promise.resolve();
 
 function handleChatSessionsRequest(ack) {
   const respond = (payload) => {
+    fileLog(`chatSessions respond: success=${payload.success}, activas=${payload.data ? payload.data.activas.length : '-'}, hasAck=${typeof ack === 'function'}`);
     if (typeof ack === 'function') {
       ack(payload);
     } else {
@@ -158,6 +173,7 @@ function handleChatSessionsRequest(ack) {
       respond({ success: true, data });
     } catch (err) {
       console.log('[interfaz_remota] Error al consultar sesiones de chat:', err.message);
+      fileLog(`chatSessions error: ${err.message}`);
       respond({ success: false, error: err.message ? err.message : 'Error al consultar sesiones de chat.' });
     }
   });
@@ -251,6 +267,7 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
     wsState.message = 'Socket conectado al servicio de gestión interna.';
     wsState.error = null;
     console.log('[interfaz_remota] socket.io conectado:', socket.id);
+    fileLog(`CONNECT socket.id=${socket.id}`);
     emitAnnounce();
     scheduleAnnounce();
   });
@@ -261,6 +278,7 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
     wsState.announce = null;
     wsState.message = `Conexión socket.io cerrada (${reason}).`;
     console.log('[interfaz_remota] socket.io desconectado:', reason);
+    fileLog(`DISCONNECT reason=${reason}`);
     if (announceTimer) {
       clearInterval(announceTimer);
       announceTimer = null;
@@ -272,6 +290,7 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
     wsState.error = err.message ? err.message : 'Error socket.io.';
     wsState.message = 'Error en la conexión socket.io.';
     console.log('[interfaz_remota] socket.io connect_error:', err.message);
+    fileLog(`CONNECT_ERROR ${err.message}`);
   });
 
   socket.on('desarrollo:status', (payload) => {
@@ -280,6 +299,7 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
 
   socket.on('interfaz-remota:chatSessions', (payload, ack) => {
     const cb = typeof ack === 'function' ? ack : (typeof payload === 'function' ? payload : null);
+    fileLog(`EVENT interfaz-remota:chatSessions recibido, ack=${typeof ack}, payloadIsFn=${typeof payload}`);
     handleChatSessionsRequest(cb);
   });
 

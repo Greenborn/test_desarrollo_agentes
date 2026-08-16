@@ -46,8 +46,7 @@ callback ack.
         "cwd": "/ruta/de/trabajo",
         "proyecto_id": null,
         "id_ticket_redmine": null,
-        "workspace_id": 1,
-        "prefs": null
+        "workspace_id": 1
       }
     ],
     "archivadas": []
@@ -63,8 +62,6 @@ Error:
 
 ### Campos por sesión
 
-Iguales a `GET /api/chat/sessions`:
-
 | Campo               | Tipo    | Descripción                                        |
 |---------------------|---------|----------------------------------------------------|
 | `id`                | number  | Identificador de la sesión                         |
@@ -74,7 +71,11 @@ Iguales a `GET /api/chat/sessions`:
 | `proyecto_id`       | number/null | Proyecto vinculado                          |
 | `id_ticket_redmine` | number/null | Ticket Redmine vinculado                  |
 | `workspace_id`      | number  | Workspace al que pertenece                         |
-| `prefs`             | object/null | Preferencias de la sesión                      |
+
+> **Nota:** el campo `prefs` de `chat_sessions` se **excluye** a propósito del payload. Puede contener
+> cientos de KB por sesión y, con muchas sesiones, infla el ACK por encima del límite por defecto de
+> socket.io (~1 MB), lo que corta la conexión en el `transport close` y el SGI recibe
+> "El sistema de desarrollo no respondió". El listado de sesiones no necesita `prefs`.
 
 ## Consideraciones
 
@@ -83,6 +84,23 @@ Iguales a `GET /api/chat/sessions`:
 - Si no se provee callback ack, la respuesta se registra solo en consola (no se envía).
 - Consulta en paralelo de activas (`archived = false`) y archivadas (`archived = true`), ambas
   ordenadas por `updated_at` descendente.
+
+## Rol de la gestión interna (SGI) como retransmisor
+
+Este pseudoendpoint no lo emite el sistema de desarrollo de forma autónoma: lo dispara la **gestión
+interna** (SGI). El flujo completo es:
+
+1. El frontend admin del SGI emite `desarrollo:getChatSessions` con `{ sistemaId }` hacia el backend
+   del SGI (`sgi-backend/src/desarrollo.js`).
+2. El SGI localiza el socket del sistema dev anunciado y **retransmite** emitiendo
+   `interfaz-remota:chatSessions` con un payload vacío `{}` + callback ack hacia ese socket.
+3. El sistema dev responde por ese mismo ACK con `{ success, data: { activas, archivadas } }`.
+4. El SGI reenvía la respuesta tal cual por el ACK del solicitante.
+
+**Reintentos serializados (lado SGI):** el SGI reintenta (2 × 3500ms) pero nunca re-emite
+`interfaz-remota:chatSessions` mientras ya haya una emisión en vuelo contra el mismo socket
+(`emisionActiva`), para no disparar consultas DB duplicadas que bloqueen el event loop del sistema
+dev (provocaría `ping timeout` → reconexión espuria). El SGI sube además su `pingTimeout` a 60s.
 
 ## Referencias en el código
 

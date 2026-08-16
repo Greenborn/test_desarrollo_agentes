@@ -192,7 +192,7 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - **Auth:** Requerida
 - **Body:** ninguno
 - **Descripción:** Prueba el pseudoendpoint de sesiones de chat (`interfaz-remota:chatSessions`). Invoca directamente la misma lógica que el handler de socket.io que responde a la gestión interna cuando ésta solicita las sesiones de chat de este sistema, sin depender del WebSocket.
-- **Respuesta 200:** `{ success: true, data: { activas: [{ id, title, updated_at, cwd, proyecto_id, id_ticket_redmine, workspace_id, prefs }], archivadas: [...] }, checkedAt: "..." }`
+- **Respuesta 200:** `{ success: true, data: { activas: [{ id, title, updated_at, cwd, proyecto_id, id_ticket_redmine, workspace_id }], archivadas: [...] }, checkedAt: "..." }` (sin `prefs`)
 - **Respuesta 500:** `{ success: false, error: "...", checkedAt: "..." }`
 
 ---
@@ -1552,21 +1552,22 @@ Endpoints del módulo Interfaz Remota. Al iniciar el backend se intenta conectar
 
 ### Pseudoendpoint socket.io `interfaz-remota:chatSessions`
 - **Auth:** Vía conexión socket.io (token del login en `auth.token`)
-- **Descripción:** Pseudoendpoint request/response sobre WebSocket (no HTTP). La gestión interna emite el evento `interfaz-remota:chatSessions` (con callback ack) para consultar las sesiones de chat actuales del sistema. Devuelve todas las sesiones (sin filtrar por usuario ni workspace) agrupadas por estado en `activas` y `archivadas`.
-- **Request:** `socket.emit('interfaz-remota:chatSessions', ack)`
+- **Descripción:** Pseudoendpoint request/response sobre WebSocket (no HTTP). La gestión interna (SGI) emite el evento `interfaz-remota:chatSessions` (con callback ack) para consultar las sesiones de chat actuales del sistema. El SGI actúa como **retransmisor**: recibe `desarrollo:getChatSessions` de su frontend admin, localiza el socket del sistema dev y emite este evento con payload `{}` + ack. Devuelve todas las sesiones (sin filtrar por usuario ni workspace) agrupadas por estado en `activas` y `archivadas`.
+- **Request:** `socket.emit('interfaz-remota:chatSessions', ack)` (el SGI emite `{}, ack`)
 - **Respuesta (ack):**
 ```json
 {
   "success": true,
   "data": {
     "activas": [
-      { "id": 1, "title": "...", "updated_at": "...", "cwd": "...", "proyecto_id": null, "id_ticket_redmine": null, "workspace_id": 1, "prefs": null }
+      { "id": 1, "title": "...", "updated_at": "...", "cwd": "...", "proyecto_id": null, "id_ticket_redmine": null, "workspace_id": 1 }
     ],
     "archivadas": []
   }
 }
 ```
-- Los campos por sesión son los mismos que `GET /api/chat/sessions` (`id, title, updated_at, cwd, proyecto_id, id_ticket_redmine, workspace_id, prefs`).
+- Los campos por sesión son: `id, title, updated_at, cwd, proyecto_id, id_ticket_redmine, workspace_id`.
+- **Nota:** el campo `prefs` se **excluye** del payload a propósito. Puede alcanzar cientos de KB por sesión y, con muchas sesiones, infla el ACK por encima del límite por defecto de socket.io (~1 MB), cortando la conexión en `transport close` (el SGI vería "El sistema de desarrollo no respondió").
 - En caso de error: `{ "success": false, "error": "<mensaje>" }`
 - Si no se provee callback ack, la respuesta se registra solo en consola (no se envía).
 
