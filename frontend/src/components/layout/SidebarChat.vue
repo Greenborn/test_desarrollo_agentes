@@ -4,17 +4,12 @@
     :class="{ collapsed: sidebarCollapsed, transitioning: sidebarTransitioning }"
     :style="sidebarStyle"
   >
-    <!-- Tab bar -->
-    <div class="tab-bar d-flex align-items-center px-3 pt-0 pb-1 flex-shrink-0">
-      <button v-for="(t, i) in localTabs" :key="t.id" class="tab-btn"
-        :class="{ active: tab === t.id, dragging: dragIndex === i, 'drag-over': dragOverIndex === i }"
-        draggable="true"
-        @click="selectChatTab(t.id)"
-        @dragstart="onDragStart(i, $event)"
-        @dragover.prevent="onDragOver(i)"
-        @drop.prevent="onDrop(i)"
-        @dragend="onDragEnd">{{ t.label }}</button>
-    </div>
+    <TabBar
+      :tabs="ctl.localTabs.value"
+      :active="ctl.activeTab.value"
+      @select="selectChatTab"
+      @reorder="ctl.reorder"
+    />
     <div v-if="tab === 'chats'" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
     <div class="d-flex align-items-center gap-2 mb-2 flex-shrink-0">
       <button class="btn btn-sm flex-shrink-0 btn-argentina" @click="createSession" :disabled="creating" style="flex:1;">
@@ -158,8 +153,9 @@
 </template>
 
 <script>
-import { computed, watch, ref, reactive, shallowRef, onMounted, nextTick } from 'vue'
+import { computed, watch, ref, reactive, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
+import { TabBar, useTabController } from 'vue-greenborn-panels'
 import { useChatStore } from '../../stores/chat.js'
 import { useCommandStore } from '../../stores/command.js'
 import { useUiStore } from '../../stores/ui.js'
@@ -171,10 +167,9 @@ import { copyToClipboard } from '../../utils/clipboard.js'
 import ServiciosPanel from '../services/ServiciosPanel.vue'
 import { useModuleRegistry } from '../../composables/useModuleRegistry.js'
 import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
-import { sortTabs } from '../../utils/sortTabs.js'
 
 export default {
-  components: { ServiciosPanel },
+  components: { ServiciosPanel, TabBar },
   setup() {
     const chat = useChatStore()
     const cmd = useCommandStore()
@@ -183,71 +178,50 @@ export default {
     const ws = useWorkspaceStore()
     const { mostrar_alerta } = useModal()
     const { sessions, archivedSessions, activeSessionId, creating, sessionStatus, pendingNotifications } = storeToRefs(chat)
-    const { sidebarCollapsed, sidebarWidth, centralPanelCollapsed, sidebarWidthPct, rightPanelCollapsed } = storeToRefs(ui)
-    const tab = ref('chats')
+    const { sidebarCollapsed, sidebarWidth, centralPanelCollapsed, sidebarWidthPct, rightPanelCollapsed, sidebarChatTabOrder } = storeToRefs(ui)
     const { redmineUrl } = storeToRefs(settings)
     const { workspaces, selectedIds } = storeToRefs(ws)
     const { sidebarChatTabs } = useModuleRegistry()
-    const { sidebarChatTabOrder } = storeToRefs(ui)
 
     const builtInChatTabs = [
       { id: 'chats', label: 'Chats', priority: 10 },
       { id: 'servicios', label: 'Servicios', priority: 20 },
       { id: 'archived', label: 'Archivados', priority: 30 },
     ]
-    const localTabs = shallowRef([])
-    const dragIndex = ref(null)
-    const dragOverIndex = ref(null)
-
-    function buildTabs() {
-      const all = [...builtInChatTabs]
-      if (sidebarChatTabs) {
-        all.push(...sidebarChatTabs)
-      }
-      localTabs.value = sortTabs(all, sidebarChatTabOrder.value)
-    }
 
     function saveTabOrder(ids) {
       sidebarChatTabOrder.value = ids
       ui.saveLayoutPrefs()
     }
 
-    function onDragStart(index, e) {
-      dragIndex.value = index
-      e.dataTransfer.effectAllowed = 'move'
-      e.dataTransfer.setData('text/plain', String(index))
+    function restoreTab() {
+      const prefs = chat.getSessionPrefs(chat.activeSessionId)
+      return prefs?.sidebarChatTab || 'chats'
     }
 
-    function onDragOver(index) {
-      dragOverIndex.value = index
-    }
+    const ctl = useTabController({
+      slotTabs: sidebarChatTabs,
+      builtinTabs: builtInChatTabs,
+      savedOrder: sidebarChatTabOrder,
+      persistOrder: saveTabOrder,
+      initialTab: 'chats',
+      restoreTab,
+    })
 
-    function onDrop(index) {
-      if (dragIndex.value === null || dragIndex.value === index) {
-        dragIndex.value = null
-        dragOverIndex.value = null
-        return
+    const tab = computed(() => ctl.activeTab.value)
+
+    function selectChatTab(val) {
+      ctl.select(val)
+      chat.saveSessionTabPref(chat.activeSessionId, val)
+      if (val === 'archived') {
+        chat.loadArchivedSessions()
       }
-      const items = [...localTabs.value]
-      const [moved] = items.splice(dragIndex.value, 1)
-      items.splice(index, 0, moved)
-      localTabs.value = items
-      saveTabOrder(items.map(t => t.id))
-      dragIndex.value = null
-      dragOverIndex.value = null
     }
 
-    function onDragEnd() {
-      dragIndex.value = null
-      dragOverIndex.value = null
-    }
-
-    watch(sidebarChatTabOrder, () => buildTabs(), { immediate: true })
-    watch(sidebarChatTabs, () => buildTabs(), { immediate: true })
     watch(activeSessionId, (newId) => {
-      if (!newId) { tab.value = 'chats'; return }
+      if (!newId) { ctl.activeTab.value = 'chats'; return }
       const s = sessions.value.find(s => Number(s.id) === Number(newId)) || archivedSessions.value.find(s => Number(s.id) === Number(newId))
-      tab.value = s?.prefs?.sidebarChatTab || 'chats'
+      ctl.activeTab.value = s?.prefs?.sidebarChatTab || 'chats'
     })
     const activeRegistryChatComponent = computed(() => {
       if (!sidebarChatTabs) return null
@@ -419,15 +393,7 @@ export default {
       const s = chat.sessions.find((s) => s.id === id) || chat.archivedSessions.find((s) => s.id === id)
       if (s && s.cwd) cmd.currentDir = s.cwd
       chat.loadMessages(id)
-      tab.value = s?.prefs?.sidebarChatTab || 'chats'
-    }
-
-    function selectChatTab(val) {
-      tab.value = val
-      chat.saveSessionTabPref(chat.activeSessionId, val)
-      if (val === 'archived') {
-        chat.loadArchivedSessions()
-      }
+      ctl.activeTab.value = s?.prefs?.sidebarChatTab || 'chats'
     }
 
     function ticketPriorityClass(priorityId) {
@@ -531,13 +497,7 @@ export default {
       copyPathFromCtxMenu,
       deleteFromCtxMenu,
       sessionNavEnabled,
-      localTabs,
-      dragIndex,
-      dragOverIndex,
-      onDragStart,
-      onDragOver,
-      onDrop,
-      onDragEnd,
+      ctl,
       activeRegistryChatComponent,
     }
   },
@@ -573,12 +533,6 @@ export default {
 }
 .tab-btn.drag-over {
   border-bottom-color: #75AADB;
-}
-.tab-label {
-  color: #75AADB;
-  font-size: 0.75rem;
-  padding: 4px 10px;
-  border-bottom: 2px solid #75AADB;
 }
 .sidebar-chat {
   position: relative;

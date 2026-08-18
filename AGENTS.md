@@ -14,6 +14,7 @@ Todos deben mantenerse actualizados con cada cambio significativo.
 
 - **Backend:** Node.js + Express + Knex + better-sqlite3 + SQLite — JavaScript puro (NO TypeScript)
 - **Frontend:** Vue 3 + Vite + Bootstrap 5 — JavaScript puro (NO TypeScript)
+- **Paneles/tabs:** `vue-greenborn-panels` (npm) — `TabBar`/`TabPanel` + `useTabController`/`usePanelRegistry`/`useLayoutState`. Los paneles `SidebarRight.vue`, `SidebarChat.vue` y `DevInstancePanel.vue` usan este paquete; el CSS se importa una vez en `frontend/src/main.js` (`vue-greenborn-panels/style.css`)
 - **Comunicación:** HTTP REST + SSE streaming + WebSocket (api_memoria vía ws)
 - **Autenticación:** Sesiones con cookies (api_memoria — sesiones almacenadas en servicio de memoria centralizado)
 - **Agente chat:** DeepSeek API con streaming (thinking + respuesta en vivo)
