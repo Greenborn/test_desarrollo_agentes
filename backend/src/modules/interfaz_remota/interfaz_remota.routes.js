@@ -4,9 +4,20 @@ import {
   setInterfazRemotaEnabled,
   enableInterfazRemota,
   testChatSessions,
+  getChatMessages,
+  sendChatMessage,
+  executeChatCommand,
+  createChatSession,
   getInterfazRemotaIoLog,
   subscribeIoEvents,
 } from './interfaz_remota.service.js';
+import {
+  createRemoteTerminal,
+  writeRemoteTerminal,
+  resizeRemoteTerminal,
+  closeRemoteTerminal,
+  listRemoteTerminals,
+} from './remoteTerminal.js';
 
 const router = Router();
 
@@ -76,6 +87,96 @@ router.post('/test/chat-sessions', async (req, res) => {
   const result = await testChatSessions();
   if (!result.success) {
     res.status(500).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+router.post('/test/get-messages', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const result = await getChatMessages(req.body || {});
+  if (!result.success) {
+    res.status(400).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+router.post('/test/send-message', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const result = await sendChatMessage(req.body || {});
+  if (!result.success) {
+    res.status(400).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+router.post('/test/send-command', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const result = await executeChatCommand(req.body || {});
+  if (!result.success) {
+    res.status(400).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+router.post('/test/crear-sesion', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const result = await createChatSession(req.body || {});
+  if (!result.success) {
+    res.status(400).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+router.post('/test/terminal/create', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const result = createRemoteTerminal(req.body || {});
+  if (!result.success) {
+    res.status(400).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+router.post('/test/terminal/input', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const result = writeRemoteTerminal(req.body || {});
+  if (!result.success) {
+    res.status(400).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+router.post('/test/terminal/resize', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const result = resizeRemoteTerminal(req.body || {});
+  if (!result.success) {
+    res.status(400).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+router.post('/test/terminal/close', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const result = closeRemoteTerminal(req.body || {});
+  if (!result.success) {
+    res.status(400).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+router.post('/test/terminal/list', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const result = listRemoteTerminals(req.body || {});
+  if (!result.success) {
+    res.status(400).json(result);
     return;
   }
   res.json(result);

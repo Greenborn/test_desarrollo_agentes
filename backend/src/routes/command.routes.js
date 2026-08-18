@@ -7,6 +7,7 @@ import db from '../config/db.js';
 import dbWorkspaceEnvironments from '../config/dbWorkspaceEnvironments.js';
 import dbCommandHistory from '../config/dbCommandHistory.js';
 import dbRedmineComentarios from '../config/dbRedmineComentarios.js';
+import { executeBackendCommand } from '../services/commandExecutor.js';
 
 const router = Router();
 
@@ -506,86 +507,11 @@ router.post('/execute', async (req, res) => {
   if (!command) return res.status(400).json({ error: 'Comando requerido' });
 
   try {
-    const parts = command.trim().split(/\s+/);
-    const cmd = parts[0].toLowerCase();
-    const args = parts.slice(1);
-
-    let result = '';
-
-    if (cmd === '/cd') {
-      const dir = args.join(' ');
-      if (!dir) {
-        result = 'Error: debe especificar un directorio';
-      } else {
-        let baseDir = process.cwd();
-        if (sessionId) {
-          const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
-          if (session && session.cwd) baseDir = session.cwd;
-        }
-        let resolved;
-        if (dir.startsWith('~')) {
-          resolved = process.env.HOME ? dir.replace(/^~/, process.env.HOME) : dir;
-        } else {
-          resolved = path.resolve(baseDir, dir);
-        }
-        if (!fs.existsSync(resolved)) {
-          result = `Error: el directorio '${resolved}' no existe`;
-        } else if (!fs.statSync(resolved).isDirectory()) {
-          result = `Error: '${resolved}' no es un directorio`;
-        } else {
-          if (sessionId) {
-            await db('chat_sessions').where({ id: sessionId }).update({ cwd: resolved });
-          }
-          result = resolved;
-        }
-      }
-    } else if (cmd === '/ls') {
-      const dirArg = args.join(' ');
-      let baseDir = process.cwd();
-      if (sessionId) {
-        const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
-        if (session && session.cwd) baseDir = session.cwd;
-      }
-      let targetDir;
-      if (!dirArg) {
-        targetDir = baseDir;
-      } else if (dirArg.startsWith('~')) {
-        targetDir = process.env.HOME ? dirArg.replace(/^~/, process.env.HOME) : dirArg;
-      } else {
-        targetDir = path.resolve(baseDir, dirArg);
-      }
-      if (!fs.existsSync(targetDir)) {
-        result = `Error: el directorio '${targetDir}' no existe`;
-      } else if (!fs.statSync(targetDir).isDirectory()) {
-        result = `Error: '${targetDir}' no es un directorio`;
-      } else {
-        const entries = fs.readdirSync(targetDir, { withFileTypes: true });
-        const lines = entries.map((e) => {
-          const type = e.isDirectory() ? 'd' : '-';
-          return `${type}  ${e.name}`;
-        });
-        result = lines.join('\n');
-      }
-    } else if (cmd === '/help') {
-      result = 'Comando recibido — el modal de ayuda se muestra en cliente';
-    } else if (cmd === '/history') {
-      const rows = await dbCommandHistory('command_history')
-        .where({ user_id: req.session.userId })
-        .orderBy('created_at', 'desc')
-        .limit(20)
-        .select('command', 'created_at');
-      const formatted = rows.map((r) => `${r.created_at}: ${r.command}`).join('\n');
-      result = formatted ? formatted : '(sin historial)';
-    } else {
-      result = `Error: comando desconocido '${cmd}'`;
-    }
-
+    const result = await executeBackendCommand(command, { sessionId, userId: req.session.userId });
     const histRecord = { user_id: req.session.userId, command };
     if (sessionId) histRecord.session_id = sessionId;
     await dbCommandHistory('command_history').insert(histRecord);
-
-    const success = !result.startsWith('Error:');
-    res.json({ success, result, command });
+    res.json(result);
   } catch (err) {
     console.log('Error al ejecutar comando:', err.message);
     const errorResult = `Error: ${err.message}`;

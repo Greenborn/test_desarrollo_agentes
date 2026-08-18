@@ -4,6 +4,17 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { login, getGestionCredentials } from '../gestion/gestion.service.js';
 import db from '../../config/db.js';
+import dbChatMessages from '../../config/dbChatMessages.js';
+import { streamChat } from '../../services/deepseek.js';
+import { executeBackendCommand } from '../../services/commandExecutor.js';
+import {
+  createRemoteTerminal,
+  writeRemoteTerminal,
+  resizeRemoteTerminal,
+  closeRemoteTerminal,
+  listRemoteTerminals,
+  stopAllRemoteTerminals,
+} from './remoteTerminal.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -189,6 +200,125 @@ export async function testChatSessions() {
   }
 }
 
+// Cola global para serializar las peticiones de pseudoendpoints. Evita que múltiples
+// ACK concurrentes (reintentos del lado SGI, usuarios, etc.) lancen operaciones DB /
+// streaming duplicados que bloquean el event loop y disparan el ping timeout -> reconexión.
+let remotaQueue = Promise.resolve();
+
+function enqueueRemota(work) {
+  remotaQueue = remotaQueue.then(work).catch((err) => {
+    console.log('[interfaz_remota] Error no manejado en pseudoendpoint:', err.message);
+  });
+  return remotaQueue;
+}
+
+async function getSessionOrNull(sessionId) {
+  return db('chat_sessions').where({ id: sessionId }).first();
+}
+
+export async function getChatMessages({ sessionId, limit = 200 } = {}) {
+  if (!sessionId) return { success: false, error: 'sessionId requerido' };
+  const session = await getSessionOrNull(sessionId);
+  if (!session) return { success: false, error: 'Sesión de chat no encontrada' };
+  const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 200, 1), 500);
+  const messages = await dbChatMessages('chat_messages')
+    .where({ session_id: sessionId })
+    .orderBy('created_at', 'asc')
+    .limit(safeLimit)
+    .select('id', 'role', 'content', 'thinking', 'created_at');
+  return { success: true, data: { sessionId, messages } };
+}
+
+export async function sendChatMessage({ sessionId, message } = {}) {
+  if (!sessionId) return { success: false, error: 'sessionId requerido' };
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    return { success: false, error: 'message requerido' };
+  }
+  const session = await getSessionOrNull(sessionId);
+  if (!session) return { success: false, error: 'Sesión de chat no encontrada' };
+
+  await dbChatMessages('chat_messages').insert({ session_id: sessionId, role: 'user', content: message });
+  await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
+
+  const history = await dbChatMessages('chat_messages')
+    .where({ session_id: sessionId })
+    .orderBy('created_at', 'asc')
+    .select('role', 'content');
+
+  const wsId = session.workspace_id || 1;
+  let fullThinking = '';
+  let fullResponse = '';
+  for await (const chunk of streamChat(history, wsId)) {
+    if (chunk.type === 'usage') continue;
+    if (chunk.type === 'thinking') {
+      fullThinking += chunk.content;
+    } else {
+      fullResponse += chunk.content;
+    }
+  }
+
+  await dbChatMessages('chat_messages').insert({
+    session_id: sessionId,
+    role: 'assistant',
+    content: fullResponse,
+    thinking: fullThinking ? fullThinking : null,
+  });
+  await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
+
+  return { success: true, data: { content: fullResponse, thinking: fullThinking ? fullThinking : null } };
+}
+
+export async function executeChatCommand({ sessionId, command } = {}) {
+  if (!sessionId) return { success: false, error: 'sessionId requerido' };
+  if (!command || typeof command !== 'string' || !command.trim()) {
+    return { success: false, error: 'command requerido' };
+  }
+  const session = await getSessionOrNull(sessionId);
+  if (!session) return { success: false, error: 'Sesión de chat no encontrada' };
+
+  const result = await executeBackendCommand(command, { sessionId });
+  await dbChatMessages('chat_messages').insert([
+    { session_id: sessionId, role: 'command', content: command },
+    { session_id: sessionId, role: 'result', content: result.result },
+  ]);
+  return { success: true, data: { result: result.result, success: result.success } };
+}
+
+export async function createChatSession({ title, cwd } = {}) {
+  const generated = title && typeof title === 'string' && title.trim() ? title.trim() : null;
+  const insertData = {
+    user_id: 1,
+    workspace_id: 1,
+    cwd: cwd && typeof cwd === 'string' ? cwd : null,
+  };
+  if (generated) insertData.title = generated;
+  const [id] = await db('chat_sessions').insert(insertData);
+  const session = await db('chat_sessions').where({ id }).first();
+  return { success: true, data: { session } };
+}
+
+function makeRemotaHandler(work) {
+  return (payload, ack) => {
+    const respond = (resp) => {
+      if (typeof ack === 'function') {
+        ack(resp);
+      } else {
+        console.log('[interfaz_remota] pseudoendpoint sin callback ack:', JSON.stringify(resp).slice(0, 120));
+      }
+    };
+    const body = payload && typeof payload === 'object' ? payload : {};
+    enqueueRemota(async () => {
+      try {
+        const resp = await work(body);
+        respond(resp);
+      } catch (err) {
+        console.log('[interfaz_remota] Error en pseudoendpoint:', err.message);
+        respond({ success: false, error: err.message ? err.message : 'Error interno del pseudoendpoint' });
+      }
+    });
+  };
+}
+
 function emitAnnounce() {
   if (!socket || !socket.connected) {
     console.log('[interfaz_remota] No se puede anunciar: socket no conectado.');
@@ -279,6 +409,7 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
     wsState.message = `Conexión socket.io cerrada (${reason}).`;
     console.log('[interfaz_remota] socket.io desconectado:', reason);
     fileLog(`DISCONNECT reason=${reason}`);
+    stopAllRemoteTerminals();
     if (announceTimer) {
       clearInterval(announceTimer);
       announceTimer = null;
@@ -302,6 +433,22 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
     fileLog(`EVENT interfaz-remota:chatSessions recibido, ack=${typeof ack}, payloadIsFn=${typeof payload}`);
     handleChatSessionsRequest(cb);
   });
+
+  socket.on('interfaz-remota:getMessages', makeRemotaHandler((body) => getChatMessages(body)));
+  socket.on('interfaz-remota:sendMessage', makeRemotaHandler((body) => sendChatMessage(body)));
+  socket.on('interfaz-remota:sendCommand', makeRemotaHandler((body) => executeChatCommand(body)));
+  socket.on('interfaz-remota:crearSesion', makeRemotaHandler((body) => createChatSession(body)));
+
+  const emitRemoto = (event, payload) => {
+    if (socket && socket.connected) {
+      socket.emit(event, payload);
+    }
+  };
+  socket.on('interfaz-remota:terminal:create', makeRemotaHandler((body) => createRemoteTerminal({ ...body, emit: emitRemoto })));
+  socket.on('interfaz-remota:terminal:input', makeRemotaHandler((body) => writeRemoteTerminal(body)));
+  socket.on('interfaz-remota:terminal:resize', makeRemotaHandler((body) => resizeRemoteTerminal(body)));
+  socket.on('interfaz-remota:terminal:close', makeRemotaHandler((body) => closeRemoteTerminal(body)));
+  socket.on('interfaz-remota:terminal:list', makeRemotaHandler((body) => listRemoteTerminals(body)));
 
   socket.onAny((event, ...args) => {
     appendIoLog('in', event, args.length === 1 ? args[0] : args);
@@ -345,6 +492,7 @@ export function stopInterfazRemotaWs() {
     }
     socket = null;
   }
+  stopAllRemoteTerminals();
   wsState = {
     attempted: false,
     connected: false,

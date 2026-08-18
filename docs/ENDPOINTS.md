@@ -195,6 +195,46 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - **Respuesta 200:** `{ success: true, data: { activas: [{ id, title, updated_at, cwd, proyecto_id, id_ticket_redmine, workspace_id }], archivadas: [...] }, checkedAt: "..." }` (sin `prefs`)
 - **Respuesta 500:** `{ success: false, error: "...", checkedAt: "..." }`
 
+### `POST /api/interfaz-remota/test/get-messages`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number, limit?: number }`
+- **Descripción:** Prueba el pseudoendpoint `interfaz-remota:getMessages` (historial de una sesión).
+- **Respuesta 200:** `{ success: true, data: { sessionId, messages: [{ id, role, content, thinking, created_at }] } }`
+- **Respuesta 400:** `{ success: false, error: "..." }` (sesión no encontrada, falta `sessionId`)
+
+### `POST /api/interfaz-remota/test/send-message`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number, message: string }`
+- **Descripción:** Prueba el pseudoendpoint `interfaz-remota:sendMessage` (envía mensaje y devuelve la respuesta final del agente). Bloquea hasta completar el streaming del agente.
+- **Respuesta 200:** `{ success: true, data: { content: string, thinking: string|null } }`
+- **Respuesta 400:** `{ success: false, error: "..." }`
+
+### `POST /api/interfaz-remota/test/send-command`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number, command: string }`
+- **Descripción:** Prueba el pseudoendpoint `interfaz-remota:sendCommand` (ejecuta un comando de backend `/cd`, `/ls`, `/help`, `/history`, `/dev_opencode_iniciar`). Sin fallback al agente.
+- **Respuesta 200:** `{ success: true, data: { success: boolean, result: string } }`
+- **Respuesta 400:** `{ success: false, error: "..." }`
+
+### `POST /api/interfaz-remota/test/crear-sesion`
+- **Auth:** Requerida
+- **Body:** `{ title?: string, cwd?: string }`
+- **Descripción:** Prueba el pseudoendpoint `interfaz-remota:crearSesion` (crea una sesión nueva).
+- **Respuesta 200:** `{ success: true, data: { session: {...} } }`
+- **Respuesta 400:** `{ success: false, error: "..." }`
+
+### Endpoints de test de la terminal remota
+Prueban la lógica de la terminal remota simulada (`remoteTerminal.js`). En estos tests no hay socket
+SGI conectado, así que la salida del PTY solo se registra en consola (no se transmite).
+
+| Endpoint | Body | Respuesta |
+|----------|------|-----------|
+| `POST /api/interfaz-remota/test/terminal/create` | `{ sessionId, cwd?, cmd? }` | `{ success, data: { terminalId } }` |
+| `POST /api/interfaz-remota/test/terminal/input` | `{ terminalId, data }` | `{ success }` |
+| `POST /api/interfaz-remota/test/terminal/resize` | `{ terminalId, cols, rows }` | `{ success }` |
+| `POST /api/interfaz-remota/test/terminal/close` | `{ terminalId }` | `{ success }` |
+| `POST /api/interfaz-remota/test/terminal/list` | `{ sessionId }` | `{ success, data: { terminals: [] } }` |
+
 ---
 
 ## Autenticación (`/api/auth`)
@@ -1570,6 +1610,58 @@ Endpoints del módulo Interfaz Remota. Al iniciar el backend se intenta conectar
 - **Nota:** el campo `prefs` se **excluye** del payload a propósito. Puede alcanzar cientos de KB por sesión y, con muchas sesiones, infla el ACK por encima del límite por defecto de socket.io (~1 MB), cortando la conexión en `transport close` (el SGI vería "El sistema de desarrollo no respondió").
 - En caso de error: `{ "success": false, "error": "<mensaje>" }`
 - Si no se provee callback ack, la respuesta se registra solo en consola (no se envía).
+
+### Pseudoendpoints socket.io de emulación de sesión de chat
+
+Los siguientes pseudoendpoints (request/response sobre WebSocket, no HTTP) permiten **emular la sesión
+de chat completa** desde la gestión interna. El SGI los retransmite recibiendo `desarrollo:<accion>` y
+emitiendo `interfaz-remota:<accion>` hacia el socket del sistema dev. Todos devuelven `{ success, data }`
+o `{ success: false, error }` y aceptan el callback ack.
+
+#### `interfaz-remota:getMessages`
+- **Request:** `{ sessionId, limit? }` (`limit` default 200, máx 500)
+- **Respuesta:** `{ success, data: { sessionId, messages: [{ id, role, content, thinking, created_at }] } }`
+  ordenados por `created_at` ascendente. Roles: `user, assistant, command, result, opencode_info,
+  opencode_result, opencode_control, opencode_confirmed`.
+- **Descripción:** lee el historial de mensajes de una sesión.
+
+#### `interfaz-remota:sendMessage`
+- **Request:** `{ sessionId, message }`
+- **Respuesta:** `{ success, data: { content, thinking } }` — respuesta final completa del agente.
+- **Descripción:** inserta `role:'user'`, ejecuta `streamChat` con el historial completo de la sesión
+  (DeepSeek/Ollama) e inserta `role:'assistant'`. Actualiza `updated_at`. No registra gastos de tokens.
+- **Errores:** sesión no encontrada (`404`-like), `message` vacío.
+
+#### `interfaz-remota:sendCommand`
+- **Request:** `{ sessionId, command }`
+- **Respuesta:** `{ success, data: { success, result } }`.
+- **Descripción:** ejecuta **solo comandos de backend** (`/cd`, `/ls`, `/help`, `/history`,
+  `/dev_opencode_iniciar`; desconocido → `Error: comando desconocido`). Sin fallback al agente.
+  Persiste `role:'command'` y `role:'result'`.
+- **`/dev_opencode_iniciar`:** inicia el servidor OpenCode de la sesión (si no corre) y crea una
+  instancia nueva. Requiere que la sesión tenga `cwd` definido (usar `/cd` antes si no lo tiene).
+
+#### `interfaz-remota:crearSesion`
+- **Request:** `{ title?, cwd? }`
+- **Respuesta:** `{ success, data: { session } }`.
+- **Descripción:** crea una sesión nueva (`workspace_id: 1`, `title` autogenerado si no se provee).
+
+#### Terminal remota simulada
+Replica `/terminal` del frontend local. Ciclo de vida con ack; streaming sin ack.
+
+| Evento | Request | Respuesta |
+|--------|---------|-----------|
+| `interfaz-remota:terminal:create` | `{ sessionId, cwd?, cmd? }` | `{ success, data: { terminalId } }` |
+| `interfaz-remota:terminal:input` | `{ sessionId, terminalId, data }` | `{ success }` |
+| `interfaz-remota:terminal:resize` | `{ sessionId, terminalId, cols, rows }` | `{ success }` |
+| `interfaz-remota:terminal:close` | `{ sessionId, terminalId }` | `{ success }` |
+| `interfaz-remota:terminal:list` | `{ sessionId }` | `{ success, data: { terminals: [] } }` |
+
+Streaming (eventos sin ack, sistema dev → SGI):
+- `interfaz-remota:terminal:data` `{ chatSessionId, terminalId, data }`
+- `interfaz-remota:terminal:exit` `{ chatSessionId, terminalId, code, signal, output }`
+
+El SGI los retransmite como `desarrollo:terminal:data` / `desarrollo:terminal:exit` (broadcast).
 
 ---
 
