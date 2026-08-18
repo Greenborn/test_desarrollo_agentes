@@ -165,8 +165,7 @@ import { useCommandStore } from '../../stores/command.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
-import { useModalStore } from '../../stores/modal.js'
-import AlertModal from '../modals/AlertModal.vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { contrastTextColor } from '../../utils/color.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import ServiciosPanel from '../services/ServiciosPanel.vue'
@@ -182,7 +181,7 @@ export default {
     const ui = useUiStore()
     const settings = useSettingsStore()
     const ws = useWorkspaceStore()
-    const modal = useModalStore()
+    const { mostrar_alerta } = useModal()
     const { sessions, archivedSessions, activeSessionId, creating, sessionStatus, pendingNotifications } = storeToRefs(chat)
     const { sidebarCollapsed, sidebarWidth, centralPanelCollapsed, sidebarWidthPct, rightPanelCollapsed } = storeToRefs(ui)
     const tab = ref('chats')
@@ -320,7 +319,7 @@ export default {
         if (cloned) {
           chat.loadMessages(cloned.id)
         } else {
-          modal.open(AlertModal, { message: 'No se pudo clonar la sesión. Consulta la consola para más detalles.' }, { title: 'Error' })
+          mostrar_alerta('No se pudo clonar la sesión. Consulta la consola para más detalles.')
         }
       }
     }
@@ -337,14 +336,14 @@ export default {
       if (!session) return
       const path = session.cwd || session.session_path || ''
       if (!path) {
-        modal.open(AlertModal, { message: 'La sesión no tiene un path asociado.' }, { title: 'Copiar path' })
+        mostrar_alerta('La sesión no tiene un path asociado.')
         return
       }
       copyToClipboard(path).then(() => {
-        modal.open(AlertModal, { message: `Path copiado: ${path}` }, { title: 'Copiar path' })
+        mostrar_alerta(`Path copiado: ${path}`)
       }).catch((err) => {
         console.error('Error copiando path al portapapeles:', err)
-        modal.open(AlertModal, { message: 'No se pudo copiar el path.' }, { title: 'Copiar path' })
+        mostrar_alerta('No se pudo copiar el path.')
       })
     }
 
@@ -526,6 +525,11 @@ export default {
       menuRef,
       onSessionContextMenu,
       closeSessionCtxMenu,
+      archiveFromCtxMenu,
+      unarchiveFromCtxMenu,
+      cloneFromCtxMenu,
+      copyPathFromCtxMenu,
+      deleteFromCtxMenu,
       sessionNavEnabled,
       localTabs,
       dragIndex,

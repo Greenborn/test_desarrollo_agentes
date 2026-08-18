@@ -10,15 +10,15 @@
       </div>
       <div v-else class="d-flex flex-column flex-grow-1" style="min-height: 0;">
         <div class="file-path text-muted small px-3 py-1 flex-shrink-0 d-flex align-items-center justify-content-between">
-          <span class="text-truncate">{{ filePath }}</span>
-          <button v-if="(isMarkdown || isJson) && !readonly" class="btn btn-sm" :class="editMode ? 'btn-outline-primary' : 'btn-outline-info'" @click="toggleMode">
+          <span class="text-truncate">{{ parametros.filePath }}</span>
+          <button v-if="(isMarkdown || isJson) && !parametros.readonly" class="btn btn-sm" :class="editMode ? 'btn-outline-primary' : 'btn-outline-info'" @click="toggleMode">
             {{ editMode ? 'Vista previa' : 'Editar' }}
           </button>
         </div>
-        <div v-if="readonly && !isJson" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
+        <div v-if="parametros.readonly && !isJson" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
           <pre class="code-pre m-0"><code>{{ content }}</code></pre>
         </div>
-        <div v-if="readonly && isJson" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
+        <div v-if="parametros.readonly && isJson" class="preview-content flex-grow-1 overflow-y-auto px-3 py-2" style="min-height: 0;">
           <JsonTreeView :data="parsedJson" />
         </div>
         <template v-else>
@@ -36,14 +36,14 @@
           ></textarea>
         </template>
         <div class="d-flex align-items-center gap-2 px-3 py-2 flex-shrink-0" style="background: #1a1a2e;">
-          <template v-if="!readonly">
+          <template v-if="!parametros.readonly">
             <span v-if="saving" class="text-muted small">Guardando...</span>
             <span v-if="saved" class="text-success small">✓ Guardado</span>
             <button class="btn btn-sm btn-argentina ms-auto" @click="save" :disabled="saving || !dirty">
               {{ saving ? 'Guardando...' : 'Guardar' }}
             </button>
           </template>
-          <button class="btn btn-sm btn-outline-secondary" :class="{ 'ms-auto': readonly }" @click="$emit('close')" :disabled="saving">Cerrar</button>
+          <button class="btn btn-sm btn-outline-secondary" :class="{ 'ms-auto': parametros.readonly }" @click="ocultar_modal(parametros._modal_cod)" :disabled="saving">Cerrar</button>
         </div>
       </div>
     </div>
@@ -56,6 +56,7 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 import ChatFormatter from '../chat/ChatFormatter.vue'
 import FileEditorOpenCodeChat from './FileEditorOpenCodeChat.vue'
 import JsonTreeView from '../utils/JsonTreeView.vue'
@@ -70,12 +71,14 @@ const OC_PANEL_WIDTH_MIN = 200
 export default {
   components: { ChatFormatter, FileEditorOpenCodeChat, JsonTreeView },
   props: {
-    filePath: { type: String, required: true },
-    sessionId: { type: [Number, String], default: null },
-    readonly: { type: Boolean, default: false },
+    parametros: {
+      type: Object,
+      default: () => ({}),
+    },
   },
-  emits: ['close'],
   setup(props) {
+    const { ocultar_modal } = useModal()
+    const parametros = props.parametros
     const chat = useChatStore()
     const content = ref('')
     const originalContent = ref('')
@@ -87,9 +90,9 @@ export default {
     const ocPanelWidth = ref(OC_PANEL_WIDTH_DEFAULT)
 
     const dirty = computed(() => content.value !== originalContent.value)
-    const isMarkdown = computed(() => props.filePath.toLowerCase().endsWith('.md'))
+    const isMarkdown = computed(() => parametros.filePath.toLowerCase().endsWith('.md'))
     const isJson = computed(() => {
-      if (!props.filePath.toLowerCase().endsWith('.json')) return false
+      if (!parametros.filePath.toLowerCase().endsWith('.json')) return false
       try {
         const parsed = JSON.parse(content.value)
         return parsed !== null && typeof parsed === 'object'
@@ -106,12 +109,12 @@ export default {
     })
 
     const cwd = computed(() => {
-      if (props.sessionId) {
-        const session = chat.sessions.find(s => Number(s.id) === Number(props.sessionId))
+      if (parametros.sessionId) {
+        const session = chat.sessions.find(s => Number(s.id) === Number(parametros.sessionId))
         if (session?.cwd) return session.cwd
       }
-      const lastSlash = props.filePath.lastIndexOf('/')
-      return lastSlash > 0 ? props.filePath.slice(0, lastSlash) : null
+      const lastSlash = parametros.filePath.lastIndexOf('/')
+      return lastSlash > 0 ? parametros.filePath.slice(0, lastSlash) : null
     })
 
     async function loadOcPanelWidth() {
@@ -190,7 +193,7 @@ export default {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ path: props.filePath, content: content.value }),
+          body: JSON.stringify({ path: parametros.filePath, content: content.value }),
         })
         const data = await res.json()
         if (data.success) {
@@ -208,11 +211,11 @@ export default {
     }
 
     function reload() {
-      loadFile(props.filePath)
+      loadFile(parametros.filePath)
     }
 
     onMounted(() => {
-      loadFile(props.filePath)
+      loadFile(parametros.filePath)
       loadOcPanelWidth()
     })
 
@@ -220,7 +223,7 @@ export default {
       content, loading, saving, saved, error, dirty,
       editMode, isMarkdown, isJson, parsedJson, toggleMode,
       save, reload, cwd,
-      ocPanelWidth, onOcSplitStart,
+      ocPanelWidth, onOcSplitStart, ocultar_modal, parametros,
     }
   },
 }

@@ -32,7 +32,7 @@
 
 <script>
 import { ref } from 'vue'
-import { useModalStore } from '../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import DescripcionMejorarModal from '../chat-controls/DescripcionMejorarModal.vue'
 
 export default {
@@ -56,14 +56,14 @@ export default {
     }
 
     function abrirModal() {
-      const modal = useModalStore()
-      modal.open(DescripcionMejorarModal, {
+      const { mostrar_modal } = useModal()
+      mostrar_modal(DescripcionMejorarModal, 'Mejorar comentario con IA', {
         sessionId: props.sessionId,
         ticketId: props.ticketId,
         onApply: (improved) => {
           commentText.value = improved
         },
-      }, { title: 'Mejorar comentario con IA', wide: true })
+      }, { size: 'full' })
     }
 
     return { commentText, modoEnvio, confirmar, cancelar, abrirModal }

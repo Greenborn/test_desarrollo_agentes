@@ -43,7 +43,7 @@ import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../stores/chat.js'
 import { useCommandStore } from '../../stores/command.js'
-import { useModalStore } from '../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useOpencodeStore } from '../../stores/opencode.js'
 import { useGitStore } from '../../stores/git.js'
 import { useDevInstanceStore } from '../../stores/devInstance.js'
@@ -70,7 +70,7 @@ export default {
   setup() {
     const chat = useChatStore()
     const cmdStore = useCommandStore()
-    const modal = useModalStore()
+    const { mostrar_modal } = useModal()
     const ocStore = useOpencodeStore()
     const gitStore = useGitStore()
     const devInstanceStore = useDevInstanceStore()
@@ -372,7 +372,7 @@ export default {
       const parts = raw.split(/\s+/)
       const cmdName = parts[0].toLowerCase()
       if (cmdName === '/help') {
-        modal.open(HelpContent, {})
+        mostrar_modal(HelpContent, 'Ayuda', {})
         return
       }
       const known = find(cmdName)

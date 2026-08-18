@@ -34,7 +34,7 @@
         </select>
       </div>
       <div class="d-flex justify-content-end gap-2">
-        <button type="button" class="btn btn-sm btn-outline-secondary" @click="$emit('close')" :disabled="submitting">Cancelar</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @click="ocultar_modal(parametros._modal_cod)" :disabled="submitting">Cancelar</button>
         <button type="submit" class="btn btn-sm btn-argentina" :disabled="submitting">
           <span v-if="submitting" class="spinner-border spinner-border-sm me-1" role="status"></span>
           {{ submitting ? 'Creando…' : 'Crear Variable' }}
@@ -42,21 +42,28 @@
       </div>
     </form>
     <div v-else-if="success" class="text-center">
-      <button type="button" class="btn btn-sm btn-argentina mt-2" @click="$emit('close')">Cerrar</button>
+      <button type="button" class="btn btn-sm btn-argentina mt-2" @click="ocultar_modal(parametros._modal_cod)">Cerrar</button>
     </div>
   </div>
 </template>
 
 <script>
 import { ref, reactive } from 'vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useChatStore } from '../../stores/chat.js'
 import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
 
 export default {
-  emits: ['close'],
-  setup() {
+  props: {
+    parametros: {
+      type: Object,
+      default: () => ({}),
+    },
+  },
+  setup(props) {
     const chat = useChatStore()
-    const { find } = useCommandRegistry()
+    const { ocultar_modal } = useModal()
+    const parametros = props.parametros
 
     const form = reactive({
       key: '',

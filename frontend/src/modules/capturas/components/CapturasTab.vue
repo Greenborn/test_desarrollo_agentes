@@ -68,7 +68,7 @@ import { watch, ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useUiStore } from '../../../stores/ui.js'
-import { useModalStore } from '../../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useBrowserStore } from '../../../stores/browser.js'
 import { useCommandRegistry } from '../../../composables/useCommandRegistry.js'
 import { settingSet, settingGet } from '../../../services/settingService.js'
@@ -78,7 +78,7 @@ export default {
   setup() {
     const ui = useUiStore()
     const chat = useChatStore()
-    const modal = useModalStore()
+    const { mostrar_modal } = useModal()
     const browser = useBrowserStore()
     const { find } = useCommandRegistry()
     const { activeSessionId, sessions } = storeToRefs(chat)
@@ -168,7 +168,7 @@ export default {
     }
 
     function verDetallesCaptura(c) {
-      modal.open(CapturaDetailModal, { captura: c }, { title: c.nombre_original, wide: true })
+      mostrar_modal(CapturaDetailModal, c.nombre_original, { captura: c }, { size: 'full' })
     }
 
     async function eliminarCaptura(c) {

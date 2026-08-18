@@ -58,32 +58,31 @@
 
 <script>
 import { ref } from 'vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useProjectVariablesStore } from '../../stores/projectVariables.js'
-import { useModalStore } from '../../stores/modal.js'
 import JsonTreeView from '../utils/JsonTreeView.vue'
 
 export default {
   components: { JsonTreeView },
   props: {
-    variable: { type: Object, required: true },
-    proyectoId: { type: [Number, String], default: null },
-    modalId: { type: [Number, String], default: null },
+    parametros: { type: Object, default: () => ({}) },
   },
   setup(props) {
     const projectVariables = useProjectVariablesStore()
-    const modal = useModalStore()
+    const { ocultar_modal } = useModal()
+    const parametros = props.parametros
 
     const editMode = ref(false)
-    const editKey = ref(props.variable.key)
-    const editValue = ref(typeof props.variable.value === 'string' ? props.variable.value : JSON.stringify(props.variable.value, null, 2))
-    const editType = ref(props.variable.type || 'db')
+    const editKey = ref(parametros.variable.key)
+    const editValue = ref(typeof parametros.variable.value === 'string' ? parametros.variable.value : JSON.stringify(parametros.variable.value, null, 2))
+    const editType = ref(parametros.variable.type || 'db')
     const saving = ref(false)
     const errorMsg = ref('')
 
     function enterEditMode() {
-      editKey.value = props.variable.key
-      editValue.value = typeof props.variable.value === 'string' ? props.variable.value : JSON.stringify(props.variable.value, null, 2)
-      editType.value = props.variable.type || 'db'
+      editKey.value = parametros.variable.key
+      editValue.value = typeof parametros.variable.value === 'string' ? parametros.variable.value : JSON.stringify(parametros.variable.value, null, 2)
+      editType.value = parametros.variable.type || 'db'
       errorMsg.value = ''
       editMode.value = true
     }
@@ -101,8 +100,8 @@ export default {
       saving.value = true
       errorMsg.value = ''
       try {
-        await projectVariables.saveVariable(props.proyectoId, editKey.value.trim(), editValue.value, editType.value)
-        if (props.modalId) modal.close(props.modalId)
+        await projectVariables.saveVariable(parametros.proyectoId, editKey.value.trim(), editValue.value, editType.value)
+        ocultar_modal(parametros._modal_cod)
       } catch (err) {
         errorMsg.value = err.message || 'Error al guardar la variable'
       } finally {
@@ -114,8 +113,8 @@ export default {
       saving.value = true
       errorMsg.value = ''
       try {
-        await projectVariables.deleteVariable(props.proyectoId, props.variable.key)
-        if (props.modalId) modal.close(props.modalId)
+        await projectVariables.deleteVariable(parametros.proyectoId, parametros.variable.key)
+        ocultar_modal(parametros._modal_cod)
       } catch (err) {
         errorMsg.value = err.message || 'Error al eliminar la variable'
       } finally {
@@ -124,7 +123,7 @@ export default {
     }
 
     function copiarValor() {
-      const raw = typeof props.variable.value === 'string' ? props.variable.value : JSON.stringify(props.variable.value, null, 2)
+      const raw = typeof parametros.variable.value === 'string' ? parametros.variable.value : JSON.stringify(parametros.variable.value, null, 2)
       navigator.clipboard.writeText(raw).catch(err => {
         console.error('Error al copiar valor:', err)
       })
@@ -136,6 +135,9 @@ export default {
     }
   },
   computed: {
+    variable() {
+      return this.parametros.variable
+    },
     isJson() {
       const v = this.variable.value
       if (!v) return false

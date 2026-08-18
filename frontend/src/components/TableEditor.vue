@@ -262,18 +262,16 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
-import { useModalStore } from '@/stores/modal'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { usePreferenciasStore } from '@/stores/preferencias'
 import { BtnConfig } from './BtnConfig'
 import { mapFilaJSONtabla, getCamposJSONyFieldDef, getCamposJson } from '@/helpers/mapCampoJSON'
 import { getProcessFieldDef, reOrder, getFieldsForFilter, getFiltersFrFields, getFieldDefFFormated } from '@/helpers/procesarFieldDef'
 import { row_formatter } from '@/helpers/formatter'
 import { verifica_permisos } from '@/helpers/rbac'
-import AlertModal from '@/components/modals/AlertModal.vue'
-import ConfirmModal from '@/components/modals/ConfirmModal.vue'
 import FormularioGenerico from '@/components/genericos/formulario-generico/FormularioGenerico.vue'
 
-const modal = useModalStore()
+const { mostrar_modal, mostrar_alerta, mostrar_confirm } = useModal()
 const prefStore = usePreferenciasStore()
 const props = defineProps(['api', 'permisos', 'config', 'data', 'id'])
 const emit = defineEmits(['loaded', 'rowSelected', 'rowDoubleClick'])
@@ -616,36 +614,36 @@ async function _createRecord() {
   let cf = [...columnDefs.value]
   const fc = props.config?.formConfig || {}
   if (props.config?.extraFields?.create) cf.push(...props.config.extraFields.create)
-  const modalId = modal.open(FormularioGenerico, {
+  mostrar_modal(FormularioGenerico, `${elementLabels.value.create} ${props.config?.elementName?.singular || ''}`, {
     campos: cf,
     modelo: formModel.value,
     onSubmit: props.api.create,
     guardado: _refresh,
     _modalState: null,
-  }, { title: `${elementLabels.value.create} ${props.config?.elementName?.singular || ''}` })
+  })
 }
 
 async function _editRecord() {
   if (!props.api?.edit) return
   if (!selectedRow.value && !selectedRows.value.size) {
-    modal.open(AlertModal, { message: `Es necesario seleccionar ${elementLabels.value.article} ${props.config?.elementName?.singular || 'elemento'}` }, { title: 'Aviso' })
+    mostrar_alerta(`Es necesario seleccionar ${elementLabels.value.article} ${props.config?.elementName?.singular || 'elemento'}`)
     return
   }
   let dr = selectionMode.value === 'multiple' ? [...selectedRows.value.values()][0] : selectedRow.value
   let cf = [...columnDefs.value]
   if (props.config?.extraFields?.edit) cf.push(...props.config.extraFields.edit)
-  modal.open(FormularioGenerico, {
+  mostrar_modal(FormularioGenerico, `Editar ${props.config?.elementName?.singular || ''}`, {
     campos: cf,
     modelo: dr,
     onSubmit: props.api.edit,
     guardado: _refresh,
     _modalState: null,
-  }, { title: `Editar ${props.config?.elementName?.singular || ''}` })
+  })
 }
 
 async function _deleteRecord() {
   if (!selectedRow.value && !selectedRows.value.size) {
-    modal.open(AlertModal, { message: `Es necesario seleccionar ${elementLabels.value.article} ${props.config?.elementName?.singular || 'elemento'}` }, { title: 'Aviso' })
+    mostrar_alerta(`Es necesario seleccionar ${elementLabels.value.article} ${props.config?.elementName?.singular || 'elemento'}`)
     return
   }
   const data = selectionMode.value === 'multiple'
@@ -653,13 +651,10 @@ async function _deleteRecord() {
     : [selectedRow.value]
   const ids = data.map(r => r.id).filter(Boolean)
   if (!ids.length) return
-  modal.open(ConfirmModal, {
-    message: '¿Está seguro?',
-    confirmLabel: elementLabels.value.delete,
-    confirmSeverity: 'btn-danger',
-  }, {
+  mostrar_confirm({
     title: 'Confirmar',
-    onClose: () => _executeDelete(ids),
+    text: '¿Está seguro?',
+    confirmar_accion: () => _executeDelete(ids),
   })
 }
 
@@ -671,14 +666,14 @@ async function _executeDelete(ids) {
     selectedRows.value = new Map()
     editEnabled.value = true
     if (res?.stat) {
-      modal.open(AlertModal, { message: `${props.config?.elementName?.singular || ''} ${elementLabels.value.deleted} correctamente` }, { title: 'Éxito' })
+      mostrar_alerta(`${props.config?.elementName?.singular || ''} ${elementLabels.value.deleted} correctamente`)
       _refresh()
     } else {
-      modal.open(AlertModal, { message: res?.text || 'Error al eliminar' }, { title: 'Error' })
+      mostrar_alerta(res?.text || 'Error al eliminar')
     }
   } catch (err) {
     console.error('[TableEditor] Error al eliminar:', err)
-    modal.open(AlertModal, { message: 'Error al eliminar' }, { title: 'Error' })
+    mostrar_alerta('Error al eliminar')
   } finally {
     loading.value = false
   }

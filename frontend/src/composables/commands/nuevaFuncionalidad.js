@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
-import { useModalStore } from '../../stores/modal.js';
+import { useModal } from 'vue-greenborn-modal-manager';
 import FuncionalidadWizard from '../../components/wizards/FuncionalidadWizard.vue';
 
 const { register } = useCommandRegistry();
@@ -20,11 +20,10 @@ register({
       if (!data.proyectoId) {
         throw new Error('No hay proyecto seleccionado. Use /chat_set_proyecto primero.');
       }
-      const modal = useModalStore();
-      modal.open(FuncionalidadWizard, { sessionId, proyectoId: data.proyectoId }, {
-        title: 'Asistente de Creación de Nueva Funcionalidad',
-        wide: true,
-      });
+      const { mostrar_modal } = useModal();
+      mostrar_modal(FuncionalidadWizard, 'Asistente de Creación de Nueva Funcionalidad', {
+        sessionId, proyectoId: data.proyectoId,
+      }, { size: 'full' });
     } catch (err) {
       console.error('Error al verificar proyecto:', err.message);
       throw err;

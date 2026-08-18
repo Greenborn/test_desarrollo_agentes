@@ -1,5 +1,5 @@
 import { parseCommandArgs, getUsedFlags } from '../../../composables/parseCommandArgs.js'
-import { useModalStore } from '../../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useWorkspaceStore } from '../../../stores/workspace.js'
 import GestionSyncModal from '../../../components/modals/GestionSyncModal.vue'
 
@@ -52,14 +52,11 @@ export default {
 
     const importedSlugs = (gestData.proyectos || []).map((p) => p.slug)
 
-    const modal = useModalStore()
-    modal.open(GestionSyncModal, {
+    const { mostrar_modal } = useModal()
+    mostrar_modal(GestionSyncModal, 'Exportar Proyectos a Gestión', {
       proyectos,
       importedSlugs,
       workspaceId: workspaceId || 0,
-    }, {
-      title: 'Exportar Proyectos a Gestión',
-      wide: true,
     })
 
     return 'Seleccione los proyectos locales a exportar en el modal. Los ya exportados al sistema de gestión se muestran deshabilitados.'

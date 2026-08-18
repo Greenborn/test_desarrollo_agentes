@@ -30,7 +30,7 @@ import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../../stores/auth.js'
 import { useRouter } from 'vue-router'
 import { useCommandStore } from '../../stores/command.js'
-import { useModalStore } from '../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useOpencodeStore } from '../../stores/opencode.js'
 import { useBrowserStore } from '../../stores/browser.js'
 import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
@@ -52,7 +52,7 @@ export default {
     const auth = useAuthStore()
     const cmdStore = useCommandStore()
     const chatStore = useChatStore()
-    const modal = useModalStore()
+    const { mostrar_modal } = useModal()
     const ocStore = useOpencodeStore()
     const wsStore = useWorkspaceStore()
     const browserStore = useBrowserStore()
@@ -81,7 +81,7 @@ export default {
       description: 'Muestra esta ayuda general de comandos, organizada por categoría.',
       usage: '/help',
       async execute(args, { cmdStore }) {
-        modal.open(HelpContent, {})
+        mostrar_modal(HelpContent, 'Ayuda', {})
       },
     })
 
@@ -560,11 +560,11 @@ export default {
     })
 
     function openSettings() {
-      modal.open(SettingsView, {}, { title: 'Configuración', wide: true })
+      mostrar_modal(SettingsView, 'Configuración', {}, { size: 'full' })
     }
 
     function openWorkspaceSwitcher() {
-      modal.open(WorkspaceSwitcherModal, {}, { title: 'Espacios de Trabajo' })
+      mostrar_modal(WorkspaceSwitcherModal, 'Espacios de Trabajo', {})
     }
 
     let dropdownInstance = null

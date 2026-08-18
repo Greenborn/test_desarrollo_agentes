@@ -34,15 +34,18 @@
 
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 
 export default {
   props: {
-    remoteUrl: { type: String, default: '' },
-    onSubmit: { type: Function, default: null },
-    onCancel: { type: Function, default: null },
+    parametros: {
+      type: Object,
+      default: () => ({}),
+    },
   },
-  emits: ['close'],
-  setup(props, { emit }) {
+  setup(props) {
+    const { ocultar_modal } = useModal()
+    const parametros = props.parametros
     const usernameInput = ref(null)
     const form = reactive({
       username: '',
@@ -53,13 +56,17 @@ export default {
 
     function submit() {
       if (!valid.value) return
-      if (props.onSubmit) props.onSubmit({ username: form.username.trim(), token: form.token.trim() })
-      emit('close')
+      if (parametros._modalState && parametros._modalState.resolve) {
+        parametros._modalState.resolve({ username: form.username.trim(), token: form.token.trim() })
+      }
+      ocultar_modal(parametros._modal_cod)
     }
 
     function cancel() {
-      if (props.onCancel) props.onCancel()
-      emit('close')
+      if (parametros._modalState && parametros._modalState.resolve) {
+        parametros._modalState.resolve(null)
+      }
+      ocultar_modal(parametros._modal_cod)
     }
 
     onMounted(() => {

@@ -160,10 +160,10 @@ function generateId() {
 
 export default {
   props: {
-    captura: { type: Object, required: true },
+    parametros: { type: Object, default: () => ({}) },
   },
-  emits: ['close'],
   setup(props) {
+    const captura = props.parametros.captura
     const activeTab = ref('captura')
     const metadata = ref([])
     const loadingMetadata = ref(false)
@@ -302,7 +302,7 @@ export default {
     async function loadMetadata() {
       loadingMetadata.value = true
       try {
-        const res = await fetch(`/api/archivos/${props.captura.id}/metadata`, { credentials: 'include' })
+        const res = await fetch(`/api/archivos/${captura.id}/metadata`, { credentials: 'include' })
         if (res.ok) {
           const data = await res.json()
           metadata.value = data.metadata || []
@@ -330,7 +330,7 @@ export default {
 
     async function saveNotes() {
       try {
-        await fetch(`/api/archivos/${props.captura.id}/metadata`, {
+        await fetch(`/api/archivos/${captura.id}/metadata`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -372,7 +372,7 @@ export default {
     async function eliminarMetadata(m) {
       if (!confirm(`¿Eliminar metadata "${m.key}"?`)) return
       try {
-        const res = await fetch(`/api/archivos/${props.captura.id}/metadata/${m.id}`, {
+        const res = await fetch(`/api/archivos/${captura.id}/metadata/${m.id}`, {
           method: 'DELETE',
           credentials: 'include',
         })

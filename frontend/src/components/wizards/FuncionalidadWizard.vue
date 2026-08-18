@@ -37,7 +37,7 @@
     </div>
 
     <div class="d-flex justify-content-end gap-2 mt-3 flex-shrink-0">
-      <button class="btn btn-outline-secondary btn-sm" @click="$emit('close')">Cancelar</button>
+      <button class="btn btn-outline-secondary btn-sm" @click="ocultar_modal(parametros._modal_cod)">Cancelar</button>
       <button class="btn btn-success btn-sm" @click="save" :disabled="saving">
         {{ saving ? 'Guardando...' : 'Guardar' }}
       </button>
@@ -47,15 +47,19 @@
 
 <script>
 import { computed, onMounted } from 'vue';
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useFuncionalidadStore } from '../../stores/funcionalidad.js';
 
 export default {
   props: {
-    sessionId: { type: Number, required: true },
-    proyectoId: { type: String, default: null },
+    parametros: {
+      type: Object,
+      default: () => ({}),
+    },
   },
-  emits: ['close'],
-  setup(props, { emit }) {
+  setup(props) {
+    const { ocultar_modal } = useModal()
+    const parametros = props.parametros
     const tabs = [
       { key: 'relevamiento', label: 'Relevamiento Funcionalidad', placeholder: 'Describa los requisitos y alcance de la funcionalidad...' },
       { key: 'diseno', label: 'Diseño', placeholder: 'Describa el diseño de la solución, componentes, flujos...' },
@@ -69,15 +73,15 @@ export default {
     const activeTabData = computed(() => tabs.find(t => t.key === funcStore.activeTab));
 
     async function handleSave() {
-      const data = await funcStore.save({ sessionId: props.sessionId, proyectoId: props.proyectoId });
+      const data = await funcStore.save({ sessionId: parametros.sessionId, proyectoId: parametros.proyectoId });
       if (data.success) {
-        emit('close');
+        ocultar_modal(parametros._modal_cod);
       }
     }
 
-    onMounted(() => funcStore.load(props.sessionId));
+    onMounted(() => funcStore.load(parametros.sessionId));
 
-    return { tabs, activeTab: funcStore.activeTab, activeTabData, formData: funcStore.formData, nombre: funcStore.nombre, urlRedmine: funcStore.urlRedmine, saving: funcStore.saving, save: handleSave };
+    return { tabs, activeTab: funcStore.activeTab, activeTabData, formData: funcStore.formData, nombre: funcStore.nombre, urlRedmine: funcStore.urlRedmine, saving: funcStore.saving, save: handleSave, ocultar_modal, parametros };
   },
 };
 </script>

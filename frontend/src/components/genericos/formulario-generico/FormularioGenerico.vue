@@ -24,28 +24,28 @@ import { ref, onMounted } from 'vue'
 
 export default {
   props: {
-    campos: { type: Array, default: () => [] },
-    modelo: { type: Object, default: () => ({}) },
-    onSubmit: { type: Function, default: null },
-    guardado: { type: Function, default: null },
-    _modalState: { type: Object, default: null },
+    parametros: { type: Object, default: () => ({}) },
   },
-  emits: ['close', 'cancel'],
   setup(props) {
-    const model = ref({ ...(props.modelo || {}) })
+    const campos = props.parametros.campos || []
+    const modelo = props.parametros.modelo || {}
+    const onSubmit = props.parametros.onSubmit || null
+    const guardado = props.parametros.guardado || null
+    const _modalState = props.parametros._modalState || null
+    const model = ref({ ...(modelo || {}) })
 
     onMounted(() => {
-      if (props._modalState) {
-        props._modalState.guardar = handleSubmit
+      if (_modalState) {
+        _modalState.guardar = handleSubmit
       }
     })
 
     async function handleSubmit() {
-      if (!props.onSubmit) return
+      if (!onSubmit) return
       try {
-        const res = await props.onSubmit(model.value)
+        const res = await onSubmit(model.value)
         if (res && res.stat !== false) {
-          if (props.guardado) props.guardado()
+          if (guardado) guardado()
         }
       } catch (err) {
         console.error('[FormularioGenerico] Error en submit:', err)

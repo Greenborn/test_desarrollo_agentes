@@ -234,7 +234,7 @@ hljs.registerLanguage('dockerfile', dockerfile)
 hljs.registerLanguage('plaintext', plaintext)
 import ChatFormatter from '../chat/ChatFormatter.vue'
 import { useSettingsStore } from '../../stores/settings.js'
-import { useModalStore } from '../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useCsvParser } from '../../composables/useCsvParser.js'
 import CsvViewerModal from './CsvViewerModal.vue'
 
@@ -400,7 +400,7 @@ export default {
       }
     }
 
-    const modal = useModalStore()
+    const { mostrar_modal } = useModal()
     const { parseCsv: parseCsvRaw } = useCsvParser()
 
     const csvRawContent = ref('')
@@ -423,7 +423,7 @@ export default {
     }
 
     function openCsvDetail() {
-      modal.open(CsvViewerModal, { filePath: props.filePath }, { title: `CSV: ${fileName.value}`, wide: true })
+      mostrar_modal(CsvViewerModal, `CSV: ${fileName.value}`, { filePath: props.filePath }, { size: 'full' })
     }
 
     const isTooLarge = computed(() => {

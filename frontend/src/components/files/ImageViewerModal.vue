@@ -9,14 +9,14 @@
     </div>
     <div v-else class="d-flex flex-column flex-grow-1" style="min-height: 0;">
       <div class="file-path text-muted small px-3 py-1 flex-shrink-0">
-        <span class="text-truncate">{{ filePath }}</span>
+        <span class="text-truncate">{{ parametros.filePath }}</span>
       </div>
       <div class="image-container flex-grow-1 d-flex align-items-center justify-content-center overflow-auto p-3" style="min-height: 0;">
         <img :src="imageSrc" :alt="fileName" class="img-fluid" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
       </div>
       <div class="d-flex align-items-center gap-2 px-3 py-2 flex-shrink-0" style="background: #1a1a2e;">
         <span class="text-muted small">{{ fileName }} ({{ fileSize }})</span>
-        <button class="btn btn-sm btn-outline-secondary ms-auto" @click="$emit('close')">Cerrar</button>
+        <button class="btn btn-sm btn-outline-secondary ms-auto" @click="ocultar_modal(parametros._modal_cod)">Cerrar</button>
       </div>
     </div>
   </div>
@@ -24,22 +24,27 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 
 const API = '/api'
 
 export default {
   props: {
-    filePath: { type: String, required: true },
+    parametros: {
+      type: Object,
+      default: () => ({}),
+    },
   },
-  emits: ['close'],
   setup(props) {
+    const { ocultar_modal } = useModal()
+    const parametros = props.parametros
     const loading = ref(false)
     const error = ref(null)
     const base64 = ref(null)
     const mime = ref(null)
     const fileSize = ref('')
 
-    const fileName = computed(() => props.filePath.split('/').pop() || props.filePath)
+    const fileName = computed(() => parametros.filePath.split('/').pop() || parametros.filePath)
     const imageSrc = computed(() => base64.value && mime.value ? `data:${mime.value};base64,${base64.value}` : null)
 
     function formatSize(bytes) {
@@ -72,15 +77,15 @@ export default {
     }
 
     function reload() {
-      loadImage(props.filePath)
+      loadImage(parametros.filePath)
     }
 
     onMounted(() => {
-      loadImage(props.filePath)
+      loadImage(parametros.filePath)
     })
 
     return {
-      loading, error, imageSrc, fileName, fileSize, reload,
+      loading, error, imageSrc, fileName, fileSize, reload, ocultar_modal, parametros,
     }
   },
 }

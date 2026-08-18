@@ -82,14 +82,13 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Modal } from 'bootstrap'
 import TableEditor from '../../../components/TableEditor.vue'
 import { BtnConfig } from '../../../components/BtnConfig.js'
-import ConfirmModal from '../../../components/modals/ConfirmModal.vue'
 import OllamaConfigModal from './OllamaConfigModal.vue'
-import { useModalStore } from '../../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 
 export default {
   components: { TableEditor },
   setup() {
-    const modal = useModalStore()
+    const { mostrar_modal, mostrar_confirm } = useModal()
     const modelos = ref([])
     const cargando = ref(false)
     const errorMsg = ref('')
@@ -276,13 +275,11 @@ export default {
     }
 
     function confirmarEliminar(modelo) {
-      modal.open(ConfirmModal, {
-        message: '¿Eliminar el modelo "' + modelo.name + '"?',
-        confirmLabel: 'Eliminar',
-        confirmSeverity: 'btn-danger',
-      }, {
+      mostrar_confirm({
         title: 'Confirmar',
-        onClose: () => eliminarModelo(modelo),
+        text: '¿Eliminar el modelo "' + modelo.name + '"?',
+        severity_confirmar: 'danger',
+        confirmar_accion: () => eliminarModelo(modelo),
       })
     }
 
@@ -341,13 +338,11 @@ export default {
     }
 
     function resetearCommitModel() {
-      modal.open(ConfirmModal, {
-        message: '¿Desactivar el modelo local para commits? A partir de ahora se usará DeepSeek nuevamente.',
-        confirmLabel: 'Usar DeepSeek',
-        confirmSeverity: 'btn-danger',
-      }, {
+      mostrar_confirm({
         title: 'Resetear configuración',
-        onClose: async () => {
+        text: '¿Desactivar el modelo local para commits? A partir de ahora se usará DeepSeek nuevamente.',
+        severity_confirmar: 'danger',
+        confirmar_accion: async () => {
           try {
             const res = await fetch('/api/ollama/config', {
               method: 'POST',
@@ -368,25 +363,26 @@ export default {
       })
     }
 
-    function abrirModalConfig() {
+    async function abrirModalConfig() {
       if (!selectedRow.value) return
-      modal.open(OllamaConfigModal, {
-        modelName: selectedRow.value.name,
-        commitModelName: commitModelName.value,
-      }, {
-        title: 'Configurar Modelo',
-        onClose: (result) => {
-          if (result && result.commitModel !== undefined) {
-            commitModelName.value = result.commitModel
-            if (result.commitModel) {
-              statusMsg.value = 'Modelo "' + result.commitModel + '" configurado para commits'
-            } else {
-              statusMsg.value = 'Configuración de commits desactivada'
-            }
-            limpiarStatus()
-          }
-        },
+      const _modalState = { resolve: null }
+      const result = await new Promise((resolve) => {
+        _modalState.resolve = resolve
+        mostrar_modal(OllamaConfigModal, 'Configurar Modelo', {
+          modelName: selectedRow.value.name,
+          commitModelName: commitModelName.value,
+          _modalState,
+        })
       })
+      if (result && result.commitModel !== undefined) {
+        commitModelName.value = result.commitModel
+        if (result.commitModel) {
+          statusMsg.value = 'Modelo "' + result.commitModel + '" configurado para commits'
+        } else {
+          statusMsg.value = 'Configuración de commits desactivada'
+        }
+        limpiarStatus()
+      }
     }
 
     onMounted(() => {

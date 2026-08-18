@@ -46,9 +46,8 @@ import { watch, ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useComandosPersonalizadosStore } from '../../../stores/comandosPersonalizados.js'
-import { useModalStore } from '../../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import TableEditor from '../../../components/TableEditor.vue'
-import AlertModal from '../../../components/modals/AlertModal.vue'
 import { BtnConfig } from '@/components/BtnConfig'
 import wsClient from '../../../services/wsClient'
 
@@ -59,7 +58,7 @@ export default {
   setup() {
     const chat = useChatStore()
     const comandosStore = useComandosPersonalizadosStore()
-    const modal = useModalStore()
+    const { mostrar_alerta } = useModal()
     const { activeSessionId, sessions } = storeToRefs(chat)
 
     const activeSession = computed(() => {
@@ -157,7 +156,7 @@ export default {
       const check = chat.canCreateTerminal(sid)
       if (!check.ok) {
         console.log(`[comandos] Límite de terminales alcanzado (${check.used}/${check.total})`)
-        modal.open(AlertModal, { message: `Límite de terminales alcanzado: ${check.used}/${check.total} terminales activas. Cierre una terminal antes de ejecutar un comando.` }, { title: 'Aviso' })
+        mostrar_alerta(`Límite de terminales alcanzado: ${check.used}/${check.total} terminales activas. Cierre una terminal antes de ejecutar un comando.`)
         return false
       }
       return true

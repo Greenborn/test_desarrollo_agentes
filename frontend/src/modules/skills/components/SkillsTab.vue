@@ -117,11 +117,10 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
-import { useModalStore } from '../../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useWorkspaceStore } from '../../../stores/workspace.js'
 import { settingSet, settingGet } from '../../../services/settingService.js'
 import ChatFormatter from '../../../components/chat/ChatFormatter.vue'
-import AlertModal from '../../../components/modals/AlertModal.vue'
 
 const SKILLS_AGENT_WIDTH_KEY = 'skills_agent_width'
 const SKILLS_AGENT_MIN_WIDTH = 120
@@ -129,10 +128,10 @@ const SKILLS_EDITOR_MIN_WIDTH = 120
 
 export default {
   name: 'SkillsTab',
-  components: { ChatFormatter, AlertModal },
+  components: { ChatFormatter },
   setup() {
     const chat = useChatStore()
-    const modal = useModalStore()
+    const { mostrar_alerta } = useModal()
     const wsStore = useWorkspaceStore()
     const { sessions, activeSessionId } = storeToRefs(chat)
 
@@ -378,11 +377,11 @@ function resetAgentState() {
           const nuevo = skills.value.find(s => s.name === name.trim())
           if (nuevo) selectSkill(nuevo)
         } else {
-          modal.open(AlertModal, { message: data.error || 'Error al crear skill' }, { title: 'Error' })
+          mostrar_alerta(data.error || 'Error al crear skill')
         }
       } catch (err) {
         console.error('Error al crear skill:', err)
-        modal.open(AlertModal, { message: 'Error al crear skill' }, { title: 'Error' })
+        mostrar_alerta('Error al crear skill')
       }
     }
 

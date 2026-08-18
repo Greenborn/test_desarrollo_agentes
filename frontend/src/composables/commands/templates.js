@@ -1,6 +1,6 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
-import { useModalStore } from '../../stores/modal.js';
+import { useModal } from 'vue-greenborn-modal-manager';
 import { useTemplatesStore } from '../../stores/templates.js';
 import TemplateEditorModal from '../../components/modals/TemplateEditorModal.vue';
 
@@ -12,8 +12,8 @@ register({
   description: 'Abre el editor para crear una nueva plantilla Markdown.',
   usage: '/plantilla_crear',
   async execute(args, { chatStore }) {
-    const modal = useModalStore();
-    modal.open(TemplateEditorModal, {}, { title: 'Nueva Plantilla' });
+    const { mostrar_modal } = useModal();
+    mostrar_modal(TemplateEditorModal, 'Nueva Plantilla', {});
   },
 });
 
@@ -92,8 +92,8 @@ register({
     const { params, errors } = parseCommandArgs(args, { slug: { required: true } });
     if (errors.length) return errors.join('\n');
 
-    const modal = useModalStore();
-    modal.open(TemplateEditorModal, { initialSlug: params.slug }, { title: `Editar Plantilla: ${params.slug}` });
+    const { mostrar_modal } = useModal();
+    mostrar_modal(TemplateEditorModal, `Editar Plantilla: ${params.slug}`, { initialSlug: params.slug });
   },
 });
 

@@ -29,25 +29,30 @@
     <div v-if="errorMsg" class="small text-danger mt-1" style="font-size: 0.75rem;">{{ errorMsg }}</div>
 
     <div class="d-flex justify-content-end mt-3 gap-2">
-      <button class="btn btn-sm btn-secondary" @click="$emit('cancel')">Cancelar</button>
+      <button class="btn btn-sm btn-secondary" @click="cancelar">Cancelar</button>
       <button class="btn btn-sm" style="background: rgba(117, 170, 219, 0.15); color: #75AADB; border: 1px solid rgba(117, 170, 219, 0.3);" :disabled="guardando" @click="onGuardar">{{ guardando ? 'Guardando...' : 'Guardar' }}</button>
     </div>
   </div>
 </template>
 
 <script>
-import ConfirmModal from '../../../components/modals/ConfirmModal.vue'
-import { useModalStore } from '../../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 
 export default {
   props: {
-    modelName: { type: String, required: true },
-    commitModelName: { type: String, default: '' },
+    parametros: { type: Object, default: () => ({}) },
   },
-  emits: ['close', 'cancel'],
+  setup(props) {
+    const { ocultar_modal, mostrar_confirm } = useModal()
+    const parametros = props.parametros
+
+    return { ocultar_modal, mostrar_confirm, parametros }
+  },
   data() {
     return {
-      commitEnabled: this.commitModelName === this.modelName,
+      modelName: this.parametros.modelName || '',
+      commitModelName: this.parametros.commitModelName || '',
+      commitEnabled: this.parametros.commitModelName === this.parametros.modelName,
       guardando: false,
       errorMsg: '',
     }
@@ -71,7 +76,10 @@ export default {
         })
         const data = await res.json()
         if (data.status) {
-          this.$emit('close', { commitModel: newModel })
+          if (this.parametros._modalState && this.parametros._modalState.resolve) {
+            this.parametros._modalState.resolve({ commitModel: newModel })
+          }
+          this.ocultar_modal(this.parametros._modal_cod)
         } else {
           this.errorMsg = data.error || 'Error al guardar configuración'
         }
@@ -82,16 +90,19 @@ export default {
         this.guardando = false
       }
     },
+    cancelar() {
+      if (this.parametros._modalState && this.parametros._modalState.resolve) {
+        this.parametros._modalState.resolve(null)
+      }
+      this.ocultar_modal(this.parametros._modal_cod)
+    },
     onGuardar() {
       if (this.otherModelActivo && this.commitEnabled) {
-        const modal = useModalStore()
-        modal.open(ConfirmModal, {
-          message: 'El modelo "' + this.commitModelName + '" está actualmente configurado para commits.\n\n¿Deseas habilitar "' + this.modelName + '" en su lugar?',
-          confirmLabel: 'Sí, usar este',
-          confirmSeverity: 'btn-primary',
-        }, {
+        this.mostrar_confirm({
           title: 'Cambiar modelo de commits',
-          onClose: () => this.guardar(),
+          text: 'El modelo "' + this.commitModelName + '" está actualmente configurado para commits.\n\n¿Deseas habilitar "' + this.modelName + '" en su lugar?',
+          severity_confirmar: 'primary',
+          confirmar_accion: () => this.guardar(),
         })
       } else {
         this.guardar()

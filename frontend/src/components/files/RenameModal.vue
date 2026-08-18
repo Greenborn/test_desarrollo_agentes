@@ -13,14 +13,14 @@
           placeholder="Nuevo nombre del archivo o carpeta"
           required
           :disabled="submitting"
-          @keydown.esc="$emit('close')"
+          @keydown.esc="ocultar_modal(parametros._modal_cod)"
         />
         <div class="mt-2 small text-muted">
-          Ruta: <code>{{ path }}</code>
+          Ruta: <code>{{ parametros.path }}</code>
         </div>
       </div>
       <div class="d-flex justify-content-end gap-2">
-        <button type="button" class="btn btn-sm btn-outline-secondary" @click="$emit('close')" :disabled="submitting">Cancelar</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @click="ocultar_modal(parametros._modal_cod)" :disabled="submitting">Cancelar</button>
         <button type="submit" class="btn btn-sm btn-argentina" :disabled="submitting">
           <span v-if="submitting" class="spinner-border spinner-border-sm me-1" role="status"></span>
           {{ submitting ? 'Renombrando…' : 'Renombrar' }}
@@ -28,25 +28,25 @@
       </div>
     </form>
     <div v-else class="text-center py-2">
-      <button type="button" class="btn btn-sm btn-argentina" @click="$emit('close')">Cerrar</button>
+      <button type="button" class="btn btn-sm btn-argentina" @click="ocultar_modal(parametros._modal_cod)">Cerrar</button>
     </div>
   </div>
 </template>
 
 <script>
 import { ref, onMounted, nextTick } from 'vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useFileTreeStore } from '../../stores/fileTree.js'
 
 export default {
   props: {
-    path: { type: String, required: true },
-    currentName: { type: String, required: true },
-    sessionId: { type: Number, default: null },
+    parametros: { type: Object, default: () => ({}) },
   },
-  emits: ['close'],
   setup(props) {
     const fileTreeStore = useFileTreeStore()
-    const name = ref(props.currentName)
+    const { ocultar_modal } = useModal()
+    const parametros = props.parametros
+    const name = ref(parametros.currentName)
     const submitting = ref(false)
     const error = ref('')
     const nameInput = ref(null)
@@ -66,7 +66,7 @@ export default {
         error.value = 'El nombre no puede estar vacío.'
         return
       }
-      if (newName === props.currentName) {
+      if (newName === parametros.currentName) {
         error.value = 'El nuevo nombre es igual al actual.'
         return
       }
@@ -79,7 +79,7 @@ export default {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ path: props.path, newName }),
+          body: JSON.stringify({ path: parametros.path, newName }),
         })
         const data = await res.json()
         if (!data.success) {
@@ -87,10 +87,10 @@ export default {
           submitting.value = false
           return
         }
-        if (props.sessionId) {
-          fileTreeStore.fetchTree(props.sessionId)
+        if (parametros.sessionId) {
+          fileTreeStore.fetchTree(parametros.sessionId)
         }
-        emit('close')
+        ocultar_modal(parametros._modal_cod)
       } catch (err) {
         console.error('Error al renombrar:', err.message)
         error.value = `Error al renombrar: ${err.message}`
@@ -98,7 +98,7 @@ export default {
       }
     }
 
-    return { name, submitting, error, nameInput, submit }
+    return { name, submitting, error, nameInput, submit, ocultar_modal, parametros }
   },
 }
 </script>

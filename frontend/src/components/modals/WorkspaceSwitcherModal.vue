@@ -46,17 +46,18 @@
 <script>
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useModalStore } from '../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useChatStore } from '../../stores/chat.js'
-import AlertModal from '../modals/AlertModal.vue'
 
 export default {
-  emits: ['close'],
-  setup(props, { emit }) {
+  props: {
+    parametros: { type: Object, default: () => ({}) },
+  },
+  setup(props) {
     const wsStore = useWorkspaceStore()
-    const modal = useModalStore()
+    const { mostrar_alerta, ocultar_modal } = useModal()
     const auth = useAuthStore()
     const chatStore = useChatStore()
     const { workspaces } = storeToRefs(wsStore)
@@ -82,7 +83,7 @@ export default {
     async function applySelection() {
       const ids = [...selected.value]
       if (ids.length === 0) {
-        modal.open(AlertModal, { message: 'Debe seleccionar al menos un espacio de trabajo.' }, { title: 'Aviso' })
+        mostrar_alerta('Debe seleccionar al menos un espacio de trabajo.')
         return
       }
 
@@ -114,7 +115,7 @@ export default {
         auth.setWorkspaceIds(result.workspaceIds)
         chatStore.stopAllExecutions()
         await wsStore.loadWorkspaces()
-        emit('close')
+        ocultar_modal(props.parametros._modal_cod)
       }
       saving.value = false
     }

@@ -54,7 +54,7 @@
     <div v-if="saveError" class="alert alert-danger py-1 px-2 mb-2 small">{{ saveError }}</div>
 
     <div class="d-flex gap-2 justify-content-end">
-      <button class="btn btn-sm btn-secondary" @click="emit('close')">Cancelar</button>
+      <button class="btn btn-sm btn-secondary" @click="ocultar_modal(parametros._modal_cod)">Cancelar</button>
       <button class="btn btn-sm btn-success" @click="save" :disabled="!slugValue.trim() || !contentValue.trim() || saving || isProtected">
         {{ initialSlug ? 'Actualizar' : 'Crear plantilla' }}
       </button>
@@ -64,6 +64,7 @@
 
 <script>
 import { ref, onMounted } from 'vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useTemplatesStore } from '../../stores/templates.js'
 import { useChatStore } from '../../stores/chat.js'
 import ChatFormatter from '../chat/ChatFormatter.vue'
@@ -71,13 +72,15 @@ import ChatFormatter from '../chat/ChatFormatter.vue'
 export default {
   components: { ChatFormatter },
   props: {
-    initialSlug: { type: String, default: '' },
+    parametros: { type: Object, default: () => ({}) },
   },
-  emits: ['close'],
-  setup(props, { emit }) {
+  setup(props) {
     const templatesStore = useTemplatesStore()
     const chatStore = useChatStore()
-    const slugValue = ref(props.initialSlug)
+    const { ocultar_modal } = useModal()
+    const parametros = props.parametros
+    const initialSlug = parametros.initialSlug || ''
+    const slugValue = ref(initialSlug)
     const contentValue = ref('')
     const tab = ref('editor')
     const saving = ref(false)
@@ -85,9 +88,9 @@ export default {
     const isProtected = ref(false)
 
     onMounted(async () => {
-      if (props.initialSlug) {
+      if (initialSlug) {
         try {
-          const tmpl = await templatesStore.fetchBySlug(props.initialSlug)
+          const tmpl = await templatesStore.fetchBySlug(initialSlug)
           if (tmpl) {
             slugValue.value = tmpl.slug
             contentValue.value = tmpl.content
@@ -103,11 +106,11 @@ export default {
       saving.value = true
       saveError.value = ''
       try {
-        if (props.initialSlug) {
+        if (initialSlug) {
           const data = {}
-          if (slugValue.value !== props.initialSlug) data.slug = slugValue.value.trim()
+          if (slugValue.value !== initialSlug) data.slug = slugValue.value.trim()
           data.content = contentValue.value
-          await templatesStore.update(props.initialSlug, data)
+          await templatesStore.update(initialSlug, data)
           chatStore.pushMessage({
             role: 'result',
             content: `Plantilla "${slugValue.value}" actualizada.`,
@@ -121,7 +124,7 @@ export default {
             _key: 'res-' + Date.now(),
           })
         }
-        emit('close')
+        ocultar_modal(parametros._modal_cod)
       } catch (err) {
         saveError.value = err.message || 'Error al guardar plantilla'
       } finally {
@@ -129,7 +132,7 @@ export default {
       }
     }
 
-    return { slugValue, contentValue, tab, saving, saveError, isProtected, save, emit }
+    return { slugValue, contentValue, tab, saving, saveError, isProtected, initialSlug, save }
   },
 }
 </script>

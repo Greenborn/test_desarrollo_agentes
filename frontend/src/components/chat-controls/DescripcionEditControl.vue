@@ -39,7 +39,7 @@
 
 <script>
 import { ref, onMounted } from 'vue'
-import { useModalStore } from '../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import DescripcionMejorarModal from './DescripcionMejorarModal.vue'
 
 export default {
@@ -71,14 +71,14 @@ export default {
     }
 
     function abrirModal() {
-      const modal = useModalStore()
-      modal.open(DescripcionMejorarModal, {
+      const { mostrar_modal } = useModal()
+      mostrar_modal(DescripcionMejorarModal, props.ticketSubject ? `Mejorar: ${props.ticketSubject}` : 'Mejorar descripción con IA', {
         sessionId: props.sessionId,
         ticketId: props.ticketId,
         onApply: (improved) => {
           text.value = improved
         },
-      }, { title: props.ticketSubject ? `Mejorar: ${props.ticketSubject}` : 'Mejorar descripción con IA', wide: true })
+      }, { size: 'full' })
     }
 
     onMounted(() => {

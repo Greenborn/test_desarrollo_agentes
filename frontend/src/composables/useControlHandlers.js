@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import { useChatStore } from '../stores/chat.js'
 import { useOpencodeStore } from '../stores/opencode.js'
 import { useCommandStore } from '../stores/command.js'
-import { useModalStore } from '../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useWorkspaceStore } from '../stores/workspace.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useSettingsStore } from '../stores/settings.js'
@@ -19,7 +19,7 @@ export function useControlHandlers(api) {
   const chat = useChatStore()
   const ocStore = useOpencodeStore()
   const cmdStore = useCommandStore()
-  const modal = useModalStore()
+  const { mostrar_modal } = useModal()
   const redmineComments = useRedmineCommentsStore()
   const projectVarStore = useProjectVariablesStore()
   const auth = useAuthStore()
@@ -299,10 +299,10 @@ export function useControlHandlers(api) {
       }
       return
     } else if (controlType === 'funcionalidad_list') {
-      modal.open(FuncionalidadWizard, {
+      mostrar_modal(FuncionalidadWizard, 'Editar funcionalidad', {
         sessionId: value.sessionId,
         proyectoId: value.proyectoId,
-      }, { title: 'Editar funcionalidad', wide: true })
+      }, { size: 'full' })
       return
     } else if (controlType === 'ticket_edit') {
       if (value === null) {
@@ -2046,12 +2046,10 @@ export function useControlHandlers(api) {
     const isGitHub = /github\.com/i.test(remoteUrl)
     if (!isGitHub) return false
 
+    const _modalState = { resolve }
     const credentials = await new Promise((resolve) => {
-      modal.open(GitAuthModal, {
-        remoteUrl,
-        onSubmit: (creds) => resolve(creds),
-        onCancel: () => resolve(null),
-      }, { title: 'Autenticación GitHub' })
+      _modalState.resolve = resolve
+      mostrar_modal(GitAuthModal, 'Autenticación GitHub', { remoteUrl, _modalState })
     })
 
     if (!credentials) {

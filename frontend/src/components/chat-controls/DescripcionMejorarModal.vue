@@ -170,6 +170,7 @@
 
 <script>
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useChatStore } from '../../stores/chat.js'
 import { useOpencodeStore } from '../../stores/opencode.js'
 import { settingGet, settingSet } from '../../services/settingService.js'
@@ -226,12 +227,14 @@ async function streamRefine(text, systemPrompt, sessionId) {
 export default {
   components: { ChatFormatter },
   props: {
-    sessionId: { type: [String, Number], default: '' },
-    ticketId: { type: [String, Number], default: null },
-    onApply: { type: Function, default: null },
+    parametros: {
+      type: Object,
+      default: () => ({}),
+    },
   },
-  emits: ['close'],
-  setup(props, { emit }) {
+  setup(props) {
+    const { ocultar_modal } = useModal()
+    const parametros = props.parametros
     const chatStore = useChatStore()
 
     const objetivo = ref('')
@@ -255,11 +258,11 @@ export default {
     const ocSending = ref(false)
     const ocChatRef = ref(null)
     const ocAgentLinked = computed(() => {
-      const map = ocStore.sessionsMap[String(props.sessionId)]
+      const map = ocStore.sessionsMap[String(parametros.sessionId)]
       return map && map.ocSessionId ? true : false
     })
     const ocMessages = computed(() => {
-      if (!props.sessionId) return []
+      if (!parametros.sessionId) return []
       return chatStore.messages.filter(m => {
         return ['opencode_confirmed', 'opencode_result', 'opencode_stream', 'opencode_info', 'opencode_control'].includes(m.role)
       })
@@ -291,9 +294,9 @@ export default {
     }
 
     async function iniciarOpencode() {
-      if (!props.sessionId) return
+      if (!parametros.sessionId) return
       try {
-        const res = await fetch(`/api/opencode/start?sessionId=${encodeURIComponent(props.sessionId)}`, { credentials: 'include' })
+        const res = await fetch(`/api/opencode/start?sessionId=${encodeURIComponent(parametros.sessionId)}`, { credentials: 'include' })
         if (!res.ok) return
         const data = await res.json()
         const provider = data.providers?.[0]
@@ -304,7 +307,7 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({
-            sessionId: props.sessionId,
+            sessionId: parametros.sessionId,
             provider: provider.id,
             model: model?.id || model,
             thinking: 'medium',
@@ -312,7 +315,7 @@ export default {
             temperature: '0.7',
           }),
         })
-        ocStore.saveCurrentToMap(props.sessionId)
+        ocStore.saveCurrentToMap(parametros.sessionId)
         chatStore.pushMessage({ role: 'opencode_info', content: 'OpenCode iniciado', _key: 'oc-info-' + Date.now() })
       } catch (err) {
         console.error('Error al iniciar OpenCode:', err)
@@ -321,21 +324,21 @@ export default {
 
     async function sendToOc() {
       const text = ocInput.value.trim()
-      if (!text || !props.sessionId || ocSending.value) return
+      if (!text || !parametros.sessionId || ocSending.value) return
       ocInput.value = ''
       ocSending.value = true
 
       const msgKey = 'oc-' + Date.now()
       chatStore.pushMessage({ role: 'opencode_confirmed', content: text, _key: msgKey })
 
-      const map = ocStore.sessionsMap[String(props.sessionId)]
+      const map = ocStore.sessionsMap[String(parametros.sessionId)]
       if (!map) { ocSending.value = false; return }
 
       const streamKey = 'oc-stream-' + Date.now()
       chatStore.pushMessage({ role: 'opencode_stream', content: '', _key: streamKey, _streaming: true })
 
       try {
-        await ocStore.streamPrompt(props.sessionId, text, map.selectedProvider, map.selectedModel,
+        await ocStore.streamPrompt(parametros.sessionId, text, map.selectedProvider, map.selectedModel,
           map.selectedThinking || 'medium', map.selectedMode || 'Plan', map.selectedTemperature || '0.7', {
           onChunk(content, full) {
             chatStore.updateMessageByKey(streamKey, { content: full, _streaming: true })
@@ -449,8 +452,8 @@ export default {
         loadResultWidth(),
       ])
 
-      if (props.sessionId) {
-        ocStore.loadFromMap(props.sessionId)
+      if (parametros.sessionId) {
+        ocStore.loadFromMap(parametros.sessionId)
       }
 
       try {
@@ -477,7 +480,7 @@ export default {
           objetivoFinal = await streamRefine(
             `Notas de reunión:\n${notasReunion.value}`,
             objetivoPrompt.value,
-            props.sessionId || undefined
+            parametros.sessionId || undefined
           )
         }
 
@@ -486,7 +489,7 @@ export default {
         const promtOpencode = await streamRefine(
           promptData,
           promptAgentePrompt.value,
-          props.sessionId || undefined
+          parametros.sessionId || undefined
         )
 
         let final = plantillaDescripcion.value
@@ -508,14 +511,14 @@ export default {
     function aplicar() {
       const finalText = aiResponse.value || response.value
       if (!finalText) return
-      if (props.onApply) {
-        props.onApply(finalText)
+      if (parametros.onApply) {
+        parametros.onApply(finalText)
       }
-      emit('close')
+      ocultar_modal(parametros._modal_cod)
     }
 
     function cancelar() {
-      emit('close')
+      ocultar_modal(parametros._modal_cod)
     }
 
     function copiarTexto() {

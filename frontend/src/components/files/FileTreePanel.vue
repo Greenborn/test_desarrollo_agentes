@@ -74,7 +74,7 @@
 
 <script>
 import { computed, ref, reactive, watch, onBeforeUnmount, onMounted, nextTick } from 'vue'
-import { useModalStore } from '../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useFileTreeStore } from '../../stores/fileTree.js'
 import { useComponentContextMenu } from '../../composables/useComponentContextMenu.js'
 import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
@@ -82,7 +82,6 @@ import FileEditorModal from './FileEditorModal.vue'
 import RenameModal from './RenameModal.vue'
 import CsvViewerModal from './CsvViewerModal.vue'
 import ImageViewerModal from './ImageViewerModal.vue'
-import AlertModal from '../modals/AlertModal.vue'
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'bmp'])
 
@@ -123,7 +122,7 @@ export default {
   },
   emits: ['file-selected'],
   setup(props, { emit }) {
-    const modal = useModalStore()
+    const { mostrar_modal, mostrar_alerta } = useModal()
     const fileTreeStore = useFileTreeStore()
 
     const selectedFile = ref(null)
@@ -223,11 +222,11 @@ export default {
       const name = path.split('/').pop() || path
       selectedFile.value = path
       if (name.toLowerCase().endsWith('.csv')) {
-        modal.open(CsvViewerModal, { filePath: path }, { title: `CSV: ${name}`, wide: true })
+        mostrar_modal(CsvViewerModal, `CSV: ${name}`, { filePath: path }, { size: 'full' })
       } else if (isImageFile(name)) {
-        modal.open(ImageViewerModal, { filePath: path }, { title: `Imagen: ${name}`, wide: true })
+        mostrar_modal(ImageViewerModal, `Imagen: ${name}`, { filePath: path }, { size: 'full' })
       } else {
-        modal.open(FileEditorModal, { filePath: path, sessionId: props.sessionId }, { title: `Editar: ${name}`, wide: true })
+        mostrar_modal(FileEditorModal, `Editar: ${name}`, { filePath: path, sessionId: props.sessionId }, { size: 'full' })
       }
     }
 
@@ -280,10 +279,10 @@ export default {
       const filePath = ctxMenu.value.path
       const currentName = filePath.split('/').pop() || filePath
       closeCtxMenu()
-      modal.open(
+      mostrar_modal(
         RenameModal,
-        { path: filePath, currentName, sessionId: props.sessionId },
-        { title: 'Renombrar' }
+        'Renombrar',
+        { path: filePath, currentName, sessionId: props.sessionId }
       )
     }
 
@@ -342,11 +341,11 @@ export default {
         if (data.success) {
           await navigator.clipboard.writeText(data.content)
         } else {
-          modal.open(AlertModal, { message: `Error al leer archivo: ${data.error}` }, { title: 'Error' })
+          mostrar_alerta(`Error al leer archivo: ${data.error}`)
         }
       } catch (err) {
         console.error('Error al copiar contenido del archivo:', err)
-        modal.open(AlertModal, { message: `Error al copiar contenido: ${err.message}` }, { title: 'Error' })
+        mostrar_alerta(`Error al copiar contenido: ${err.message}`)
       }
       closeCtxMenu()
     }
@@ -396,11 +395,11 @@ export default {
             fileTreeStore.fetchTree(props.sessionId)
           }
         } else {
-          modal.open(AlertModal, { message: `Error al eliminar directorio: ${data.error}` }, { title: 'Error' })
+          mostrar_alerta(`Error al eliminar directorio: ${data.error}`)
         }
       } catch (err) {
         console.error('Error al eliminar directorio:', err)
-        modal.open(AlertModal, { message: `Error al eliminar directorio: ${err.message}` }, { title: 'Error' })
+        mostrar_alerta(`Error al eliminar directorio: ${err.message}`)
       }
     }
 
@@ -420,11 +419,11 @@ export default {
             fileTreeStore.fetchTree(props.sessionId)
           }
         } else {
-          modal.open(AlertModal, { message: `Error al eliminar archivo: ${data.error}` }, { title: 'Error' })
+          mostrar_alerta(`Error al eliminar archivo: ${data.error}`)
         }
       } catch (err) {
         console.error('Error al eliminar archivo:', err)
-        modal.open(AlertModal, { message: `Error al eliminar archivo: ${err.message}` }, { title: 'Error' })
+        mostrar_alerta(`Error al eliminar archivo: ${err.message}`)
       }
     }
 

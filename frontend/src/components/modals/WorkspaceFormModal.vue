@@ -36,33 +36,35 @@
       <button class="btn btn-argentina flex-grow-1" :disabled="saving || !formName.trim()" @click="save">
         {{ saving ? 'Guardando...' : (isEdit ? 'Guardar cambios' : 'Crear espacio de trabajo') }}
       </button>
-      <button class="btn btn-outline-secondary" @click="$emit('close')" :disabled="saving">Cancelar</button>
+      <button class="btn btn-outline-secondary" @click="ocultar_modal(parametros._modal_cod)" :disabled="saving">Cancelar</button>
     </div>
   </div>
 </template>
 
 <script>
 import { ref, computed, onMounted } from 'vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { contrastTextColor } from '../../utils/color.js'
 
 export default {
   props: {
-    workspace: {
+    parametros: {
       type: Object,
-      default: null,
+      default: () => ({}),
     },
   },
-  emits: ['close'],
-  setup(props, { emit }) {
+  setup(props) {
     const wsStore = useWorkspaceStore()
+    const { ocultar_modal } = useModal()
+    const workspace = props.parametros.workspace || null
     const nameInput = ref(null)
     const formName = ref('')
     const formColor = ref('#75AADB')
     const saving = ref(false)
     const error = ref('')
 
-    const isEdit = computed(() => !!props.workspace)
+    const isEdit = computed(() => !!workspace)
 
     const previewStyle = computed(() => ({
       backgroundColor: formColor.value,
@@ -70,9 +72,9 @@ export default {
     }))
 
     onMounted(() => {
-      if (props.workspace) {
-        formName.value = props.workspace.name || ''
-        formColor.value = props.workspace.color || '#75AADB'
+      if (workspace) {
+        formName.value = workspace.name || ''
+        formColor.value = workspace.color || '#75AADB'
       }
       nameInput.value?.focus()
     })
@@ -88,12 +90,12 @@ export default {
       try {
         let result
         if (isEdit.value) {
-          result = await wsStore.updateWorkspace(props.workspace.id, name, formColor.value)
+          result = await wsStore.updateWorkspace(workspace.id, name, formColor.value)
         } else {
           result = await wsStore.createWorkspace(name, formColor.value)
         }
         if (result.success) {
-          emit('close')
+          ocultar_modal(props.parametros._modal_cod)
         } else {
           error.value = result.error || 'Error al guardar'
         }

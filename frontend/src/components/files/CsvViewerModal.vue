@@ -25,7 +25,7 @@
           <button class="btn btn-sm btn-argentina ms-auto" @click="save" :disabled="saving || !dirty">
             {{ saving ? 'Guardando...' : 'Guardar' }}
           </button>
-          <button class="btn btn-sm btn-outline-secondary" @click="$emit('close')" :disabled="saving">Cerrar</button>
+          <button class="btn btn-sm btn-outline-secondary" @click="ocultar_modal(parametros._modal_cod)" :disabled="saving">Cerrar</button>
         </div>
       </div>
       <template v-else>
@@ -74,9 +74,9 @@
         </div>
 
         <div class="d-flex align-items-center gap-2 px-3 py-2 flex-shrink-0" style="background: #1a1a2e; border-top: 1px solid #374151;">
-          <span class="text-muted small text-truncate" :title="filePath">{{ filePath }}</span>
+          <span class="text-muted small text-truncate" :title="parametros.filePath">{{ parametros.filePath }}</span>
           <button class="btn btn-sm btn-outline-info ms-auto" @click="toggleEditMode">Editar</button>
-          <button class="btn btn-sm btn-outline-secondary" @click="$emit('close')">Cerrar</button>
+          <button class="btn btn-sm btn-outline-secondary" @click="ocultar_modal(parametros._modal_cod)">Cerrar</button>
         </div>
       </template>
     </template>
@@ -85,16 +85,21 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useCsvParser } from '../../composables/useCsvParser.js'
 
 const API = '/api'
 
 export default {
   props: {
-    filePath: { type: String, required: true },
+    parametros: {
+      type: Object,
+      default: () => ({}),
+    },
   },
-  emits: ['close'],
   setup(props) {
+    const { ocultar_modal } = useModal()
+    const parametros = props.parametros
     const { parseCsv: parse } = useCsvParser()
 
     const rawContent = ref('')
@@ -127,7 +132,7 @@ export default {
       loading.value = true
       error.value = null
       try {
-        const res = await fetch(`${API}/command/read-file?path=${encodeURIComponent(props.filePath)}`, {
+        const res = await fetch(`${API}/command/read-file?path=${encodeURIComponent(parametros.filePath)}`, {
           credentials: 'include',
         })
         const data = await res.json()
@@ -154,7 +159,7 @@ export default {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ path: props.filePath, content: rawContent.value }),
+          body: JSON.stringify({ path: parametros.filePath, content: rawContent.value }),
         })
         const data = await res.json()
         if (data.success) {
@@ -179,7 +184,7 @@ export default {
     return {
       loading, saving, saved, error, delimiter, quoteChar, hasHeader,
       columns, parsedRows, columnCount, dirty, editMode,
-      loadFile, parseCsv, toggleEditMode, save, filePath: props.filePath, rawContent,
+      loadFile, parseCsv, toggleEditMode, save, filePath: parametros.filePath, rawContent, ocultar_modal, parametros,
     }
   },
 }

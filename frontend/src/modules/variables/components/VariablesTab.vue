@@ -26,7 +26,7 @@ import { watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useProjectVariablesStore } from '../../../stores/projectVariables.js'
-import { useModalStore } from '../../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import VariableDetailModal from '../../../components/modals/VariableDetailModal.vue'
 import CreateVariableModal from '../../../components/modals/CreateVariableModal.vue'
 import TableEditor from '../../../components/TableEditor.vue'
@@ -35,7 +35,7 @@ export default {
   components: { TableEditor },
   setup() {
     const chat = useChatStore()
-    const modal = useModalStore()
+    const { mostrar_modal } = useModal()
     const projectVariables = useProjectVariablesStore()
     const { activeSessionId, sessions } = storeToRefs(chat)
 
@@ -80,7 +80,7 @@ export default {
     }))
 
     function openVariableDetail(variable) {
-      modal.open(VariableDetailModal, { variable, proyectoId: proyectoId.value }, { title: variable.key })
+      mostrar_modal(VariableDetailModal, variable.key, { variable, proyectoId: proyectoId.value })
     }
 
     function onRowDblClick({ data }) {
@@ -89,7 +89,7 @@ export default {
     }
 
     function agregarVariable() {
-      modal.open(CreateVariableModal, {}, { title: 'Nueva Variable' })
+      mostrar_modal(CreateVariableModal, 'Nueva Variable', {})
     }
 
     watch([proyectoId, activeSessionId], () => {

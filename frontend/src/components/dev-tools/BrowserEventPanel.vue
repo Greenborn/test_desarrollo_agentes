@@ -304,15 +304,13 @@ import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
 import { useCommandStore } from '../../stores/command.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useUiStore } from '../../stores/ui.js'
-import { useModalStore } from '../../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { storeToRefs } from 'pinia'
 import { useComponentContextMenu } from '../../composables/useComponentContextMenu.js'
 import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
-import AlertModal from '../modals/AlertModal.vue'
 
 export default {
   setup() {
-    const modal = useModalStore()
     const logsStore = usePlaywrightLogsStore()
     const chatStore = useChatStore()
     const projectStore = useProjectStore()
@@ -474,7 +472,8 @@ export default {
       if (!name) return
       showNewRecordingInput.value = false
       if (!currentProjectId.value) {
-        modal.open(AlertModal, { message: 'No hay un proyecto activo. Seleccione o cree un proyecto antes de crear una grabación.' }, { title: 'Aviso' })
+        const { mostrar_alerta } = useModal()
+        mostrar_alerta('No hay un proyecto activo. Seleccione o cree un proyecto antes de crear una grabación.')
         newRecordingName.value = ''
         return
       }

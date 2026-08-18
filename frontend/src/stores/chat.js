@@ -6,8 +6,7 @@ import { useSettingsStore } from './settings.js'
 import { useOpencodeStore } from './opencode.js'
 import wsClient from '../services/wsClient.js'
 import { playAlertBeep } from '../utils/audio.js'
-import { useModalStore } from './modal.js'
-import AlertModal from '../components/modals/AlertModal.vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 
 const API = '/api'
 const SESSION_KEY = 'oc_active_session_id'
@@ -208,8 +207,8 @@ export const useChatStore = defineStore('chat', () => {
   function _notifyTerminalLimit(sid) {
     const { used, total } = getTerminalSlotUsage(sid)
     console.log(`[terminales] Límite de terminales alcanzado (${used}/${total}) para sesión ${sid}`)
-    const modal = useModalStore()
-    modal.open(AlertModal, { message: `Límite de terminales alcanzado: ${used}/${total} terminales activas. Cierre una terminal antes de abrir una nueva.` }, { title: 'Aviso' })
+    const { mostrar_alerta } = useModal()
+    mostrar_alerta(`Límite de terminales alcanzado: ${used}/${total} terminales activas. Cierre una terminal antes de abrir una nueva.`)
   }
 
   function closeTerminal(terminalId) {

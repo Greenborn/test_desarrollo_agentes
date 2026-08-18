@@ -86,44 +86,47 @@
       <button
         v-if="done"
         class="btn btn-argentina flex-grow-1"
-        @click="$emit('close')"
+        @click="ocultar_modal(parametros._modal_cod)"
       >
         Cerrar
       </button>
-      <button class="btn btn-outline-secondary" @click="$emit('close')" :disabled="creating">Cancelar</button>
+      <button class="btn btn-outline-secondary" @click="ocultar_modal(parametros._modal_cod)" :disabled="creating">Cancelar</button>
     </div>
   </div>
 </template>
 
 <script>
 import { ref, reactive, computed } from 'vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 
 export default {
   props: {
-    proyectos: { type: Array, default: () => [] },
-    importedSlugs: { type: Array, default: () => [] },
-    workspaceId: { type: Number, default: 0 },
+    parametros: { type: Object, default: () => ({}) },
   },
-  emits: ['close'],
   setup(props) {
+    const { ocultar_modal } = useModal()
+    const parametros = props.parametros
+    const proyectos = parametros.proyectos || []
+    const importedSlugs = parametros.importedSlugs || []
+    const workspaceId = parametros.workspaceId || 0
     const selected = reactive({})
     const creating = ref(false)
     const done = ref(false)
     const error = ref('')
     const resultados = ref([])
 
-    const isImported = (slug) => props.importedSlugs.includes(slug)
-    const exportableCount = computed(() => props.proyectos.filter((p) => !isImported(p.id)).length)
+    const isImported = (slug) => importedSlugs.includes(slug)
+    const exportableCount = computed(() => proyectos.filter((p) => !isImported(p.id)).length)
     const selectedCount = computed(() => Object.keys(selected).filter((k) => selected[k]).length)
 
     const allSelected = computed(() => {
-      const exportable = props.proyectos.filter((p) => !isImported(p.id))
+      const exportable = proyectos.filter((p) => !isImported(p.id))
       return exportable.length > 0 && exportable.every((p) => selected[p.id])
     })
 
     function toggleAll(e) {
       const val = e.target.checked
-      for (const p of props.proyectos) {
+      for (const p of proyectos) {
         if (!isImported(p.id)) selected[p.id] = val
       }
     }
@@ -138,12 +141,12 @@ export default {
         .replace(/\b\w/g, (c) => c.toUpperCase())
     }
 
-    props.proyectos.forEach((p) => {
+    proyectos.forEach((p) => {
       if (!isImported(p.id)) selected[p.id] = true
     })
 
     async function startExport() {
-      const targets = props.proyectos.filter((p) => selected[p.id] && !isImported(p.id))
+      const targets = proyectos.filter((p) => selected[p.id] && !isImported(p.id))
       if (targets.length === 0) return
       creating.value = true
       error.value = ''
@@ -163,7 +166,7 @@ export default {
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({
-              workspace_id: props.workspaceId || undefined,
+              workspace_id: workspaceId || undefined,
               proyecto: {
                 slug: target.id,
                 nombre: readableName(target.id),
@@ -193,7 +196,7 @@ export default {
 
     const okCount = computed(() => resultados.value.filter((r) => r.status === 'ok').length)
     const errorCount = computed(() => resultados.value.filter((r) => r.status === 'error').length)
-    const skipCount = computed(() => props.proyectos.filter((p) => isImported(p.id)).length)
+    const skipCount = computed(() => proyectos.filter((p) => isImported(p.id)).length)
     const errorsList = computed(() => resultados.value.filter((r) => r.status === 'error'))
 
     return {

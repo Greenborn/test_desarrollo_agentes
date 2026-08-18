@@ -515,10 +515,9 @@ import { useSettingsStore } from '../stores/settings.js'
 import { useWorkspaceStore } from '../stores/workspace.js'
 import { useChatStore } from '../stores/chat.js'
 import { useAuthStore } from '../stores/auth.js'
-import { useModalStore } from '../stores/modal.js'
+import { useModal } from 'vue-greenborn-modal-manager'
 import { useEnvironmentsStore } from '../stores/environments.js'
 import WorkspaceFormModal from '../components/modals/WorkspaceFormModal.vue'
-import AlertModal from '../components/modals/AlertModal.vue'
 
 export default {
   setup() {
@@ -526,7 +525,7 @@ export default {
     const wsStore = useWorkspaceStore()
     const chatStore = useChatStore()
     const auth = useAuthStore()
-    const modal = useModalStore()
+    const { mostrar_modal } = useModal()
     const envStore = useEnvironmentsStore()
     const { workspaces } = storeToRefs(wsStore)
 
@@ -760,13 +759,13 @@ export default {
     const deleting = ref(false)
 
     function openCreateModal() {
-      modal.open(WorkspaceFormModal, {}, { title: 'Nuevo espacio de trabajo' })
+      mostrar_modal(WorkspaceFormModal, 'Nuevo espacio de trabajo', {})
     }
 
     function openEditModal() {
       const ws = workspaces.value.find(w => w.id === selectedWId.value)
       if (!ws) return
-      modal.open(WorkspaceFormModal, { workspace: { id: ws.id, name: ws.name, color: ws.color } }, { title: 'Editar espacio de trabajo' })
+      mostrar_modal(WorkspaceFormModal, 'Editar espacio de trabajo', { workspace: { id: ws.id, name: ws.name, color: ws.color } })
     }
 
     function openDeleteConfirm() {
