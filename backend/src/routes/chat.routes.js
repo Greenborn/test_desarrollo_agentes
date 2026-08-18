@@ -1,12 +1,18 @@
 import { Router } from 'express';
+import http from 'http';
 import db from '../config/db.js';
 import dbUserSettings from '../config/dbUserSettings.js';
 import dbConfig from '../config/dbConfig.js';
 import dbChatMessages from '../config/dbChatMessages.js';
 import dbRedmineData from '../config/dbRedmineData.js';
 import { streamChat } from '../services/deepseek.js';
+import opencode from '../services/opencode.js';
 
 const router = Router();
+
+const PROCESOS_HOST = 'localhost';
+const PROCESOS_PORT = process.env.SERVICIO_PROCESOS_CONSOLA_PORT || 3575;
+const PROCESOS_API_KEY = process.env.PROCESOS_CONSOLA_API_KEY || '';
 
 function authGuard(req, res) {
   if (!req.session?.userId) {
@@ -354,6 +360,48 @@ router.delete('/sessions/:id/messages', async (req, res) => {
     res.json({ success: true, sessionId: req.params.id });
   } catch (err) {
     console.log('Error al limpiar mensajes:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+function closeTerminalsByChatSession(chatSessionId) {
+  return new Promise((resolve) => {
+    const options = {
+      hostname: PROCESOS_HOST,
+      port: PROCESOS_PORT,
+      path: `/api/terminal?chatSessionId=${encodeURIComponent(chatSessionId)}`,
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': PROCESOS_API_KEY },
+    };
+
+    const proxyReq = http.request(options, (proxyRes) => {
+      let data = '';
+      proxyRes.on('data', (chunk) => { data += chunk; });
+      proxyRes.on('end', () => resolve(data));
+    });
+
+    proxyReq.on('error', (err) => {
+      console.log('[limpiar_sesion] Error cerrando terminales:', err.message);
+      resolve(null);
+    });
+    proxyReq.end();
+  });
+}
+
+router.post('/sessions/:id/limpiar', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const sessionId = req.params.id;
+    const session = await db('chat_sessions').where({ id: sessionId, user_id: req.session.userId }).first();
+    if (!session) return res.status(404).json({ error: 'Sesión no encontrada' });
+
+    await dbChatMessages('chat_messages').where({ session_id: sessionId }).del();
+    await closeTerminalsByChatSession(sessionId);
+    opencode.stopServer(sessionId);
+
+    res.json({ success: true, sessionId });
+  } catch (err) {
+    console.log('Error al limpiar sesión:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });

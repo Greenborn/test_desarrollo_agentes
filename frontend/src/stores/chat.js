@@ -941,6 +941,47 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function limpiarSesion(sessionId) {
+    if (!sessionId) return
+    try {
+      const res = await fetch(`${API}/chat/sessions/${sessionId}/limpiar`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.error || 'Error al limpiar sesión')
+      }
+      if (Number(activeSessionId.value) === Number(sessionId)) {
+        messages.value = []
+        currentChunk.value = ''
+        currentThinking.value = ''
+      }
+      delete _terminalSessions.value[sessionId]
+      delete _streamingSessions.value[sessionId]
+      delete _ocStreamingSessions.value[sessionId]
+      delete _sessionStreamCache.value[sessionId]
+      delete _ocSessionStreamCache.value[sessionId]
+      delete _cmdStreamingSessions.value[sessionId]
+      delete _cmdSessionStreamCache.value[sessionId]
+      delete _cmdPendingSave.value[sessionId]
+      delete _sessionCmdCount.value[sessionId]
+      delete pendingNotifications.value[sessionId]
+      delete sessionTickets.value[sessionId]
+      try {
+        const { useOpencodeStore } = await import('./opencode.js')
+        const ocStore = useOpencodeStore()
+        if (ocStore.sessionsMap[String(sessionId)]) {
+          delete ocStore.sessionsMap[String(sessionId)]
+        }
+      } catch (e) {
+        console.error('Error limpiando opencode al limpiar sesión:', e.message)
+      }
+    } catch (err) {
+      console.error('Error al limpiar sesión:', err)
+    }
+  }
+
   function stopAllExecutions() {
     creating.value = false
     executingCount.value = 0

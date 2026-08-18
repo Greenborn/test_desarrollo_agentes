@@ -22,6 +22,7 @@ El texto que no comienza con `/` se ignora al presionar Enter.
 | `/history` | Muestra el historial de comandos ejecutados | `/history` |
 | `/terminal` | Abre o reconecta una terminal interactiva (bash) en el panel de chat para la sesión actual. La terminal se cataloga por `chatSessionId` en `api_procesos_consola`. Si ya existe una terminal activa para la sesión, reconecta a ella. Si se alcanzó el límite de terminales por sesión (configurable `terminal_max_terminals`, por defecto 5) no abre una nueva y muestra un mensaje de error por modal. **En la interfaz remota (SGI)** abre una terminal remota simulada: el botón "Terminal" de una sesión crea un PTY real en el backend dev (`remoteTerminal.js`) y transmite I/O por socket.io (`desarrollo:terminal:*`). | `/terminal` |
 | `/terminal_cerrar` | Cierra la terminal de la sesión actual. Mata el proceso bash y libera recursos | `/terminal_cerrar` |
+| `/limpiar_sesion` | Vacía los mensajes de la sesión de chat actual y cierra todas las terminales y ventanas OpenCode de esa sesión. La sesión se conserva (cwd, proyecto, ticket). Equivalente al botón 🗑️ "Limpiar chat". | `/limpiar_sesion` |
 
 ---
 

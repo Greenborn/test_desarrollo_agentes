@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -9,16 +8,21 @@ import db from '../config/db.js';
 import dbConfig from '../config/dbConfig.js';
 import dbUserSettings from '../config/dbUserSettings.js';
 import dbProjectVariables from '../config/dbProjectVariables.js';
-import dbChatMessages from '../config/dbChatMessages.js';
 import opencode from '../services/opencode.js';
+import {
+  controlEmitter,
+  getRepoSkillPaths,
+  ensureGitignore,
+  mergeWorkspaceSkillPaths,
+  loadWorkspaceSkillContents,
+  runOpencodePrompt,
+} from '../services/opencodeStream.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const OPENCODE_DEV_DIR = path.resolve(__dirname, '../../../opencode_dev');
 const router = Router();
-const controlEmitter = new EventEmitter();
-controlEmitter.setMaxListeners(100);
 
 function authGuard(req, res) {
   if (!req.session?.userId) {
@@ -43,172 +47,6 @@ async function saveUserSetting(userId, key, value) {
     .insert({ user_id: userId, key, value })
     .onConflict(['user_id', 'key'])
     .merge();
-}
-
-const MAX_MSG_LENGTH = 50000;
-
-async function saveLongMessage(sessionId, role, content, extraFields = {}) {
-  if (!content) {
-    await dbChatMessages('chat_messages').insert({ session_id: sessionId, role, content: '(sin respuesta)', ...extraFields });
-    return;
-  }
-
-  const parts = [];
-  for (let i = 0; i < content.length; i += MAX_MSG_LENGTH) {
-    parts.push(content.slice(i, i + MAX_MSG_LENGTH));
-  }
-
-  const inserts = parts.map((part, i) => ({
-    session_id: sessionId,
-    role,
-    content: parts.length > 1
-      ? `[Parte ${i + 1}/${parts.length}]\n${part}`
-      : part,
-    ...(i === 0 ? extraFields : {}),
-  }));
-
-  await dbChatMessages('chat_messages').insert(inserts);
-}
-
-function getRepoSkillPaths(repoDir) {
-  const configPath = path.join(repoDir, '.opencode', 'opencode.json')
-  const defaultPaths = ['.opencode/skills', '.agents/skills']
-  try {
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-      if (Array.isArray(config.skills?.paths) && config.skills.paths.length > 0) {
-        return config.skills.paths
-      }
-    }
-  } catch (e) {
-    console.log('[opencode] Error reading repo opencode config:', e.message)
-  }
-  return defaultPaths
-}
-
-function ensureGitignore(dir) {
-  const gitignorePath = path.join(dir, '.gitignore')
-  if (!fs.existsSync(gitignorePath)) {
-    fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(gitignorePath, '*\n!.gitignore\n', 'utf-8')
-    console.log(`[opencode] .gitignore creado en ${gitignorePath}`)
-  }
-}
-
-async function mergeWorkspaceSkillPaths(cwd, workspaceIds) {
-  if (!workspaceIds || workspaceIds.length === 0) return
-
-  const projectRoot = path.resolve(__dirname, '../../..')
-
-  const targets = new Set()
-  targets.add(cwd)
-  targets.add(projectRoot)
-
-  for (const target of targets) {
-    const configDir = path.join(target, '.opencode')
-    const configPath = path.join(configDir, 'opencode.json')
-
-    let config = { skills: { paths: [] } }
-    if (fs.existsSync(configPath)) {
-      try {
-        config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-      } catch (e) {
-        console.log('[opencode] Error reading opencode config for merge:', e.message)
-      }
-    }
-
-    if (!config.skills) config.skills = {}
-    if (!Array.isArray(config.skills.paths)) config.skills.paths = []
-
-    const existingPaths = new Set(config.skills.paths)
-    let changed = false
-
-    for (const wsId of workspaceIds) {
-      const ws = await db('workspaces').where({ id: wsId }).select('slug').first()
-      if (!ws || !ws.slug) continue
-
-      const repoDir = path.join(OPENCODE_DEV_DIR, ws.slug)
-      if (!fs.existsSync(repoDir)) continue
-
-      const paths = getRepoSkillPaths(repoDir)
-      for (const relPath of paths) {
-        const absPath = path.resolve(repoDir, relPath)
-        if (fs.existsSync(absPath)) {
-          if (!existingPaths.has(absPath)) {
-            config.skills.paths.push(absPath)
-            existingPaths.add(absPath)
-            changed = true
-          }
-        }
-      }
-    }
-
-    // También inyectar los paths de skills del proyecto raíz (ej: .agents/skills)
-    // para que estén disponibles para agentes spawneados desde workspaces
-    const rootPaths = getRepoSkillPaths(projectRoot)
-    for (const relPath of rootPaths) {
-      const absPath = path.resolve(projectRoot, relPath)
-      if (fs.existsSync(absPath) && !existingPaths.has(absPath)) {
-        config.skills.paths.push(absPath)
-        existingPaths.add(absPath)
-        changed = true
-      }
-    }
-
-    if (changed) {
-      if (!fs.existsSync(configDir)) {
-        fs.mkdirSync(configDir, { recursive: true })
-      }
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
-      console.log(`[opencode] Workspace skill paths merged into ${target}/.opencode/opencode.json`)
-    }
-  }
-}
-
-const MAX_SKILL_CHARS = 4000
-
-async function loadWorkspaceSkillContents(workspaceId) {
-  if (!workspaceId) return []
-  const result = []
-
-  const ws = await db('workspaces').where({ id: workspaceId }).select('slug').first()
-  if (!ws || !ws.slug) return result
-
-  const repoDir = path.join(OPENCODE_DEV_DIR, ws.slug)
-  if (!fs.existsSync(repoDir)) return result
-
-  const paths = getRepoSkillPaths(repoDir)
-  const scanned = new Set()
-
-  for (const relPath of paths) {
-    const dir = path.resolve(repoDir, relPath)
-    if (!fs.existsSync(dir)) continue
-
-    const entries = fs.readdirSync(dir, { withFileTypes: true })
-    for (const entry of entries) {
-      let skillPath = null
-      let skillName = null
-
-      if (entry.isDirectory()) {
-        skillPath = path.join(dir, entry.name, 'SKILL.md')
-        skillName = entry.name
-      } else if (entry.isFile() && entry.name.endsWith('.md') && entry.name !== 'SKILL.md') {
-        skillPath = path.join(dir, entry.name)
-        skillName = entry.name.slice(0, -3)
-      }
-
-      if (skillPath && fs.existsSync(skillPath) && !scanned.has(skillName)) {
-        scanned.add(skillName)
-        let content = fs.readFileSync(skillPath, 'utf-8')
-        if (content.length > MAX_SKILL_CHARS) {
-          content = content.slice(0, MAX_SKILL_CHARS) + '\n\n[...truncado...]'
-        }
-        result.push(`[SKILL DE AMBIENTE: ${skillName}]\n${content}\n[/SKILL]`)
-      }
-    }
-  }
-
-  return result
 }
 
 router.get('/start', async (req, res) => {
@@ -289,309 +127,69 @@ router.post('/select', async (req, res) => {
   }
 });
 
-let _agentIdCounter = 1;
-
 router.post('/send', async (req, res) => {
   if (!authGuard(req, res)) return;
   const { prompt, provider, model, thinking, mode, sessionId, temperature } = req.body;
   if (!prompt) return res.status(400).json({ error: 'prompt requerido' });
 
-  try {
-    let cwd = process.cwd();
-    if (sessionId) {
-      const chatSession = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
-      if (chatSession && chatSession.cwd) cwd = chatSession.cwd;
-    }
-
-    const wsIds = req.session.workspaceIds || [1];
-    const wsId = wsIds[0] || 1;
-    const localeRow = await dbConfig('settings').where({ workspace_id: wsId, setting_key: 'locale' }).first();
-    const locale = localeRow ? localeRow.setting_value : 'es_ES.UTF-8';
-    await mergeWorkspaceSkillPaths(cwd, req.session.workspaceIds);
-    const server = await opencode.getOrStartServer(cwd, sessionId, locale);
-
-    // Enforce terminal limit: block if at capacity
-    if (sessionId) {
-      const maxTerminalsRow = await dbConfig('settings').where({ workspace_id: wsId, setting_key: 'terminal_max_terminals' }).first();
-      const maxTerminals = maxTerminalsRow ? parseInt(maxTerminalsRow.setting_value, 10) || 5 : 5;
-      const activeSessions = await opencode.listSessions(sessionId);
-      if (activeSessions.length >= maxTerminals) {
-        return res.status(429).json({ error: `Límite de agentes alcanzado (${maxTerminals}). Cerrá un agente existente antes de abrir uno nuevo.` });
-      }
-    }
-
-    const agentName = mode === 'Plan' ? 'plan' : 'build';
-    const agentId = 'agent-' + (_agentIdCounter++) + '-' + Date.now();
-    const ocSession = await server.createSession('Agent Orchestrator - ' + (prompt.slice(0, 50)), agentName);
-    const ocSessionId = ocSession.id;
-
-    if (sessionId) {
-      await dbChatMessages('chat_messages').insert({
-        session_id: sessionId, role: 'user', content: prompt,
-      });
-      await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
-    }
-
+  const wsIds = req.session.workspaceIds || [1];
+  let sseStarted = false;
+  let keepAlive = null;
+  const startSSE = () => {
+    if (sseStarted) return;
+    sseStarted = true;
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
     });
-
-    const keepAlive = setInterval(() => {
+    keepAlive = setInterval(() => {
       try { res.write(':ping\n\n'); } catch (err) { console.log('[opencode] Error en keepAlive ping:', err.message); clearInterval(keepAlive); }
     }, 30000);
     res.on('close', () => clearInterval(keepAlive));
+  };
 
-    async function registrarGastos(sessionId, ocSessionId, server, fullResponse) {
-      if (!sessionId) return;
-      try {
-        let realTokens = 0;
-        let realCost = 0;
-
-        const messages = await server.getSessionMessages(ocSessionId);
-        const lastAssistant = messages && messages.findLast
-          ? messages.findLast(m => m?.info?.role === 'assistant' || m?.role === 'assistant')
-          : messages && messages.length > 0
-            ? [...messages].reverse().find(m => m?.info?.role === 'assistant' || m?.role === 'assistant')
-            : null;
-        if (lastAssistant) {
-          realTokens = lastAssistant?.info?.tokens?.output || lastAssistant?.tokens?.output || lastAssistant?.info?.tokens?.output_tokens || lastAssistant?.tokens?.output_tokens || 0;
-          realCost = lastAssistant?.info?.cost || lastAssistant?.cost || 0;
-        }
-
-        if (!realTokens && !realCost && fullResponse) {
-          realTokens = Math.ceil(fullResponse.length / 4);
-          realCost = 0;
-        }
-
-        const chatSess = await db('chat_sessions').where({ id: sessionId }).select('proyecto_id').first();
-        const idProyecto = chatSess?.proyecto_id;
-        if (idProyecto) {
-          const gastosPort = process.env.SERVICIO_GASTOS_PORT || 4100;
-          await fetch(`http://localhost:${gastosPort}/api/gastos/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id_chat_session: sessionId,
-              id_proyecto: idProyecto,
-              precio: realCost,
-              tokens: realTokens,
-              id_sesion_opencode: ocSessionId,
-            }),
-          });
-        }
-      } catch (e) {
-        console.log('[gastos] error al registrar:', e.message);
-      }
-    }
-
-    const processControl = async (controlEvent) => {
-      return new Promise((resolve) => {
-        const controlId = Date.now() + Math.random();
-        const controlData = { ...controlEvent, controlId };
-
-        res.write(`data: ${JSON.stringify({ type: 'control_request', control: controlData, agentId })}\n\n`);
-
-        if (sessionId) {
-          dbChatMessages('chat_messages').insert({
-            session_id: sessionId,
-            role: 'opencode_control',
-            content: JSON.stringify(controlData),
-          }).catch((e) => console.log('Error al guardar control:', e.message));
-        }
-
-        const timeout = setTimeout(() => {
-          resolve({ response: 'yes', remember: false });
-        }, 300000);
-
-        controlEmitter.once(`control-${controlId}`, (result) => {
-          clearTimeout(timeout);
-          resolve(result);
-        });
-      });
+  try {
+    const writeEvent = (event) => {
+      startSSE();
+      try { res.write(`data: ${JSON.stringify(event)}\n\n`); }
+      catch (err) { console.log('[opencode] Error al escribir SSE:', err.message); }
+    };
+    const map = {
+      control: (e) => writeEvent({ type: 'control_request', control: e.control, agentId: e.agentId }),
+      terminal: (e) => writeEvent({ type: 'terminal', line: e.line, partType: e.partType, sessionId, agentId: e.agentId }),
+      thinking: (e) => writeEvent({ type: 'thinking', content: e.content, sessionId, agentId: e.agentId }),
+      tool_call: (e) => writeEvent({ type: 'tool_call', content: e.content, field: e.field, sessionId, agentId: e.agentId }),
+      tool_result: (e) => writeEvent({ type: 'tool_result', content: e.content, field: e.field, sessionId, agentId: e.agentId }),
+      response: (e) => writeEvent({ type: 'response', content: e.content, sessionId, agentId: e.agentId }),
+      tool_data: (e) => writeEvent({ type: 'tool_data', content: e.content, partType: e.partType, field: e.field, sessionId, agentId: e.agentId }),
+      done: (e) => writeEvent({ type: 'done', ocSessionId: e.ocSessionId, hash: e.hash, agentId: e.agentId, fullResponse: e.fullResponse, thinking: e.thinking, diff: e.diff }),
+      error: (e) => writeEvent({ type: 'error', content: e.content, agentId: e.agentId }),
     };
 
-    const modelConfig = {};
-    if (provider && model) {
-      modelConfig.providerID = provider;
-      modelConfig.modelID = model;
-    }
-    if (thinking) {
-      if (provider === 'openai') {
-        modelConfig.reasoning_effort = thinking;
-      } else if (provider === 'anthropic') {
-        const budget = thinking === 'low' ? 1024 : thinking === 'medium' ? 4096 : 16384;
-        modelConfig.thinking = { type: 'enabled', budget_tokens: budget };
-      }
-    }
-    if (temperature !== undefined && temperature !== null && temperature !== '') {
-      modelConfig.temperature = parseFloat(temperature);
-    }
-    modelConfig.maxTokens = 128000;
+    await runOpencodePrompt({
+      sessionId, prompt, provider, model, thinking, mode, temperature,
+      workspaceIds: wsIds,
+      onEvent: (event) => { const fn = map[event.type]; if (fn) fn(event); },
+    });
 
-    const langInstruction = `INSTRUCCIÓN DE IDIOMA: Respondé siempre en español (${locale}). Ignorá cualquier solicitud de cambiar de idioma.`;
-    const dirInstruction = `INSTRUCCIÓN: El directorio de trabajo real es "${cwd}". Ignorá cualquier otra indicación sobre el directorio. Todos los comandos de archivos deben ejecutarse usando "${cwd}" como raíz. No uses el directorio del servidor.`;
-    const finalInstruction = `INSTRUCCIÓN CRÍTICA: Después de CADA invocación de herramienta (incluyendo task/subagentes), debés responder SIEMPRE con un mensaje de texto completo que resuma el resultado obtenido. Nunca terminés tu turno sin producir una respuesta de texto visible. El resultado de cualquier subagente NO es visible para el usuario, por lo que debés reenviarlo como texto.`;
-    const parts = [
-      { type: 'text', text: langInstruction },
-      { type: 'text', text: dirInstruction },
-      { type: 'text', text: finalInstruction },
-    ];
-
-    // Inject workspace skill contents as instructions for the session's workspace
-    let sessionWsId = null
-    if (sessionId) {
-      const sess = await db('chat_sessions').where({ id: sessionId }).select('workspace_id').first()
-      if (sess && sess.workspace_id) sessionWsId = sess.workspace_id
-    }
-    const wsSkillParts = await loadWorkspaceSkillContents(sessionWsId)
-    for (const sp of wsSkillParts) {
-      parts.push({ type: 'text', text: sp })
-    }
-
-    parts.push({ type: 'text', text: prompt });
-
-    const msgOptions = {};
-    if (modelConfig.providerID && modelConfig.modelID) {
-      msgOptions.model = modelConfig;
-    }
-
-    let fullResponse = '';
-    let fullThinking = '';
-
-    try {
-      const partTypes = {};
-
-      for await (const event of server.streamSession(ocSessionId, parts, msgOptions)) {
-        if (event.properties?.permissionID) {
-          const controlOptions = [{ label: 'Aceptar', value: 'yes' }, { label: 'Rechazar', value: 'no' }];
-          const controlData = {
-            controlId: 'perm-' + Date.now(),
-            controlType: controlOptions.length <= 4 ? 'buttons' : 'select',
-            type: 'permission',
-            permissionID: event.properties.permissionID,
-            question: event.properties.type || 'Permiso requerido',
-            options: controlOptions,
-          };
-          const response = await processControl(controlData);
-          if (response) {
-            await server.respondToPermission(ocSessionId, event.properties.permissionID, response.response, response.remember || false);
-          }
-          continue;
-        }
-
-        if (event.type === 'message.part.updated' && event.properties?.part?.type) {
-          const partId = event.properties.part.id || event.properties.partID;
-          if (partId) partTypes[partId] = event.properties.part.type;
-        }
-
-        if (event.type === 'message.part.delta' && event.properties?.delta) {
-          const partId = event.properties.partID;
-          const partType = partTypes[partId] || '';
-          const delta = event.properties.delta || '';
-          const field = event.properties.field || '';
-          let terminalLine = '';
-
-          if (partType === 'reasoning') {
-            fullThinking += delta;
-            res.write(`data: ${JSON.stringify({ type: 'thinking', content: delta, sessionId, agentId })}\n\n`);
-          } else if (partType === 'tool_call') {
-            let toolName = delta;
-            try { const p = JSON.parse(delta); if (p.name) toolName = p.name; if (p.arguments) toolName += ' ' + JSON.stringify(p.arguments); } catch (err) { console.log('[opencode] Error al parsear tool call delta:', err.message); }
-            terminalLine = `\x1b[38;5;214m$ ${toolName}\x1b[0m`;
-            res.write(`data: ${JSON.stringify({ type: 'tool_call', content: delta, field, sessionId, agentId })}\n\n`);
-          } else if (partType === 'tool_result') {
-            terminalLine = `\x1b[38;5;246m${delta}\x1b[0m`;
-            res.write(`data: ${JSON.stringify({ type: 'tool_result', content: delta, field, sessionId, agentId })}\n\n`);
-          } else if (field === 'text') {
-            fullResponse += delta;
-            terminalLine = delta;
-            res.write(`data: ${JSON.stringify({ type: 'response', content: delta, sessionId, agentId })}\n\n`);
-          } else {
-            res.write(`data: ${JSON.stringify({ type: 'tool_data', content: delta, partType, field, sessionId, agentId })}\n\n`);
-          }
-          if (terminalLine) {
-            res.write(`data: ${JSON.stringify({ type: 'terminal', line: terminalLine, partType, sessionId, agentId })}\n\n`);
-          }
-        }
-
-        if (event.type === 'session.status' && event.properties?.status?.type === 'idle') {
-          break;
-        }
-      }
-
-      const diff = await server.getSessionDiff(ocSessionId);
-
-      res.write(`data: ${JSON.stringify({ type: 'terminal', line: '', partType: 'separator', sessionId, agentId })}\n\n`);
-      if (diff && diff.length > 0) {
-        for (const d of diff) {
-          res.write(`data: ${JSON.stringify({ type: 'terminal', line: `\x1b[38;5;39m📁 ${d.path} (\x1b[38;5;214m${d.type || 'modificado'}\x1b[38;5;39m)\x1b[0m`, partType: 'diff', sessionId, agentId })}\n\n`);
-        }
-      }
-      res.write(`data: ${JSON.stringify({ type: 'terminal', line: '\x1b[38;5;40m✅ Hecho.\x1b[0m', partType: 'done', sessionId, agentId })}\n\n`);
-
-      if (!fullResponse || fullResponse.trim().length === 0) {
-        try {
-          const messages = await server.getSessionMessages(ocSessionId);
-          const lastAssistant = messages
-            ? [...messages].reverse().find(m => m?.role === 'assistant' || m?.info?.role === 'assistant')
-            : null;
-          if (lastAssistant?.content) {
-            const fallbackText = typeof lastAssistant.content === 'string'
-              ? lastAssistant.content
-              : JSON.stringify(lastAssistant.content);
-            if (fallbackText.trim()) {
-              fullResponse = fallbackText;
-              console.log(`[opencode] fallback recuperó respuesta final de getSessionMessages (${fallbackText.length} chars)`);
-            }
-          }
-        } catch (msgErr) {
-          console.log('[opencode] fallback getSessionMessages falló:', msgErr.message);
-        }
-      }
-
-      if (sessionId) {
-        await saveLongMessage(sessionId, 'opencode_result', fullResponse, { thinking: fullThinking || null });
-        await saveLongMessage(sessionId, 'opencode_info', JSON.stringify({ type: 'finished', hash: ocSessionId, diff: diff || [] }));
-        await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
-      }
-
-      await registrarGastos(sessionId, ocSessionId, server, fullResponse);
-
-      res.write(`data: ${JSON.stringify({ type: 'done', ocSessionId, hash: ocSessionId, agentId, fullResponse, thinking: fullThinking, diff: diff || [] })}\n\n`);
+    if (sseStarted) {
       res.end();
-
-    } catch (msgErr) {
-      console.log('Error en opencode streamSession:', msgErr.message);
-      try {
-        res.write(`data: ${JSON.stringify({ type: 'error', content: msgErr.message, agentId })}\n\n`);
-      } catch (writeErr) {
-        console.log('Error al escribir error en stream SSE:', writeErr.message);
-      }
-      if (sessionId) {
-        try {
-          await saveLongMessage(sessionId, 'opencode_result', JSON.stringify({ error: msgErr.message }));
-          await saveLongMessage(sessionId, 'opencode_info', JSON.stringify({ type: 'error', error: msgErr.message }));
-        } catch (e) {
-          console.log('Error al guardar mensajes de error:', e.message);
-        }
-      }
-      await registrarGastos(sessionId, ocSessionId, server, fullResponse).catch((e) => console.log('[gastos] error en catch post-error:', e.message));
-      res.end();
+    } else {
+      res.json({ success: true });
     }
-
   } catch (err) {
     console.log('Error en opencode/send:', err.message);
-    if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
-    } else {
-      try {
-        res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
+    if (!sseStarted) {
+      const status = (err.status >= 400 && err.status < 500) ? err.status : 500;
+      if (res.headersSent) {
         res.end();
-      } catch (writeErr) {
-        console.log('Error al escribir error en respuesta SSE:', writeErr.message);
+      } else {
+        res.status(status).json({ error: err.message });
       }
+    } else {
+      // El evento de error ya fue emitido por runOpencodePrompt sobre el stream
+      try { res.end(); } catch (endErr) { console.log('Error al cerrar stream SSE:', endErr.message); }
     }
   }
 });

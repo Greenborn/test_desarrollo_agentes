@@ -5,8 +5,10 @@ import { fileURLToPath } from 'url';
 import { login, getGestionCredentials } from '../gestion/gestion.service.js';
 import db from '../../config/db.js';
 import dbChatMessages from '../../config/dbChatMessages.js';
+import dbRedmineData from '../../config/dbRedmineData.js';
 import { streamChat } from '../../services/deepseek.js';
 import { executeBackendCommand } from '../../services/commandExecutor.js';
+import { runOpencodePrompt, controlEmitter } from '../../services/opencodeStream.js';
 import {
   createRemoteTerminal,
   writeRemoteTerminal,
@@ -160,7 +162,45 @@ async function queryChatSessions() {
       .select(SESSION_FIELDS),
   ]);
   console.log(`[interfaz_remota] chatSessions respondidas: ${activas.length} activas, ${archivadas.length} archivadas`);
-  return { activas, archivadas };
+  const [enrActivas, enrArchivadas] = await Promise.all([
+    enriquecerSesiones(activas),
+    enriquecerSesiones(archivadas),
+  ]);
+  return { activas: enrActivas, archivadas: enrArchivadas };
+}
+
+// Agrega a cada sesion el slug del proyecto asociado (join a proyectos) y el
+// ambiente al que pertenece (nombre del workspace). Los datos se exponen en el
+// payload para que el selector de sesiones de la gestion interna los muestre.
+async function enriquecerSesiones(sesiones) {
+  if (!sesiones || sesiones.length === 0) return sesiones;
+
+  const proyectoIds = [...new Set(sesiones.map((s) => s.proyecto_id).filter(Boolean))];
+  const workspaceIds = [...new Set(sesiones.map((s) => s.workspace_id).filter(Boolean))];
+
+  const [proyectos, workspaces] = await Promise.all([
+    proyectoIds.length > 0
+      ? dbRedmineData('proyectos').whereIn('id', proyectoIds).select('id')
+      : Promise.resolve([]),
+    workspaceIds.length > 0
+      ? db('workspaces').whereIn('id', workspaceIds).select('id', 'name')
+      : Promise.resolve([]),
+  ]);
+
+  const proyectoMap = {};
+  for (const p of proyectos) proyectoMap[p.id] = p;
+  const workspaceMap = {};
+  for (const w of workspaces) workspaceMap[w.id] = w;
+
+  for (const s of sesiones) {
+    if (s.proyecto_id && proyectoMap[s.proyecto_id]) {
+      s.proyecto_slug = proyectoMap[s.proyecto_id].id;
+    }
+    if (s.workspace_id && workspaceMap[s.workspace_id]) {
+      s.ambiente = workspaceMap[s.workspace_id].name;
+    }
+  }
+  return sesiones;
 }
 
 // Serializa las peticiones de sesiones de chat por socket. Evita que múltiples
@@ -282,6 +322,51 @@ export async function executeChatCommand({ sessionId, command } = {}) {
     { session_id: sessionId, role: 'result', content: result.result },
   ]);
   return { success: true, data: { result: result.result, success: result.success } };
+}
+
+// Confirma un control interactivo de OpenCode (permisos) emitido por el socket.
+// El SGI envía { sessionId, controlId, value }; se resuelve el wait de `processControl`.
+export function handleSendControl(body = {}) {
+  const controlId = body?.controlId;
+  if (!controlId) return { success: false, error: 'controlId requerido' };
+  const value = body?.value;
+  const response = value === 'no' ? 'no' : 'yes';
+  controlEmitter.emit(`control-${controlId}`, { response, remember: false });
+  return { success: true, data: { ok: true } };
+}
+
+// Lanza un prompt hacia el agente OpenCode por socket y emite el streaming
+// (terminal, thinking, response, control, done, error) como eventos
+// `interfaz-remota:opencode:event` de vuelta al SGI.
+export function runOpencodePromptSocket(body = {}, emit) {
+  const { sessionId, prompt } = body || {};
+  if (!prompt) return { success: false, error: 'prompt requerido' };
+  if (!sessionId) return { success: false, error: 'sessionId requerido' };
+
+  const onEvent = (event) => {
+    if (typeof emit !== 'function') return;
+    try {
+      emit('interfaz-remota:opencode:event', { ...event, chatSessionId: sessionId });
+    } catch (err) {
+      console.log('[interfaz_remota] error al emitir opencode:event:', err.message);
+    }
+  };
+
+  (async () => {
+    try {
+      let workspaceIds = [1];
+      if (sessionId) {
+        const sess = await db('chat_sessions').where({ id: sessionId }).select('workspace_id').first();
+        if (sess && sess.workspace_id) workspaceIds = [sess.workspace_id];
+      }
+      await runOpencodePrompt({ ...body, workspaceIds, onEvent });
+    } catch (err) {
+      console.log('[interfaz_remota] Error en opencode prompt:', err.message);
+      onEvent({ type: 'error', content: err.message, agentId: null });
+    }
+  })();
+
+  return { success: true, data: { started: true } };
 }
 
 export async function createChatSession({ title, cwd } = {}) {
@@ -449,6 +534,11 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
   socket.on('interfaz-remota:terminal:resize', makeRemotaHandler((body) => resizeRemoteTerminal(body)));
   socket.on('interfaz-remota:terminal:close', makeRemotaHandler((body) => closeRemoteTerminal(body)));
   socket.on('interfaz-remota:terminal:list', makeRemotaHandler((body) => listRemoteTerminals(body)));
+
+  // Prompt del agente OpenCode por socket (streaming vía interfaz-remota:opencode:event)
+  socket.on('interfaz-remota:opencode:send', makeRemotaHandler((body) => runOpencodePromptSocket(body, emitRemoto)));
+  // Confirmación de controles interactivos del agente OpenCode (permisos, forms, etc.)
+  socket.on('interfaz-remota:sendControl', makeRemotaHandler((body) => handleSendControl(body)));
 
   socket.onAny((event, ...args) => {
     appendIoLog('in', event, args.length === 1 ? args[0] : args);

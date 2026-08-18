@@ -202,7 +202,7 @@ export default {
 
     async function clearChat() {
       if (!activeSessionId.value) return
-      await chatStore.clearMessages(activeSessionId.value)
+      await chatStore.limpiarSesion(activeSessionId.value)
     }
 
     function abrirNavegador() {

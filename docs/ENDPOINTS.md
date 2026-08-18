@@ -322,6 +322,12 @@ SGI conectado, así que la salida del PTY solo se registra en consola (no se tra
 - **Respuesta:** `{ success: true, sessionId }`
 - **Descripción:** Elimina todos los mensajes de una sesión sin eliminar la sesión ni sus metadatos (ticket, proyecto, etc.).
 
+### `POST /api/chat/sessions/:id/limpiar`
+- **Auth:** Requerida
+- **Respuesta 200:** `{ success: true, sessionId }`
+- **Respuesta 404:** `{ error: "Sesión no encontrada" }`
+- **Descripción:** Limpieza completa de la sesión: elimina todos sus mensajes, cierra todas las terminales de la sesión en `api_procesos_consola` (`DELETE /api/terminal?chatSessionId=`) y detiene el servidor OpenCode de la sesión (`opencode.stopServer`). La sesión se conserva.
+
 ### `POST /api/chat/sessions/:id/clone`
 - **Auth:** Requerida
 - **Respuesta:** `{ success: true, session: { id, title, updated_at, cwd, proyecto_id, id_ticket_redmine, workspace_id, proyecto_descripcion, proyecto_color, priority_id, priority_name, session_redmine_url } }`
