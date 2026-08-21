@@ -1800,10 +1800,18 @@ export function useControlHandlers(api) {
   }
 
   async function executeCommit(controlId, controlMsg, message, addComment, modo_envio, runCommandEnabled, runCommandId) {
-    const sessionId = chat.activeSessionId
-    const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
-    if (idx >= 0) {
-      chat.messages[idx].controlData.loading = true
+    const sessionId = controlMsg?.controlData?.sessionId || chat.activeSessionId
+    const renderResult = (content, isError = false) => chat.replaceControlMessage(controlId, {
+      role: 'result',
+      content,
+      _key: (isError ? 'err-' : 'result-') + Date.now(),
+    }, sessionId)
+
+    if (chat.activeSessionId && Number(sessionId) === Number(chat.activeSessionId)) {
+      const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+      if (idx >= 0) {
+        chat.messages[idx].controlData.loading = true
+      }
     }
 
     const sessions = chat.sessions
@@ -1836,13 +1844,7 @@ export function useControlHandlers(api) {
       const addData = await addRes.json()
 
       if (!addData.success) {
-        if (idx >= 0) {
-          chat.messages[idx] = {
-            role: 'result',
-            content: 'Error al ejecutar git add .: ' + (addData.stderr || addData.error || 'Error desconocido'),
-            _key: 'err-' + Date.now(),
-          }
-        }
+        await renderResult('Error al ejecutar git add .: ' + (addData.stderr || addData.error || 'Error desconocido'), true)
         return
       }
 
@@ -1855,13 +1857,7 @@ export function useControlHandlers(api) {
       const commitData_ = await commitRes.json()
 
       if (!commitData_.success) {
-        if (idx >= 0) {
-          chat.messages[idx] = {
-            role: 'result',
-            content: 'Error al realizar commit: ' + (commitData_.stderr || commitData_.error || 'Error desconocido'),
-            _key: 'err-' + Date.now(),
-          }
-        }
+        await renderResult('Error al realizar commit: ' + (commitData_.stderr || commitData_.error || 'Error desconocido'), true)
         return
       }
 
@@ -2001,22 +1997,10 @@ export function useControlHandlers(api) {
         }
       }
 
-      if (idx >= 0) {
-        chat.messages[idx] = {
-          role: 'result',
-          content: resultLines.join('\n'),
-          _key: 'result-' + Date.now(),
-        }
-      }
+      await renderResult(resultLines.join('\n'))
     } catch (err) {
       console.error('Error al ejecutar commit:', err.message)
-      if (idx >= 0) {
-        chat.messages[idx] = {
-          role: 'result',
-          content: 'Error de conexión: ' + err.message,
-          _key: 'err-' + Date.now(),
-        }
-      }
+      await renderResult('Error de conexión: ' + err.message, true)
     } finally {
       // No OpenCode session to close
     }
@@ -2092,10 +2076,18 @@ export function useControlHandlers(api) {
   }
 
   async function executeAmbientesDiffComment(controlId, controlMsg, message, modo_envio) {
-    const sessionId = chat.activeSessionId
-    const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
-    if (idx >= 0) {
-      chat.messages[idx].controlData.loading = true
+    const sessionId = controlMsg?.controlData?.sessionId || chat.activeSessionId
+    const renderResult = (content, isError = false) => chat.replaceControlMessage(controlId, {
+      role: 'result',
+      content,
+      _key: (isError ? 'err-' : 'result-') + Date.now(),
+    }, sessionId)
+
+    if (chat.activeSessionId && Number(sessionId) === Number(chat.activeSessionId)) {
+      const idx = chat.messages.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+      if (idx >= 0) {
+        chat.messages[idx].controlData.loading = true
+      }
     }
 
     try {
@@ -2105,13 +2097,7 @@ export function useControlHandlers(api) {
       const idTicket = session?.id_ticket_redmine || ticketInfoValue?.redmine_id || null
 
       if (!idTicket) {
-        if (idx >= 0) {
-          chat.messages[idx] = {
-            role: 'result',
-            content: 'No hay ticket asociado a la sesión. Use /chat_set_ticket para asignar uno.',
-            _key: 'err-' + Date.now(),
-          }
-        }
+        await renderResult('No hay ticket asociado a la sesión. Use /chat_set_ticket para asignar uno.', true)
         return
       }
 
@@ -2130,61 +2116,27 @@ export function useControlHandlers(api) {
           })
           const ticketData = await ticketRes.json()
 
-          if (idx >= 0) {
-            if (ticketData.success) {
-              chat.messages[idx] = {
-                role: 'result',
-                content: '✓ Comentario enviado al ticket #' + idTicket + '.',
-                _key: 'result-' + Date.now(),
-              }
-            } else {
-              chat.messages[idx] = {
-                role: 'result',
-                content: '✗ Error al enviar comentario: ' + (ticketData.error || 'Error desconocido'),
-                _key: 'err-' + Date.now(),
-              }
-            }
+          if (ticketData.success) {
+            await renderResult('✓ Comentario enviado al ticket #' + idTicket + '.')
+          } else {
+            await renderResult('✗ Error al enviar comentario: ' + (ticketData.error || 'Error desconocido'), true)
           }
         } catch (err) {
           console.error('Error al enviar comentario al ticket:', err.message)
-          if (idx >= 0) {
-            chat.messages[idx] = {
-              role: 'result',
-              content: '✗ Error al enviar comentario: ' + err.message,
-              _key: 'err-' + Date.now(),
-            }
-          }
+          await renderResult('✗ Error al enviar comentario: ' + err.message, true)
         }
       } else {
         try {
           await redmineComments.queueComment(sessionId, idTicket, notesBody)
-          if (idx >= 0) {
-            chat.messages[idx] = {
-              role: 'result',
-              content: '✓ Comentario encolado para el ticket #' + idTicket + '. Usá /dev_redmine_comentarios_enviar para enviarlo.',
-              _key: 'result-' + Date.now(),
-            }
-          }
+          await renderResult('✓ Comentario encolado para el ticket #' + idTicket + '. Usá /dev_redmine_comentarios_enviar para enviarlo.')
         } catch (err) {
           console.error('Error al encolar comentario:', err.message)
-          if (idx >= 0) {
-            chat.messages[idx] = {
-              role: 'result',
-              content: '✗ Error al encolar comentario: ' + err.message,
-              _key: 'err-' + Date.now(),
-            }
-          }
+          await renderResult('✗ Error al encolar comentario: ' + err.message, true)
         }
       }
     } catch (err) {
       console.error('Error al procesar comentario de diff:', err.message)
-      if (idx >= 0) {
-        chat.messages[idx] = {
-          role: 'result',
-          content: 'Error de conexión: ' + err.message,
-          _key: 'err-' + Date.now(),
-        }
-      }
+      await renderResult('Error de conexión: ' + err.message, true)
     } finally {
       const fromTestingNotes = controlMsg?.controlData?.fromTestingNotes
       if (fromTestingNotes) {

@@ -200,6 +200,7 @@ register({
           message: commentBody,
           sourceEnv: data.sourceEnv,
           targetEnv: data.targetEnv,
+          sessionId,
           modo_envio: settings.defaultCommentModeDiff || 'encolar',
         },
         _key: 'control-' + Date.now(),

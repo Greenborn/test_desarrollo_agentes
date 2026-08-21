@@ -646,6 +646,7 @@ export function useOpencodeStreaming() {
         message: translatedText || '(sin respuesta)',
         repoUrl: repoUrl,
         loading: false,
+        sessionId,
         modo_envio: settings.defaultCommentModeCommit || 'encolar',
       }
       const controlMsg = {
@@ -655,6 +656,7 @@ export function useOpencodeStreaming() {
         _key: 'control-' + Date.now(),
       }
 
+      await chat._saveMessageToDb(sessionId, controlMsg)
       if (isActiveSession(sessionId)) {
         const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
         if (idx >= 0) {
@@ -663,7 +665,6 @@ export function useOpencodeStreaming() {
           chat.pushMessage(controlMsg, sessionId)
         }
       } else {
-        await chat._saveMessageToDb(sessionId, controlMsg)
         chat.pendingNotifications[sessionId] = Date.now()
       }
 
@@ -678,6 +679,7 @@ export function useOpencodeStreaming() {
         controlType: 'commit_result',
         message: '[Error al generar commit: ' + err.message + ']',
         loading: false,
+        sessionId,
         modo_envio: settings.defaultCommentModeCommit || 'encolar',
       }
       const errorControlMsg = {
@@ -687,6 +689,7 @@ export function useOpencodeStreaming() {
         _key: 'control-' + Date.now(),
       }
 
+      await chat._saveMessageToDb(sessionId, errorControlMsg)
       if (isActiveSession(sessionId)) {
         const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
         if (idx >= 0) {
@@ -695,7 +698,6 @@ export function useOpencodeStreaming() {
           chat.pushMessage(errorControlMsg, sessionId)
         }
       } else {
-        await chat._saveMessageToDb(sessionId, errorControlMsg)
         chat.pendingNotifications[sessionId] = Date.now()
       }
 

@@ -1027,6 +1027,41 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function replaceControlMessage(controlId, newMsg, targetSessionId) {
+    const sid = targetSessionId || activeSessionId.value
+    if (!sid) return false
+    let replacedInMemory = false
+    if (Number(sid) === Number(activeSessionId.value)) {
+      const idx = messages.value.findIndex((m) => m.controlData && m.controlData.controlId === controlId)
+      if (idx >= 0) {
+        messages.value[idx] = newMsg
+        replacedInMemory = true
+      }
+    }
+    try {
+      await fetch(`${API}/chat/sessions/${sid}/replace-control`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          controlId,
+          message: {
+            role: newMsg.role,
+            content: newMsg.content,
+            thinking: newMsg.thinking || null,
+          },
+        }),
+      })
+    } catch (err) {
+      console.error('Error al reemplazar mensaje de control en BD:', err)
+    }
+    if (!replacedInMemory) {
+      flashLed(sid)
+      pendingNotifications.value[sid] = Date.now()
+    }
+    return replacedInMemory
+  }
+
   function updateMessageByKey(key, updates, targetSessionId) {
     if (targetSessionId && Number(targetSessionId) !== Number(activeSessionId.value)) return -1
     const idx = messages.value.findIndex(m => (m.id ?? m._key) === key)
@@ -1257,6 +1292,7 @@ export const useChatStore = defineStore('chat', () => {
     loadingMore, hasMoreMessages,
     sendMessage, deleteMessage, deleteSession, cloneSession, clearMessages, stopAllExecutions,
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
+    replaceControlMessage,
     setOcStreaming, getIsOcStreaming, updateOcStreamCache, clearOcStreamCache,
     setCmdStreaming, updateCmdStreamCache, clearCmdStreamCache,
     registerCmdPendingSave, consumeCmdPendingSave, hasCmdPendingSave,

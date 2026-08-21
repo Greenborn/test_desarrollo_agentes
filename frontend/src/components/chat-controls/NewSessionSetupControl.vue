@@ -2,7 +2,7 @@
   <div class="d-flex flex-column gap-3 p-1">
     <div class="d-flex flex-column gap-2">
       <label class="small text-muted mb-0">1. Espacio de trabajo <span class="text-danger">*</span></label>
-      <select v-model="workspaceId" class="form-select form-select-sm bg-dark text-light border-secondary" @change="onWorkspaceChange">
+      <select v-model="workspaceId" class="form-select form-select-sm bg-dark text-light border-secondary">
         <option value="" disabled>Selecciona espacio de trabajo...</option>
         <option v-for="w in workspaces" :key="w.id" :value="String(w.id)">{{ w.name }}</option>
       </select>
@@ -33,7 +33,7 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 export default {
   props: {
@@ -52,6 +52,8 @@ export default {
     const error = ref('')
 
     const canConfirm = computed(() => !!workspaceId.value && !!proyectoId.value)
+
+    watch(workspaceId, onWorkspaceChange, { immediate: true })
 
     async function onWorkspaceChange() {
       proyectoId.value = ''

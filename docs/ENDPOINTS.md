@@ -322,6 +322,13 @@ SGI conectado, así que la salida del PTY solo se registra en consola (no se tra
 - **Respuesta:** `{ success: true, sessionId }`
 - **Descripción:** Elimina todos los mensajes de una sesión sin eliminar la sesión ni sus metadatos (ticket, proyecto, etc.).
 
+### `PUT /api/chat/sessions/:id/replace-control`
+- **Auth:** Requerida
+- **Body:** `{ controlId: string, message: { role: string, content: string, thinking?: string|null } }`
+- **Respuesta 200:** `{ success: true, messageId }`
+- **Respuesta 404:** `{ error: "Sesión no encontrada" }` o `{ error: "Mensaje de control no encontrado" }`
+- **Descripción:** Reemplaza el mensaje de control de la sesión (localizado por su `controlId`, contenido como JSON dentro de `content`) por un mensaje resultado. Se actualizan `role`, `content` y `thinking`, y se marca `updated_at` de la sesión. Permite que el resultado de un flujo de commit/comentario persista en la sesión de origen aunque el usuario haya cambiado de sesión de chat.
+
 ### `POST /api/chat/sessions/:id/limpiar`
 - **Auth:** Requerida
 - **Respuesta 200:** `{ success: true, sessionId }`

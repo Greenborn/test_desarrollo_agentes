@@ -337,6 +337,42 @@ router.post('/sessions/:id/save-messages', async (req, res) => {
   }
 });
 
+router.put('/sessions/:id/replace-control', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const { controlId, message } = req.body;
+  if (!controlId) {
+    return res.status(400).json({ success: false, error: 'controlId es requerido' });
+  }
+  if (!message || typeof message !== 'object') {
+    return res.status(400).json({ success: false, error: 'message es requerido' });
+  }
+  try {
+    const session = await db('chat_sessions').where({ id: req.params.id, user_id: req.session.userId }).first();
+    if (!session) {
+      return res.status(404).json({ success: false, error: 'Sesión no encontrada' });
+    }
+    // El control se guarda con content = JSON.stringify(controlData) donde controlData tiene controlId.
+    const target = await dbChatMessages('chat_messages')
+      .where({ session_id: req.params.id })
+      .whereRaw('content LIKE ?', [`%${controlId}%`])
+      .orderBy('id', 'desc')
+      .first();
+    if (!target) {
+      return res.status(404).json({ success: false, error: 'Mensaje de control no encontrado' });
+    }
+    await dbChatMessages('chat_messages').where({ id: target.id }).update({
+      role: message.role || target.role,
+      content: message.content,
+      thinking: message.thinking || null,
+    });
+    await db('chat_sessions').where({ id: req.params.id }).update({ updated_at: db.fn.now() });
+    res.json({ success: true, messageId: target.id });
+  } catch (err) {
+    console.log('Error al reemplazar mensaje de control:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.delete('/sessions/:sessionId/messages/:messageId', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
