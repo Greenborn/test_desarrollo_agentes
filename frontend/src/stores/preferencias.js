@@ -1,9 +1,21 @@
 import { defineStore } from 'pinia'
-import api from '@/api/axios'
+import { settingGet, settingSet } from '@/services/settingService.js'
+
+const PREFS_KEY = 'table_editor_prefs'
+
+function parsePrefs(raw) {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch (err) {
+    console.log('preferencias: error al parsear preferencias guardadas, se ignoran:', err.message)
+    return {}
+  }
+}
 
 export const usePreferenciasStore = defineStore('preferencias', {
   state: () => ({
-    definiciones: [],
     misValores: {},
     loading: false,
     error: null,
@@ -14,60 +26,30 @@ export const usePreferenciasStore = defineStore('preferencias', {
     },
   },
   actions: {
-    async fetchDefiniciones() {
-      this.loading = true
-      this.error = null
-      try {
-        const { data: body } = await api.get('/preferencias')
-        if (body.status) this.definiciones = body.data
-      } catch (err) {
-        this.error = err.message
-      } finally {
-        this.loading = false
-      }
-    },
     async fetchMisPreferencias() {
       this.loading = true
       this.error = null
       try {
-        const { data: body } = await api.get('/preferencias/usuario')
-        if (body.status) {
-          this.definiciones = body.data.definiciones
-          this.misValores = body.data.valores
-        }
+        const result = await settingGet(PREFS_KEY)
+        this.misValores = parsePrefs(result.value)
       } catch (err) {
-        this.error = err.response?.data?.error || err.message
+        console.log('preferencias: error al cargar preferencias:', err.message)
+        this.error = err.message
       } finally {
         this.loading = false
       }
     },
     async guardarMisPreferencias(valores) {
       this.error = null
+      this.misValores = { ...this.misValores, ...valores }
       try {
-        const { data: body } = await api.put('/preferencias/usuario', valores)
-        if (body.status) {
-          this.misValores = { ...this.misValores, ...valores }
-        }
-        return body
+        await settingSet(PREFS_KEY, JSON.stringify(this.misValores))
+        return { status: true }
       } catch (err) {
-        this.error = err.response?.data?.error || err.message
+        console.log('preferencias: error al guardar preferencias:', err.message)
+        this.error = err.message
         throw err
       }
-    },
-    async crearDefinicion(data) {
-      const { data: body } = await api.post('/preferencias', data)
-      if (body.status) await this.fetchDefiniciones()
-      return body
-    },
-    async actualizarDefinicion(id, data) {
-      const { data: body } = await api.put(`/preferencias/${id}`, data)
-      if (body.status) await this.fetchDefiniciones()
-      return body
-    },
-    async eliminarDefinicion(id) {
-      const { data: body } = await api.delete(`/preferencias/${id}`)
-      if (body.status) await this.fetchDefiniciones()
-      return body
     },
   },
 })

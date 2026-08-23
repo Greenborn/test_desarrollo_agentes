@@ -919,6 +919,12 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
     handleChatSessionsRequest(cb);
   });
 
+  const emitRemoto = (event, payload) => {
+    if (socket && socket.connected) {
+      socket.emit(event, payload);
+    }
+  };
+
   socket.on('interfaz-remota:getMessages', makeRemotaHandler((body) => getChatMessagesCached(body)));
   socket.on('interfaz-remota:sendMessage', makeStreamingHandler((body, emit) => sendChatMessageStreaming(body, emit), emitRemoto));
   socket.on('interfaz-remota:sendCommand', makeStreamingHandler((body, emit) => executeChatCommandStreaming(body, emit), emitRemoto));
@@ -926,11 +932,6 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
   socket.on('interfaz-remota:listComandos', makeRemotaHandler((body) => listComandosPersonalizados(body)));
   socket.on('interfaz-remota:ejecutarComando', makeStreamingHandler((body, emit) => ejecutarComandoPersonalizadoRemotoStreaming(body, emit), emitRemoto));
 
-  const emitRemoto = (event, payload) => {
-    if (socket && socket.connected) {
-      socket.emit(event, payload);
-    }
-  };
   socket.on('interfaz-remota:terminal:create', makeRemotaHandler((body) => createRemoteTerminal({ ...body, emit: emitRemoto })));
   socket.on('interfaz-remota:terminal:input', makeRemotaHandler((body) => writeRemoteTerminal(body)));
   socket.on('interfaz-remota:terminal:resize', makeRemotaHandler((body) => resizeRemoteTerminal(body)));
