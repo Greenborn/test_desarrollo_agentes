@@ -81,7 +81,40 @@ wss.on('connection', (ws, req) => {
     return;
   }
 
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
+
   handleConnection(ws, req, terminalId);
+});
+
+// Heartbeat: envía ping periódico para mantener vivas las conexiones ociosas (agentes
+// OpenCode sin output). El navegador responde pong a nivel protocolo sin código app.
+// Si un socket no responde pong, se termina para liberar recursos. Intercepta el cierre
+// real (y no el heartbeat) para no desconectar terminales activas por inactividad.
+const HEARTBEAT_INTERVAL_MS = 30000;
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) {
+      try {
+        ws.terminate();
+      } catch (err) {
+        console.log('[procesos_consola] Error al terminar socket muerto:', err.message);
+      }
+      continue;
+    }
+    ws.isAlive = false;
+    try {
+      ws.ping();
+    } catch (err) {
+      console.log('[procesos_consola] Error al enviar ping:', err.message);
+    }
+  }
+}, HEARTBEAT_INTERVAL_MS);
+
+wss.on('close', () => {
+  clearInterval(heartbeat);
 });
 
 server.listen(PORT, (err) => {

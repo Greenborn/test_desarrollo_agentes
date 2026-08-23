@@ -60,6 +60,7 @@ export default {
     let reconnectAttempts = 0
     let reconnectTimer = null
     let isReconnecting = false
+    let reconnectNoticeShown = false
 
     function fitTerminal() {
       if (!fitAddon || !terminal) return
@@ -118,6 +119,7 @@ export default {
       }
       reconnectAttempts = 0
       isReconnecting = false
+      reconnectNoticeShown = false
     }
 
     function scheduleReconnect() {
@@ -128,8 +130,11 @@ export default {
       const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(1.5, reconnectAttempts - 1), RECONNECT_MAX_DELAY)
       const jitter = delay * (0.5 + Math.random() * 0.5)
 
-      if (terminal) {
-        terminal.write(`\r\n\x1b[38;5;214m[reconectando en ${Math.round(jitter / 1000)}s... (intento ${reconnectAttempts})]\x1b[0m\r\n`)
+      // Mostrar el aviso de reconexión solo una vez por corte (no en cada reintento),
+      // para no inundar la terminal mientras el backoff intenta reconectar.
+      if (!reconnectNoticeShown && terminal) {
+        terminal.write(`\r\n\x1b[38;5;214m[reconectando... (intento ${reconnectAttempts})]\x1b[0m\r\n`)
+        reconnectNoticeShown = true
       }
 
       reconnectTimer = setTimeout(() => {
@@ -151,7 +156,7 @@ export default {
 
       ws.onopen = () => {
         console.log('[xterm] terminal WebSocket conectado')
-        if (isReconnecting && terminal) {
+        if (isReconnecting && reconnectNoticeShown && terminal) {
           terminal.write(`\r\n\x1b[38;5;245m[reconectado exitosamente]\x1b[0m\r\n`)
         }
         cancelReconnect()
@@ -179,7 +184,7 @@ export default {
           emit('exit', { code: msg.code, output: msg.output || accumulatedOutput, terminalId: currentTerminalId })
           closingIntentionally = true
           setTimeout(() => disconnect(), 1500)
-        } else if (msg.type === 'created' && terminal && isReconnecting) {
+        } else if (msg.type === 'created' && terminal && isReconnecting && reconnectNoticeShown) {
           terminal.write(`\r\n\x1b[38;5;245m[reconectado exitosamente]\x1b[0m\r\n`)
         }
       }

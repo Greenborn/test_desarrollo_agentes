@@ -8,3 +8,6 @@ uploads/data/
 *.db
 *.sql
 .opencode/skills/
+# Repositorios externos — nunca comitear su código
+opencode_dev/
+greenborn_1/
