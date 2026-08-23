@@ -1,8 +1,22 @@
 import { decrypt } from '../../services/crypto.js';
 import dbConfig from '../../config/dbConfig.js';
 
+const REQUEST_TIMEOUT_MS = 15000;
+
 async function apiRequest(method, url, headers, body) {
-  const res = await fetch(url, { method, headers, body });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(url, { method, headers, body, signal: controller.signal });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw Object.assign(new Error(`Tiempo de espera agotado al conectar con gestión interna (${REQUEST_TIMEOUT_MS}ms)`), { requestLog: { method, url } });
+    }
+    throw err;
+  }
+  clearTimeout(timeoutId);
   const requestLog = { method, url, statusCode: res.status };
   return { response: res, requestLog };
 }

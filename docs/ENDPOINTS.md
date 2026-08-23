@@ -1568,6 +1568,8 @@ Endpoints para gestionar skills del proyecto (archivos `.agents/skills/[name]/SK
 
 Endpoints del módulo Interfaz Remota. Al iniciar el backend se intenta conectar con el servicio de gestión interna (login y obtención de token). Tras el login, el backend se conecta por socket.io-client (`socket.io-client@4.8+`) al socket del sistema de gestión interna y se **anuncia** emitiendo el evento `desarrollo:announce`, de modo que el panel admin de gestión interna (`/#/admin/desarrollo`) muestre el sistema de desarrollo como conectado. El anuncio se repite periódicamente (heartbeat ~45s) y se re-emite al reconectar. El estado se almacena en memoria y se expone a través del endpoint de estado.
 
+**Renovación de token (estabilidad de la conexión):** el token SSO/local de gestión interna tiene un TTL de 24h. Para no perder la conexión por expiración, el backend **renueva el token proactivamente cada ~7h** (`renewToken`): actualiza `socket.io.opts.auth.token` para que las futuras reconexiones usen un token fresco y re-emite `desarrollo:announce` (el socket permanece conectado). Además, si una conexión falla por autenticación (`unauthorized`/token caducado), se reloguea de inmediato (`relogin`) y se fuerza la reconexión con el token nuevo. Las llamadas HTTP de `login` tienen un timeout de 15s.
+
 ### `GET /api/interfaz-remota/status`
 - **Auth:** Requerida
 - **Descripción:** Devuelve el estado del intento de login al servicio de gestión interna, el estado de la conexión socket.io y si la conexión está habilitada. El login y la conexión se intentan al iniciar el backend (si la conexión está habilitada). El socket se conecta a `<url-gestion>` con path `/socket.io`, `transports: ['websocket']` y `auth.token` = token SSO/local obtenido en el login.

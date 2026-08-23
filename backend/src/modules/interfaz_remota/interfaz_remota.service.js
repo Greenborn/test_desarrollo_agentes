@@ -29,6 +29,11 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const ANNOUNCE_INTERVAL_MS = 45000;
+// Margen de seguridad para renovar el token antes de que expire. El token del
+// login SGI tiene un TTL de 24h (ver sgi-backend/src/auth/sso.js); renovamos
+// cada ~7h para disponer siempre de un token fresco para futuras reconexiones
+// y así nunca quedarnos fuera por expiración.
+const TOKEN_RENEW_INTERVAL_MS = 7 * 60 * 60 * 1000;
 const IO_LOG_MAX = 200;
 const FILE_LOG_PATH = path.resolve(__dirname, '../../../logs/interfaz_remota.log');
 
@@ -66,6 +71,7 @@ let wsState = {
 let socket = null;
 let wsReconnectTimer = null;
 let announceTimer = null;
+let tokenRenewTimer = null;
 let enabled = true;
 
 let ioLog = [];
@@ -177,6 +183,50 @@ async function queryChatSessions() {
   return { activas: enrActivas, archivadas: enrArchivadas };
 }
 
+// Caché breve de lecturas para que refrescos de sesiones no golpeen la DB en cada
+// consulta. Se invalida al escribir (nueva sesión / mensaje). TTL corto para no
+// servir datos obsoletos durante mucho tiempo.
+const CHAT_SESSIONS_TTL_MS = 5000;
+let chatSessionsCache = { at: 0, data: null };
+
+async function queryChatSessionsCached() {
+  const now = Date.now();
+  if (chatSessionsCache.data && now - chatSessionsCache.at < CHAT_SESSIONS_TTL_MS) {
+    return chatSessionsCache.data;
+  }
+  const data = await queryChatSessions();
+  chatSessionsCache = { at: now, data };
+  return data;
+}
+
+function invalidateChatSessionsCache() {
+  chatSessionsCache = { at: 0, data: null };
+}
+
+// Caché breve por sesión del historial de mensajes (getMessages). Se invalida al
+// insertar mensajes para que el próximo refresco traiga el estado actual.
+const MESSAGES_TTL_MS = 3000;
+const messagesCache = new Map();
+
+function invalidateMessagesCache(sessionId) {
+  if (sessionId !== undefined && sessionId !== null) {
+    messagesCache.delete(String(sessionId));
+  }
+}
+
+async function getChatMessagesCached({ sessionId, limit = 200 } = {}) {
+  if (sessionId === undefined || sessionId === null) return { success: false, error: 'sessionId requerido' };
+  const key = String(sessionId);
+  const now = Date.now();
+  const entry = messagesCache.get(key);
+  if (entry && now - entry.at < MESSAGES_TTL_MS) {
+    return entry.data;
+  }
+  const data = await getChatMessages({ sessionId, limit });
+  messagesCache.set(key, { at: now, data });
+  return data;
+}
+
 // Agrega a cada sesion el slug del proyecto asociado (join a proyectos) y el
 // ambiente al que pertenece (nombre del workspace). Los datos se exponen en el
 // payload para que el selector de sesiones de la gestion interna los muestre.
@@ -219,7 +269,8 @@ let chatSessionQueue = Promise.resolve();
 
 function handleChatSessionsRequest(ack) {
   const respond = (payload) => {
-    fileLog(`chatSessions respond: success=${payload.success}, activas=${payload.data ? payload.data.activas.length : '-'}, hasAck=${typeof ack === 'function'}`);
+    // No se escribe a disco en cada refresh (I/O síncrona en camino caliente); el
+    // tráfico IO ya queda visible vía console/SSE en `appendIoLog`.
     if (typeof ack === 'function') {
       ack(payload);
     } else {
@@ -228,7 +279,7 @@ function handleChatSessionsRequest(ack) {
   };
   chatSessionQueue = chatSessionQueue.then(async () => {
     try {
-      const data = await queryChatSessions();
+      const data = await queryChatSessionsCached();
       respond({ success: true, data });
     } catch (err) {
       console.log('[interfaz_remota] Error al consultar sesiones de chat:', err.message);
@@ -240,7 +291,7 @@ function handleChatSessionsRequest(ack) {
 
 export async function testChatSessions() {
   try {
-    const data = await queryChatSessions();
+    const data = await queryChatSessionsCached();
     return { success: true, data, checkedAt: new Date().toISOString() };
   } catch (err) {
     console.log('[interfaz_remota] Error al testear pseudoendpoint de sesiones de chat:', err.message);
@@ -248,16 +299,25 @@ export async function testChatSessions() {
   }
 }
 
-// Cola global para serializar las peticiones de pseudoendpoints. Evita que múltiples
-// ACK concurrentes (reintentos del lado SGI, usuarios, etc.) lancen operaciones DB /
-// streaming duplicados que bloquean el event loop y disparan el ping timeout -> reconexión.
-let remotaQueue = Promise.resolve();
+// Colas por sesión para serializar las peticiones de pseudoendpoints. Evita que
+// operaciones largas (streaming de chat, prompts opencode) bloqueen el event loop
+// o a otras sesiones: cada sesión mantiene su propio orden, pero sesiones distintas
+// corren en paralelo. La clave '__global__' agrupa las peticiones sin sesión.
+const remotaQueues = new Map();
 
-function enqueueRemota(work) {
-  remotaQueue = remotaQueue.then(work).catch((err) => {
+function remotaQueueKey(body) {
+  const id = body && (body.sessionId !== undefined ? body.sessionId : body.chatSessionId);
+  return id !== undefined && id !== null ? String(id) : '__global__';
+}
+
+function enqueueRemota(body, work) {
+  const key = remotaQueueKey(body);
+  const prev = remotaQueues.get(key) || Promise.resolve();
+  const chain = prev.then(work).catch((err) => {
     console.log('[interfaz_remota] Error no manejado en pseudoendpoint:', err.message);
   });
-  return remotaQueue;
+  remotaQueues.set(key, chain);
+  return chain;
 }
 
 async function getSessionOrNull(sessionId) {
@@ -312,8 +372,75 @@ export async function sendChatMessage({ sessionId, message } = {}) {
     thinking: fullThinking ? fullThinking : null,
   });
   await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
+  invalidateMessagesCache(sessionId);
+  invalidateChatSessionsCache();
 
   return { success: true, data: { content: fullResponse, thinking: fullThinking ? fullThinking : null } };
+}
+
+// Variante streaming de sendMessage para socket: ACK inmediato (via makeStreamingHandler)
+// y el progreso (thinking/response/done/error) se emite por `interfaz-remota:message:event`.
+export async function sendChatMessageStreaming({ sessionId, message } = {}, emitEvent) {
+  if (!sessionId) {
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'message', type: 'error', error: 'sessionId requerido' });
+    return;
+  }
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'message', type: 'error', error: 'message requerido' });
+    return;
+  }
+  const session = await getSessionOrNull(sessionId);
+  if (!session) {
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'message', type: 'error', error: 'Sesión de chat no encontrada' });
+    return;
+  }
+
+  await dbChatMessages('chat_messages').insert({ session_id: sessionId, role: 'user', content: message });
+  await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
+  invalidateMessagesCache(sessionId);
+  invalidateChatSessionsCache();
+
+  const history = await dbChatMessages('chat_messages')
+    .where({ session_id: sessionId })
+    .orderBy('created_at', 'asc')
+    .select('role', 'content');
+
+  const wsId = session.workspace_id || 1;
+  let fullThinking = '';
+  let fullResponse = '';
+  const push = (type, content) => {
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'message', type, content });
+  };
+  for await (const chunk of streamChat(history, wsId)) {
+    if (chunk.type === 'usage') continue;
+    if (chunk.type === 'thinking') {
+      fullThinking += chunk.content;
+      push('thinking', chunk.content);
+    } else {
+      fullResponse += chunk.content;
+      push('response', chunk.content);
+    }
+  }
+
+  await dbChatMessages('chat_messages').insert({
+    session_id: sessionId,
+    role: 'assistant',
+    content: fullResponse,
+    thinking: fullThinking ? fullThinking : null,
+  });
+  await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
+  invalidateMessagesCache(sessionId);
+  invalidateChatSessionsCache();
+
+  if (emitEvent) {
+    emitEvent('interfaz-remota:message:event', {
+      chatSessionId: sessionId,
+      sessionId,
+      kind: 'message',
+      type: 'done',
+      data: { content: fullResponse, thinking: fullThinking ? fullThinking : null },
+    });
+  }
 }
 
 export async function executeChatCommand({ sessionId, command } = {}) {
@@ -329,7 +456,44 @@ export async function executeChatCommand({ sessionId, command } = {}) {
     { session_id: sessionId, role: 'command', content: command },
     { session_id: sessionId, role: 'result', content: result.result },
   ]);
+  invalidateMessagesCache(sessionId);
+  invalidateChatSessionsCache();
   return { success: true, data: { result: result.result, success: result.success } };
+}
+
+// Variante streaming de executeChatCommand para socket: ACK inmediato (via
+// makeStreamingHandler) y el resultado se entrega por `interfaz-remota:message:event`.
+export async function executeChatCommandStreaming({ sessionId, command } = {}, emitEvent) {
+  if (!sessionId) {
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'command', type: 'error', error: 'sessionId requerido' });
+    return;
+  }
+  if (!command || typeof command !== 'string' || !command.trim()) {
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'command', type: 'error', error: 'command requerido' });
+    return;
+  }
+  const session = await getSessionOrNull(sessionId);
+  if (!session) {
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'command', type: 'error', error: 'Sesión de chat no encontrada' });
+    return;
+  }
+
+  const result = await executeBackendCommand(command, { sessionId });
+  await dbChatMessages('chat_messages').insert([
+    { session_id: sessionId, role: 'command', content: command },
+    { session_id: sessionId, role: 'result', content: result.result },
+  ]);
+  invalidateMessagesCache(sessionId);
+  invalidateChatSessionsCache();
+  if (emitEvent) {
+    emitEvent('interfaz-remota:message:event', {
+      chatSessionId: sessionId,
+      sessionId,
+      kind: 'command',
+      type: 'done',
+      data: { result: result.result, success: result.success },
+    });
+  }
 }
 
 // Lista los comandos personalizados del proyecto al que pertenece la sesión.
@@ -372,11 +536,73 @@ export async function ejecutarComandoPersonalizadoRemoto({ sessionId, comandoId 
     { session_id: sessionId, role: 'result', content: res.output },
   ]);
   await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
+  invalidateMessagesCache(sessionId);
+  invalidateChatSessionsCache();
 
   return {
     success: true,
     data: { result: res.output, success: res.success, ocultarEjecucion: res.ocultarEjecucion },
   };
+}
+
+// Variante streaming de ejecutarComandoPersonalizadoRemoto para socket: ACK inmediato
+// (via makeStreamingHandler) y el resultado se entrega por `interfaz-remota:message:event`.
+export async function ejecutarComandoPersonalizadoRemotoStreaming({ sessionId, comandoId } = {}, emitEvent) {
+  if (!sessionId) {
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'comando', type: 'error', error: 'sessionId requerido', comandoId });
+    return;
+  }
+  if (!comandoId) {
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'comando', type: 'error', error: 'comandoId requerido', comandoId });
+    return;
+  }
+  const session = await getSessionOrNull(sessionId);
+  if (!session) {
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'comando', type: 'error', error: 'Sesión de chat no encontrada', comandoId });
+    return;
+  }
+
+  let comando;
+  try {
+    comando = await obtenerComandoPersonalizado(comandoId);
+  } catch (err) {
+    console.log('[interfaz_remota] Error al obtener comando personalizado:', err.message);
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'comando', type: 'error', error: 'Error al consultar comando personalizado', comandoId });
+    return;
+  }
+  if (!comando) {
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'comando', type: 'error', error: 'Comando personalizado no encontrado', comandoId });
+    return;
+  }
+
+  let res;
+  try {
+    res = await ejecutarComandoPersonalizado(comandoId, sessionId);
+  } catch (err) {
+    console.log('[interfaz_remota] Error al ejecutar comando personalizado:', err.message);
+    if (emitEvent) emitEvent('interfaz-remota:message:event', { chatSessionId: sessionId, sessionId, kind: 'comando', type: 'error', error: err.message ? err.message : 'Error al ejecutar comando personalizado', comandoId });
+    return;
+  }
+
+  const labelComando = comando.label ? `${comando.label}: ${res.shellCommand}` : res.shellCommand;
+  await dbChatMessages('chat_messages').insert([
+    { session_id: sessionId, role: 'command', content: labelComando },
+    { session_id: sessionId, role: 'result', content: res.output },
+  ]);
+  await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
+  invalidateMessagesCache(sessionId);
+  invalidateChatSessionsCache();
+
+  if (emitEvent) {
+    emitEvent('interfaz-remota:message:event', {
+      chatSessionId: sessionId,
+      sessionId,
+      kind: 'comando',
+      type: 'done',
+      comandoId,
+      data: { result: res.output, success: res.success, ocultarEjecucion: res.ocultarEjecucion },
+    });
+  }
 }
 
 // Lista los componentes en ejecución de una sesión (terminales + agentes opencode),
@@ -486,6 +712,7 @@ export async function createChatSession({ title, cwd } = {}) {
   };
   if (generated) insertData.title = generated;
   const [id] = await db('chat_sessions').insert(insertData);
+  invalidateChatSessionsCache();
   const session = await db('chat_sessions').where({ id }).first();
   return { success: true, data: { session } };
 }
@@ -500,7 +727,7 @@ function makeRemotaHandler(work) {
       }
     };
     const body = payload && typeof payload === 'object' ? payload : {};
-    enqueueRemota(async () => {
+    enqueueRemota(body, async () => {
       try {
         const resp = await work(body);
         respond(resp);
@@ -508,6 +735,45 @@ function makeRemotaHandler(work) {
         console.log('[interfaz_remota] Error en pseudoendpoint:', err.message);
         respond({ success: false, error: err.message ? err.message : 'Error interno del pseudoendpoint' });
       }
+    });
+  };
+}
+
+// Handler de pseudoendpoint "streaming": ACK inmediato con `{ started: true }` y la
+// respuesta/progreso se entrega después por eventos vía `emit`. Evita que operaciones
+// largas (chat, comandos, opencode) mantengan en vuelo un ACK (timeout del SGI) y que
+// bloqueen la cola. Se ejecuta en paralelo (no serializa) para que la UI responda al
+// instante; la duplicación por reintentos del SGI ya está evitada por su `emisionActiva`.
+function makeStreamingHandler(work, emit) {
+  return (payload, ack) => {
+    const respond = (resp) => {
+      if (typeof ack === 'function') {
+        ack(resp);
+      } else {
+        console.log('[interfaz_remota] pseudoendpoint streaming sin callback ack:', JSON.stringify(resp).slice(0, 120));
+      }
+    };
+    const body = payload && typeof payload === 'object' ? payload : {};
+    const emitEvent = (event, data) => {
+      if (typeof emit === 'function') {
+        try {
+          emit(event, data);
+        } catch (err) {
+          console.log('[interfaz_remota] error al emitir evento streaming:', err.message);
+        }
+      }
+    };
+    const sessionId = body && (body.sessionId !== undefined ? body.sessionId : body.chatSessionId);
+    respond({ success: true, data: { started: true } });
+    work(body, emitEvent).catch((err) => {
+      console.log('[interfaz_remota] Error en pseudoendpoint streaming:', err.message);
+      emitEvent('interfaz-remota:message:event', {
+        chatSessionId: sessionId,
+        sessionId,
+        kind: 'message',
+        type: 'error',
+        error: err.message ? err.message : 'Error interno del pseudoendpoint',
+      });
     });
   };
 }
@@ -569,7 +835,7 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
     socket = io(isSecure ? `https://${socketUrl}` : `http://${socketUrl}`, {
       path: '/socket.io',
       transports: ['websocket', 'polling'],
-      auth: { token },
+      auth: { token, unique_id: announceId },
       reconnection: true,
       reconnectionDelay: 5000,
       reconnectionDelayMax: 15000,
@@ -602,6 +868,7 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
     });
     emitAnnounce();
     scheduleAnnounce();
+    scheduleTokenRenewal();
   });
 
   socket.on('disconnect', (reason) => {
@@ -618,12 +885,28 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
     }
   });
 
-  socket.on('connect_error', (err) => {
+  socket.on('connect_error', async (err) => {
     wsState.connected = false;
     wsState.error = err.message ? err.message : 'Error socket.io.';
     wsState.message = 'Error en la conexión socket.io.';
     console.log('[interfaz_remota] socket.io connect_error:', err.message);
     fileLog(`CONNECT_ERROR ${err.message}`);
+    // Si el token caducó (o la autenticación falló), renovarlo de inmediato y
+    // reconectar con el token fresco. No esperamos el backoff de socket.io con un
+    // token inválido, que reintentaría para siempre sin progreso.
+    if (isAuthError(err)) {
+      console.log('[interfaz_remota] Error de autenticación detectado, renovando token y reconectando...');
+      try {
+        const { token } = await relogin();
+        loginState.token = token;
+        loginState.success = true;
+        updateSocketAuth(token);
+        forceReconnect();
+      } catch (reloginErr) {
+        console.log('[interfaz_remota] re-login tras unauthorized falló:', reloginErr.message);
+        fileLog(`TOKEN_RENEW error=${reloginErr.message}`);
+      }
+    }
   });
 
   socket.on('desarrollo:status', (payload) => {
@@ -636,12 +919,12 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
     handleChatSessionsRequest(cb);
   });
 
-  socket.on('interfaz-remota:getMessages', makeRemotaHandler((body) => getChatMessages(body)));
-  socket.on('interfaz-remota:sendMessage', makeRemotaHandler((body) => sendChatMessage(body)));
-  socket.on('interfaz-remota:sendCommand', makeRemotaHandler((body) => executeChatCommand(body)));
+  socket.on('interfaz-remota:getMessages', makeRemotaHandler((body) => getChatMessagesCached(body)));
+  socket.on('interfaz-remota:sendMessage', makeStreamingHandler((body, emit) => sendChatMessageStreaming(body, emit), emitRemoto));
+  socket.on('interfaz-remota:sendCommand', makeStreamingHandler((body, emit) => executeChatCommandStreaming(body, emit), emitRemoto));
   socket.on('interfaz-remota:crearSesion', makeRemotaHandler((body) => createChatSession(body)));
   socket.on('interfaz-remota:listComandos', makeRemotaHandler((body) => listComandosPersonalizados(body)));
-  socket.on('interfaz-remota:ejecutarComando', makeRemotaHandler((body) => ejecutarComandoPersonalizadoRemoto(body)));
+  socket.on('interfaz-remota:ejecutarComando', makeStreamingHandler((body, emit) => ejecutarComandoPersonalizadoRemotoStreaming(body, emit), emitRemoto));
 
   const emitRemoto = (event, payload) => {
     if (socket && socket.connected) {
@@ -697,6 +980,10 @@ export function stopInterfazRemotaWs() {
     clearInterval(announceTimer);
     announceTimer = null;
   }
+  if (tokenRenewTimer) {
+    clearTimeout(tokenRenewTimer);
+    tokenRenewTimer = null;
+  }
   if (socket) {
     try {
       socket.removeAllListeners();
@@ -719,6 +1006,89 @@ export function stopInterfazRemotaWs() {
   };
   ioLog = [];
   ioLogIdCounter = 0;
+  remotaQueues.clear();
+  chatSessionsCache = { at: 0, data: null };
+  messagesCache.clear();
+}
+
+// Reutilizable: obtiene credenciales, hace login y devuelve el token fresco sin
+// tocar el socket. Lo usan el login inicial, el watchdog de renovación proactiva
+// y la re-autenticación ante errores `unauthorized`.
+async function relogin() {
+  const creds = await getGestionCredentials(1);
+  if (!creds) {
+    throw new Error('Gestión interna no configurada. Configure gestion_url, gestion_api_user y gestion_api_password.');
+  }
+  const result = await login(creds.gestionUrl, creds.username, creds.password);
+  return { url: creds.gestionUrl, token: result.token, requestLog: result.requestLog };
+}
+
+// Aplica un token nuevo a las futuras conexiones del Manager de socket.io. No
+// reinicia el socket actual: solo asegura que las próximas reconexiones usen el
+// token fresco en vez del caducado.
+function updateSocketAuth(token) {
+  if (socket && socket.io && socket.io.opts) {
+    socket.io.opts.auth = { token, unique_id: announceId };
+  }
+}
+
+// Detecta errores de conexión causados por autenticación (token caducado/inválido)
+// para renovar el token y reconectar, en vez de dejar que socket.io reintente con
+// un token inservible.
+function isAuthError(err) {
+  const msg = String((err && (err.message || err.type)) || '').toLowerCase();
+  return msg.includes('unauthorized') || msg.includes('token') || msg.includes('autenticación');
+}
+
+// Fuerza una reconexión inmediata con la autenticación ya actualizada. Se usa tras
+// renovar el token ante un `unauthorized`, para no esperar el backoff de socket.io.
+function forceReconnect() {
+  if (!socket) return;
+  try {
+    if (socket.connected) {
+      socket.disconnect();
+    }
+    socket.connect();
+  } catch (err) {
+    console.log('[interfaz_remota] error al forzar reconexión:', err.message);
+  }
+}
+
+// Renueva el token proactivamente antes de que expire y lo deja listo para las
+// próximas reconexiones. Mientras el socket siga conectado no se interrumpe la
+// sesión: solo se re-anuncia para mantener el registro en la gestión interna.
+async function renewToken() {
+  try {
+    const { url, token } = await relogin();
+    loginState.token = token;
+    loginState.url = url;
+    loginState.success = true;
+    updateSocketAuth(token);
+    emitAnnounce();
+    console.log('[interfaz_remota] token renovado (renovación proactiva).');
+    fileLog(`TOKEN_RENEW ok url=${url}`);
+  } catch (err) {
+    loginState.success = false;
+    loginState.message = err.message ? err.message : 'Error al renovar token de gestión interna.';
+    console.log('[interfaz_remota] Error al renovar token:', err.message);
+    fileLog(`TOKEN_RENEW error=${err.message}`);
+  }
+}
+
+// Programa la renovación periódica del token (~7h) de forma recursiva para no
+// solapar ejecuciones si `renewToken` tardase más de lo esperado.
+function scheduleTokenRenewal() {
+  if (!enabled || !socket) return;
+  if (tokenRenewTimer) {
+    clearTimeout(tokenRenewTimer);
+  }
+  tokenRenewTimer = setTimeout(() => {
+    renewToken().finally(() => {
+      // Solo reprogramamos si la conexión sigue habilitada y con socket vivo (p. ej.
+      // un `disable`/`stop` durante un `renewToken` en vuelo no debe reactivarla).
+      if (enabled && socket) scheduleTokenRenewal();
+    });
+  }, TOKEN_RENEW_INTERVAL_MS);
 }
 
 export async function initInterfazRemotaLogin() {
@@ -734,25 +1104,16 @@ export async function initInterfazRemotaLogin() {
   };
 
   try {
-    const creds = await getGestionCredentials(1);
-    if (!creds) {
-      loginState.configured = false;
-      loginState.message = 'Gestión interna no configurada.';
-      console.log('[interfaz_remota] No hay credenciales de gestión interna configuradas.');
-      return loginState;
-    }
-
+    const { url, token, requestLog } = await relogin();
     loginState.configured = true;
-    loginState.url = creds.gestionUrl;
-
-    const result = await login(creds.gestionUrl, creds.username, creds.password);
     loginState.success = true;
-    loginState.token = result.token;
-    loginState.requestLog = result.requestLog;
+    loginState.url = url;
+    loginState.token = token;
+    loginState.requestLog = requestLog;
     loginState.message = 'Login exitoso en gestión interna.';
     console.log('[interfaz_remota] Login exitoso en gestión interna.');
 
-    connectInterfazRemotaWs(creds.gestionUrl, result.token);
+    connectInterfazRemotaWs(url, token);
   } catch (err) {
     loginState.success = false;
     loginState.message = err.message ? err.message : 'Error al conectar con gestión interna.';
