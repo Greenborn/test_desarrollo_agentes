@@ -47,8 +47,8 @@ import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useComandosPersonalizadosStore } from '../../../stores/comandosPersonalizados.js'
 import { useModal } from 'vue-greenborn-modal-manager'
-import TableEditor from '../../../components/TableEditor.vue'
-import { BtnConfig } from '@/components/BtnConfig'
+import { TableEditor, BtnConfig } from 'vue-table-editor'
+import { createPiniaPrefsAdapter } from '../../../components/TableEditor/preferenciasAdapter.js'
 import wsClient from '../../../services/wsClient'
 
 const SCRIPTS_NS = 'scripts_cache'
@@ -443,13 +443,14 @@ export default {
       hideCsvExport: true,
       showPaginator: false,
       selectionMode: 'single',
+      preferencesStore: createPiniaPrefsAdapter(),
       buttons: {
         rowActions: [
-          new BtnConfig({ key: 'ejecutar', icon: 'bi bi-play-fill', severity: 'btn-outline-success', label: '▶ Ejecutar', onClick: (row) => ejecutarComando(row) }),
-          new BtnConfig({ key: 'detener', icon: 'bi bi-stop-fill', severity: 'btn-outline-warning', label: '⏹ Detener', onClick: (row) => detenerComando(row) }),
-          new BtnConfig({ key: 'edit', icon: 'bi bi-pencil', severity: 'btn-outline-info', label: '✏', onClick: (row) => editarComando(row) }),
-          new BtnConfig({ key: 'copy', icon: 'bi bi-files', severity: 'btn-outline-secondary', label: '📋', onClick: (row) => copiarComando(row) }),
-          new BtnConfig({ key: 'delete', icon: 'bi bi-trash', severity: 'btn-outline-danger', label: '🗑', onClick: (row) => eliminarComando(row) }),
+          new BtnConfig({ key: 'ejecutar', icon: 'play', severity: 'btn-outline-success', label: '▶ Ejecutar', onClick: (row) => ejecutarComando(row) }),
+          new BtnConfig({ key: 'detener', icon: 'stop', severity: 'btn-outline-warning', label: '⏹ Detener', onClick: (row) => detenerComando(row) }),
+          new BtnConfig({ key: 'edit', icon: 'pencil', severity: 'btn-outline-info', label: '✏', onClick: (row) => editarComando(row) }),
+          new BtnConfig({ key: 'copy', icon: 'files', severity: 'btn-outline-secondary', label: '📋', onClick: (row) => copiarComando(row) }),
+          new BtnConfig({ key: 'delete', icon: 'trash', severity: 'btn-outline-danger', label: '🗑', onClick: (row) => eliminarComando(row) }),
         ],
       },
     }))
@@ -484,10 +485,11 @@ export default {
       hideCsvExport: true,
       showPaginator: false,
       selectionMode: 'single',
+      preferencesStore: createPiniaPrefsAdapter(),
       buttons: {
         rowActions: [
-          new BtnConfig({ key: 'ejecutar', icon: 'bi bi-play-fill', severity: 'btn-outline-success', label: '▶ Ejecutar', onClick: (row) => ejecutarNpmScript(row._packagePath, row._scriptName, row.command) }),
-          new BtnConfig({ key: 'detener', icon: 'bi bi-stop-fill', severity: 'btn-outline-warning', label: '⏹ Detener', onClick: (row) => detenerNpmScript(row._packagePath, row._scriptName) }),
+          new BtnConfig({ key: 'ejecutar', icon: 'play', severity: 'btn-outline-success', label: '▶ Ejecutar', onClick: (row) => ejecutarNpmScript(row._packagePath, row._scriptName, row.command) }),
+          new BtnConfig({ key: 'detener', icon: 'stop', severity: 'btn-outline-warning', label: '⏹ Detener', onClick: (row) => detenerNpmScript(row._packagePath, row._scriptName) }),
         ],
       },
     }))

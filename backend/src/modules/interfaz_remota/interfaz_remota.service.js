@@ -8,7 +8,15 @@ import dbChatMessages from '../../config/dbChatMessages.js';
 import dbRedmineData from '../../config/dbRedmineData.js';
 import { streamChat } from '../../services/deepseek.js';
 import { executeBackendCommand } from '../../services/commandExecutor.js';
+import {
+  listarComandosPorProyecto,
+  obtenerComandoPersonalizado,
+  ejecutarComandoPersonalizado,
+} from '../../services/comandosPersonalizados.service.js';
 import { runOpencodePrompt, controlEmitter } from '../../services/opencodeStream.js';
+import * as hub from '../../services/componentHub.js';
+import * as terminalBridge from '../../services/terminalBridge.js';
+import opencode from '../../services/opencode.js';
 import {
   createRemoteTerminal,
   writeRemoteTerminal,
@@ -324,6 +332,106 @@ export async function executeChatCommand({ sessionId, command } = {}) {
   return { success: true, data: { result: result.result, success: result.success } };
 }
 
+// Lista los comandos personalizados del proyecto al que pertenece la sesión.
+export async function listComandosPersonalizados({ sessionId } = {}) {
+  if (!sessionId) return { success: false, error: 'sessionId requerido' };
+  const session = await getSessionOrNull(sessionId);
+  if (!session) return { success: false, error: 'Sesión de chat no encontrada' };
+  const comandos = await listarComandosPorProyecto(session.proyecto_id);
+  return { success: true, data: { sessionId, comandos } };
+}
+
+// Ejecuta un comando personalizado sobre una sesión. Resuelve variables y cwd de la
+// sesión, captura la salida completa y persiste los mensajes `command` y `result`.
+export async function ejecutarComandoPersonalizadoRemoto({ sessionId, comandoId } = {}) {
+  if (!sessionId) return { success: false, error: 'sessionId requerido' };
+  if (!comandoId) return { success: false, error: 'comandoId requerido' };
+  const session = await getSessionOrNull(sessionId);
+  if (!session) return { success: false, error: 'Sesión de chat no encontrada' };
+
+  let comando;
+  try {
+    comando = await obtenerComandoPersonalizado(comandoId);
+  } catch (err) {
+    console.log('[interfaz_remota] Error al obtener comando personalizado:', err.message);
+    return { success: false, error: 'Error al consultar comando personalizado' };
+  }
+  if (!comando) return { success: false, error: 'Comando personalizado no encontrado' };
+
+  let res;
+  try {
+    res = await ejecutarComandoPersonalizado(comandoId, sessionId);
+  } catch (err) {
+    console.log('[interfaz_remota] Error al ejecutar comando personalizado:', err.message);
+    return { success: false, error: err.message ? err.message : 'Error al ejecutar comando personalizado' };
+  }
+
+  const labelComando = comando.label ? `${comando.label}: ${res.shellCommand}` : res.shellCommand;
+  await dbChatMessages('chat_messages').insert([
+    { session_id: sessionId, role: 'command', content: labelComando },
+    { session_id: sessionId, role: 'result', content: res.output },
+  ]);
+  await db('chat_sessions').where({ id: sessionId }).update({ updated_at: db.fn.now() });
+
+  return {
+    success: true,
+    data: { result: res.output, success: res.success, ocultarEjecucion: res.ocultarEjecucion },
+  };
+}
+
+// Lista los componentes en ejecución de una sesión (terminales + agentes opencode),
+// iniciando el bridge de terminales y descubriendo agentes opencode activos.
+export async function listComponentes({ sessionId } = {}) {
+  if (!sessionId) return { success: false, error: 'sessionId requerido' };
+  const session = await getSessionOrNull(sessionId);
+  if (!session) return { success: false, error: 'Sesión de chat no encontrada' };
+
+  // Puentear terminales del servicio local (sin modificar api_procesos_consola)
+  try { terminalBridge.ensureSession(sessionId); } catch (err) {
+    console.log('[interfaz_remota] error al iniciar bridge de terminales:', err.message);
+  }
+
+  // Descubrir agentes opencode en ejecución y registrarlos en el hub si faltan
+  try {
+    const sessions = await opencode.listSessions(sessionId);
+    for (const s of (Array.isArray(sessions) ? sessions : [])) {
+      if (s && s.id && !hub.getComponent(s.id)) {
+        hub.register({
+          componentId: s.id,
+          kind: 'opencode',
+          sessionId,
+          label: s.title ? `OpenCode: ${s.title}` : 'OpenCode',
+          meta: { agent: s.agent || null, ocSessionId: s.id },
+        });
+      }
+    }
+  } catch (err) {
+    console.log('[interfaz_remota] error al listar sesiones opencode:', err.message);
+  }
+
+  const componentes = hub.listBySession(sessionId);
+  return { success: true, data: { sessionId, componentes } };
+}
+
+// Envía input a una terminal puenteada.
+export function componentInput({ sessionId, terminalId, data } = {}) {
+  if (!terminalId) return { success: false, error: 'terminalId requerido' };
+  if (data === null || data === undefined) return { success: false, error: 'data requerido' };
+  return terminalBridge.sendInput(sessionId, terminalId, data);
+}
+
+// Redimensiona una terminal puenteada.
+export function componentResize({ sessionId, terminalId, cols, rows } = {}) {
+  if (!terminalId) return { success: false, error: 'terminalId requerido' };
+  return terminalBridge.resize(sessionId, terminalId, cols, rows);
+}
+
+// Detiene el monitoreo de componentes de una sesión (liberación de recursos).
+export function stopComponentesSession({ sessionId } = {}) {
+  if (sessionId) terminalBridge.stopSession(sessionId);
+  return { success: true };
+}
+
 // Confirma un control interactivo de OpenCode (permisos) emitido por el socket.
 // El SGI envía { sessionId, controlId, value }; se resuelve el wait de `processControl`.
 export function handleSendControl(body = {}) {
@@ -483,6 +591,15 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
     wsState.error = null;
     console.log('[interfaz_remota] socket.io conectado:', socket.id);
     fileLog(`CONNECT socket.id=${socket.id}`);
+    hub.setBroadcaster((evt) => {
+      if (socket && socket.connected) {
+        try {
+          socket.emit('interfaz-remota:componentes:event', evt);
+        } catch (err) {
+          console.log('[interfaz_remota] error al emitir componentes:event:', err.message);
+        }
+      }
+    });
     emitAnnounce();
     scheduleAnnounce();
   });
@@ -523,6 +640,8 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
   socket.on('interfaz-remota:sendMessage', makeRemotaHandler((body) => sendChatMessage(body)));
   socket.on('interfaz-remota:sendCommand', makeRemotaHandler((body) => executeChatCommand(body)));
   socket.on('interfaz-remota:crearSesion', makeRemotaHandler((body) => createChatSession(body)));
+  socket.on('interfaz-remota:listComandos', makeRemotaHandler((body) => listComandosPersonalizados(body)));
+  socket.on('interfaz-remota:ejecutarComando', makeRemotaHandler((body) => ejecutarComandoPersonalizadoRemoto(body)));
 
   const emitRemoto = (event, payload) => {
     if (socket && socket.connected) {
@@ -538,6 +657,11 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
   // Prompt del agente OpenCode por socket (streaming vía interfaz-remota:opencode:event)
   socket.on('interfaz-remota:opencode:send', makeRemotaHandler((body) => runOpencodePromptSocket(body, emitRemoto)));
   // Confirmación de controles interactivos del agente OpenCode (permisos, forms, etc.)
+  // Componentes en ejecución (terminales puenteadas + agentes opencode) con historial+en vivo
+  socket.on('interfaz-remota:componentes:list', makeRemotaHandler((body) => listComponentes(body)));
+  socket.on('interfaz-remota:componentes:input', makeRemotaHandler((body) => componentInput(body)));
+  socket.on('interfaz-remota:componentes:resize', makeRemotaHandler((body) => componentResize(body)));
+  socket.on('interfaz-remota:componentes:stop', makeRemotaHandler((body) => stopComponentesSession(body)));
   socket.on('interfaz-remota:sendControl', makeRemotaHandler((body) => handleSendControl(body)));
 
   socket.onAny((event, ...args) => {

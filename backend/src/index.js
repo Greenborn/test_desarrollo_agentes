@@ -49,6 +49,7 @@ import dbRedmineComentarios from './config/dbRedmineComentarios.js';
 import { runMigrations } from './config/dbFactory.js';
 import { fetchAllSessionRepos } from './services/gitFetchService.js';
 import { initInterfazRemotaLogin, stopInterfazRemotaWs } from './modules/interfaz_remota/interfaz_remota.service.js';
+import * as terminalBridge from './services/terminalBridge.js';
 
 const PORT = process.env.PORT;
 if (!PORT) {
@@ -155,12 +156,14 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('exit', () => {
   stopComandosPersonalizados();
   stopInterfazRemotaWs();
+  terminalBridge.stopAll();
   devInstanceManager.stopAll();
   opencode.stopAllServers();
 });
 process.on('SIGTERM', () => {
   stopComandosPersonalizados();
   stopInterfazRemotaWs();
+  terminalBridge.stopAll();
   devInstanceManager.stopAll();
   opencode.stopAllServers();
   process.exit(0);
@@ -168,6 +171,7 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   stopComandosPersonalizados();
   stopInterfazRemotaWs();
+  terminalBridge.stopAll();
   devInstanceManager.stopAll();
   opencode.stopAllServers();
   process.exit(0);

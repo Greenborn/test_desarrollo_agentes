@@ -29,8 +29,8 @@ import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useRedmineCommentsStore } from '../../../stores/redmineComments.js'
 import { useCommandRegistry } from '../../../composables/useCommandRegistry.js'
-import TableEditor from '../../../components/TableEditor.vue'
-import { BtnConfig } from '../../../components/BtnConfig.js'
+import { TableEditor, BtnConfig } from 'vue-table-editor'
+import { createPiniaPrefsAdapter } from '../../../components/TableEditor/preferenciasAdapter.js'
 
 export default {
   components: { TableEditor },
@@ -79,6 +79,7 @@ export default {
       hideToolbarEnd: true,
       selectionMode: 'single',
       striped: true,
+      preferencesStore: createPiniaPrefsAdapter(),
       valueFormatters: {
         ticket_redmine_id: (row) => `#${row.ticket_redmine_id}`,
         comentario: (row) => {
@@ -171,6 +172,7 @@ export default {
       enviarComentariosPendientes,
       deleteComment,
       deleteSentComments,
+      createPiniaPrefsAdapter,
     }
   },
 }

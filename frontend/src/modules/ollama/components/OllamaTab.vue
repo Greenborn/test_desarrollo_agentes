@@ -80,8 +80,8 @@
 <script>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Modal } from 'bootstrap'
-import TableEditor from '../../../components/TableEditor.vue'
-import { BtnConfig } from '../../../components/BtnConfig.js'
+import { TableEditor, BtnConfig } from 'vue-table-editor'
+import { createPiniaPrefsAdapter } from '../../../components/TableEditor/preferenciasAdapter.js'
 import OllamaConfigModal from './OllamaConfigModal.vue'
 import { useModal } from 'vue-greenborn-modal-manager'
 
@@ -156,35 +156,36 @@ export default {
       showPaginator: false,
       striped: false,
       infiniteScroll: false,
+      preferencesStore: createPiniaPrefsAdapter(),
       buttons: {
         toolbar: [
           new BtnConfig({
             key: 'configurar',
-            icon: 'bi bi-gear',
-            severity: 'btn-outline-primary',
+            icon: 'gear',
+            severity: 'outline-primary',
             label: 'Configurar',
             onClick: abrirModalConfig,
             isDisabled: () => !selectedRow.value,
           }),
           new BtnConfig({
             key: 'instalar',
-            icon: 'bi bi-plus-lg',
-            severity: 'btn-outline-primary',
+            icon: 'plus',
+            severity: 'outline-primary',
             label: 'Instalar',
             onClick: abrirModalInstalar,
           }),
           new BtnConfig({
             key: 'reset',
-            icon: 'bi bi-arrow-counterclockwise',
-            severity: 'btn-outline-danger',
+            icon: 'refresh',
+            severity: 'outline-danger',
             label: 'Reset',
             isVisible: () => !!commitModelName.value,
             onClick: resetearCommitModel,
           }),
           new BtnConfig({
             key: 'refresh',
-            icon: 'bi bi-arrow-clockwise',
-            severity: 'btn-outline-secondary',
+            icon: 'refresh',
+            severity: 'outline-secondary',
             label: '',
             onClick: cargarModelos,
             isDisabled: () => cargando.value,
@@ -193,8 +194,8 @@ export default {
         rowActions: [
           new BtnConfig({
             key: 'delete',
-            icon: 'bi bi-trash',
-            severity: 'btn-outline-danger',
+            icon: 'trash',
+            severity: 'outline-danger',
             label: '🗑',
             onClick: (row) => row && confirmarEliminar(row._raw),
             isDisabled: (row) => !row || eliminando.value === row._raw.name,
@@ -429,6 +430,7 @@ export default {
       onRowSelected,
       abrirModalConfig,
       resetearCommitModel,
+      createPiniaPrefsAdapter,
     }
   },
 }

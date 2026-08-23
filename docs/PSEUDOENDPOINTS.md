@@ -232,6 +232,80 @@ socket.emit('interfaz-remota:crearSesion', { title: 'Nueva tarea', cwd: '/ruta' 
 }
 ```
 
+## Evento `interfaz-remota:listComandos`
+
+Lista los **comandos personalizados** del proyecto al que pertenece una sesión de chat (tabla
+`comandos_personalizados_proyectos`). Si la sesión no tiene `proyecto_id`, devuelve lista vacía.
+
+### Request
+
+```js
+socket.emit('interfaz-remota:listComandos', { sessionId: 1 }, (resp) => {
+  console.log(resp);
+});
+```
+
+- `sessionId` (requerido): id de la sesión.
+
+### Response (ack)
+
+```json
+{
+  "success": true,
+  "data": {
+    "sessionId": 1,
+    "comandos": [
+      {
+        "id": 3,
+        "label": "Compilar frontend",
+        "descripcion": "Ejecuta el build de producción",
+        "comando": "npm run build --prefix {{FRONTEND_DIR}}",
+        "id_proyecto": 7,
+        "ocultar_ejecucion": 0
+      }
+    ]
+  }
+}
+```
+
+`comandos` contiene las filas completas de `comandos_personalizados_proyectos` (no se incluye la
+resolución de variables; eso lo hace `ejecutarComando`).
+
+## Evento `interfaz-remota:ejecutarComando`
+
+Ejecuta un **comando personalizado** sobre una sesión. Resuelve las variables `{{key}}` del proyecto
+y usa el `cwd` de la sesión, captura la salida completa y persiste los mensajes `command` y `result`
+en `chat_messages`. El transporte por ACK no soporta streaming: la salida se devuelve completa al
+terminar.
+
+### Request
+
+```js
+socket.emit('interfaz-remota:ejecutarComando', { sessionId: 1, comandoId: 3 }, (resp) => {
+  console.log(resp);
+});
+```
+
+- `sessionId` (requerido): id de la sesión.
+- `comandoId` (requerido): id del comando personalizado (de `listComandos`).
+
+### Response (ack)
+
+```json
+{
+  "success": true,
+  "data": {
+    "result": "✓ built in 2.07s\n",
+    "success": true,
+    "ocultarEjecucion": false
+  }
+}
+```
+
+- `data.success`: `true` si el proceso salió con código 0.
+- `data.result`: salida combinada (stdout + stderr) o `(sin salida)`.
+- `data.ocultarEjecucion`: `true` si el comando está marcado para no mostrar el comando ejecutado.
+
 ## Terminal remota simulada
 
 Replica la usabilidad de `/terminal` del frontend local desde la gestión interna. El sistema dev crea
@@ -314,6 +388,9 @@ Correspondencia evento SGI → evento dev:
 | `desarrollo:getMessages` | `interfaz-remota:getMessages` |
 | `desarrollo:sendMessage` | `interfaz-remota:sendMessage` |
 | `desarrollo:sendCommand` | `interfaz-remota:sendCommand` |
+| `desarrollo:sendControl` | `interfaz-remota:sendControl` |
+| `desarrollo:listComandos` | `interfaz-remota:listComandos` |
+| `desarrollo:ejecutarComando` | `interfaz-remota:ejecutarComando` |
 | `desarrollo:crearSesion` | `interfaz-remota:crearSesion` |
 | `desarrollo:terminal:create` | `interfaz-remota:terminal:create` |
 | `desarrollo:terminal:input` | `interfaz-remota:terminal:input` |
@@ -337,7 +414,11 @@ disparar operaciones DB/streaming duplicadas que bloqueen el event loop del sist
 
 - Implementación de los pseudoendpoints: `backend/src/modules/interfaz_remota/interfaz_remota.service.js`
   (funciones `queryChatSessions`, `getChatMessages`, `sendChatMessage`, `executeChatCommand`,
-  `createChatSession` + registros `socket.on('interfaz-remota:*', ...)`).
+  `listComandosPersonalizados`, `ejecutarComandoPersonalizadoRemoto`, `createChatSession` +
+  registros `socket.on('interfaz-remota:*', ...)`).
+- Comandos personalizados: `backend/src/services/comandosPersonalizados.service.js` (listar, resolver
+  variables, ejecutar) — usado por `backend/src/routes/comandosPersonalizados.routes.js` y por los
+  pseudoendpoints `listComandos`/`ejecutarComando`.
 - Terminal remota simulada: `backend/src/modules/interfaz_remota/remoteTerminal.js`.
 - Ejecución de comandos de backend: `backend/src/services/commandExecutor.js` (`executeBackendCommand`),
   también usado por `backend/src/routes/command.routes.js` (`POST /execute`).

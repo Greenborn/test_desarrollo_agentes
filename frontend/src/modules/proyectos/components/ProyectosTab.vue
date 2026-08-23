@@ -24,6 +24,7 @@
           striped: true,
           scrollHeight: '100%',
           pageSize: 200,
+          preferencesStore: createPiniaPrefsAdapter(),
         }"
         @rowSelected="onRowSelected"
       />
@@ -37,7 +38,8 @@ import { storeToRefs } from 'pinia'
 import { useProjectStore } from '../../../stores/project.js'
 import { useWorkspaceStore } from '../../../stores/workspace.js'
 import { useChatStore } from '../../../stores/chat.js'
-import TableEditor from '../../../components/TableEditor.vue'
+import { TableEditor } from 'vue-table-editor'
+import { createPiniaPrefsAdapter } from '../../../components/TableEditor/preferenciasAdapter.js'
 
 export default {
   components: { TableEditor },
@@ -109,6 +111,7 @@ export default {
       filteredProjects,
       tableData,
       onRowSelected,
+      createPiniaPrefsAdapter,
     }
   },
 }

@@ -223,6 +223,20 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 - **Respuesta 200:** `{ success: true, data: { session: {...} } }`
 - **Respuesta 400:** `{ success: false, error: "..." }`
 
+### `POST /api/interfaz-remota/test/list-comandos`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number }`
+- **Descripción:** Prueba el pseudoendpoint `interfaz-remota:listComandos` (comandos personalizados del proyecto de la sesión).
+- **Respuesta 200:** `{ success: true, data: { sessionId, comandos: [...] } }`
+- **Respuesta 400:** `{ success: false, error: "..." }`
+
+### `POST /api/interfaz-remota/test/ejecutar-comando`
+- **Auth:** Requerida
+- **Body:** `{ sessionId: number, comandoId: number }`
+- **Descripción:** Prueba el pseudoendpoint `interfaz-remota:ejecutarComando` (resuelve variables + cwd y ejecuta un comando personalizado, devolviendo la salida completa).
+- **Respuesta 200:** `{ success: true, data: { success: boolean, result: string, ocultarEjecucion: boolean } }`
+- **Respuesta 400:** `{ success: false, error: "..." }`
+
 ### Endpoints de test de la terminal remota
 Prueban la lógica de la terminal remota simulada (`remoteTerminal.js`). En estos tests no hay socket
 SGI conectado, así que la salida del PTY solo se registra en consola (no se transmite).
@@ -1658,6 +1672,19 @@ o `{ success: false, error }` y aceptan el callback ack.
 - **Request:** `{ title?, cwd? }`
 - **Respuesta:** `{ success, data: { session } }`.
 - **Descripción:** crea una sesión nueva (`workspace_id: 1`, `title` autogenerado si no se provee).
+
+#### `interfaz-remota:listComandos`
+- **Request:** `{ sessionId }`
+- **Respuesta:** `{ success, data: { sessionId, comandos: [...] } }`.
+- **Descripción:** lista los comandos personalizados del proyecto de la sesión
+  (`comandos_personalizados_proyectos`). Vacío si la sesión no tiene `proyecto_id`.
+
+#### `interfaz-remota:ejecutarComando`
+- **Request:** `{ sessionId, comandoId }`
+- **Respuesta:** `{ success, data: { success, result, ocultarEjecucion } }`.
+- **Descripción:** resuelve variables `{{key}}` del proyecto + `cwd` de la sesión, ejecuta el comando
+  personalizado capturando la salida completa y persiste `role:'command'` y `role:'result'`. Actualiza
+  `updated_at`. Sin streaming (la salida se devuelve al terminar).
 
 #### Terminal remota simulada
 Replica `/terminal` del frontend local. Ciclo de vida con ack; streaming sin ack.

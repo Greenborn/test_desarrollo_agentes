@@ -5,6 +5,7 @@ import router from './router/index.js'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'bootstrap'
 import 'vue-greenborn-panels/style.css'
+import 'vue-table-editor/style.css'
 
 import { useAuthStore } from './stores/auth.js'
 import { initModules } from './modules/index.js'

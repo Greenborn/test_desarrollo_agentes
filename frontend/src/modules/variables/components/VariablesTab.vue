@@ -29,7 +29,8 @@ import { useProjectVariablesStore } from '../../../stores/projectVariables.js'
 import { useModal } from 'vue-greenborn-modal-manager'
 import VariableDetailModal from '../../../components/modals/VariableDetailModal.vue'
 import CreateVariableModal from '../../../components/modals/CreateVariableModal.vue'
-import TableEditor from '../../../components/TableEditor.vue'
+import { TableEditor } from 'vue-table-editor'
+import { createPiniaPrefsAdapter } from '../../../components/TableEditor/preferenciasAdapter.js'
 
 export default {
   components: { TableEditor },
@@ -70,6 +71,7 @@ export default {
       striped: true,
       scrollHeight: '100%',
       pageSize: 200,
+      preferencesStore: createPiniaPrefsAdapter(),
       valueFormatters: {
         type(row) {
           return row.type === 'memory'
@@ -83,8 +85,8 @@ export default {
       mostrar_modal(VariableDetailModal, variable.key, { variable, proyectoId: proyectoId.value })
     }
 
-    function onRowDblClick({ data }) {
-      const variable = variables.value.find(v => v.key === data.key)
+    function onRowDblClick(row) {
+      const variable = variables.value.find(v => v.key === row?.key)
       if (variable) openVariableDetail(variable)
     }
 
@@ -109,6 +111,7 @@ export default {
       tableConfig,
       onRowDblClick,
       agregarVariable,
+      createPiniaPrefsAdapter,
     }
   },
 }

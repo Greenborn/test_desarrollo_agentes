@@ -6,6 +6,7 @@ import db from '../config/db.js';
 import dbConfig from '../config/dbConfig.js';
 import dbChatMessages from '../config/dbChatMessages.js';
 import opencode from './opencode.js';
+import * as hub from './componentHub.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -287,6 +288,27 @@ export async function runOpencodePrompt({ sessionId, prompt, provider, model, th
   const ocSession = await server.createSession('Agent Orchestrator - ' + (prompt.slice(0, 50)), agentName);
   const ocSessionId = ocSession.id;
 
+  // Registrar el agente en el Component Hub para streaming bidireccional (historial + en vivo)
+  try {
+    hub.register({
+      componentId: ocSessionId,
+      kind: 'opencode',
+      sessionId,
+      label: `OpenCode (${agentName})`,
+      meta: { agentId, cwd, agent: agentName },
+    });
+  } catch (hubErr) {
+    console.log('[opencode] error al registrar agente en hub:', hubErr.message);
+  }
+
+  // Despacha cada evento al consumidor original (SSE local o socket SGI) Y al hub.
+  const dispatchEvent = (evt) => {
+    if (typeof onEvent === 'function') {
+      try { onEvent(evt); } catch (err) { console.log('[opencode] error en onEvent:', err.message); }
+    }
+    try { hub.pushEvent(ocSessionId, evt); } catch (err) { console.log('[opencode] error al pushear al hub:', err.message); }
+  };
+
   if (sessionId) {
     await dbChatMessages('chat_messages').insert({
       session_id: sessionId, role: 'user', content: prompt,
@@ -299,7 +321,7 @@ export async function runOpencodePrompt({ sessionId, prompt, provider, model, th
       const controlId = Date.now() + Math.random();
       const controlData = { ...controlEvent, controlId };
 
-      onEvent({ type: 'control', control: controlData, sessionId, agentId });
+      dispatchEvent({ type: 'control', control: controlData, sessionId, agentId });
 
       if (sessionId) {
         dbChatMessages('chat_messages').insert({
@@ -403,24 +425,24 @@ export async function runOpencodePrompt({ sessionId, prompt, provider, model, th
 
         if (partType === 'reasoning') {
           fullThinking += delta;
-          onEvent({ type: 'thinking', content: delta, sessionId, agentId });
+          dispatchEvent({ type: 'thinking', content: delta, sessionId, agentId });
         } else if (partType === 'tool_call') {
           let toolName = delta;
           try { const p = JSON.parse(delta); if (p.name) toolName = p.name; if (p.arguments) toolName += ' ' + JSON.stringify(p.arguments); } catch (err) { console.log('[opencode] Error al parsear tool call delta:', err.message); }
           terminalLine = `\x1b[38;5;214m$ ${toolName}\x1b[0m`;
-          onEvent({ type: 'tool_call', content: delta, field, sessionId, agentId });
+          dispatchEvent({ type: 'tool_call', content: delta, field, sessionId, agentId });
         } else if (partType === 'tool_result') {
           terminalLine = `\x1b[38;5;246m${delta}\x1b[0m`;
-          onEvent({ type: 'tool_result', content: delta, field, sessionId, agentId });
+          dispatchEvent({ type: 'tool_result', content: delta, field, sessionId, agentId });
         } else if (field === 'text') {
           fullResponse += delta;
           terminalLine = delta;
-          onEvent({ type: 'response', content: delta, sessionId, agentId });
+          dispatchEvent({ type: 'response', content: delta, sessionId, agentId });
         } else {
-          onEvent({ type: 'tool_data', content: delta, partType, field, sessionId, agentId });
+          dispatchEvent({ type: 'tool_data', content: delta, partType, field, sessionId, agentId });
         }
         if (terminalLine) {
-          onEvent({ type: 'terminal', line: terminalLine, partType, sessionId, agentId });
+          dispatchEvent({ type: 'terminal', line: terminalLine, partType, sessionId, agentId });
         }
       }
 
@@ -431,13 +453,13 @@ export async function runOpencodePrompt({ sessionId, prompt, provider, model, th
 
     const diff = await server.getSessionDiff(ocSessionId);
 
-    onEvent({ type: 'terminal', line: '', partType: 'separator', sessionId, agentId });
+    dispatchEvent({ type: 'terminal', line: '', partType: 'separator', sessionId, agentId });
     if (diff && diff.length > 0) {
       for (const d of diff) {
-        onEvent({ type: 'terminal', line: `\x1b[38;5;39m📁 ${d.path} (\x1b[38;5;214m${d.type || 'modificado'}\x1b[38;5;39m)\x1b[0m`, partType: 'diff', sessionId, agentId });
+        dispatchEvent({ type: 'terminal', line: `\x1b[38;5;39m📁 ${d.path} (\x1b[38;5;214m${d.type || 'modificado'}\x1b[38;5;39m)\x1b[0m`, partType: 'diff', sessionId, agentId });
       }
     }
-    onEvent({ type: 'terminal', line: '\x1b[38;5;40m✅ Hecho.\x1b[0m', partType: 'done', sessionId, agentId });
+    dispatchEvent({ type: 'terminal', line: '\x1b[38;5;40m✅ Hecho.\x1b[0m', partType: 'done', sessionId, agentId });
 
     if (!fullResponse || fullResponse.trim().length === 0) {
       try {
@@ -467,11 +489,13 @@ export async function runOpencodePrompt({ sessionId, prompt, provider, model, th
 
     await registrarGastos(sessionId, ocSessionId, server, fullResponse);
 
-    onEvent({ type: 'done', ocSessionId, hash: ocSessionId, agentId, fullResponse, thinking: fullThinking, diff: diff || [] });
+    dispatchEvent({ type: 'done', ocSessionId, hash: ocSessionId, agentId, fullResponse, thinking: fullThinking, diff: diff || [] });
+    try { hub.finalize(ocSessionId, { status: 'done', evt: { type: 'done' } }); } catch (err) { console.log('[opencode] error al finalizar hub:', err.message); }
     return { success: true, ocSessionId, fullResponse, diff: diff || [] };
   } catch (msgErr) {
     console.log('Error en opencode streamSession:', msgErr.message);
-    onEvent({ type: 'error', content: msgErr.message, agentId });
+    dispatchEvent({ type: 'error', content: msgErr.message, agentId });
+    try { hub.finalize(ocSessionId, { status: 'error', evt: { type: 'error', content: msgErr.message } }); } catch (err) { console.log('[opencode] error al finalizar hub:', err.message); }
     if (sessionId) {
       try {
         await saveLongMessage(sessionId, 'opencode_result', JSON.stringify({ error: msgErr.message }));

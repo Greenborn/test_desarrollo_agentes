@@ -1,10 +1,8 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
-import db from '../config/db.js';
 import dbComandos from '../config/dbComandos.js';
-import dbProjectVariables from '../config/dbProjectVariables.js';
 import dbRedmineData from '../config/dbRedmineData.js';
-import memoriaClient from '../services/memoriaClient.js';
+import { resolverComando } from '../services/comandosPersonalizados.service.js';
 
 const router = Router();
 const runningProcesses = new Set();
@@ -185,43 +183,7 @@ router.post('/:id/resolve', async (req, res) => {
       return res.status(404).json({ error: 'Comando no encontrado' });
     }
 
-    let cwd = process.cwd();
-    if (sessionId) {
-      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
-      if (session && session.cwd) cwd = session.cwd;
-    }
-
-    let shellCommand = comando.comando;
-    if (comando.id_proyecto && shellCommand.includes('{{')) {
-      try {
-        const dbVariables = await dbProjectVariables('project_variables')
-          .select('key', 'value', 'type')
-          .where({ proyecto_id: comando.id_proyecto });
-
-        const variableMap = {};
-        const memoryNamespace = `proyecto:${comando.id_proyecto}`;
-
-        for (const v of dbVariables) {
-          if (v.type === 'memory') {
-            try {
-              const memResult = await memoriaClient.get(memoryNamespace, v.key);
-              variableMap[v.key] = memResult.value;
-            } catch (err) {
-              console.log('[comandosPersonalizados] Error al obtener variable de memoria:', err.message);
-              variableMap[v.key] = '';
-            }
-          } else {
-            variableMap[v.key] = v.value;
-          }
-        }
-
-        shellCommand = shellCommand.replace(/\{\{(.+?)\}\}/g, (match, key) => {
-          return key in variableMap ? variableMap[key] : match;
-        });
-      } catch (err) {
-        console.log('Error al resolver variables para comando personalizado:', err.message);
-      }
-    }
+    const { shellCommand, cwd } = await resolverComando(comando, sessionId);
 
     res.json({ comando: shellCommand, cwd, id_proyecto: comando.id_proyecto, ocultar_ejecucion: comando.ocultar_ejecucion, label: comando.label });
   } catch (err) {
@@ -241,43 +203,7 @@ router.post('/:id/execute', async (req, res) => {
       return res.status(404).json({ error: 'Comando no encontrado' });
     }
 
-    let cwd = process.cwd();
-    if (sessionId) {
-      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first();
-      if (session && session.cwd) cwd = session.cwd;
-    }
-
-    let shellCommand = comando.comando;
-    if (comando.id_proyecto && shellCommand.includes('{{')) {
-      try {
-        const dbVariables = await dbProjectVariables('project_variables')
-          .select('key', 'value', 'type')
-          .where({ proyecto_id: comando.id_proyecto });
-
-        const variableMap = {};
-        const memoryNamespace = `proyecto:${comando.id_proyecto}`;
-
-        for (const v of dbVariables) {
-          if (v.type === 'memory') {
-            try {
-              const memResult = await memoriaClient.get(memoryNamespace, v.key);
-              variableMap[v.key] = memResult.value;
-            } catch (err) {
-              console.log('[comandosPersonalizados] Error al obtener variable de memoria:', err.message);
-              variableMap[v.key] = '';
-            }
-          } else {
-            variableMap[v.key] = v.value;
-          }
-        }
-
-        shellCommand = shellCommand.replace(/\{\{(.+?)\}\}/g, (match, key) => {
-          return key in variableMap ? variableMap[key] : match;
-        });
-      } catch (err) {
-        console.log('Error al resolver variables para comando personalizado:', err.message);
-      }
-    }
+    const { shellCommand, cwd } = await resolverComando(comando, sessionId);
 
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',

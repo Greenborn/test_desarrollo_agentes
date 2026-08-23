@@ -8,6 +8,8 @@ import {
   sendChatMessage,
   executeChatCommand,
   createChatSession,
+  listComandosPersonalizados,
+  ejecutarComandoPersonalizadoRemoto,
   getInterfazRemotaIoLog,
   subscribeIoEvents,
 } from './interfaz_remota.service.js';
@@ -125,6 +127,26 @@ router.post('/test/send-command', async (req, res) => {
 router.post('/test/crear-sesion', async (req, res) => {
   if (!authGuard(req, res)) return;
   const result = await createChatSession(req.body || {});
+  if (!result.success) {
+    res.status(400).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+router.post('/test/list-comandos', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const result = await listComandosPersonalizados(req.body || {});
+  if (!result.success) {
+    res.status(400).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+router.post('/test/ejecutar-comando', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  const result = await ejecutarComandoPersonalizadoRemoto(req.body || {});
   if (!result.success) {
     res.status(400).json(result);
     return;
