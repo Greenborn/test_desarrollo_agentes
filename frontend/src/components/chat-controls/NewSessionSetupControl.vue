@@ -14,6 +14,13 @@
         <option value="" disabled>{{ projectsLoading ? 'Cargando proyectos...' : (workspaceId ? 'Selecciona proyecto...' : 'Primero selecciona un espacio de trabajo') }}</option>
         <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ p.id }} — {{ p.descripcion || '' }}</option>
       </select>
+      <button
+        class="btn btn-sm btn-outline-secondary align-self-end"
+        :disabled="!workspaceId"
+        @click="abrirCrearProyecto"
+      >
+        + Crear proyecto en Redmine
+      </button>
     </div>
 
     <div class="d-flex flex-column gap-2">
@@ -34,6 +41,7 @@
 
 <script>
 import { ref, computed, watch } from 'vue'
+import { useModal } from 'vue-greenborn-modal-manager'
 
 export default {
   props: {
@@ -102,7 +110,29 @@ export default {
       })
     }
 
-    return { workspaceId, proyectoId, ticketId, projects, tickets, projectsLoading, ticketsLoading, error, canConfirm, onWorkspaceChange, onProjectChange, confirm }
+    async function abrirCrearProyecto() {
+      if (!workspaceId.value) return
+      try {
+        const { default: CrearProyectoRedmineModal } = await import('../modals/CrearProyectoRedmineModal.vue')
+        const { mostrar_modal } = useModal()
+        mostrar_modal(CrearProyectoRedmineModal, 'Crear proyecto en Redmine', {
+          workspaceId: workspaceId.value,
+          onCreated: handleProjectCreated,
+        })
+      } catch (err) {
+        console.log('Error al abrir el modal de crear proyecto:', err)
+        error.value = 'Error al abrir el modal: ' + err.message
+      }
+    }
+
+    async function handleProjectCreated(proyecto) {
+      await onWorkspaceChange()
+      if (proyecto && proyecto.id) {
+        proyectoId.value = String(proyecto.id)
+      }
+    }
+
+    return { workspaceId, proyectoId, ticketId, projects, tickets, projectsLoading, ticketsLoading, error, canConfirm, onWorkspaceChange, onProjectChange, confirm, abrirCrearProyecto }
   },
 }
 </script>

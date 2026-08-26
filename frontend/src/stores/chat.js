@@ -943,42 +943,52 @@ export const useChatStore = defineStore('chat', () => {
 
   async function limpiarSesion(sessionId) {
     if (!sessionId) return
+    // La limpieza del estado local en memoria no debe depender de que el backend
+    // responda ok: aunque el endpoint falle (p. ej. 500 al cerrar servicios) o se
+    // cuelgue, la UI tiene que vaciarse igualmente. El error del backend se registra
+    // para no ocultarlo, pero no bloquea el borrado en pantalla.
     try {
       const res = await fetch(`${API}/chat/sessions/${sessionId}/limpiar`, {
         method: 'POST',
         credentials: 'include',
       })
       if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData.error || 'Error al limpiar sesión')
-      }
-      if (Number(activeSessionId.value) === Number(sessionId)) {
-        messages.value = []
-        currentChunk.value = ''
-        currentThinking.value = ''
-      }
-      delete _terminalSessions.value[sessionId]
-      delete _streamingSessions.value[sessionId]
-      delete _ocStreamingSessions.value[sessionId]
-      delete _sessionStreamCache.value[sessionId]
-      delete _ocSessionStreamCache.value[sessionId]
-      delete _cmdStreamingSessions.value[sessionId]
-      delete _cmdSessionStreamCache.value[sessionId]
-      delete _cmdPendingSave.value[sessionId]
-      delete _sessionCmdCount.value[sessionId]
-      delete pendingNotifications.value[sessionId]
-      delete sessionTickets.value[sessionId]
-      try {
-        const { useOpencodeStore } = await import('./opencode.js')
-        const ocStore = useOpencodeStore()
-        if (ocStore.sessionsMap[String(sessionId)]) {
-          delete ocStore.sessionsMap[String(sessionId)]
+        let errMsg = `HTTP ${res.status}`
+        try {
+          const errData = await res.json()
+          errMsg = errData.error || errMsg
+        } catch (e) {
+          console.error('Error al parsear respuesta de limpiar sesión:', e.message)
         }
-      } catch (e) {
-        console.error('Error limpiando opencode al limpiar sesión:', e.message)
+        console.error('Error al limpiar sesión en backend:', errMsg)
       }
     } catch (err) {
-      console.error('Error al limpiar sesión:', err)
+      console.error('Error al llamar al backend al limpiar sesión:', err.message)
+    }
+    if (Number(activeSessionId.value) === Number(sessionId)) {
+      messages.value = []
+      currentChunk.value = ''
+      currentThinking.value = ''
+    }
+    delete _terminalSessions.value[sessionId]
+    delete _streamingSessions.value[sessionId]
+    delete _ocStreamingSessions.value[sessionId]
+    delete _sessionStreamCache.value[sessionId]
+    delete _ocSessionStreamCache.value[sessionId]
+    delete _cmdStreamingSessions.value[sessionId]
+    delete _cmdSessionStreamCache.value[sessionId]
+    delete _cmdPendingSave.value[sessionId]
+    delete _sessionCmdCount.value[sessionId]
+    delete pendingNotifications.value[sessionId]
+    delete sessionTickets.value[sessionId]
+    try {
+      const { useOpencodeStore } = await import('./opencode.js')
+      const ocStore = useOpencodeStore()
+      if (ocStore.sessionsMap[String(sessionId)]) {
+        delete ocStore.sessionsMap[String(sessionId)]
+      }
+    } catch (e) {
+      console.error('Error limpiando opencode al limpiar sesión:', e.message)
     }
   }
 

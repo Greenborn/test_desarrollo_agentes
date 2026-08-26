@@ -4,6 +4,8 @@ import { useOpencodeStreaming } from '../useOpencodeStreaming.js'
 
 const { register } = useCommandRegistry()
 
+const runningBySession = {}
+
 register({
   name: '/dev_generar_commit',
   category: 'Desarrollo',
@@ -16,7 +18,27 @@ register({
     }
 
     const chat = useChatStore()
+    const sessionKey = String(sessionId)
 
+    if (runningBySession[sessionKey]) {
+      chat.pushMessage({
+        role: 'result',
+        content: '⚠️ Ya hay un proceso de /dev_generar_commit en curso en esta sesión. Esperá a que finalice antes de ejecutarlo de nuevo.',
+        _key: 'duplicate-' + Date.now(),
+      }, sessionId)
+      return
+    }
+    runningBySession[sessionKey] = true
+
+    try {
+      await _runCommit(sessionId, chat)
+    } finally {
+      delete runningBySession[sessionKey]
+    }
+  },
+})
+
+async function _runCommit(sessionId, chat) {
     chat.pushMessage({
       role: 'result',
       content: '🔄 Obteniendo cambios de Git...',
@@ -81,5 +103,5 @@ register({
 
     const { deepseekStreamCommit } = useOpencodeStreaming()
     await deepseekStreamCommit(sessionId, prompt, systemPrompt)
-  },
-})
+  }
+

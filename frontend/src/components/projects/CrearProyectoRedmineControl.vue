@@ -74,7 +74,7 @@
       <label class="form-check-label small" for="publicSwitch">Proyecto público</label>
     </div>
 
-    <div class="form-check form-switch mb-3">
+    <div v-if="!ocultarAsignarSesion" class="form-check form-switch mb-3">
       <input
         class="form-check-input"
         type="checkbox"
@@ -104,6 +104,7 @@ import { ref, reactive, onMounted } from 'vue'
 export default {
   props: {
     prefill: { type: Object, default: () => ({ nombre: '', descripcion: '', workspaceId: null }) },
+    ocultarAsignarSesion: { type: Boolean, default: false },
   },
   emits: ['confirm'],
   setup(props, { emit }) {

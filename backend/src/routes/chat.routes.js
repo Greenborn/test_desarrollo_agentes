@@ -410,13 +410,23 @@ function closeTerminalsByChatSession(chatSessionId) {
       headers: { 'Content-Type': 'application/json', 'X-API-Key': PROCESOS_API_KEY },
     };
 
+    const timer = setTimeout(() => {
+      proxyReq.destroy();
+      console.log('[limpiar_sesion] Timeout cerrando terminales');
+      resolve(null);
+    }, 5000);
+
     const proxyReq = http.request(options, (proxyRes) => {
       let data = '';
       proxyRes.on('data', (chunk) => { data += chunk; });
-      proxyRes.on('end', () => resolve(data));
+      proxyRes.on('end', () => {
+        clearTimeout(timer);
+        resolve(data);
+      });
     });
 
     proxyReq.on('error', (err) => {
+      clearTimeout(timer);
       console.log('[limpiar_sesion] Error cerrando terminales:', err.message);
       resolve(null);
     });
@@ -432,8 +442,16 @@ router.post('/sessions/:id/limpiar', async (req, res) => {
     if (!session) return res.status(404).json({ error: 'Sesión no encontrada' });
 
     await dbChatMessages('chat_messages').where({ session_id: sessionId }).del();
-    await closeTerminalsByChatSession(sessionId);
-    opencode.stopServer(sessionId);
+    try {
+      await closeTerminalsByChatSession(sessionId);
+    } catch (err) {
+      console.log('[limpiar_sesion] Error cerrando terminales:', err.message);
+    }
+    try {
+      opencode.stopServer(sessionId);
+    } catch (err) {
+      console.log('[limpiar_sesion] Error deteniendo servidor OpenCode:', err.message);
+    }
 
     res.json({ success: true, sessionId });
   } catch (err) {

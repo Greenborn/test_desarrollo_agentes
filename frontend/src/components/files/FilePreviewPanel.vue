@@ -306,7 +306,7 @@ export default {
     })
 
     const codeExtensions = computed(() => {
-      const raw = settings.codeFileExtensions || '.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql,.json'
+      const raw = settings.codeFileExtensions || '.js,.jsx,.ts,.tsx,.vue,.py,.php,.java,.rb,.go,.rs,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.scala,.sh,.bash,.pl,.lua,.r,.m,.mm,.css,.scss,.less,.sass,.html,.sql,.json,.gitignore'
       return raw.split(',').map(e => e.trim().replace(/^\./, '').toLowerCase()).filter(Boolean)
     })
 

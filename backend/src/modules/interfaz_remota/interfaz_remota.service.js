@@ -932,7 +932,13 @@ export function connectInterfazRemotaWs(gestionUrl, token) {
   socket.on('interfaz-remota:listComandos', makeRemotaHandler((body) => listComandosPersonalizados(body)));
   socket.on('interfaz-remota:ejecutarComando', makeStreamingHandler((body, emit) => ejecutarComandoPersonalizadoRemotoStreaming(body, emit), emitRemoto));
 
-  socket.on('interfaz-remota:terminal:create', makeRemotaHandler((body) => createRemoteTerminal({ ...body, emit: emitRemoto })));
+  socket.on('interfaz-remota:terminal:create', makeRemotaHandler((body) => {
+    console.log('[interfaz_remota] terminal:create recibido:', JSON.stringify({ chatSessionId: body.chatSessionId, cwd: body.cwd, cmd: body.cmd ? '(set)' : null }));
+    const t0 = Date.now();
+    const resp = createRemoteTerminal({ ...body, emit: emitRemoto });
+    console.log(`[interfaz_remota] terminal:create respondido en ${Date.now() - t0} ms:`, JSON.stringify(resp).slice(0, 160));
+    return resp;
+  }));
   socket.on('interfaz-remota:terminal:input', makeRemotaHandler((body) => writeRemoteTerminal(body)));
   socket.on('interfaz-remota:terminal:resize', makeRemotaHandler((body) => resizeRemoteTerminal(body)));
   socket.on('interfaz-remota:terminal:close', makeRemotaHandler((body) => closeRemoteTerminal(body)));
