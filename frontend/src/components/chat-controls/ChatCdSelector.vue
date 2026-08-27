@@ -7,7 +7,15 @@
 
     <div v-if="loading" class="text-center py-2" style="color: #9ca3af;">Cargando...</div>
 
-    <div v-else class="d-flex flex-column gap-1" style="max-height: 200px; overflow-y: auto;">
+    <input
+      v-else
+      v-model="filterText"
+      type="text"
+      class="form-control form-control-sm bg-dark text-light border-secondary font-monospace"
+      placeholder="Filtrar por nombre..."
+    />
+
+    <div v-if="!loading" class="d-flex flex-column gap-1" style="max-height: 200px; overflow-y: auto;">
       <div
         v-if="canGoUp"
         class="d-flex align-items-center gap-2 px-2 py-1 rounded"
@@ -20,7 +28,7 @@
         <span>..</span>
       </div>
       <div
-        v-for="dir in directories"
+        v-for="dir in filteredDirectories"
         :key="dir.fullPath"
         class="d-flex align-items-center gap-2 px-2 py-1 rounded"
         :style="{ cursor: 'pointer', color: '#e0e0e0', background: dir.fullPath === hoveredDir ? '#1a2744' : 'transparent' }"
@@ -31,7 +39,7 @@
         <span style="color: #75AADB;">📁</span>
         <span>{{ dir.name }}/</span>
       </div>
-      <div v-if="directories.length === 0 && !canGoUp && !loading" class="text-center py-2" style="color: #9ca3af;">
+      <div v-if="filteredDirectories.length === 0 && !canGoUp && !loading" class="text-center py-2" style="color: #9ca3af;">
         (directorio vacío)
       </div>
     </div>
@@ -72,8 +80,15 @@ export default {
     const manualPath = ref('')
     const error = ref('')
     const hoveredDir = ref('')
+    const filterText = ref('')
 
     const canGoUp = computed(() => currentPath.value !== '/' && currentPath.value !== '')
+
+    const filteredDirectories = computed(() => {
+      const q = filterText.value.trim().toLowerCase()
+      if (!q) return directories.value
+      return directories.value.filter((d) => d.name.toLowerCase().includes(q))
+    })
 
     async function fetchDirectories() {
       loading.value = true
@@ -102,6 +117,7 @@ export default {
     function navigate(fullPath) {
       currentPath.value = fullPath
       manualPath.value = ''
+      filterText.value = ''
       error.value = ''
       fetchDirectories()
     }
@@ -111,6 +127,7 @@ export default {
       parts.pop()
       currentPath.value = parts.length ? '/' + parts.join('/') : '/'
       manualPath.value = ''
+      filterText.value = ''
       error.value = ''
       fetchDirectories()
     }
@@ -122,7 +139,7 @@ export default {
 
     onMounted(fetchDirectories)
 
-    return { currentPath, directories, loading, manualPath, error, canGoUp, hoveredDir, navigate, goUp, selectPath }
+    return { currentPath, directories, loading, manualPath, error, canGoUp, hoveredDir, filterText, filteredDirectories, navigate, goUp, selectPath }
   },
 }
 </script>
