@@ -31,6 +31,11 @@
       </select>
     </div>
 
+    <div class="d-flex flex-column gap-2">
+      <label class="small text-muted mb-0">4. Directorio de trabajo <span class="text-danger">*</span></label>
+      <ChatCdSelector :current-dir="currentDir" @confirm="onDirSelected" />
+    </div>
+
     <div v-if="error" class="small" style="color: #ef4444;">{{ error }}</div>
 
     <button class="btn btn-sm btn-success align-self-end" :disabled="!canConfirm" @click="confirm()">
@@ -42,24 +47,27 @@
 <script>
 import { ref, computed, watch } from 'vue'
 import { useModal } from 'vue-greenborn-modal-manager'
+import ChatCdSelector from './ChatCdSelector.vue'
 
 export default {
   props: {
     workspaces: { type: Array, default: () => [] },
     preselect: { type: String, default: '' },
+    currentDir: { type: String, default: '/' },
   },
   emits: ['confirm'],
   setup(props, { emit }) {
     const workspaceId = ref(props.preselect || '')
     const proyectoId = ref('')
     const ticketId = ref('')
+    const selectedCwd = ref('')
     const projects = ref([])
     const tickets = ref([])
     const projectsLoading = ref(false)
     const ticketsLoading = ref(false)
     const error = ref('')
 
-    const canConfirm = computed(() => !!workspaceId.value && !!proyectoId.value)
+    const canConfirm = computed(() => !!workspaceId.value && !!proyectoId.value && !!selectedCwd.value)
 
     watch(workspaceId, onWorkspaceChange, { immediate: true })
 
@@ -101,12 +109,17 @@ export default {
       }
     }
 
+    function onDirSelected(path) {
+      selectedCwd.value = path || ''
+    }
+
     function confirm() {
       if (!canConfirm.value) return
       emit('confirm', {
         workspaceId: workspaceId.value,
         proyectoId: proyectoId.value,
         idTicketRedmine: ticketId.value ? String(ticketId.value) : null,
+        cwd: selectedCwd.value,
       })
     }
 
@@ -132,7 +145,7 @@ export default {
       }
     }
 
-    return { workspaceId, proyectoId, ticketId, projects, tickets, projectsLoading, ticketsLoading, error, canConfirm, onWorkspaceChange, onProjectChange, confirm, abrirCrearProyecto }
+    return { workspaceId, proyectoId, ticketId, selectedCwd, projects, tickets, projectsLoading, ticketsLoading, error, canConfirm, onWorkspaceChange, onProjectChange, onDirSelected, confirm, abrirCrearProyecto }
   },
 }
 </script>

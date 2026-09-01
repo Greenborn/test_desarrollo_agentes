@@ -1,7 +1,7 @@
 <template>
   <div class="d-flex flex-column h-100 overflow-x-hidden" @click="closeCtxMenu">
     <div class="d-flex flex-column flex-grow-1 overflow-hidden" style="min-height: 0;" :style="{ display: (ocMaximized && isOcSessionActive) ? 'none' : '' }">
-      <div class="flex-grow-1 overflow-y-auto" ref="messagesContainer" style="min-height: 0;" :style="{ fontSize: gitStore.chatZoom + '%' }">
+      <div class="flex-grow-1 overflow-y-auto" ref="messagesContainer" style="min-height: 0; overscroll-behavior: contain;" :style="{ fontSize: gitStore.chatZoom + '%' }">
         <div v-if="!activeSessionId" class="text-center text-muted mt-5">
           <h5 class="text-white">Selecciona o crea un nuevo chat</h5>
         </div>

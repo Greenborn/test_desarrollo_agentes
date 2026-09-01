@@ -163,8 +163,7 @@ CREATE TABLE settings (
 | `chat:sessions` | C → S | Listar sesiones del usuario |
 | `chat:sessions_res` | S → C | Lista de sesiones ordenadas por updated_at DESC |
 | `chat:create` | C → S | Crear nueva sesión |
-| `chat:create_res` | S → C | Sesión creada |
-| `chat:load` | C → S | Cargar mensajes de una sesión |
+| `chat:create_res` | S → C | Sesión creada || `chat:load` | C → S | Cargar mensajes de una sesión |
 | `chat:load_res` | S → C | Mensajes de la sesión |
 | `chat:send` | C → S | Enviar mensaje a DeepSeek |
 | `chat:chunk` | S → C | Fragmento de thinking o response (streaming) |
@@ -221,6 +220,17 @@ CREATE TABLE settings (
 1. **Login** (`/`) — formulario usuario/contraseña, redirige a dashboard si hay sesión
 2. **Dashboard** (`/dashboard`) — sidebar con historial de sesiones + ventana de chat
 3. **Settings** (`/settings`) — formulario para API Key DeepSeek y system prompt del agente
+
+### Configuración de nueva sesión
+
+Al pulsar **"＋ Nuevo chat"** se crea la sesión y se muestra un panel de configuración (`NewSessionSetupControl.vue`) en la ventana de chat con los siguientes campos (obligatorios marcados con `*`):
+
+1. **Espacio de trabajo `*`** — selector de workspace
+2. **Proyecto `*`** — selector de proyectos del workspace (con opción "＋ Crear proyecto en Redmine")
+3. **Ticket** (opcional) — selector de tickets del proyecto
+4. **Directorio de trabajo `*`** — selector de directorios (`ChatCdSelector.vue`), reutiliza el mismo componente del comando `/cd`
+
+El botón **Confirmar** se habilita solo cuando workspace, proyecto y directorio están seleccionados. Al confirmar, se asigna workspace/proyecto/ticket a la sesión y se aplica el directorio reutilizando el mecanismo `/cd` (`POST /api/command/execute` con `command: "/cd <ruta>"`).
 
 ### Stores (Pinia)
 

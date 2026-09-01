@@ -2255,16 +2255,17 @@ export function useControlHandlers(api) {
   }
 
   async function handleNewSessionSetup(controlId, value, controlMsg) {
-    if (!value || !value.workspaceId || !value.proyectoId) {
+    if (!value || !value.workspaceId || !value.proyectoId || !value.cwd) {
       const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
       if (idx >= 0) {
-        chat.messages[idx] = { role: 'result', content: 'Workspace y proyecto son obligatorios.', _key: 'err-' + Date.now() }
+        chat.messages[idx] = { role: 'result', content: 'Workspace, proyecto y directorio de trabajo son obligatorios.', _key: 'err-' + Date.now() }
       }
       return
     }
     const workspaceId = parseInt(value.workspaceId, 10)
     const proyectoId = value.proyectoId
     const idTicketRedmine = value.idTicketRedmine ? parseInt(value.idTicketRedmine, 10) : null
+    const cwd = value.cwd
     chat.suppressWorkspaceReset = true
     try {
       const res = await fetch(`/api/chat/sessions/${chat.activeSessionId}/workspace`, {
@@ -2316,9 +2317,30 @@ export function useControlHandlers(api) {
         await loadTicketInfo()
       }
 
+      let cwdResult = cwd
+      try {
+        const cmdRes = await fetch('/api/command/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ command: `/cd ${cwd}`, sessionId: chat.activeSessionId }),
+        })
+        const cmdData = await cmdRes.json()
+        if (cmdData.success) {
+          cwdResult = cmdData.result
+          cmdStore.currentDir = cmdData.result
+          const session = chat.sessions.find(s => Number(s.id) === Number(chat.activeSessionId))
+          if (session) session.cwd = cmdData.result
+        } else {
+          console.log('No se pudo aplicar el directorio de la sesión:', cmdData.result || 'error desconocido')
+        }
+      } catch (cmdErr) {
+        console.error('Error al aplicar el directorio de la sesión:', cmdErr)
+      }
+
       const idx = chat.messages.findIndex(m => m.controlData && m.controlData.controlId === controlId)
       if (idx >= 0) {
-        const resumen = `Workspace #${workspaceId} · Proyecto "${proyectoId}"` + (idTicketRedmine ? ` · Ticket #${idTicketRedmine}` : ' · Sin ticket')
+        const resumen = `Workspace #${workspaceId} · Proyecto "${proyectoId}"` + (idTicketRedmine ? ` · Ticket #${idTicketRedmine}` : ' · Sin ticket') + ` · Directorio "${cwdResult}"`
         chat.messages[idx] = { role: 'opencode_confirmed', content: resumen, _key: 'confirmed-' + Date.now() }
       }
     } catch (err) {

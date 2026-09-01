@@ -122,11 +122,14 @@ export function useChatVirtualScroll(messages, { windowSize = 30, overscan = 5 }
       return
     }
     isNearBottom.value = el.scrollTop + el.clientHeight >= el.scrollHeight - 200
-    if (isNearBottom.value) {
-      startIdx.value = Math.max(0, len - windowSize)
-      endIdx.value = len
-      return
-    }
+    // La ventana se calcula siempre de forma continua a partir de la posición
+    // real de scroll. Antes existía una rama que forzaba la ventana a los
+    // últimos `windowSize` mensajes al estar cerca del fondo; ese salto
+    // discontinuo de `startIdx` cambiaba la altura de `topPad` (y por tanto
+    // `scrollHeight`), lo que invertía la evaluación de `isNearBottom` en el
+    // siguiente tick del wheel y producía un bucle de oscilación (vibración)
+    // al llegar al final. El auto-scroll al fondo durante streaming lo siguen
+    // haciendo `scrollToBottom()` y el watch de longitud, no este onScroll.
     const i = indexFromScroll(el.scrollTop)
     const count = visibleCountForViewport(el.clientHeight)
     startIdx.value = Math.max(0, i - overscan)

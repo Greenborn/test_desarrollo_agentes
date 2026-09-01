@@ -65,6 +65,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   })
   let _nextTerminalKey = 1
+  const _terminalRestorePromises = {}
 
   function _genTerminalKey() {
     return _nextTerminalKey++
@@ -231,6 +232,47 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  // Restaura las terminales vivas de una sesión desde api_procesos_consola.
+  // Se usa al recargar el front (F5) y al cambiar de sesión: los PTY siguen
+  // vivos en el backend, solo se había perdido el estado de UI del store.
+  async function restoreTerminals(sid) {
+    if (!sid) return
+    // Ya restauradas (o abiertas por el usuario): no tocar.
+    if (_terminalSessions.value[sid] && _terminalSessions.value[sid].length > 0) return
+    // Evita fetches en paralelo duplicados para la misma sesión.
+    if (_terminalRestorePromises[sid]) return _terminalRestorePromises[sid]
+    _terminalRestorePromises[sid] = (async () => {
+      try {
+        const res = await fetch(`${API}/procesos/terminal?chatSessionId=${sid}`, { credentials: 'include' })
+        if (!res.ok) {
+          console.error('Error al restaurar terminales, status', res.status)
+          return
+        }
+        const list = await res.json()
+        if (!Array.isArray(list) || list.length === 0) return
+        const existing = _terminalSessions.value[sid] || []
+        const existingIds = new Set(existing.map(t => t.terminalId).filter(Boolean))
+        const additions = list
+          .filter(t => t.terminalId && !existingIds.has(t.terminalId))
+          .map(t => ({
+            _key: _genTerminalKey(),
+            terminalId: t.terminalId,
+            cwd: t.cwd || '',
+            initCommand: t.cmd || '',
+            label: t.cmd || 'terminal',
+          }))
+        if (additions.length === 0) return
+        _terminalSessions.value[sid] = [...existing, ...additions]
+        flashLed(sid)
+      } catch (err) {
+        console.error('Error al restaurar terminales de la sesión', sid, ':', err)
+      } finally {
+        delete _terminalRestorePromises[sid]
+      }
+    })()
+    return _terminalRestorePromises[sid]
+  }
+
   const streaming = computed(() => {
     const sid = activeSessionId.value
     return sid ? !!_streamingSessions.value[sid] || !!_ocStreamingSessions.value[sid] : false
@@ -312,6 +354,7 @@ export const useChatStore = defineStore('chat', () => {
       id: w.id,
       name: w.name,
     }))
+    const currentDir = session.cwd || '/'
     if (wsOptions.length > 0) {
       pushMessage({
         role: 'opencode_control',
@@ -322,6 +365,7 @@ export const useChatStore = defineStore('chat', () => {
           question: 'Configura la nueva sesión:',
           workspaces: wsOptions,
           preselect: String(session.workspace_id || wsOptions[0]?.id || ''),
+          currentDir,
         },
         _key: 'ctrl-setup-ws-' + Date.now(),
       })
@@ -1289,8 +1333,9 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  watch(activeSessionId, () => {
+  watch(activeSessionId, (sid) => {
     saveUiState()
+    if (sid) restoreTerminals(sid)
   })
 
   return {
@@ -1313,6 +1358,7 @@ export const useChatStore = defineStore('chat', () => {
     suppressWorkspaceReset,
     _terminalSessions, _terminalSessionId, terminalCwd, terminalInitCommand, terminalLabel, terminalId,
     _hasTerminal, openTerminal, closeTerminal, getTerminalCount, getTerminalSlotUsage, canCreateTerminal, getTerminals,
+    restoreTerminals,
     getTotalConcurrentSlots, maxTerminalsLimit,
     saveUiState, getSessionPrefs, saveSessionTabPref, saveSessionPref,
   }
