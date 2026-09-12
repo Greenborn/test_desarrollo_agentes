@@ -1057,6 +1057,60 @@ router.get('/package-json-scripts', async (req, res) => {
   }
 })
 
+async function scanBashScripts(baseDir) {
+  const results = []
+  let rootEntries
+  try {
+    rootEntries = await fsp.readdir(baseDir, { withFileTypes: true })
+  } catch (err) {
+    console.log('[command] Error al leer directorio raíz en scanBashScripts:', err.message)
+    return results
+  }
+  const subdirs = []
+  for (const entry of rootEntries) {
+    if (EXCLUDE_DIRS.has(entry.name)) continue
+    if (entry.isFile() && entry.name.endsWith('.sh')) {
+      results.push({ relativePath: '.', name: entry.name })
+    } else if (entry.isDirectory()) {
+      subdirs.push(entry.name)
+    }
+  }
+  async function scanSubdir(dirName) {
+    let entries
+    try {
+      entries = await fsp.readdir(path.join(baseDir, dirName), { withFileTypes: true })
+    } catch (err) {
+      console.log('[command] Error al leer subdirectorio en scanBashScripts:', err.message)
+      return
+    }
+    for (const entry of entries) {
+      if (EXCLUDE_DIRS.has(entry.name)) continue
+      if (entry.isFile() && entry.name.endsWith('.sh')) {
+        results.push({ relativePath: dirName, name: entry.name })
+      }
+    }
+  }
+  await Promise.all(subdirs.map(scanSubdir))
+  return results.sort((a, b) => (a.relativePath + '/' + a.name).localeCompare(b.relativePath + '/' + b.name))
+}
+
+router.get('/bash-scripts', async (req, res) => {
+  if (!authGuard(req, res)) return
+  try {
+    let cwd = process.cwd()
+    const sessionId = req.query.sessionId ? parseInt(req.query.sessionId) : null
+    if (sessionId) {
+      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first()
+      if (session && session.cwd) cwd = session.cwd
+    }
+    const scripts = await scanBashScripts(cwd)
+    res.json({ scripts })
+  } catch (err) {
+    console.log('Error al escanear scripts bash:', err.message)
+    res.json({ scripts: [] })
+  }
+})
+
 router.post('/execute-npm-script', async (req, res) => {
   if (!authGuard(req, res)) return
   const { sessionId, dir, scriptName } = req.body

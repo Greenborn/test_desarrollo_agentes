@@ -16,6 +16,12 @@
       </div>
       <span class="text-muted" style="font-size: 0.7rem;">Consultar scripts npm</span>
     </div>
+    <div class="d-flex align-items-center gap-2 mb-2 px-1">
+      <div class="form-check form-switch m-0">
+        <input class="form-check-input" type="checkbox" role="switch" :checked="bashEnabled" @change="onToggleBash($event)" />
+      </div>
+      <span class="text-muted" style="font-size: 0.7rem;">Consultar scripts bash</span>
+    </div>
 
     <template v-if="comandos.length > 0 || loadingComandos">
       <div v-if="loadingComandos" class="d-flex flex-column align-items-center justify-content-center text-secondary small py-2">
@@ -35,7 +41,18 @@
       <TableEditor v-else id="scripts" :data="scriptsData" :config="scriptsConfig" />
     </template>
 
-    <div v-if="comandos.length === 0 && scriptsRows.length === 0 && !loadingComandos && !loadingPackageScripts" class="d-flex flex-column align-items-center justify-content-center text-secondary small px-3 text-center py-3">
+    <template v-if="bashRows.length > 0 || loadingBashScripts">
+      <div class="section-divider d-flex align-items-center gap-2 my-2 px-1">
+        <span class="text-muted flex-shrink-0" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">Scripts bash</span>
+        <div class="flex-grow-1" style="height: 1px; background: #374151;"></div>
+      </div>
+      <div v-if="loadingBashScripts" class="d-flex align-items-center justify-content-center text-secondary small py-2">
+        <span>Cargando scripts bash…</span>
+      </div>
+      <TableEditor v-else id="bash-scripts" :data="bashData" :config="bashConfig" />
+    </template>
+
+    <div v-if="comandos.length === 0 && scriptsRows.length === 0 && bashRows.length === 0 && !loadingComandos && !loadingPackageScripts && !loadingBashScripts" class="d-flex flex-column align-items-center justify-content-center text-secondary small px-3 text-center py-3">
       <span>No hay comandos disponibles para este proyecto</span>
     </div>
   </div>
@@ -52,6 +69,7 @@ import { createPiniaPrefsAdapter } from '../../../components/TableEditor/prefere
 import wsClient from '../../../services/wsClient'
 
 const SCRIPTS_NS = 'scripts_cache'
+const BASH_SCRIPTS_NS = 'bash_scripts_cache'
 
 export default {
   components: { TableEditor },
@@ -82,8 +100,12 @@ export default {
     const packageScripts = ref([])
     const loadingPackageScripts = ref(false)
     const executingScripts = ref(new Map())
+    const bashScripts = ref([])
+    const loadingBashScripts = ref(false)
+    const executingBashScripts = ref(new Map())
 
     const scriptsEnabled = computed(() => !!chat.getSessionPrefs(activeSessionId.value)?.buscarScriptsNpm)
+    const bashEnabled = computed(() => !!chat.getSessionPrefs(activeSessionId.value)?.buscarScriptsBash)
 
     function onToggleScripts(e) {
       const sid = activeSessionId.value
@@ -94,6 +116,18 @@ export default {
         packageScripts.value = []
       } else {
         loadPackageScripts(true)
+      }
+    }
+
+    function onToggleBash(e) {
+      const sid = activeSessionId.value
+      if (!sid) return
+      const val = e.target.checked
+      chat.saveSessionPref(sid, 'buscarScriptsBash', val)
+      if (!val) {
+        bashScripts.value = []
+      } else {
+        loadBashScripts(true)
       }
     }
 
@@ -145,11 +179,53 @@ export default {
       }
     }
 
+    async function loadBashScripts(force = false) {
+      const sid = activeSessionId.value
+      if (!sid) {
+        bashScripts.value = []
+        return
+      }
+      const key = String(sid)
+      loadingBashScripts.value = true
+      try {
+        if (!force) {
+          try {
+            const mem = await wsClient.send('memoria:get', { namespace: BASH_SCRIPTS_NS, key })
+            if (mem.value) {
+              bashScripts.value = mem.value
+              return
+            }
+          } catch (err) {
+            console.log('[comandos] Caché de scripts bash no disponible, consultando backend:', err.message)
+          }
+        }
+        const res = await fetch(`/api/command/bash-scripts?sessionId=${sid}`, { credentials: 'include' })
+        if (res.ok) {
+          const data = await res.json()
+          const scripts = data.scripts || []
+          bashScripts.value = scripts
+          try {
+            await wsClient.send('memoria:set', { namespace: BASH_SCRIPTS_NS, key, value: scripts })
+          } catch (err) {
+            console.log('[comandos] Error al guardar caché de scripts bash:', err.message)
+          }
+        } else {
+          bashScripts.value = []
+        }
+      } catch (err) {
+        console.error('Error al cargar scripts bash:', err)
+        bashScripts.value = []
+      } finally {
+        loadingBashScripts.value = false
+      }
+    }
+
     function recargar() {
       const pid = proyectoId.value
       const sid = activeSessionId.value
       if (pid) comandosStore.loadCommands(pid, { force: true })
       if (sid && scriptsEnabled.value) loadPackageScripts(true)
+      if (sid && bashEnabled.value) loadBashScripts(true)
     }
 
     function checkTerminalSlot(sid) {
@@ -340,6 +416,88 @@ export default {
       }
     }
 
+    async function ejecutarBashScript(scriptPath) {
+      const sid = activeSessionId.value
+      if (!sid || executingBashScripts.value.has(scriptPath)) return
+      if (!checkTerminalSlot(sid)) return
+      const projectCwd = activeSession.value?.cwd || undefined
+      const abortController = new AbortController()
+      executingBashScripts.value.set(scriptPath, { abortController, terminalId: null })
+      const streamKey = 'stream-bash-' + Date.now()
+      const isActive = () => Number(chat.activeSessionId) === Number(sid)
+      chat.setCmdStreaming(sid, true)
+      chat.updateCmdStreamCache(sid, '', streamKey)
+      if (isActive()) {
+        chat.messages.push({ role: 'result', content: '⏳ Ejecutando bash ' + scriptPath + '...', _key: streamKey })
+        chat.flashLed(sid)
+      }
+      chat.setSessionStatus(sid, 'executing')
+      const done = () => {
+        executingBashScripts.value.delete(scriptPath)
+        chat.setSessionStatus(sid, 'idle')
+      }
+      try {
+        if (isActive()) _updateStreamMsg(streamKey, '⏳ Creando terminal...')
+        chat.updateCmdStreamCache(sid, '⏳ Creando terminal...')
+        const procRes = await fetch('/api/procesos/terminal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            chatSessionId: sid,
+            cwd: projectCwd,
+            cmd: 'bash ' + scriptPath,
+          }),
+          signal: abortController.signal,
+        })
+        if (!procRes.ok) {
+          const errData = await procRes.json()
+          throw new Error(errData.error || 'Error al crear terminal para script bash')
+        }
+        const { terminalId } = await procRes.json()
+        const entry = executingBashScripts.value.get(scriptPath)
+        if (entry) entry.terminalId = terminalId
+        chat.openTerminal({
+          sessionId: sid,
+          terminalId,
+          cwd: projectCwd,
+          initCommand: 'bash ' + scriptPath,
+          label: 'bash ' + scriptPath,
+        })
+        chat.registerCmdPendingSave(sid, {
+          commandLabel: 'bash ' + scriptPath,
+          ocultarEjecucion: false,
+          streamKey,
+        })
+        if (isActive()) _updateStreamMsg(streamKey, '⏳ Ejecutando en terminal...')
+        chat.updateCmdStreamCache(sid, '⏳ Ejecutando en terminal...')
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          if (isActive()) _updateStreamMsg(streamKey, '(ejecución detenida)')
+        } else {
+          console.error('Error ejecutando script bash:', err)
+          chat.setSessionStatus(sid, 'error')
+          if (isActive()) _updateStreamMsg(streamKey, 'Error: ' + err.message)
+        }
+        chat.setCmdStreaming(sid, false)
+        chat.clearCmdStreamCache(sid)
+      } finally {
+        done()
+      }
+    }
+
+    function detenerBashScript(scriptPath) {
+      const entry = executingBashScripts.value.get(scriptPath)
+      if (entry) {
+        entry.abortController.abort()
+        if (entry.terminalId) {
+          fetch(`/api/procesos/terminal/${entry.terminalId}`, {
+            method: 'DELETE', credentials: 'include',
+          }).catch(() => {})
+        }
+      }
+    }
+
     function crearComando() {
       const sid = activeSessionId.value
       if (!sid || !proyectoId.value) return
@@ -496,16 +654,52 @@ export default {
       },
     }))
 
+    const bashRows = computed(() => {
+      return (bashScripts.value || []).map(s => ({
+        name: s.name,
+        path: s.relativePath,
+        _scriptPath: s.relativePath === '.' ? s.name : s.relativePath + '/' + s.name,
+      }))
+    })
+
+    const bashData = computed(() => ({
+      fields_def: [
+        { field: 'name', headerName: 'Script', sortable: true },
+        { field: 'path', headerName: 'Ruta', sortable: true },
+      ],
+      rows: bashRows.value,
+    }))
+
+    const bashConfig = computed(() => ({
+      hideToolbarEnd: true,
+      hideRefresh: true,
+      hideCsvExport: true,
+      showPaginator: false,
+      selectionMode: 'single',
+      rowActionsMode: 'toolbar',
+      preferencesStore: createPiniaPrefsAdapter(),
+      buttons: {
+        rowActions: [
+          new BtnConfig({ key: 'ejecutar', severity: 'btn-outline-success', label: 'Ejecutar', onClick: (row) => ejecutarBashScript(row._scriptPath) }),
+          new BtnConfig({ key: 'detener', severity: 'btn-outline-warning', label: 'Detener', onClick: (row) => detenerBashScript(row._scriptPath) }),
+        ],
+      },
+    }))
+
     watch([proyectoId, activeSessionId], () => {
       const pid = proyectoId.value
       const sid = activeSessionId.value
       if (!pid) {
         comandosStore.clearCommands()
-        if (!sid) packageScripts.value = []
+        if (!sid) {
+          packageScripts.value = []
+          bashScripts.value = []
+        }
         return
       }
       comandosStore.loadCommands(pid)
       if (sid && scriptsEnabled.value) loadPackageScripts()
+      if (sid && bashEnabled.value) loadBashScripts()
     }, { immediate: true })
 
     return {
@@ -514,13 +708,19 @@ export default {
       comandos,
       loadingComandos,
       loadingPackageScripts,
+      loadingBashScripts,
       scriptsRows,
+      bashRows,
       commandsData,
       commandsConfig,
       scriptsData,
       scriptsConfig,
+      bashData,
+      bashConfig,
       scriptsEnabled,
+      bashEnabled,
       onToggleScripts,
+      onToggleBash,
       crearComando,
       recargar,
     }

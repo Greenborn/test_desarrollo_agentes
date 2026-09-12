@@ -529,6 +529,18 @@ SGI conectado, así que la salida del PTY solo se registra en consola (no se tra
 - **Respuesta 404:** `{ success: false, error: "La ruta '...' no existe" }`
 - **Respuesta 409:** `{ success: false, error: "Ya existe una ruta con el nombre '...'" }`
 
+### `GET /api/command/package-json-scripts`
+- **Auth:** Requerida
+- **Query:** `?sessionId=<chatSessionId>` (opcional — resuelve el `cwd` desde `chat_sessions`; si no, usa `process.cwd()`)
+- **Descripción:** Escanea el proyecto (hasta 3 niveles de profundidad, excluyendo `node_modules`, `.git`, `.opencode`, `vendor`, `.cache`, `dist`, `build`) buscando `package.json` con scripts.
+- **Respuesta:** `{ packages: [{ relativePath: string, scripts: [{ name: string, command: string }] }] }`
+
+### `GET /api/command/bash-scripts`
+- **Auth:** Requerida
+- **Query:** `?sessionId=<chatSessionId>` (opcional — resuelve el `cwd` desde `chat_sessions`; si no, usa `process.cwd()`)
+- **Descripción:** Escanea **solo el directorio raíz y el primer subdirectorio** del proyecto (excluyendo `node_modules`, `.git`, `.opencode`, `vendor`, `.cache`, `dist`, `build`) buscando archivos `*.sh`.
+- **Respuesta:** `{ scripts: [{ relativePath: string, name: string }] }` — `relativePath` es `'.'` para la raíz o el nombre del subdirectorio.
+
 ---
 
 ## OpenCode (`/api/opencode`)
