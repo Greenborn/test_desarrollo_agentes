@@ -1345,7 +1345,7 @@ export const useChatStore = defineStore('chat', () => {
     loadSessions, loadArchivedSessions, archiveSession, unarchiveSession,
     createSession, createSessionIfNeeded, runCommand, loadMessages, loadMoreMessages,
     loadingMore, hasMoreMessages,
-    sendMessage, deleteMessage, deleteSession, cloneSession, clearMessages, stopAllExecutions,
+    sendMessage, deleteMessage, deleteSession, cloneSession, clearMessages, limpiarSesion, stopAllExecutions,
     pushMessage, updateMessageByKey, updateMessageAt, spliceMessages, findMessageIndex, setSessionStatus,
     replaceControlMessage,
     setOcStreaming, getIsOcStreaming, updateOcStreamCache, clearOcStreamCache,

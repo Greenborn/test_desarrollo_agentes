@@ -6,6 +6,26 @@ import { useSettingsStore } from '../stores/settings.js'
 import { useProjectVariables } from './useProjectVariables.js'
 
 
+// Formatea el error de /api/chat/refine para mostrarlo como mensaje de chat.
+// Si el body de la respuesta del proveedor (DeepSeek/Ollama) es JSON, devuelve
+// JSON puro para que ChatFormatter lo renderice con JsonTreeView; si no,
+// texto plano con ⚠️.
+function formatCommitProviderError(errMessage) {
+  const match = typeof errMessage === 'string' ? errMessage.match(/^(\S+) API error (\d+): ([\s\S]*)$/) : null
+  if (match) {
+    try {
+      const body = JSON.parse(match[3])
+      if (body !== null && typeof body === 'object') {
+        return JSON.stringify({ error: 'Error al generar commit — ' + match[1] + ' API error ' + match[2], respuesta_api: body }, null, 2)
+      }
+    } catch (parseErr) {
+      console.log('[dev_generar_commit] Respuesta de error del proveedor no es JSON, se muestra como texto:', parseErr.message)
+    }
+  }
+  return '⚠️ Error al generar commit: ' + errMessage
+}
+
+
 export function useOpencodeStreaming() {
   const chat = useChatStore()
   const ocStore = useOpencodeStore()
@@ -488,7 +508,7 @@ export function useOpencodeStreaming() {
     })
   }
 
-  async function _callRefine(sessionId, text, systemPrompt) {
+  async function _callRefine(sessionId, text, systemPrompt, onProgress) {
     const res = await fetch('/api/chat/refine', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -517,6 +537,7 @@ export function useOpencodeStreaming() {
           const j = JSON.parse(t.slice(6))
           if (j.type === 'response') {
             result += j.content
+            if (onProgress) onProgress(result)
           } else if (j.type === 'error') {
             throw new Error(j.content)
           }
@@ -544,7 +565,16 @@ export function useOpencodeStreaming() {
         streamRef.content = 'Generando propuesta...'
       }
 
-      const generatedText = await _callRefine(sessionId, prompt, systemPrompt)
+      // Progreso parcial: muestra en vivo el texto generado por cada chunk
+      // (clave con Ollama local, que puede tardar minutos en completar).
+      const showPartial = (partial) => {
+        chat.updateOcStreamCache(sessionId, partial, null, streamMsg._key)
+        if (isActiveSession(sessionId) && streamRef) {
+          streamRef.content = partial
+        }
+      }
+
+      const generatedText = await _callRefine(sessionId, prompt, systemPrompt, showPartial)
 
       if (!generatedText || generatedText.trim().length === 0) {
         throw new Error('No se generó propuesta de commit')
@@ -557,50 +587,7 @@ export function useOpencodeStreaming() {
 
       const translateSystem = 'Sos un traductor especializado en commits técnicos. Traducí el siguiente mensaje de commit al español, preservando nombres de archivos, funciones, variables y términos técnicos. Devolvé ÚNICAMENTE el mensaje traducido, sin explicaciones, sin texto adicional.'
 
-      let translatedText = ''
-      const res = await fetch('/api/chat/refine', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ text: generatedText, systemPrompt: translateSystem, sessionId }),
-      })
-
-      if (!res.ok) {
-        let errMsg = 'Error al traducir mensaje de commit'
-        try { const errData = await res.json(); if (errData.error) errMsg = errData.error } catch (parseErr) { console.log('[traducir] Error al parsear body de error:', parseErr.message); }
-        throw new Error(errMsg)
-      }
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buf = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buf += decoder.decode(value, { stream: true })
-        const lines = buf.split('\n')
-        buf = lines.pop() || ''
-
-        for (const line of lines) {
-          const t = line.trim()
-          if (!t || !t.startsWith('data: ')) continue
-          try {
-            const j = JSON.parse(t.slice(6))
-            if (j.type === 'response') {
-              translatedText += j.content
-              chat.updateOcStreamCache(sessionId, translatedText, null, streamMsg._key)
-              if (isActiveSession(sessionId) && streamRef) {
-                streamRef.content = translatedText
-              }
-            } else if (j.type === 'error') {
-              throw new Error(j.content)
-            }
-          } catch (e) {
-            if (e.message && e.message !== 'Unexpected end of JSON input') throw e
-          }
-        }
-      }
+      const translatedText = await _callRefine(sessionId, generatedText, translateSystem, showPartial)
 
       chat.setOcStreaming(sessionId, false)
       if (sessionId) chat.setSessionStatus(sessionId, 'idle')
@@ -674,10 +661,18 @@ export function useOpencodeStreaming() {
       chat.setOcStreaming(sessionId, false)
       if (sessionId) chat.setSessionStatus(sessionId, 'idle')
 
+      // El error del proveedor se muestra como mensaje nuevo en el chat; el
+      // control se mantiene (con Reintentar) pero sin el error dentro del
+      // textarea editable de la propuesta.
+      const errorMsg = {
+        role: 'result',
+        content: formatCommitProviderError(err.message),
+        _key: 'error-commit-' + Date.now(),
+      }
       const errorControlData = {
         controlId: 'commit-result-' + Date.now(),
         controlType: 'commit_result',
-        message: '[Error al generar commit: ' + err.message + ']',
+        message: 'No se generó propuesta de commit.',
         loading: false,
         sessionId,
         modo_envio: settings.defaultCommentModeCommit || 'encolar',
@@ -689,12 +684,15 @@ export function useOpencodeStreaming() {
         _key: 'control-' + Date.now(),
       }
 
+      await chat._saveMessageToDb(sessionId, errorMsg)
       await chat._saveMessageToDb(sessionId, errorControlMsg)
       if (isActiveSession(sessionId)) {
         const idx = chat.messages.findIndex((m) => m._key === streamMsg._key)
         if (idx >= 0) {
-          chat.messages[idx] = errorControlMsg
+          chat.messages[idx] = errorMsg
+          chat.messages.splice(idx + 1, 0, errorControlMsg)
         } else {
+          chat.pushMessage(errorMsg, sessionId)
           chat.pushMessage(errorControlMsg, sessionId)
         }
       } else {

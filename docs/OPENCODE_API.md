@@ -516,7 +516,7 @@ Composable que orquesta el streaming de OpenCode para diferentes casos de uso. U
 | Función | Descripción |
 |---|---|
 | `opencodeStreamPrompt(sessionId, prompt, provider, model, thinking, mode, temperature)` | Prompt genérico. Crea un mensaje `opencode_stream` en el chat, actualiza en vivo el contenido y al finalizar lo convierte a `opencode_result`. |
-| `deepseekStreamCommit(sessionId, prompt, systemPrompt)` | Envía prompt + systemPrompt a `/api/chat/refine` (DeepSeek directo), streamea la respuesta en vivo, y al finalizar muestra `commit_result` (control) con la URL del repo. Usado por `/dev_generar_commit`. |
+| `deepseekStreamCommit(sessionId, prompt, systemPrompt)` | Envía prompt + systemPrompt a `/api/chat/refine` (Ollama local si está configurado y activo, si no DeepSeek), streamea la respuesta en vivo con progreso parcial (generación y traducción), y al finalizar muestra `commit_result` (control) con la URL del repo. Sin timeout en el backend para Ollama (stream vía `node:http` + heartbeat SSE cada 15s). Usado por `/dev_generar_commit`. |
 | `opencodeStreamPromptTestingNotes(sessionId, prompt, provider, model, thinking, mode, temperature, origen, destino)` | Prompt para generar notas de testing. Muestra el resultado como `ambientes_diff_comment` (control). |
 | `opencodeStreamDescripcion(sessionId, prompt, provider, model, thinking, mode, temperature, ticket)` | Prompt para generar/mejorar descripciones de tickets. Muestra el resultado como `descripcion_result` (control). |
 | `opencodeStreamDescripcionFollowup(sessionId, userPrompt, ticket, temperature, descripcionData)` | Continuación de una generación de descripción. Envía un mensaje de seguimiento al mismo modelo/configuración. |

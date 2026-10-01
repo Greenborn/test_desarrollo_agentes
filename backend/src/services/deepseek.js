@@ -1,3 +1,5 @@
+import http from 'node:http';
+import https from 'node:https';
 import db from '../config/db.js';
 import dbConfig from '../config/dbConfig.js';
 import dbGlobalSettings from '../config/dbGlobalSettings.js';
@@ -52,63 +54,76 @@ export async function getOllamaCommitModel() {
   }
 }
 
+// Se usa node:http en lugar de fetch: el fetch nativo (undici) aplica
+// headersTimeout/bodyTimeout de 300s por defecto y corta cuando Ollama tarda
+// más de 5 minutos en emitir el primer chunk (carga de modelo + evaluación de
+// un prompt largo). Con http.request no hay timeout de socket y el stream
+// local puede tardar lo que necesite.
 async function* streamOllama(messages, systemPrompt, model) {
-  const body = {
+  const body = JSON.stringify({
     model,
     messages: [
       { role: 'system', content: systemPrompt },
       ...messages,
     ],
     stream: true,
-  }
-
-  const response = await fetch(`${ollamaService.baseUrl()}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
   })
 
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`Ollama API error ${response.status}: ${text}`)
+  const url = new URL(`${ollamaService.baseUrl()}/api/chat`)
+  const client = url.protocol === 'https:' ? https : http
+
+  const response = await new Promise((resolve, reject) => {
+    const req = client.request({
+      hostname: url.hostname,
+      port: url.port || (url.protocol === 'https:' ? 443 : 80),
+      path: url.pathname + url.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, resolve)
+    req.on('error', reject)
+    req.write(body)
+    req.end()
+  })
+
+  if (response.statusCode !== 200) {
+    let text = ''
+    response.on('data', (c) => { text += c })
+    await new Promise((resolve) => response.on('end', resolve))
+    throw new Error(`Ollama API error ${response.statusCode}: ${text}`)
   }
 
-  const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
 
-  while (true) {
-    let chunk
-    try {
-      const result = await reader.read()
-      if (result.done) break
-      chunk = result
-    } catch (err) {
-      console.log('[ollama] Error leyendo stream:', err.message)
-      break
-    }
+  try {
+    for await (const chunk of response) {
+      buffer += decoder.decode(chunk, { stream: true })
+      const lines = buffer.split('\n')
+      const last = lines.pop()
+      buffer = last !== undefined ? last : ''
 
-    buffer += decoder.decode(chunk.value, { stream: true })
-    const lines = buffer.split('\n')
-    const last = lines.pop()
-    buffer = last !== undefined ? last : ''
-
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed) continue
-      try {
-        const json = JSON.parse(trimmed)
-        if (json.done) {
-          yield { type: 'usage', prompt_tokens: 0, completion_tokens: json.eval_count || 0, total_tokens: json.eval_count || 0 }
-          continue
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed) continue
+        try {
+          const json = JSON.parse(trimmed)
+          if (json.done) {
+            yield { type: 'usage', prompt_tokens: 0, completion_tokens: json.eval_count || 0, total_tokens: json.eval_count || 0 }
+            continue
+          }
+          if (json.message && json.message.content) {
+            yield { type: 'response', content: json.message.content }
+          }
+        } catch (err) {
+          console.log('[ollama] Error al parsear chunk:', err.message)
         }
-        if (json.message && json.message.content) {
-          yield { type: 'response', content: json.message.content }
-        }
-      } catch (err) {
-        console.log('[ollama] Error al parsear chunk:', err.message)
       }
     }
+  } catch (err) {
+    console.log('[ollama] Error leyendo stream:', err.message)
   }
 }
 
@@ -173,7 +188,7 @@ export async function* streamChat(messages, workspaceId, customSystemPrompt = nu
       chunk = result
     } catch (err) {
       console.log('[deepseek] Error leyendo stream:', err.message)
-      break
+      throw err
     }
 
     buffer += decoder.decode(chunk.value, { stream: true })

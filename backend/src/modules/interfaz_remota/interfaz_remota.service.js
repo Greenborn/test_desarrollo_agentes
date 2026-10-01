@@ -356,13 +356,18 @@ export async function sendChatMessage({ sessionId, message } = {}) {
   const wsId = session.workspace_id || 1;
   let fullThinking = '';
   let fullResponse = '';
-  for await (const chunk of streamChat(history, wsId)) {
-    if (chunk.type === 'usage') continue;
-    if (chunk.type === 'thinking') {
-      fullThinking += chunk.content;
-    } else {
-      fullResponse += chunk.content;
+  try {
+    for await (const chunk of streamChat(history, wsId)) {
+      if (chunk.type === 'usage') continue;
+      if (chunk.type === 'thinking') {
+        fullThinking += chunk.content;
+      } else {
+        fullResponse += chunk.content;
+      }
     }
+  } catch (err) {
+    console.log('[interfaz_remota] Error en stream de chat (sendChatMessage):', err.message);
+    return { success: false, error: 'Error en el proveedor de chat: ' + err.message };
   }
 
   await dbChatMessages('chat_messages').insert({

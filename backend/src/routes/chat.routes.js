@@ -481,6 +481,14 @@ router.post('/refine', async (req, res) => {
 
   let usageData = null;
 
+  // Heartbeat SSE (comentario ': ping'): mantiene viva la conexión a través de
+  // proxies (Vite dev, Nginx) mientras el proveedor (p. ej. Ollama local) tarda
+  // en emitir el primer chunk. El frontend ignora las líneas que no son 'data: '.
+  const heartbeat = setInterval(() => {
+    res.write(': ping\n\n');
+  }, 15000);
+  res.on('close', () => clearInterval(heartbeat));
+
   try {
     for await (const chunk of streamChat(messages, wsId, systemPrompt)) {
       if (chunk.type === 'usage') {
@@ -513,9 +521,11 @@ router.post('/refine', async (req, res) => {
       }
     }
 
+    clearInterval(heartbeat);
     res.write('data: {"type":"done"}\n\n');
     res.end();
   } catch (err) {
+    clearInterval(heartbeat);
     console.log('Error en refine:', err.message);
     if (res.headersSent) {
       res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
