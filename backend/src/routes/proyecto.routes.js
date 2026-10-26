@@ -5,6 +5,7 @@ import dbProjectVariables from '../config/dbProjectVariables.js';
 import dbRedmineData from '../config/dbRedmineData.js';
 import memoriaClient from '../services/memoriaClient.js';
 import { getRedmineToken, getRedmineUrl } from '../services/redmine.js';
+import { crearVariableProyecto } from '../services/projectVariables.service.js';
 
 const router = Router();
 
@@ -405,29 +406,9 @@ router.post('/proyecto/:id/variables', async (req, res) => {
     if (!proyecto) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
-    const existing = await dbProjectVariables('project_variables')
-      .where({ proyecto_id: req.params.id, key })
-      .first();
-    if (existing) {
-      return res.status(409).json({ error: `La variable "${key}" ya existe en este proyecto` });
-    }
-
-    if (varType === 'memory') {
-      await dbProjectVariables('project_variables').insert({
-        proyecto_id: req.params.id,
-        key,
-        value: '',
-        type: 'memory',
-      });
-      const memNamespace = `proyecto:${req.params.id}`;
-      await memoriaClient.set(memNamespace, key, value);
-    } else {
-      await dbProjectVariables('project_variables').insert({
-        proyecto_id: req.params.id,
-        key,
-        value: String(value),
-        type: 'db',
-      });
+    const resultado = await crearVariableProyecto({ proyectoId: req.params.id, key, value, type: varType });
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({ error: resultado.error });
     }
 
     res.json({ success: true });

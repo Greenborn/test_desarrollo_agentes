@@ -61,7 +61,7 @@ DB_REDMINE_DATA_SQLITE_PATH=../data/redmine_data.db         # proyectos y ticket
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | `archived` | BOOLEAN | NOT NULL, DEFAULT `false` — indica si la sesión está archivada |
-| `prefs` | TEXT | nullable — JSON con preferencias de la sesión (pestaña activa, etc.) |
+| `prefs` | TEXT | nullable — JSON con la configuración de UI de la sesión. Claves: `sidebarChatTab`, `sidebarRightTab` (pestaña activa del panel derecho), `devPanelTab` (pestaña activa del panel inferior), `panelCollapsed` / `rightPanelCollapsed` (panel inferior y derecho desplegados o colapsados), `activeComponents`. Es la fuente de verdad; se cachea en `api_memoria` (namespace `session_prefs`) |
 
 ---
 

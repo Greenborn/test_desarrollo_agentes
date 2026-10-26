@@ -119,6 +119,13 @@ export default {
       }
     })
 
+    // Cada sesión de chat tiene su propia configuración de paneles (pestañas
+    // activas y estado desplegado/colapsado): al volver a una sesión anterior
+    // se recarga desde api_memoria (con fallback a BD).
+    watch(() => chat.activeSessionId, (id) => {
+      ui.restoreSessionLayout(id)
+    }, { immediate: true })
+
     watch(panelCollapsed, () => {
       if (transitionTimer) clearTimeout(transitionTimer)
       isTransitioning.value = true

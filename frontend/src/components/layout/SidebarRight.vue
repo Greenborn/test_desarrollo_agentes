@@ -66,7 +66,9 @@ export default {
       if (chat.activeSessionId) chat.saveSessionPref(chat.activeSessionId, 'sidebarRightTab', id)
     }
 
-    watch(() => chat.activeSessionId, () => {
+    // Restaura la pestaña activa al cambiar de sesión y también cuando las
+    // prefs de la sesión llegan refrescadas desde el backend.
+    watch([() => chat.activeSessionId, () => chat.prefsRevision], () => {
       ctl.activeTab.value = restoreTab()
     })
 
@@ -76,7 +78,15 @@ export default {
 
     const proyectoId = computed(() => activeSession.value?.proyecto_id || null)
 
+    // Sólo forzar la pestaña "variables" cuando se asigna un proyecto a la
+    // sesión actual. Si el proyecto cambió porque se cambió de sesión, hay que
+    // respetar la pestaña guardada en las prefs de esa sesión.
+    let proyectoWatchSessionId = activeSessionId.value
     watch(proyectoId, (newId) => {
+      const sid = activeSessionId.value
+      const mismaSesion = Number(sid) === Number(proyectoWatchSessionId)
+      proyectoWatchSessionId = sid
+      if (!mismaSesion) return
       if (newId) onSelect('variables')
     })
 

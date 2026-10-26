@@ -107,6 +107,21 @@ Las variables de proyecto pueden usarse en cualquier campo de texto del chat (me
 
 ---
 
+## Consola del sistema (CLI externo)
+
+Comandos ejecutables desde una terminal del sistema (fuera del chat), mediante `backend/src/cli/index.js`. No requieren cookie de sesión: acceden directo a las bases SQLite, por lo que funcionan aunque el backend esté detenido. Se ejecutan desde `backend/`.
+
+| Comando | Descripción | Uso |
+|---|---|---|
+| `variable agregar` | Agrega una variable común al proyecto asignado a la sesión de chat indicada. Misma lógica que `/proyecto_var_crear`. Sin `--tipo` se guarda como `db`; `memory` la guarda en el servicio de memoria. Falla si la sesión no existe, no tiene proyecto o la variable ya existe | `npm run cli -- variable agregar --sesion=<id_sesion> --key=<nombre> --value=<valor> [--tipo=db\|memory]` |
+| `ayuda` | Lista los comandos disponibles | `npm run cli -- ayuda` |
+
+Ejemplo: `npm run cli -- variable agregar --sesion=5 --key=VERSION_API --value=2.1.0`
+
+> Los cambios se escriben en la base sin notificar al frontend: la pestaña Variables muestra el nuevo valor al recargar o al seleccionar otra sesión.
+
+---
+
 ## Base de datos
 
 | Comando | Descripción | Uso |

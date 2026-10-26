@@ -38,6 +38,11 @@ export const useChatStore = defineStore('chat', () => {
   const sessionStatus = ref({})
   const currentChunk = ref('')
   const currentThinking = ref('')
+  // Se incrementa cada vez que las prefs de una sesión se refrescan desde el
+  // backend, para que los paneles reapliquen su configuración.
+  const prefsRevision = ref(0)
+  // sessionId -> { patch, timer } de prefs pendientes de enviar al backend.
+  const _prefsPending = {}
   const pendingNotifications = ref({})
   const loadingMore = ref(false)
   const hasMoreMessages = ref(true)
@@ -1305,36 +1310,97 @@ export const useChatStore = defineStore('chat', () => {
     return sid ? sessionTickets.value[sid] || null : null
   })
 
+  function _findSession(sessionId) {
+    if (!sessionId) return null
+    return sessions.value.find(s => Number(s.id) === Number(sessionId))
+      || archivedSessions.value.find(s => Number(s.id) === Number(sessionId))
+      || null
+  }
+
   function getSessionPrefs(sessionId) {
     if (!sessionId) return {}
-    const session = sessions.value.find(s => Number(s.id) === Number(sessionId)) || archivedSessions.value.find(s => Number(s.id) === Number(sessionId))
-    return parsePrefs(session?.prefs)
+    return parsePrefs(_findSession(sessionId)?.prefs)
+  }
+
+  // Trae las prefs de la sesión desde el backend (api_memoria con fallback a
+  // BD) y las deja aplicadas en el store. Incrementa prefsRevision para que
+  // los paneles vuelvan a restaurar su pestaña activa con el dato fresco.
+  async function fetchSessionPrefs(sessionId) {
+    if (!sessionId) return {}
+    try {
+      const res = await fetch(`${API}/chat/sessions/${sessionId}/prefs`, { credentials: 'include' })
+      const data = await res.json()
+      if (data.error) {
+        console.error('Error al cargar preferencias de sesión:', data.error)
+        return getSessionPrefs(sessionId)
+      }
+      // Conserva los cambios locales que todavía no se enviaron al backend.
+      const pending = _prefsPending[sessionId]?.patch || {}
+      const prefs = { ...parsePrefs(data.prefs), ...pending }
+      const session = _findSession(sessionId)
+      if (session) session.prefs = prefs
+      prefsRevision.value += 1
+      return prefs
+    } catch (err) {
+      console.error('Error al cargar preferencias de sesión:', err)
+      return getSessionPrefs(sessionId)
+    }
   }
 
   async function saveSessionTabPref(sessionId, tabId) {
-    await saveSessionPref(sessionId, 'sidebarChatTab', tabId)
+    await saveSessionPrefs(sessionId, { sidebarChatTab: tabId })
   }
 
   async function saveSessionPref(sessionId, key, value) {
-    if (!sessionId || !key) return
-    const session = sessions.value.find(s => Number(s.id) === Number(sessionId)) || archivedSessions.value.find(s => Number(s.id) === Number(sessionId))
+    if (!key) return
+    await saveSessionPrefs(sessionId, { [key]: value })
+  }
+
+  // Aplica el cambio en local al instante y agrupa los envíos al backend
+  // (varios toggles seguidos → una sola escritura).
+  async function saveSessionPrefs(sessionId, patch) {
+    if (!sessionId || !patch || typeof patch !== 'object') return
+    const session = _findSession(sessionId)
     if (!session) return
-    const prefs = { ...parsePrefs(session.prefs), [key]: value }
-    session.prefs = prefs
+    session.prefs = { ...parsePrefs(session.prefs), ...patch }
+    const entry = _prefsPending[sessionId] || (_prefsPending[sessionId] = { patch: {}, timer: null })
+    Object.assign(entry.patch, patch)
+    if (entry.timer) clearTimeout(entry.timer)
+    entry.timer = setTimeout(() => { flushSessionPrefs(sessionId) }, 250)
+  }
+
+  async function flushSessionPrefs(sessionId) {
+    const entry = _prefsPending[sessionId]
+    if (!entry) return
+    if (entry.timer) clearTimeout(entry.timer)
+    delete _prefsPending[sessionId]
     try {
-      await fetch(`${API}/chat/sessions/${sessionId}/prefs`, {
-        method: 'PUT',
+      const res = await fetch(`${API}/chat/sessions/${sessionId}/prefs`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ prefs }),
+        body: JSON.stringify({ prefs: entry.patch }),
       })
+      const data = await res.json()
+      if (data.error) {
+        console.error('Error al guardar preferencias de sesión:', data.error)
+      }
     } catch (err) {
-      console.error('Error al guardar preferencia de sesión:', err)
+      console.error('Error al guardar preferencias de sesión:', err)
+    }
+  }
+
+  async function flushAllSessionPrefs() {
+    const ids = Object.keys(_prefsPending)
+    for (const id of ids) {
+      await flushSessionPrefs(id)
     }
   }
 
   watch(activeSessionId, (sid) => {
     saveUiState()
+    // Antes de cambiar de contexto, confirma en backend lo que quedó pendiente.
+    flushAllSessionPrefs()
     if (sid) restoreTerminals(sid)
   })
 
@@ -1360,6 +1426,7 @@ export const useChatStore = defineStore('chat', () => {
     _hasTerminal, openTerminal, closeTerminal, getTerminalCount, getTerminalSlotUsage, canCreateTerminal, getTerminals,
     restoreTerminals,
     getTotalConcurrentSlots, maxTerminalsLimit,
-    saveUiState, getSessionPrefs, saveSessionTabPref, saveSessionPref,
+    saveUiState, getSessionPrefs, fetchSessionPrefs, saveSessionTabPref, saveSessionPref, saveSessionPrefs,
+    flushSessionPrefs, flushAllSessionPrefs, prefsRevision,
   }
 })

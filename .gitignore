@@ -5,6 +5,7 @@ dist/
 *.log
 .vscode
 uploads/data/
+/almacenamiento/
 *.db
 *.sql
 .opencode/skills/

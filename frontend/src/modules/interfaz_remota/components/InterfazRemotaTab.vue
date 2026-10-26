@@ -2,16 +2,28 @@
   <div class="interfaz-remota-container d-flex flex-column flex-grow-1 overflow-auto p-3">
     <h6 class="text-light mb-3 d-flex align-items-center justify-content-between">
       <span>Interfaz Remota</span>
-      <button
-        class="btn btn-sm"
-        :class="enabled ? 'btn-success' : 'btn-outline-secondary'"
-        @click="toggleEnabled"
-        :disabled="toggling"
-      >
-        <span v-if="toggling" class="spinner-border spinner-border-sm me-1" role="status"></span>
-        <i :class="enabled ? 'bi bi-toggle-on' : 'bi bi-toggle-off'" class="me-1"></i>
-        {{ enabled ? 'Habilitada' : 'Deshabilitada' }}
-      </button>
+      <div class="d-flex align-items-center gap-2">
+        <button
+          class="btn btn-sm btn-outline-secondary"
+          @click="reconnect"
+          :disabled="reconnecting || toggling"
+          title="Forzar reconexión (nuevo login + socket.io)"
+        >
+          <span v-if="reconnecting" class="spinner-border spinner-border-sm me-1" role="status"></span>
+          <i v-else class="bi bi-arrow-clockwise me-1"></i>
+          Reconectar
+        </button>
+        <button
+          class="btn btn-sm"
+          :class="enabled ? 'btn-success' : 'btn-outline-secondary'"
+          @click="toggleEnabled"
+          :disabled="toggling || reconnecting"
+        >
+          <span v-if="toggling" class="spinner-border spinner-border-sm me-1" role="status"></span>
+          <i :class="enabled ? 'bi bi-toggle-on' : 'bi bi-toggle-off'" class="me-1"></i>
+          {{ enabled ? 'Habilitada' : 'Deshabilitada' }}
+        </button>
+      </div>
     </h6>
 
     <div v-if="loading" class="text-secondary">
@@ -57,6 +69,10 @@
         <div v-if="ws.announce" class="text-secondary small">
           Anunciado en gestión interna ({{ ws.announce.cantidad }} sistema(s) conectado(s))
         </div>
+        <div v-if="reconnectError" class="text-danger small mt-2">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          {{ reconnectError }}
+        </div>
 
       </div>
     </div>
@@ -101,6 +117,30 @@
           </button>
           <pre v-if="showTestDetail" class="small mb-0" style="max-height: 300px; overflow: auto; background: #142114; border-radius: 4px; padding: 8px; color: #9fd9a0;">{{ JSON.stringify(testResult, null, 2) }}</pre>
         </div>
+      </div>
+    </div>
+    <div class="card border-0 mt-3" style="background: #1e2b1e;">
+      <div class="card-body p-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="text-light">Archivos recibidos (Almacenamiento Compartido)</span>
+          <span class="badge bg-secondary">{{ archivosRecibidos.length }}</span>
+        </div>
+        <p class="text-secondary small mb-2">
+          Archivos empujados de forma remota por el sistema de gestión interno. El contenido completo
+          se navega en la pestaña "Almacenamiento".
+        </p>
+        <div v-if="archivosRecibidos.length === 0" class="text-secondary small">
+          Sin archivos recibidos todavía.
+        </div>
+        <ul v-else class="list-unstyled small mb-0">
+          <li v-for="item in archivosRecibidos" :key="item.id" class="d-flex align-items-center gap-2 mb-1">
+            <i class="bi bi-file-earmark-arrow-down text-success"></i>
+            <code>{{ item.nombre }}</code>
+            <span v-if="item.tamanio !== null" class="text-secondary">{{ formatBytes(item.tamanio) }}</span>
+            <span v-if="item.partes" class="badge bg-dark">{{ item.partes }} partes</span>
+            <span class="text-secondary ms-auto">{{ formatTs(item.ts) }}</span>
+          </li>
+        </ul>
       </div>
     </div>
     <div class="card border-0 mt-3" style="background: #1e2b1e;">
@@ -168,6 +208,8 @@ export default {
   setup() {
     const loading = ref(true)
     const toggling = ref(false)
+    const reconnecting = ref(false)
+    const reconnectError = ref(null)
     const testing = ref(false)
     const testResult = ref(null)
     const showTestDetail = ref(false)
@@ -242,6 +284,30 @@ export default {
         console.log('InterfazRemotaTab: error al cambiar estado de conexión:', err.message)
       } finally {
         toggling.value = false
+      }
+    }
+
+    async function reconnect() {
+      reconnecting.value = true
+      reconnectError.value = null
+      try {
+        const res = await fetch('/api/interfaz-remota/reconnect', {
+          method: 'POST',
+          credentials: 'include',
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          reconnectError.value = data.error || 'No se pudo reconectar.'
+          console.log('InterfazRemotaTab: error al reconectar:', reconnectError.value)
+          return
+        }
+        state.value = { login: data.login || {}, ws: data.ws || {} }
+        if (typeof data.enabled === 'boolean') enabled.value = data.enabled
+      } catch (err) {
+        reconnectError.value = 'No se pudo invocar la reconexión: ' + err.message
+        console.log('InterfazRemotaTab: error al invocar reconexión:', err.message)
+      } finally {
+        reconnecting.value = false
       }
     }
 
@@ -423,14 +489,50 @@ export default {
       return ws.value.connected ? 'text-success' : 'text-danger'
     })
 
+    const archivosRecibidos = computed(() => {
+      return ioLog.value
+        .filter((entry) => entry.direction === 'in' && (
+          entry.event === 'interfaz-remota:almacenamiento:subir:iniciar' ||
+          entry.event === 'interfaz-remota:almacenamiento:subir'
+        ))
+        .map((entry) => {
+          const body = Array.isArray(entry.data) ? entry.data[0] : entry.data
+          const tamanio = Number(body?.size)
+          const partes = Number(body?.totalChunks)
+          return {
+            id: entry.id,
+            nombre: body?.nombre || '(sin nombre)',
+            tamanio: Number.isFinite(tamanio) ? tamanio : null,
+            partes: Number.isFinite(partes) && partes > 0 ? partes : null,
+            ts: entry.ts,
+          }
+        })
+        .reverse()
+    })
+
+    function formatBytes(bytes) {
+      const valor = Number(bytes) || 0
+      if (valor < 1024) return `${Math.round(valor)} B`
+      const unidades = ['KB', 'MB', 'GB', 'TB']
+      let restante = valor
+      let indice = -1
+      do {
+        restante /= 1024
+        indice += 1
+      } while (restante >= 1024 && indice < unidades.length - 1)
+      return `${restante.toFixed(restante >= 100 ? 0 : 1)} ${unidades[indice]}`
+    }
+
     return {
       loading, toggling, enabled, login, ws,
+      reconnecting, reconnectError, reconnect,
       toggleEnabled, runChatSessionsTest,
       testing, testResult, showTestDetail,
       loginStatusLabel, loginBadgeClass, loginStatusMessage, loginMessageClass,
       wsStatusLabel, wsBadgeClass, wsStatusMessage, wsMessageClass,
       ioLog, showIoLogDetail, sseConnected, copied,
       toggleIoLogDetail, clearIoLog, copyIoLog, formatTs,
+      archivosRecibidos, formatBytes,
     }
   },
 }

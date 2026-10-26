@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getProcess, isRunning, restartService, getServiceConfig } from '../index.js';
+import { getProcess, isRunning, restartService, getServiceConfig, getServiceStatus } from '../index.js';
 
 const router = Router();
 
@@ -9,6 +9,7 @@ router.get('/services', (req, res) => {
     name,
     port: config[name].port ? parseInt(config[name].port, 10) : null,
     running: isRunning(name),
+    status: getServiceStatus(name),
   }));
 
   res.json({ services });

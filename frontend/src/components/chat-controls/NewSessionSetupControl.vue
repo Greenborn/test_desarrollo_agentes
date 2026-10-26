@@ -50,6 +50,7 @@ import { useModal } from 'vue-greenborn-modal-manager'
 import ChatCdSelector from './ChatCdSelector.vue'
 
 export default {
+  components: { ChatCdSelector },
   props: {
     workspaces: { type: Array, default: () => [] },
     preselect: { type: String, default: '' },

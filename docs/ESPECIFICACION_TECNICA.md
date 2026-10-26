@@ -215,6 +215,28 @@ CREATE TABLE settings (
 +--------------------+--------------------------------------+
 ```
 
+### Configuración de paneles por sesión de chat
+
+Cada sesión de chat tiene asociada su propia configuración de la zona de paneles:
+
+| Clave (`chat_sessions.prefs`) | Significado |
+|---|---|
+| `devPanelTab` | pestaña activa del panel inferior (`DevInstancePanel.vue`) |
+| `sidebarRightTab` | pestaña activa del panel derecho (`SidebarRight.vue`) |
+| `panelCollapsed` | panel inferior desplegado (`false`) o colapsado (`true`) |
+| `rightPanelCollapsed` | panel derecho desplegado (`false`) o colapsado (`true`) |
+| `sidebarChatTab` | pestaña activa del panel de chat (`SidebarChat.vue`) |
+| `activeComponents` | pestañas habilitadas por panel para la sesión |
+
+Flujo:
+
+1. Al seleccionar una sesión, `DashboardView.vue` llama a `ui.restoreSessionLayout(sessionId)`, que aplica primero las prefs ya presentes en el store (sin parpadeo) y luego las del backend vía `chat.fetchSessionPrefs()` (`GET /api/chat/sessions/:id/prefs`). Las respuestas obsoletas se descartan con un token si se cambió de sesión mientras tanto.
+2. Al refrescarse las prefs se incrementa `chat.prefsRevision`; los paneles observan `[activeSessionId, prefsRevision]` y vuelven a restaurar su pestaña activa.
+3. Cambiar de pestaña o desplegar/colapsar un panel escribe en las prefs de la sesión activa (`chat.saveSessionPrefs`, agrupado en 250 ms, `PATCH /api/chat/sessions/:id/prefs`). Sin sesión activa el valor pasa a ser el default global del usuario (`settings`: `panel_collapsed`, `right_panel_collapsed`), que es el que se usa para las sesiones que aún no guardaron ese estado.
+4. Persistencia y caché: la fuente de verdad es `chat_sessions.prefs` (SQLite) y la caché es `api_memoria` (namespace `session_prefs`, key `session_<id>`, TTL 24 h, valor `{ userId, prefs }`), con escritura *write-through* en cada guardado y lectura memoria-first (`backend/src/services/sessionPrefs.service.js`).
+
+Los tamaños (`panelHeight`, `rightPanelWidth`, anchos del sidebar) siguen siendo globales del usuario, no por sesión.
+
 ### Vistas
 
 1. **Login** (`/`) — formulario usuario/contraseña, redirige a dashboard si hay sesión

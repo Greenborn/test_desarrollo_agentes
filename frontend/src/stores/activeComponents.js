@@ -66,8 +66,8 @@ export const useActiveComponentsStore = defineStore('activeComponents', () => {
     }
   }
 
-  watch(() => chat.activeSessionId, (id) => {
-    loadForSession(id)
+  watch([() => chat.activeSessionId, () => chat.prefsRevision], () => {
+    loadForSession(chat.activeSessionId)
   })
 
   return { allTabs, isActive, toggle, loadForSession, applyToAll, activeConfig }

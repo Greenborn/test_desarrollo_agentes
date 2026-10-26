@@ -6,6 +6,7 @@ export const useServiciosStore = defineStore('servicios', () => {
   const loading = ref(false)
   const restarting = ref(null)
   const restartingAll = ref(false)
+  const error = ref(null) // { type: 'network' | 'server', message: string } | null
 
   let pollingTimer = null
 
@@ -14,13 +15,23 @@ export const useServiciosStore = defineStore('servicios', () => {
     try {
       const res = await fetch('/api/gestor/services', { credentials: 'include' })
       if (!res.ok) {
-        console.error('[servicios] Error al obtener servicios:', res.status)
+        let message = `Error ${res.status}`
+        try {
+          const body = await res.json()
+          if (body?.error) message = body.error
+        } catch (err) {
+          console.log('[servicios] No se pudo parsear la respuesta de error del gestor:', err.message)
+        }
+        console.error('[servicios] Error al obtener servicios:', message)
+        error.value = { type: 'server', message }
         return
       }
       const data = await res.json()
       services.value = data.services || []
+      error.value = null
     } catch (err) {
       console.error('[servicios] Error al obtener servicios:', err.message)
+      error.value = { type: 'network', message: 'No se pudo contactar al gestor de servicios' }
     } finally {
       loading.value = false
     }
@@ -82,7 +93,8 @@ export const useServiciosStore = defineStore('servicios', () => {
     loading.value = false
     restarting.value = null
     restartingAll.value = false
+    error.value = null
   }
 
-  return { services, loading, restarting, restartingAll, fetchServices, restartService, restartAllServices, startPolling, stopPolling, reset }
+  return { services, loading, restarting, restartingAll, error, fetchServices, restartService, restartAllServices, startPolling, stopPolling, reset }
 })

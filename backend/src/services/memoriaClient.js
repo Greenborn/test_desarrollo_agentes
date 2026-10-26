@@ -34,14 +34,17 @@ function flushConnectCallbacks(err) {
 }
 
 function connect() {
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-    return Promise.resolve();
-  }
-
+  // Mientras la conexión/autenticación está en curso hay que esperarla: si se
+  // resolviera de inmediato con el socket en CONNECTING, el ws.send siguiente
+  // fallaría con "WebSocket is not open".
   if (connecting) {
     return new Promise((resolve, reject) => {
       connectCallbacks.push({ resolve, reject });
     });
+  }
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    return Promise.resolve();
   }
 
   connecting = true;

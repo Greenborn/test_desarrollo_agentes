@@ -8,6 +8,12 @@ export const useUiStore = defineStore('ui', () => {
   const panelCollapsed = ref(false)
   const panelHeight = ref(250)
   const rightPanelCollapsed = ref(true)
+  // Defaults globales (settings del usuario) usados cuando la sesión de chat
+  // activa todavía no tiene guardado el estado desplegado/colapsado.
+  const defaultPanelCollapsed = ref(false)
+  const defaultRightPanelCollapsed = ref(true)
+  // Sesión cuya configuración de paneles está aplicada actualmente.
+  const layoutSessionId = ref(null)
   const rightPanelWidth = ref(220)
   const recordingListWidth = ref(220)
   const centralPanelCollapsed = ref(false)
@@ -29,12 +35,65 @@ export const useUiStore = defineStore('ui', () => {
 
   function togglePanel() {
     panelCollapsed.value = !panelCollapsed.value
-    saveLayoutPrefs()
+    persistPanelState('panelCollapsed', panelCollapsed.value)
   }
 
   function toggleRightPanel() {
     rightPanelCollapsed.value = !rightPanelCollapsed.value
-    saveLayoutPrefs()
+    persistPanelState('rightPanelCollapsed', rightPanelCollapsed.value)
+  }
+
+  // El estado desplegado/colapsado del panel inferior y del panel derecho
+  // pertenece a la sesión de chat activa (se guarda en sus prefs, persistidas
+  // en BD y cacheadas en api_memoria). Sin sesión activa, el valor pasa a ser
+  // el default global del usuario.
+  async function persistPanelState(key, value) {
+    try {
+      const { useChatStore } = await import('./chat.js')
+      const chat = useChatStore()
+      if (chat.activeSessionId) {
+        await chat.saveSessionPrefs(chat.activeSessionId, { [key]: value })
+        return
+      }
+      if (key === 'panelCollapsed') defaultPanelCollapsed.value = value
+      else defaultRightPanelCollapsed.value = value
+      await saveLayoutPrefs()
+    } catch (err) {
+      console.error('Error al guardar estado de paneles de la sesión:', err)
+    }
+  }
+
+  function applySessionPanelPrefs(prefs) {
+    const p = prefs || {}
+    panelCollapsed.value = typeof p.panelCollapsed === 'boolean' ? p.panelCollapsed : defaultPanelCollapsed.value
+    rightPanelCollapsed.value = typeof p.rightPanelCollapsed === 'boolean' ? p.rightPanelCollapsed : defaultRightPanelCollapsed.value
+  }
+
+  let _layoutToken = 0
+
+  // Restaura la configuración de paneles asociada a una sesión de chat:
+  // primero con las prefs que ya están en memoria del front (instantáneo) y
+  // luego con las del backend (api_memoria → BD), descartando respuestas
+  // obsoletas si se cambió de sesión mientras tanto.
+  async function restoreSessionLayout(sessionId) {
+    const token = ++_layoutToken
+    if (!sessionId) {
+      layoutSessionId.value = null
+      applySessionPanelPrefs(null)
+      return
+    }
+    try {
+      const { useChatStore } = await import('./chat.js')
+      const chat = useChatStore()
+      if (token !== _layoutToken) return
+      layoutSessionId.value = sessionId
+      applySessionPanelPrefs(chat.getSessionPrefs(sessionId))
+      const prefs = await chat.fetchSessionPrefs(sessionId)
+      if (token !== _layoutToken) return
+      applySessionPanelPrefs(prefs)
+    } catch (err) {
+      console.error('Error al restaurar configuración de paneles de la sesión:', err)
+    }
   }
 
   function toggleCentralPanel() {
@@ -66,9 +125,9 @@ export const useUiStore = defineStore('ui', () => {
       await Promise.all([
         settingSet('sidebar_collapsed', String(sidebarCollapsed.value)),
         settingSet('sidebar_width', String(sidebarWidth.value)),
-        settingSet('panel_collapsed', String(panelCollapsed.value)),
+        settingSet('panel_collapsed', String(defaultPanelCollapsed.value)),
         settingSet('panel_height', String(panelHeight.value)),
-        settingSet('right_panel_collapsed', String(rightPanelCollapsed.value)),
+        settingSet('right_panel_collapsed', String(defaultRightPanelCollapsed.value)),
         settingSet('right_panel_width', String(rightPanelWidth.value)),
         settingSet('recording_list_width', String(recordingListWidth.value)),
         settingSet('central_panel_collapsed', String(centralPanelCollapsed.value)),
@@ -117,7 +176,7 @@ export const useUiStore = defineStore('ui', () => {
         }
       }
       if (panelData.value !== null) {
-        panelCollapsed.value = panelData.value === 'true'
+        defaultPanelCollapsed.value = panelData.value === 'true'
       }
       if (heightData.value !== null) {
         const raw = parseFloat(heightData.value) || 250
@@ -128,7 +187,7 @@ export const useUiStore = defineStore('ui', () => {
         }
       }
       if (rightCollapsedData.value !== null) {
-        rightPanelCollapsed.value = rightCollapsedData.value === 'true'
+        defaultRightPanelCollapsed.value = rightCollapsedData.value === 'true'
       }
       if (rightWidthData.value !== null) {
         const raw = parseFloat(rightWidthData.value) || 220
@@ -180,8 +239,26 @@ export const useUiStore = defineStore('ui', () => {
       if (projectFilterData.value !== null) {
         projectFilterEnabled.value = projectFilterData.value === 'true'
       }
+      // Los defaults globales recién cargados pueden llegar después de haber
+      // restaurado la sesión activa: reaplicar para que las claves que la
+      // sesión no tiene guardadas usen el default correcto.
+      await reapplyPanelState()
     } catch (err) {
       console.error('Error loading layout preferences:', err)
+    }
+  }
+
+  async function reapplyPanelState() {
+    if (!layoutSessionId.value) {
+      applySessionPanelPrefs(null)
+      return
+    }
+    try {
+      const { useChatStore } = await import('./chat.js')
+      const chat = useChatStore()
+      applySessionPanelPrefs(chat.getSessionPrefs(layoutSessionId.value))
+    } catch (err) {
+      console.error('Error al reaplicar estado de paneles:', err)
     }
   }
 
@@ -195,6 +272,9 @@ export const useUiStore = defineStore('ui', () => {
     panelCollapsed.value = false
     panelHeight.value = 250
     rightPanelCollapsed.value = true
+    defaultPanelCollapsed.value = false
+    defaultRightPanelCollapsed.value = true
+    layoutSessionId.value = null
     rightPanelWidth.value = 220
     recordingListWidth.value = 220
     centralPanelCollapsed.value = false
@@ -209,5 +289,5 @@ export const useUiStore = defineStore('ui', () => {
     projectFilterEnabled.value = true
   }
 
-  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, rightPanelCollapsed, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarWidthPct, sidebarChatTab, sidebarRightTab, devPanelTab, sidebarChatTabOrder, sidebarRightTabOrder, devPanelTabOrder, ocMaximized, projectFilterEnabled, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setSidebarWidthPct, toggleOcMaximized, saveLayoutPrefs, loadLayoutPrefs, reset }
+  return { sidebarCollapsed, sidebarWidth, panelCollapsed, panelHeight, rightPanelCollapsed, defaultPanelCollapsed, defaultRightPanelCollapsed, layoutSessionId, restoreSessionLayout, applySessionPanelPrefs, rightPanelWidth, recordingListWidth, centralPanelCollapsed, sidebarWidthPct, sidebarChatTab, sidebarRightTab, devPanelTab, sidebarChatTabOrder, sidebarRightTabOrder, devPanelTabOrder, ocMaximized, projectFilterEnabled, toggleSidebar, togglePanel, toggleRightPanel, toggleCentralPanel, setPanelHeight, setRightPanelWidth, setSidebarWidthPct, toggleOcMaximized, saveLayoutPrefs, loadLayoutPrefs, reset }
 })

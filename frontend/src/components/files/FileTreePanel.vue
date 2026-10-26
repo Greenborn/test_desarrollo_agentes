@@ -118,7 +118,7 @@ const FILE_ICONS = {
 
 export default {
   props: {
-    sessionId: { type: Number, default: null },
+    sessionId: { type: [Number, String], default: null },
   },
   emits: ['file-selected'],
   setup(props, { emit }) {

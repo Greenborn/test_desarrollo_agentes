@@ -218,10 +218,9 @@ export default {
       }
     }
 
-    watch(activeSessionId, (newId) => {
-      if (!newId) { ctl.activeTab.value = 'chats'; return }
-      const s = sessions.value.find(s => Number(s.id) === Number(newId)) || archivedSessions.value.find(s => Number(s.id) === Number(newId))
-      ctl.activeTab.value = s?.prefs?.sidebarChatTab || 'chats'
+    watch([activeSessionId, () => chat.prefsRevision], () => {
+      if (!activeSessionId.value) { ctl.activeTab.value = 'chats'; return }
+      ctl.activeTab.value = restoreTab()
     })
     const activeRegistryChatComponent = computed(() => {
       if (!sidebarChatTabs) return null

@@ -15,6 +15,20 @@ if (!PORT) {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const processes = {};
+const serviceState = {};
+const handledExit = new WeakSet();
+let shuttingDown = false;
+
+const MAX_AUTO_RESTARTS = 5;
+const MIN_UPTIME_TO_RESET_MS = 30000;
+const BACKOFF_SEQUENCE_MS = [2000, 5000, 10000, 20000, 30000];
+
+function getState(name) {
+  if (!serviceState[name]) {
+    serviceState[name] = { intentionalStop: false, failCount: 0, lastStartedAt: 0, status: 'stopped', restartTimer: null };
+  }
+  return serviceState[name];
+}
 
 const serviceConfig = {
   memoria: {
@@ -48,6 +62,11 @@ const serviceConfig = {
     cwd: path.resolve(__dirname, '../../api_procesos_consola'),
     port: process.env.SERVICIO_PROCESOS_CONSOLA_PORT,
   },
+  interfaz_remota: {
+    script: '../../interfaz_remota/src/index.js',
+    cwd: path.resolve(__dirname, '../../interfaz_remota'),
+    port: process.env.SERVICIO_INTERFAZ_REMOTA_PORT,
+  },
 };
 
 export function getProcess(name) {
@@ -63,6 +82,33 @@ export function getServiceConfig() {
   return serviceConfig;
 }
 
+export function getServiceStatus(name) {
+  if (isRunning(name)) return 'running';
+  const state = serviceState[name];
+  return state ? state.status : 'stopped';
+}
+
+function scheduleAutoRespawn(name, logTag) {
+  const state = getState(name);
+  const uptime = Date.now() - state.lastStartedAt;
+  if (uptime > MIN_UPTIME_TO_RESET_MS) {
+    state.failCount = 0;
+  }
+  if (state.failCount >= MAX_AUTO_RESTARTS) {
+    state.status = 'crashed';
+    console.log(`[gestor] ${logTag} superó el límite de reintentos automáticos (${MAX_AUTO_RESTARTS}); requiere reinicio manual`);
+    return;
+  }
+  const delay = BACKOFF_SEQUENCE_MS[Math.min(state.failCount, BACKOFF_SEQUENCE_MS.length - 1)];
+  state.failCount += 1;
+  state.status = 'restarting';
+  console.log(`[gestor] ${logTag} finalizó inesperadamente (sin solicitud de reinicio); reintentando en ${delay}ms (intento ${state.failCount}/${MAX_AUTO_RESTARTS})`);
+  state.restartTimer = setTimeout(() => {
+    state.restartTimer = null;
+    spawnService(name, logTag);
+  }, delay);
+}
+
 function spawnService(name, logTag) {
   const config = serviceConfig[name];
   if (!config) {
@@ -70,6 +116,7 @@ function spawnService(name, logTag) {
     return null;
   }
 
+  const state = getState(name);
   const scriptPath = path.resolve(__dirname, config.script);
   const args = [scriptPath, ...(config.args || [])];
   const proc = spawn('node', args, {
@@ -88,27 +135,54 @@ function spawnService(name, logTag) {
     if (text) console.log(`[${logTag}]`, text);
   });
 
-  proc.on('exit', (code) => {
-    console.log(`[${logTag}] proceso terminado, código:`, code);
-    if (processes[name] === proc) {
+  function handleFailure(proc, reasonLog) {
+    reasonLog();
+    const wasCurrent = processes[name] === proc;
+    if (wasCurrent) {
       processes[name] = null;
     }
+    if (handledExit.has(proc)) return;
+    handledExit.add(proc);
+    if (!wasCurrent) {
+      // Ya fue reemplazado por un proceso más nuevo (p.ej. restart manual en curso); no tocar su estado.
+      return;
+    }
+    if (shuttingDown) {
+      state.status = 'stopped';
+      return;
+    }
+    if (state.intentionalStop) {
+      state.status = 'stopped';
+      return;
+    }
+    scheduleAutoRespawn(name, logTag);
+  }
+
+  proc.on('exit', (code, signal) => {
+    handleFailure(proc, () => console.log(`[${logTag}] proceso terminado, código:`, code, 'señal:', signal));
   });
 
   proc.on('error', (err) => {
-    console.log(`[${logTag}] error al iniciar:`, err.message);
-    if (processes[name] === proc) {
-      processes[name] = null;
-    }
+    handleFailure(proc, () => console.log(`[${logTag}] error al iniciar:`, err.message));
   });
 
   processes[name] = proc;
+  state.lastStartedAt = Date.now();
+  state.status = 'running';
   return proc;
 }
 
 export function restartService(name) {
+  const state = getState(name);
+  if (state.restartTimer) {
+    clearTimeout(state.restartTimer);
+    state.restartTimer = null;
+  }
+  state.failCount = 0;
+
   const current = processes[name];
   if (current && !current.killed) {
+    state.intentionalStop = true;
     current.kill('SIGTERM');
     processes[name] = null;
     try {
@@ -120,7 +194,9 @@ export function restartService(name) {
       }
     }
   }
-  return spawnService(name, name);
+  const result = spawnService(name, name);
+  state.intentionalStop = false;
+  return result;
 }
 
 function startAllServices() {
@@ -145,6 +221,14 @@ function killPort(port) {
 }
 
 function cleanup() {
+  shuttingDown = true;
+  for (const name of Object.keys(serviceState)) {
+    const state = serviceState[name];
+    if (state.restartTimer) {
+      clearTimeout(state.restartTimer);
+      state.restartTimer = null;
+    }
+  }
   const targets = [];
   for (const name of Object.keys(processes)) {
     const proc = processes[name];

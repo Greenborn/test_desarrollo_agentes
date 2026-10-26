@@ -23,22 +23,26 @@ Endpoints del orquestador `api_gestor_servicios`. Los endpoints operativos (`/se
 ```json
 {
   "services": [
-    { "name": "backend", "port": 4000, "running": true },
-    { "name": "playwright", "port": 4098, "running": true },
-    { "name": "gastos", "port": 4100, "running": true },
-    { "name": "memoria", "port": 4101, "running": true },
-    { "name": "procesos_consola", "port": 3575, "running": true }
+    { "name": "backend", "port": 4000, "running": true, "status": "running" },
+    { "name": "playwright", "port": 4098, "running": true, "status": "running" },
+    { "name": "gastos", "port": 4100, "running": true, "status": "running" },
+    { "name": "memoria", "port": 4101, "running": true, "status": "running" },
+    { "name": "procesos_consola", "port": 3575, "running": true, "status": "running" }
   ]
 }
 ```
-- **Descripción:** Lista todos los servicios gestionados por el orquestador con su puerto y estado de ejecución.
+- **Descripción:** Lista todos los servicios gestionados por el orquestador con su puerto, estado de ejecución (`running`) y estado detallado (`status`): `running`, `stopped`, `restarting` (murió inesperadamente y el orquestador lo está reintentando automáticamente) o `crashed` (superó el límite de reintentos automáticos y requiere reinicio manual vía `/services/:name/restart`).
 
 ### `POST /api/gestor/services/:name/restart`
 - **Auth:** GESTOR_API_KEY
-- **Params:** `name` — nombre del servicio (`backend`, `playwright`, `gastos`, `memoria`, `procesos_consola`)
+- **Params:** `name` — nombre del servicio (`backend`, `playwright`, `gastos`, `memoria`, `procesos_consola`, `frontend`)
 - **Respuesta 200:** `{ success: true, message: "Servicio \"backend\" reiniciado", running: true }`
 - **Respuesta 404:** `{ error: "Servicio \"...\" no encontrado" }`
-- **Descripción:** Mata el proceso del servicio y lo vuelve a spawnear.
+- **Descripción:** Mata el proceso del servicio y lo vuelve a spawnear. Resetea el contador de reintentos automáticos y cualquier timer de auto-respawn pendiente para ese servicio.
+
+### Auto-respawn ante caídas inesperadas
+
+Si un proceso hijo termina sin que haya sido solicitado vía `/restart` (p. ej. alguien lo mata manualmente desde fuera del orquestador, o crashea), `api_gestor_servicios` lo relanza automáticamente con backoff creciente (2s, 5s, 10s, 20s, 30s). Si falla 5 veces consecutivas sin lograr mantenerse al menos 30s en ejecución, deja de reintentar y marca el servicio como `crashed` — a partir de ahí requiere un reinicio manual. Durante un apagado ordenado del gestor (`SIGTERM`/`SIGINT`) no se dispara auto-respawn.
 
 ---
 
@@ -187,6 +191,10 @@ El backend se comunica con `api_memoria` exclusivamente por WebSocket a través 
 ### `POST /api/interfaz-remota/disable`
 - **Auth:** Requerida
 - **Descripción:** Deshabilita la conexión y cierra el WebSocket. Devuelve el estado actualizado.
+
+### `POST /api/interfaz-remota/reconnect`
+- **Auth:** Requerida
+- **Descripción:** Fuerza un reinicio completo de la conexión (cierra el socket.io actual si quedó colgado, repite el login HTTP a gestión interna y vuelve a conectar el WebSocket), independientemente de si ya estaba habilitada. Habilita la conexión si estaba deshabilitada. Devuelve el estado actualizado.
 
 ### `POST /api/interfaz-remota/test/chat-sessions`
 - **Auth:** Requerida
@@ -354,12 +362,27 @@ SGI conectado, así que la salida del PTY solo se registra en consola (no se tra
 - **Respuesta:** `{ success: true, session: { id, title, updated_at, cwd, proyecto_id, id_ticket_redmine, workspace_id, proyecto_descripcion, proyecto_color, priority_id, priority_name, session_redmine_url } }`
 - **Descripción:** Clona una sesión existente incluyendo todos sus mensajes. La nueva sesión se crea con `archived: false` y timestamps actuales. Los mensajes se copian con sus timestamps originales.
 
+### `GET /api/chat/sessions/:id/prefs`
+- **Auth:** Requerida
+- **Respuesta 200:** `{ prefs: { ... }, cached: boolean }`
+- **Respuesta 404:** `{ error: "Sesión no encontrada" }`
+- **Descripción:** Devuelve las preferencias de UI de la sesión. Lectura **memoria-first**: busca en `api_memoria` (namespace `session_prefs`, key `session_<id>`, TTL 24 h) y, si no está cacheada, lee la columna `chat_sessions.prefs` y calienta la caché. `cached` indica si la respuesta salió de `api_memoria`. La caché guarda `{ userId, prefs }` para poder validar pertenencia sin tocar la BD.
+
 ### `PUT /api/chat/sessions/:id/prefs`
 - **Auth:** Requerida
-- **Body:** `{ prefs: { sidebarChatTab?: string } }`
-- **Respuesta 200:** `{ success: true }`
+- **Body:** `{ prefs: object|null }` — reemplaza el objeto completo
+- **Respuesta 200:** `{ success: true, prefs }`
+- **Respuesta 400:** `{ error: "prefs debe ser un objeto o null" }`
 - **Respuesta 404:** `{ error: "Sesión no encontrada" }`
-- **Descripción:** Actualiza las preferencias de la sesión (JSON). Usado para recordar la pestaña activa del panel de chat por sesión.
+- **Descripción:** Reemplaza las preferencias de la sesión. Escritura *write-through*: persiste en `chat_sessions.prefs` y refresca la caché de `api_memoria`. No modifica `updated_at` (son preferencias de UI, no actividad de la sesión).
+
+### `PATCH /api/chat/sessions/:id/prefs`
+- **Auth:** Requerida
+- **Body:** `{ prefs: object }` — subconjunto de claves a mezclar
+- **Respuesta 200:** `{ success: true, prefs }`
+- **Respuesta 400:** `{ error: "prefs es requerido y debe ser un objeto" }`
+- **Respuesta 404:** `{ error: "Sesión no encontrada" }`
+- **Descripción:** Mezcla las claves recibidas sobre las preferencias existentes (misma caché y persistencia que el `PUT`). Es el endpoint que usa el frontend al cambiar de pestaña o desplegar/colapsar un panel, para no pisar otras claves. Claves conocidas: `sidebarChatTab`, `sidebarRightTab`, `devPanelTab`, `panelCollapsed`, `rightPanelCollapsed`, `activeComponents`.
 
 ---
 
@@ -1631,6 +1654,11 @@ Endpoints del módulo Interfaz Remota. Al iniciar el backend se intenta conectar
 - **Descripción:** Deshabilita la conexión: desconecta el socket, detiene los reintentos y el heartbeat de announce, y limpia el estado de login. Devuelve el estado completo igual que `GET /status`.
 - **Respuesta 200:** mismo objeto que `GET /status` con `enabled: false`
 
+### `POST /api/interfaz-remota/reconnect`
+- **Auth:** Requerida
+- **Descripción:** Fuerza un reinicio completo de la conexión, sin esperar a que el usuario la deshabilite primero: cierra el socket.io actual si había quedado colgado/zombi, vuelve a hacer login HTTP a gestión interna y reconecta el WebSocket desde cero. Equivalente a encadenar `disable` + `enable`, pero en una sola llamada y marcando `enabled: true` aunque estuviera deshabilitada. Pensado para el botón "Reconectar" de `InterfazRemotaTab.vue` cuando el estado queda inconsistente (p. ej. la gestión interna reporta que "el sistema de desarrollo no respondió").
+- **Respuesta 200:** mismo objeto que `GET /status` con `enabled: true`
+
 ### Pseudoendpoint socket.io `interfaz-remota:chatSessions`
 - **Auth:** Vía conexión socket.io (token del login en `auth.token`)
 - **Descripción:** Pseudoendpoint request/response sobre WebSocket (no HTTP). La gestión interna (SGI) emite el evento `interfaz-remota:chatSessions` (con callback ack) para consultar las sesiones de chat actuales del sistema. El SGI actúa como **retransmisor**: recibe `desarrollo:getChatSessions` de su frontend admin, localiza el socket del sistema dev y emite este evento con payload `{}` + ack. Devuelve todas las sesiones (sin filtrar por usuario ni workspace) agrupadas por estado en `activas` y `archivadas`.
@@ -1714,6 +1742,34 @@ Replica `/terminal` del frontend local. Ciclo de vida con ack; streaming sin ack
 Streaming (eventos sin ack, sistema dev → SGI):
 - `interfaz-remota:terminal:data` `{ chatSessionId, terminalId, data }`
 - `interfaz-remota:terminal:exit` `{ chatSessionId, terminalId, code, signal, output }`
+
+#### Almacenamiento compartido — subida por chunks (SGI → sistema dev)
+Resueltos localmente en el servicio `interfaz_remota` (`src/almacenamiento.js`), sin depender
+del backend principal. El SGI empuja un archivo hacia `ALMACENAMIENTO_DIR` dividiéndolo en
+partes para poder reportar progreso; el archivo se arma en un `.upload-<id>.part` dentro del
+directorio destino y se renombra al nombre final recién al terminar.
+
+| Evento | Request | Respuesta |
+|--------|---------|-----------|
+| `interfaz-remota:almacenamiento:listar` | `{ dir?, depth?, showHidden? }` | `{ success, data: { tree, totalFiles } }` |
+| `interfaz-remota:almacenamiento:subir:iniciar` | `{ dir?, nombre, size, totalChunks? }` | `{ success, data: { uploadId } }` |
+| `interfaz-remota:almacenamiento:subir:chunk` | `{ uploadId, index, base64 }` o `{ uploadId, index, chunk }` (binario) | `{ success, data: { receivedBytes } }` |
+| `interfaz-remota:almacenamiento:subir:finalizar` | `{ uploadId }` | `{ success, data: { path, nombre } }` |
+| `interfaz-remota:almacenamiento:subir:cancelar` | `{ uploadId }` | `{ success }` |
+
+- **Orden de chunks:** `index` debe llegar en secuencia (0, 1, 2, ...); fuera de orden se
+  rechaza con error indicando el índice esperado.
+- **Formato del chunk:** acepta `base64` (string) por compatibilidad, o `chunk` binario
+  (`Buffer`/`ArrayBuffer`, que socket.io serializa nativamente) para evitar el ~33% de
+  overhead de base64 en archivos grandes.
+- **Límite de tamaño:** `ALMACENAMIENTO_MAX_UPLOAD_BYTES` (bytes, default 500 GB).
+- **Expiración por inactividad:** `ALMACENAMIENTO_UPLOAD_TTL_MS` (ms, default 30 min) — se
+  reinicia en cada chunk recibido, no limita la duración total de la transferencia.
+- **Verificación de espacio:** antes de abrir el archivo temporal se chequea espacio libre
+  en disco (best-effort vía `fs.promises.statfs`; si no está disponible, continúa sin bloquear).
+- El file handle se mantiene abierto durante toda la subida (no se reabre el archivo en
+  cada chunk), escribiendo cada parte en su offset exacto para soportar transferencias de
+  cientos de GB sin degradar el event loop del proceso.
 
 El SGI los retransmite como `desarrollo:terminal:data` / `desarrollo:terminal:exit` (broadcast).
 

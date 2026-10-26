@@ -48,7 +48,8 @@ import dbFuncionalidades from './config/dbFuncionalidades.js';
 import dbRedmineComentarios from './config/dbRedmineComentarios.js';
 import { runMigrations } from './config/dbFactory.js';
 import { fetchAllSessionRepos } from './services/gitFetchService.js';
-import { initInterfazRemotaLogin, stopInterfazRemotaWs } from './modules/interfaz_remota/interfaz_remota.service.js';
+import { emitToInterfazRemota } from './modules/interfaz_remota/relayClient.js';
+import * as hub from './services/componentHub.js';
 import * as terminalBridge from './services/terminalBridge.js';
 
 const PORT = process.env.PORT;
@@ -139,7 +140,10 @@ async function start() {
     }
     console.log(`Server listening on port ${PORT}`);
     fetchAllSessionRepos();
-    initInterfazRemotaLogin();
+    // El servicio `interfaz_remota` (puerto SERVICIO_INTERFAZ_REMOTA_PORT) es quien
+    // mantiene la conexión con la gestión interna; este backend solo retransmite hacia
+    // allí los eventos de los componentes bridgeados (terminales locales, opencode).
+    hub.setBroadcaster((evt) => emitToInterfazRemota('interfaz-remota:componentes:event', evt));
   });
 }
 
@@ -155,14 +159,12 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('exit', () => {
   stopComandosPersonalizados();
-  stopInterfazRemotaWs();
   terminalBridge.stopAll();
   devInstanceManager.stopAll();
   opencode.stopAllServers();
 });
 process.on('SIGTERM', () => {
   stopComandosPersonalizados();
-  stopInterfazRemotaWs();
   terminalBridge.stopAll();
   devInstanceManager.stopAll();
   opencode.stopAllServers();
@@ -170,7 +172,6 @@ process.on('SIGTERM', () => {
 });
 process.on('SIGINT', () => {
   stopComandosPersonalizados();
-  stopInterfazRemotaWs();
   terminalBridge.stopAll();
   devInstanceManager.stopAll();
   opencode.stopAllServers();

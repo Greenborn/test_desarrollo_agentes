@@ -7,6 +7,7 @@ import dbChatMessages from '../config/dbChatMessages.js';
 import dbRedmineData from '../config/dbRedmineData.js';
 import { streamChat } from '../services/deepseek.js';
 import opencode from '../services/opencode.js';
+import sessionPrefsService from '../services/sessionPrefs.service.js';
 
 const router = Router();
 
@@ -812,22 +813,52 @@ router.post('/sessions/:id/clone', async (req, res) => {
   }
 });
 
+router.get('/sessions/:id/prefs', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const result = await sessionPrefsService.getSessionPrefs(req.params.id, req.session.userId);
+    if (!result.found) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+    res.json({ prefs: result.prefs, cached: result.cached });
+  } catch (err) {
+    console.log('Error al leer preferencias de sesión:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.put('/sessions/:id/prefs', async (req, res) => {
   if (!authGuard(req, res)) return;
   try {
-    const session = await db('chat_sessions')
-      .where({ id: req.params.id, user_id: req.session.userId })
-      .first();
-    if (!session) {
+    const { prefs } = req.body;
+    if (prefs !== null && prefs !== undefined && typeof prefs !== 'object') {
+      return res.status(400).json({ error: 'prefs debe ser un objeto o null' });
+    }
+    const result = await sessionPrefsService.setSessionPrefs(req.params.id, req.session.userId, prefs);
+    if (!result.found) {
       return res.status(404).json({ error: 'Sesión no encontrada' });
     }
-    const { prefs } = req.body;
-    await db('chat_sessions')
-      .where({ id: req.params.id })
-      .update({ prefs: prefs ? JSON.stringify(prefs) : null, updated_at: db.fn.now() });
-    res.json({ success: true });
+    res.json({ success: true, prefs: result.prefs });
   } catch (err) {
     console.log('Error al actualizar preferencias de sesión:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/sessions/:id/prefs', async (req, res) => {
+  if (!authGuard(req, res)) return;
+  try {
+    const { prefs } = req.body;
+    if (!prefs || typeof prefs !== 'object') {
+      return res.status(400).json({ error: 'prefs es requerido y debe ser un objeto' });
+    }
+    const result = await sessionPrefsService.mergeSessionPrefs(req.params.id, req.session.userId, prefs);
+    if (!result.found) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+    res.json({ success: true, prefs: result.prefs });
+  } catch (err) {
+    console.log('Error al mezclar preferencias de sesión:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -837,6 +868,7 @@ router.delete('/sessions/:id', async (req, res) => {
   try {
     await dbChatMessages('chat_messages').where({ session_id: req.params.id }).del();
     await db('chat_sessions').where({ id: req.params.id }).del();
+    await sessionPrefsService.invalidateSessionPrefs(req.params.id);
     res.json({ success: true, sessionId: req.params.id });
   } catch (err) {
     console.log('Error al eliminar sesión:', err.message);

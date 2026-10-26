@@ -3,6 +3,21 @@ import { ref } from 'vue'
 
 const API = '/api'
 
+// Clave especial de `fileTree`/`fetchTree` para el árbol del directorio de almacenamiento
+// compartido (no ligado a una sesión de chat). Permite reusar FileTreePanel.vue sin cambios.
+export const ALMACENAMIENTO_TREE_KEY = '__almacenamiento__'
+
+function treeUrl(key, dirPath) {
+  if (key === ALMACENAMIENTO_TREE_KEY) {
+    const params = new URLSearchParams({ depth: '1', showHidden: 'true' })
+    if (dirPath) params.set('dir', dirPath)
+    return `${API}/almacenamiento/arbol?${params.toString()}`
+  }
+  const params = new URLSearchParams({ sessionId: String(key), depth: '1', useGitignore: 'false', showHidden: 'true' })
+  if (dirPath) params.set('dir', dirPath)
+  return `${API}/command/arbol-directorios?${params.toString()}`
+}
+
 export const useFileTreeStore = defineStore('fileTree', () => {
   const trees = ref({})
   const loadingMap = ref({})
@@ -84,10 +99,7 @@ export const useFileTreeStore = defineStore('fileTree', () => {
     if (!loadingChildrenMap.value[sessionId]) loadingChildrenMap.value[sessionId] = {}
     loadingChildrenMap.value[sessionId][dirPath] = true
     try {
-      const res = await fetch(
-        `${API}/command/arbol-directorios?sessionId=${sessionId}&dir=${encodeURIComponent(dirPath)}&depth=1&useGitignore=false&showHidden=true`,
-        { credentials: 'include' }
-      )
+      const res = await fetch(treeUrl(sessionId, dirPath), { credentials: 'include' })
       const data = await res.json()
       if (data.success && data.tree && data.tree.children) {
         _insertChildren(trees.value[sessionId], dirPath, data.tree.children)
@@ -131,10 +143,7 @@ export const useFileTreeStore = defineStore('fileTree', () => {
     loadedPaths.value[sessionId] = {}
     loadingChildrenMap.value[sessionId] = {}
     try {
-      const res = await fetch(
-        `${API}/command/arbol-directorios?sessionId=${sessionId}&depth=1&useGitignore=false&showHidden=true`,
-        { credentials: 'include' }
-      )
+      const res = await fetch(treeUrl(sessionId), { credentials: 'include' })
       const data = await res.json()
       if (data.success) {
         trees.value[sessionId] = data.tree

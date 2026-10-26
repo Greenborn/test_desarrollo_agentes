@@ -55,7 +55,9 @@ export default {
       if (chat.activeSessionId) chat.saveSessionPref(chat.activeSessionId, 'devPanelTab', id)
     }
 
-    watch(() => chat.activeSessionId, () => {
+    // Restaura la pestaña activa al cambiar de sesión y también cuando las
+    // prefs de la sesión llegan refrescadas desde el backend.
+    watch([() => chat.activeSessionId, () => chat.prefsRevision], () => {
       ctl.activeTab.value = restoreTab()
     })
 
