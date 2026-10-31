@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getRedmineToken, getRedmineUrl } from '../services/redmine.js';
+import { getRedmineToken, getRedmineUrl, syncRedmineProjectTickets } from '../services/redmine.js';
 import { slugify } from '../utils/slugify.js';
 import db from '../config/db.js';
 import dbRedmineComentarios from '../config/dbRedmineComentarios.js';
@@ -396,77 +396,6 @@ router.get('/proyectos/:proyectoId/tickets', async (req, res) => {
   }
 });
 
-async function importarIssuesDeRedmine(proyecto, token, url, workspaceId) {
-  const baseUrl = url.replace(/\/+$/, '') + '/issues.json';
-  let allIssues = [];
-  let offset = 0;
-  const limit = 100;
-
-  while (true) {
-    const apiUrl = `${baseUrl}?project_id=${proyecto.redmine_id}&limit=${limit}&offset=${offset}&sort=id`;
-    const response = await fetch(apiUrl, {
-      headers: {
-        'X-Redmine-API-Key': token,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`HTTP ${response.status}${text ? ' — ' + text.slice(0, 200) : ''}`);
-    }
-
-    const data = await response.json();
-    allIssues = allIssues.concat(data.issues || []);
-
-    const total = data.total_count || allIssues.length;
-    if (allIssues.length >= total) break;
-    offset += limit;
-  }
-
-  let importados = 0;
-  let actualizados = 0;
-
-  for (const issue of allIssues) {
-    try {
-      const ticketData = {
-        proyecto_id: proyecto.id,
-        workspace_id: workspaceId || 1,
-        redmine_id: issue.id,
-        subject: issue.subject || '(sin asunto)',
-        description: issue.description || null,
-        status_name: issue.status?.name || null,
-        tracker_name: issue.tracker?.name || null,
-        priority_id: issue.priority?.id || null,
-        priority_name: issue.priority?.name || null,
-        assigned_to_name: issue.assigned_to?.name || null,
-        author_name: issue.author?.name || null,
-        start_date: issue.start_date || null,
-        due_date: issue.due_date || null,
-        estimated_hours: issue.estimated_hours || null,
-        done_ratio: issue.done_ratio || null,
-        fixed_version_name: issue.fixed_version?.name || null,
-        redmine_created_on: toDateTime(issue.created_on),
-        redmine_updated_on: toDateTime(issue.updated_on),
-        redmine_closed_on: toDateTime(issue.closed_on),
-      };
-
-      const existing = await dbRedmineData('tickets').where({ redmine_id: issue.id, workspace_id: workspaceId || 1 }).first();
-      if (existing) {
-        await dbRedmineData('tickets').where({ redmine_id: issue.id, workspace_id: workspaceId || 1 }).update(ticketData);
-        actualizados++;
-      } else {
-        await dbRedmineData('tickets').insert(ticketData);
-        importados++;
-      }
-    } catch (err) {
-      console.log('Error al guardar ticket Redmine:', issue.id, err.message);
-    }
-  }
-
-  return { importados, actualizados, total_redmine: allIssues.length };
-}
-
 router.post('/proyectos/:proyectoId/importar-tickets', async (req, res) => {
   if (!authGuard(req, res)) return;
 
@@ -493,7 +422,7 @@ router.post('/proyectos/:proyectoId/importar-tickets', async (req, res) => {
       return;
     }
 
-    const resultado = await importarIssuesDeRedmine(proyecto, token, url, wsId);
+    const resultado = await syncRedmineProjectTickets(proyecto, token, url, wsId);
 
     res.json({ success: true, ...resultado });
   } catch (err) {
@@ -529,7 +458,7 @@ router.post('/proyectos/importar-tickets-all', async (req, res) => {
 
     for (const proyecto of proyectos) {
       try {
-        const r = await importarIssuesDeRedmine(proyecto, token, url, wsId);
+        const r = await syncRedmineProjectTickets(proyecto, token, url, wsId);
         resultados.push({
           proyecto_id: proyecto.id,
           importados: r.importados,

@@ -9,6 +9,15 @@
       <span style="color: #e0e0e0; font-size: 0.8rem;" class="text-truncate">{{ ticketInfo.subject }}</span>
     </div>
 
+    <div v-if="loadError" class="alert alert-warning py-1 px-2 small mb-2">
+      {{ loadError }}
+    </div>
+    <div v-else class="small text-muted mb-2">
+      <span v-if="loading">Consultando tickets abiertos del proyecto en Redmine…</span>
+      <span v-else-if="tickets.length > 0">{{ tickets.length }} ticket(s) abierto(s) del proyecto</span>
+      <span v-else>El proyecto no tiene tickets abiertos.</span>
+    </div>
+
     <div class="d-flex gap-2 mb-2">
       <div class="flex-grow-1 position-relative">
         <input
@@ -16,9 +25,11 @@
           v-model="searchQuery"
           type="text"
           class="form-control form-control-sm"
-          :placeholder="tickets.length > 0 ? 'Buscar por ID o asunto…' : 'Cargando tickets…'"
+          :placeholder="loading ? 'Consultando tickets abiertos…' : (loadError ? 'No disponible' : 'Buscar ticket abierto por ID o asunto…')"
+          :disabled="loading || !!loadError"
           style="background: #0f172a; border: 1px solid #374151; color: #e0e0e0;"
           @input="onSearchInput"
+          @focus="onSearchInput"
           @keydown.enter.prevent="confirmSearch"
         />
         <div v-if="showDropdown && filteredTickets.length > 0" class="ticket-dropdown">
@@ -79,6 +90,8 @@ export default {
     const showDropdown = ref(false)
     const highlightedIndex = ref(-1)
     const errorMsg = ref('')
+    const loadError = ref('')
+    const loading = ref(false)
     const searchInput = ref(null)
 
     const filteredTickets = computed(() => {
@@ -105,14 +118,26 @@ export default {
     }
 
     async function loadTickets() {
+      if (!props.sessionId) {
+        loadError.value = 'No hay una sesión de chat activa.'
+        return
+      }
+      loading.value = true
+      loadError.value = ''
+      tickets.value = []
       try {
-        const res = await fetch('/api/tickets', { credentials: 'include' })
+        const res = await fetch(`/api/tickets/session/${props.sessionId}/open`, { credentials: 'include' })
         const data = await res.json()
-        if (data.success && data.tickets) {
-          tickets.value = data.tickets
+        if (!res.ok || !data.success) {
+          loadError.value = data.message || data.error || 'No se pudieron cargar los tickets abiertos del proyecto.'
+          return
         }
+        tickets.value = data.tickets || []
       } catch (err) {
-        console.error('Error al cargar tickets:', err)
+        console.error('Error al cargar tickets abiertos del proyecto:', err)
+        loadError.value = 'Error de conexión al consultar los tickets abiertos del proyecto.'
+      } finally {
+        loading.value = false
       }
     }
 
@@ -187,7 +212,7 @@ export default {
 
     return {
       tickets, searchQuery, directId, showDropdown, highlightedIndex,
-      filteredTickets, canConfirm, errorMsg, searchInput,
+      filteredTickets, canConfirm, errorMsg, loadError, loading, searchInput,
       priorityClass, onSearchInput, selectTicket, confirmSearch,
       confirmDirectId, confirmSelected, cancel,
     }

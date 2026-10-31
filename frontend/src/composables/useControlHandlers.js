@@ -42,6 +42,17 @@ export function useControlHandlers(api) {
   let repoCrearRamaData = { proyectoId: '', ticketRedmineId: '', baseBranch: '', repoAcronimo: '' }
   const peticionControllers = {}
 
+  function pushTicketDescriptionMessage(data) {
+    if (!data?.descriptionInserted) return
+    const description = data.ticket?.description ? String(data.ticket.description).trim() : ''
+    if (!description) return
+    chat.pushMessage({
+      role: 'result',
+      content: description,
+      _key: 'ticket-desc-' + Date.now(),
+    })
+  }
+
   async function onControlConfirm({ controlId, value }) {
     const controlMsg = chat.messages.find((m) => m.controlData && m.controlData.controlId === controlId)
     const controlType = controlMsg && controlMsg.controlData ? controlMsg.controlData.controlType : ''
@@ -469,6 +480,7 @@ export function useControlHandlers(api) {
                 ws.selectedIds = td.workspaceIds
                 au.setWorkspaceIds(td.workspaceIds)
               }
+              pushTicketDescriptionMessage(td)
               await chat.loadSessions()
               await loadTicketInfo()
             } catch (err) {
@@ -519,6 +531,7 @@ export function useControlHandlers(api) {
                   ws2.selectedIds = td2.workspaceIds
                   au2.setWorkspaceIds(td2.workspaceIds)
                 }
+                pushTicketDescriptionMessage(td2)
               }
               await chat.loadSessions()
 

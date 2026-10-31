@@ -6,7 +6,7 @@ const { register } = useCommandRegistry()
 register({
   name: '/chat_select_ticket',
   category: 'Proyecto',
-  description: 'Abre un selector interactivo para buscar y asignar un ticket de Redmine a la sesión actual. Permite buscar por ID o asunto, o ingresar directamente un número de ticket.',
+  description: 'Abre un selector interactivo para buscar y asignar un ticket abierto del proyecto Redmine asignado a la sesión actual. Al abrirse consulta Redmine y refresca el listado interno de tickets. Permite buscar por ID o asunto, o ingresar directamente un número de ticket.',
   usage: '/chat_select_ticket',
   async execute(args, { chatStore, sessionId }) {
     if (!sessionId) {

@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import db from '../config/db.js';
+import dbChatMessages from '../config/dbChatMessages.js';
 import dbUserSettings from '../config/dbUserSettings.js';
 import dbRedmineData from '../config/dbRedmineData.js';
-import { getRedmineToken, getRedmineUrl, syncRedmineTicket } from '../services/redmine.js';
+import { getRedmineToken, getRedmineUrl, syncRedmineTicket, syncRedmineProjectTickets } from '../services/redmine.js';
 
 const router = Router();
 
@@ -85,6 +86,88 @@ router.get('/options', async (req, res) => {
   } catch (err) {
     console.log('Error al obtener opciones de Redmine:', err.message);
     res.json({ statuses: [], priorities: [], users: [] });
+  }
+});
+
+router.get('/session/:sessionId/open', async (req, res) => {
+  if (!authGuard(req, res)) return;
+
+  try {
+    const session = await db('chat_sessions')
+      .select('proyecto_id', 'workspace_id')
+      .where({ id: req.params.sessionId, user_id: req.session.userId })
+      .first();
+
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Sesión de chat no encontrada.' });
+    }
+
+    if (!session.proyecto_id) {
+      return res.json({
+        success: false,
+        code: 'NO_PROJECT',
+        message: 'La sesión no tiene un proyecto Redmine asignado. Asigná un proyecto antes de seleccionar un ticket.',
+      });
+    }
+
+    const wsIds = req.session.workspaceIds || [1];
+    const proyecto = await dbRedmineData('proyectos')
+      .where({ id: session.proyecto_id })
+      .whereIn('workspace_id', wsIds)
+      .first();
+
+    if (!proyecto) {
+      return res.json({
+        success: false,
+        code: 'PROJECT_NOT_FOUND',
+        message: 'El proyecto asignado a la sesión no existe en el workspace activo.',
+      });
+    }
+
+    if (!proyecto.redmine_id) {
+      return res.json({
+        success: false,
+        code: 'NO_REDMINE_PROJECT',
+        message: `El proyecto "${proyecto.id}" no tiene un ID de Redmine asociado.`,
+      });
+    }
+
+    const wsId = proyecto.workspace_id || session.workspace_id || wsIds[0] || 1;
+    const token = await getRedmineToken(wsId);
+    const url = await getRedmineUrl(wsId);
+
+    if (!token || !url) {
+      return res.json({
+        success: false,
+        code: 'REDMINE_NOT_CONFIGURED',
+        message: 'Token o URL de Redmine no configurados. Configure ambos en Configuración.',
+      });
+    }
+
+    const result = await syncRedmineProjectTickets(proyecto, token, url, wsId, {
+      statusId: 'open',
+      sort: 'updated_on:desc',
+    });
+
+    const tickets = result.redmineIds.length > 0
+      ? await dbRedmineData('tickets')
+          .where({ proyecto_id: proyecto.id, workspace_id: wsId })
+          .whereIn('redmine_id', result.redmineIds)
+          .orderBy('redmine_updated_on', 'desc')
+          .select('*')
+      : [];
+
+    res.json({
+      success: true,
+      proyectoId: proyecto.id,
+      tickets,
+      importados: result.importados,
+      actualizados: result.actualizados,
+      total: tickets.length,
+    });
+  } catch (err) {
+    console.log('Error al obtener tickets abiertos de la sesión:', err.message);
+    res.status(500).json({ success: false, message: 'Error al obtener tickets abiertos: ' + err.message });
   }
 });
 
@@ -195,7 +278,13 @@ router.post('/session', async (req, res) => {
   }
 
   try {
+    const existingSession = await db('chat_sessions')
+      .where({ id: sessionId, user_id: req.session.userId })
+      .select('id_ticket_redmine')
+      .first();
+
     const updateData = { id_ticket_redmine: idTicketRedmine || null, updated_at: db.fn.now() };
+    let ticket = null;
 
     if (idTicketRedmine) {
       // 1. Determinar wsId y proyectoId
@@ -243,7 +332,7 @@ router.post('/session', async (req, res) => {
       }
 
       // 3. Obtener datos frescos del ticket (sync pudo resolver proyectoId)
-      const ticket = await dbRedmineData('tickets')
+      ticket = await dbRedmineData('tickets')
         .where({ redmine_id: idTicketRedmine, workspace_id: wsId })
         .select('*')
         .first();
@@ -276,7 +365,19 @@ router.post('/session', async (req, res) => {
       .where({ id: sessionId, user_id: req.session.userId })
       .update(updateData);
 
-    res.json({ success: true, workspaceIds: req.session.workspaceIds || [1] });
+    // 6. Pegar la descripción del ticket en la sesión de chat
+    let descriptionInserted = false;
+    const description = ticket?.description ? String(ticket.description).trim() : '';
+    if (existingSession && description) {
+      await dbChatMessages('chat_messages').insert({
+        session_id: sessionId,
+        role: 'result',
+        content: description,
+      });
+      descriptionInserted = true;
+    }
+
+    res.json({ success: true, workspaceIds: req.session.workspaceIds || [1], ticket, descriptionInserted });
   } catch (err) {
     console.log('Error al asignar ticket a sesión:', err.message);
     res.status(500).json({ error: err.message });

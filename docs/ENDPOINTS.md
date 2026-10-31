@@ -974,6 +974,16 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 - **Descripción:** Obtiene los estados permitidos (transiciones válidas) para un ticket específico desde la API de Redmine. Consulta `GET /issues/{ticketId}.json?include=allowed_statuses`. Si Redmine no está configurado o falla la conexión, retorna arreglo vacío.
 - **Respuesta 200:** `{ statuses: [{ id: 1, name: "New" }, { id: 2, name: "In Progress" }, ...] }`
 
+### `GET /api/tickets/session/:sessionId/open`
+- **Auth:** Requerida
+- **Params:** `sessionId` — ID de la sesión de chat
+- **Descripción:** Devuelve los tickets abiertos del proyecto Redmine asignado a la sesión. Antes de responder, consulta Redmine (`/issues.json?project_id=...&status_id=open`) con paginación automática y actualiza/inserta esos tickets en la tabla local `tickets` (refresco del listado interno). Solo devuelve los tickets abiertos obtenidos en esa consulta.
+- **Respuesta 200:** `{ success: true, proyectoId, tickets: [{ id, proyecto_id, redmine_id, subject, status_name, priority_id, priority_name, assigned_to_name, redmine_updated_on, ... }], importados, actualizados, total }`
+- **Respuesta 200 (sin proyecto):** `{ success: false, code: "NO_PROJECT", message: "La sesión no tiene un proyecto Redmine asignado..." }`
+- **Respuesta 200 (proyecto inválido):** `{ success: false, code: "PROJECT_NOT_FOUND" | "NO_REDMINE_PROJECT" | "REDMINE_NOT_CONFIGURED", message }`
+- **Respuesta 404:** `{ success: false, message: "Sesión de chat no encontrada." }`
+- **Respuesta 500:** `{ success: false, message: "Error al obtener tickets abiertos: ..." }`
+
 ### `GET /api/tickets/session/:sessionId`
 - **Auth:** Requerida
 - **Params:** `sessionId` — ID de la sesión de chat
@@ -997,8 +1007,8 @@ Hace proxy al servicio de gastos independiente (puerto `4100`).
 ### `POST /api/tickets/session`
 - **Auth:** Requerida
 - **Body:** `{ sessionId: number, idTicketRedmine: number }`
-- **Descripción:** Asigna un ticket de Redmine a la sesión de chat. Si `idTicketRedmine` es `null` o se omite, limpia la asignación.
-- **Respuesta 200:** `{ success: true }`
+- **Descripción:** Asigna un ticket de Redmine a la sesión de chat. Si `idTicketRedmine` es `null` o se omite, limpia la asignación. Si el ticket tiene una descripción no vacía, la inserta como mensaje `result` en la sesión de chat para que quede visible en el historial.
+- **Respuesta 200:** `{ success: true, workspaceIds: [...], ticket: { ...datos del ticket... } | null, descriptionInserted: boolean }`
 - **Respuesta 400:** `{ error: "sessionId es requerido" }`
 
 ### `PUT /api/tickets/session/:sessionId`

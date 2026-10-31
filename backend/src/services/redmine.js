@@ -31,6 +31,91 @@ function toDateTime(dateStr) {
   return d.toISOString().replace('T', ' ').replace('Z', '').split('.')[0];
 }
 
+export async function syncRedmineProjectTickets(proyecto, token, url, workspaceId, options = {}) {
+  const { statusId = null, sort = 'id' } = options;
+  const baseUrl = url.replace(/\/+$/, '') + '/issues.json';
+  const wsId = workspaceId || 1;
+  let allIssues = [];
+  let offset = 0;
+  const limit = 100;
+
+  while (true) {
+    const params = new URLSearchParams({
+      project_id: proyecto.redmine_id,
+      limit: String(limit),
+      offset: String(offset),
+      sort,
+    });
+    if (statusId) params.set('status_id', statusId);
+
+    const response = await fetch(`${baseUrl}?${params.toString()}`, {
+      headers: {
+        'X-Redmine-API-Key': token,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`HTTP ${response.status}${text ? ' — ' + text.slice(0, 200) : ''}`);
+    }
+
+    const data = await response.json();
+    allIssues = allIssues.concat(data.issues || []);
+
+    const total = data.total_count || allIssues.length;
+    if (allIssues.length >= total) break;
+    offset += limit;
+  }
+
+  let importados = 0;
+  let actualizados = 0;
+
+  for (const issue of allIssues) {
+    try {
+      const ticketData = {
+        proyecto_id: proyecto.id,
+        workspace_id: wsId,
+        redmine_id: issue.id,
+        subject: issue.subject || '(sin asunto)',
+        description: issue.description || null,
+        status_name: issue.status?.name || null,
+        tracker_name: issue.tracker?.name || null,
+        priority_id: issue.priority?.id || null,
+        priority_name: issue.priority?.name || null,
+        assigned_to_name: issue.assigned_to?.name || null,
+        author_name: issue.author?.name || null,
+        start_date: issue.start_date || null,
+        due_date: issue.due_date || null,
+        estimated_hours: issue.estimated_hours || null,
+        done_ratio: issue.done_ratio || null,
+        fixed_version_name: issue.fixed_version?.name || null,
+        redmine_created_on: toDateTime(issue.created_on),
+        redmine_updated_on: toDateTime(issue.updated_on),
+        redmine_closed_on: toDateTime(issue.closed_on),
+      };
+
+      const existing = await dbRedmineData('tickets').where({ redmine_id: issue.id, workspace_id: wsId }).first();
+      if (existing) {
+        await dbRedmineData('tickets').where({ redmine_id: issue.id, workspace_id: wsId }).update(ticketData);
+        actualizados++;
+      } else {
+        await dbRedmineData('tickets').insert(ticketData);
+        importados++;
+      }
+    } catch (err) {
+      console.log('Error al guardar ticket Redmine:', issue.id, err.message);
+    }
+  }
+
+  return {
+    importados,
+    actualizados,
+    total_redmine: allIssues.length,
+    redmineIds: allIssues.map(issue => issue.id),
+  };
+}
+
 export async function syncRedmineTicket(redmineId, wsId, proyectoId) {
   const token = await getRedmineToken(wsId);
   const url = await getRedmineUrl(wsId);
