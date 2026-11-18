@@ -35,7 +35,7 @@
 
 <script>
 import { ref, onMounted, nextTick } from 'vue'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useFileTreeStore } from '../../stores/fileTree.js'
 
 export default {

@@ -58,7 +58,7 @@
 
 <script>
 import { ref } from 'vue'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useProjectVariablesStore } from '../../stores/projectVariables.js'
 import JsonTreeView from '../utils/JsonTreeView.vue'
 

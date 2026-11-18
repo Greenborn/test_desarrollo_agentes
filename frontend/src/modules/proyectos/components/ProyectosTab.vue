@@ -38,7 +38,7 @@ import { storeToRefs } from 'pinia'
 import { useProjectStore } from '../../../stores/project.js'
 import { useWorkspaceStore } from '../../../stores/workspace.js'
 import { useChatStore } from '../../../stores/chat.js'
-import { TableEditor } from 'vue-table-editor'
+import { TableEditor } from '@greenborn/vue-table-editor'
 import { createPiniaPrefsAdapter } from '../../../components/TableEditor/preferenciasAdapter.js'
 
 export default {

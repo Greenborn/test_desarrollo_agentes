@@ -32,7 +32,7 @@
 
 <script>
 import { ref } from 'vue'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import DescripcionMejorarModal from '../chat-controls/DescripcionMejorarModal.vue'
 
 export default {

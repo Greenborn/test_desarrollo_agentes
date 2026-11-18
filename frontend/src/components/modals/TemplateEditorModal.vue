@@ -64,7 +64,7 @@
 
 <script>
 import { ref, onMounted } from 'vue'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useTemplatesStore } from '../../stores/templates.js'
 import { useChatStore } from '../../stores/chat.js'
 import ChatFormatter from '../chat/ChatFormatter.vue'

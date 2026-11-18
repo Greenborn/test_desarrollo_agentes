@@ -157,7 +157,7 @@ import NewSessionSetupControl from '../chat-controls/NewSessionSetupControl.vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useChatStore } from '../../stores/chat.js'
 import { useComandosPersonalizadosStore } from '../../stores/comandosPersonalizados.js'
-import { watch, computed } from 'vue'
+import { watch, computed, ref } from 'vue'
 
 let counter = 0
 
@@ -196,10 +196,40 @@ export default {
       return session?.proyecto_id || null
     })
 
-    const projectCommands = computed(() => {
+    const customCommands = computed(() => {
       const pid = proyectoId.value
       if (!pid) return []
       return comandosStore.commandsByProject[pid] || []
+    })
+
+    const bashScripts = ref([])
+
+    async function loadBashScripts() {
+      const sid = sessionId.value
+      if (!sid) {
+        bashScripts.value = []
+        return
+      }
+      try {
+        const res = await fetch(`/api/command/bash-scripts?sessionId=${sid}`, { credentials: 'include' })
+        if (res.ok) {
+          const data = await res.json()
+          bashScripts.value = data.scripts || []
+        } else {
+          bashScripts.value = []
+        }
+      } catch (err) {
+        console.log('[ChatMessage] Error al cargar scripts bash:', err.message)
+        bashScripts.value = []
+      }
+    }
+
+    const projectCommands = computed(() => {
+      const bashOptions = (bashScripts.value || []).map(s => {
+        const scriptPath = s.relativePath === '.' ? s.name : s.relativePath + '/' + s.name
+        return { id: 'bash:' + scriptPath, label: '📜 ' + scriptPath }
+      })
+      return [...customCommands.value, ...bashOptions]
     })
 
     const runCommandEnabled = computed(() => {
@@ -216,7 +246,8 @@ export default {
 
     watch([isCommitControl, proyectoId], ([isCommit, pid]) => {
       if (isCommit && pid) comandosStore.loadCommands(pid)
-    })
+      if (isCommit) loadBashScripts()
+    }, { immediate: true })
 
     function onRunCommandEnabled(val) {
       const sid = sessionId.value

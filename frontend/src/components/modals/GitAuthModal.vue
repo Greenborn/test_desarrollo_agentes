@@ -34,7 +34,7 @@
 
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 
 export default {
   props: {

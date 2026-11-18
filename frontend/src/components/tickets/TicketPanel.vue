@@ -38,7 +38,7 @@ import { useChatStore } from '../../stores/chat.js'
 import { useTicketStore } from '../../stores/ticket.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useProjectStore } from '../../stores/project.js'
-import { TableEditor } from 'vue-table-editor'
+import { TableEditor } from '@greenborn/vue-table-editor'
 import { createPiniaPrefsAdapter } from '../TableEditor/preferenciasAdapter.js'
 
 export default {

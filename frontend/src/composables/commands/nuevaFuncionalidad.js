@@ -1,5 +1,5 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
-import { useModal } from 'vue-greenborn-modal-manager';
+import { useModal } from '@greenborn/vue-greenborn-modal-manager';
 import FuncionalidadWizard from '../../components/wizards/FuncionalidadWizard.vue';
 
 const { register } = useCommandRegistry();

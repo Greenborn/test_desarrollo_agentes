@@ -234,7 +234,7 @@ hljs.registerLanguage('dockerfile', dockerfile)
 hljs.registerLanguage('plaintext', plaintext)
 import ChatFormatter from '../chat/ChatFormatter.vue'
 import { useSettingsStore } from '../../stores/settings.js'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useCsvParser } from '../../composables/useCsvParser.js'
 import CsvViewerModal from './CsvViewerModal.vue'
 

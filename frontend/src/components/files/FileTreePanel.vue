@@ -74,7 +74,7 @@
 
 <script>
 import { computed, ref, reactive, watch, onBeforeUnmount, onMounted, nextTick } from 'vue'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useFileTreeStore } from '../../stores/fileTree.js'
 import { useComponentContextMenu } from '../../composables/useComponentContextMenu.js'
 import { adjustContextMenuPosition } from '../../utils/contextMenu.js'

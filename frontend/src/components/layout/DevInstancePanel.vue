@@ -14,7 +14,7 @@
 <script>
 import { watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { TabPanel, useTabController } from 'vue-greenborn-panels'
+import { TabPanel, useTabController } from '@greenborn/vue-greenborn-panels'
 import { useUiStore } from '../../stores/ui.js'
 import { useChatStore } from '../../stores/chat.js'
 import { useActiveComponentsStore } from '../../stores/activeComponents.js'

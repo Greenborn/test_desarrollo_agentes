@@ -47,7 +47,7 @@
 
 <script>
 import { computed, onMounted } from 'vue';
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useFuncionalidadStore } from '../../stores/funcionalidad.js';
 
 export default {

@@ -56,7 +56,7 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import ChatFormatter from '../chat/ChatFormatter.vue'
 import FileEditorOpenCodeChat from './FileEditorOpenCodeChat.vue'
 import JsonTreeView from '../utils/JsonTreeView.vue'

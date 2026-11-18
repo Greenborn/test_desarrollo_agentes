@@ -1,6 +1,6 @@
 import { useCommandRegistry } from '../useCommandRegistry.js';
 import { parseCommandArgs, getUsedFlags } from '../parseCommandArgs.js';
-import { useModal } from 'vue-greenborn-modal-manager';
+import { useModal } from '@greenborn/vue-greenborn-modal-manager';
 import { useTemplatesStore } from '../../stores/templates.js';
 import TemplateEditorModal from '../../components/modals/TemplateEditorModal.vue';
 

@@ -5,8 +5,8 @@
 
 <script>
 import { onMounted, watch } from 'vue'
-import { ModalContainer } from 'vue-greenborn-modal-manager'
-import 'vue-greenborn-modal-manager/style.css'
+import { ModalContainer } from '@greenborn/vue-greenborn-modal-manager'
+import '@greenborn/vue-greenborn-modal-manager/style.css'
 import { useAuthStore } from './stores/auth.js'
 import { useSettingsStore } from './stores/settings.js'
 import { useComponentContextMenu } from './composables/useComponentContextMenu.js'

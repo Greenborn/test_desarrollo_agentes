@@ -29,7 +29,7 @@ import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useRedmineCommentsStore } from '../../../stores/redmineComments.js'
 import { useCommandRegistry } from '../../../composables/useCommandRegistry.js'
-import { TableEditor, BtnConfig } from 'vue-table-editor'
+import { TableEditor, BtnConfig } from '@greenborn/vue-table-editor'
 import { createPiniaPrefsAdapter } from '../../../components/TableEditor/preferenciasAdapter.js'
 
 export default {

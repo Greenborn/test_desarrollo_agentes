@@ -1,5 +1,5 @@
 import { parseCommandArgs, getUsedFlags } from '../../../composables/parseCommandArgs.js'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useWorkspaceStore } from '../../../stores/workspace.js'
 import GestionSyncModal from '../../../components/modals/GestionSyncModal.vue'
 

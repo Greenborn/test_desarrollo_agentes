@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import { useChatStore } from '../stores/chat.js'
 import { useOpencodeStore } from '../stores/opencode.js'
 import { useCommandStore } from '../stores/command.js'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useWorkspaceStore } from '../stores/workspace.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useSettingsStore } from '../stores/settings.js'
@@ -1763,8 +1763,44 @@ export function useControlHandlers(api) {
     await deepseekStreamCommit(sessionId, prompt, systemPrompt)
   }
 
+  async function _consumeCommandSSE(res) {
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let output = ''
+    let exitCode = null
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed || trimmed === 'data: [DONE]') continue
+        if (!trimmed.startsWith('data: ')) continue
+        try {
+          const json = JSON.parse(trimmed.slice(6))
+          if (json.type === 'stdout' || json.type === 'stderr') {
+            output += json.content
+          } else if (json.type === 'exit') {
+            exitCode = json.code
+          } else if (json.type === 'error') {
+            output += (output ? '\n' : '') + '[Error: ' + json.content + ']'
+          }
+        } catch (err) {
+          console.error('Error parseando SSE de comando del proyecto:', err.message)
+        }
+      }
+    }
+    return { output: output.trim(), exitCode }
+  }
+
   async function runProjectCommand(sessionId, commandId) {
     if (!sessionId || !commandId) return { output: '', exitCode: null }
+    if (typeof commandId === 'string' && commandId.startsWith('bash:')) {
+      return runBashScriptCommand(sessionId, commandId.slice(5))
+    }
     try {
       const res = await fetch(`/api/comandos-personalizados/${commandId}/execute`, {
         method: 'POST',
@@ -1776,39 +1812,30 @@ export function useControlHandlers(api) {
         const errData = await res.json().catch(() => ({}))
         return { output: 'Error al ejecutar comando: ' + (errData.error || res.statusText), exitCode: null }
       }
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let output = ''
-      let exitCode = null
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-        for (const line of lines) {
-          const trimmed = line.trim()
-          if (!trimmed || trimmed === 'data: [DONE]') continue
-          if (!trimmed.startsWith('data: ')) continue
-          try {
-            const json = JSON.parse(trimmed.slice(6))
-            if (json.type === 'stdout' || json.type === 'stderr') {
-              output += json.content
-            } else if (json.type === 'exit') {
-              exitCode = json.code
-            } else if (json.type === 'error') {
-              output += (output ? '\n' : '') + '[Error: ' + json.content + ']'
-            }
-          } catch (err) {
-            console.error('Error parseando SSE de comando del proyecto:', err.message)
-          }
-        }
-      }
-      return { output: output.trim(), exitCode }
+      return await _consumeCommandSSE(res)
     } catch (err) {
       console.error('Error al ejecutar comando del proyecto:', err.message)
       return { output: 'Error al ejecutar comando: ' + err.message, exitCode: null }
+    }
+  }
+
+  async function runBashScriptCommand(sessionId, scriptPath) {
+    if (!sessionId || !scriptPath) return { output: '', exitCode: null }
+    try {
+      const res = await fetch('/api/command/execute-bash-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ sessionId, scriptPath }),
+      })
+      if (!res.ok || !res.body) {
+        const errData = await res.json().catch(() => ({}))
+        return { output: 'Error al ejecutar script bash: ' + (errData.error || res.statusText), exitCode: null }
+      }
+      return await _consumeCommandSSE(res)
+    } catch (err) {
+      console.error('Error al ejecutar script bash:', err.message)
+      return { output: 'Error al ejecutar script bash: ' + err.message, exitCode: null }
     }
   }
 

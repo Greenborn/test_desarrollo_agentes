@@ -9,6 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@greenborn/vue-greenborn-modal-manager": "^1.5.1",
+    "@greenborn/vue-greenborn-panels": "^1.0.0",
+    "@greenborn/vue-table-editor": "^1.1.1",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-image": "^0.9.0",
     "@xterm/xterm": "^6.0.0",
@@ -17,10 +20,7 @@
     "highlight.js": "^11.11.1",
     "pinia": "^2.3.1",
     "vue": "^3.5.13",
-    "vue-greenborn-modal-manager": "^1.5.1",
-    "vue-greenborn-panels": "^1.0.0",
-    "vue-router": "^4.5.0",
-    "vue-table-editor": "^1.1.1"
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.3",

@@ -26,10 +26,10 @@ import { watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
 import { useProjectVariablesStore } from '../../../stores/projectVariables.js'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import VariableDetailModal from '../../../components/modals/VariableDetailModal.vue'
 import CreateVariableModal from '../../../components/modals/CreateVariableModal.vue'
-import { TableEditor } from 'vue-table-editor'
+import { TableEditor } from '@greenborn/vue-table-editor'
 import { createPiniaPrefsAdapter } from '../../../components/TableEditor/preferenciasAdapter.js'
 
 export default {

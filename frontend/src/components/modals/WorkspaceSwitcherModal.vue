@@ -46,7 +46,7 @@
 <script>
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useChatStore } from '../../stores/chat.js'

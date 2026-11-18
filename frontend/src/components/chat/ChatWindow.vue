@@ -43,7 +43,7 @@ import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../stores/chat.js'
 import { useCommandStore } from '../../stores/command.js'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useOpencodeStore } from '../../stores/opencode.js'
 import { useGitStore } from '../../stores/git.js'
 import { useDevInstanceStore } from '../../stores/devInstance.js'

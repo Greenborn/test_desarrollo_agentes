@@ -1011,4 +1011,92 @@ router.post('/execute-npm-script', async (req, res) => {
   }
 })
 
+router.post('/execute-bash-script', async (req, res) => {
+  if (!authGuard(req, res)) return
+  const { sessionId, scriptPath } = req.body
+  if (!scriptPath) {
+    return res.status(400).json({ error: 'scriptPath es requerido' })
+  }
+
+  try {
+    let cwd = process.cwd()
+    if (sessionId) {
+      const session = await db('chat_sessions').where({ id: sessionId }).select('cwd').first()
+      if (session && session.cwd) cwd = session.cwd
+    }
+
+    const resolvedPath = path.resolve(cwd, scriptPath)
+    const normalizedCwd = path.resolve(cwd)
+    if (!resolvedPath.startsWith(normalizedCwd + path.sep) && resolvedPath !== normalizedCwd) {
+      return res.status(400).json({ error: 'scriptPath fuera del directorio del proyecto' })
+    }
+    if (!fs.existsSync(resolvedPath)) {
+      return res.status(400).json({ error: `El script '${resolvedPath}' no existe` })
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    })
+
+    const proc = spawn('bash', [resolvedPath], {
+      cwd: normalizedCwd,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+
+    let aborted = false
+    const cleanup = () => {
+      if (!aborted) {
+        aborted = true
+        proc.kill('SIGTERM')
+      }
+    }
+
+    req.on('close', cleanup)
+
+    proc.stdout.on('data', (data) => {
+      if (aborted) return
+      const text = data.toString()
+      if (text) {
+        res.write(`data: ${JSON.stringify({ type: 'stdout', content: text })}\n\n`)
+      }
+    })
+
+    proc.stderr.on('data', (data) => {
+      if (aborted) return
+      const text = data.toString()
+      if (text) {
+        res.write(`data: ${JSON.stringify({ type: 'stderr', content: text })}\n\n`)
+      }
+    })
+
+    proc.on('exit', (code) => {
+      if (!aborted) {
+        res.write(`data: ${JSON.stringify({ type: 'exit', code })}\n\n`)
+        res.write('data: [DONE]\n\n')
+      }
+      res.end()
+    })
+
+    proc.on('error', (err) => {
+      if (!aborted) {
+        res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`)
+        res.write('data: [DONE]\n\n')
+      }
+      res.end()
+    })
+  } catch (err) {
+    console.log('Error al ejecutar script bash:', err.message)
+    if (res.headersSent) {
+      res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`)
+      res.write('data: [DONE]\n\n')
+      res.end()
+    } else {
+      res.status(500).json({ error: err.message })
+    }
+  }
+})
+
 export default router;

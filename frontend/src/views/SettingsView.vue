@@ -515,7 +515,7 @@ import { useSettingsStore } from '../stores/settings.js'
 import { useWorkspaceStore } from '../stores/workspace.js'
 import { useChatStore } from '../stores/chat.js'
 import { useAuthStore } from '../stores/auth.js'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useEnvironmentsStore } from '../stores/environments.js'
 import WorkspaceFormModal from '../components/modals/WorkspaceFormModal.vue'
 

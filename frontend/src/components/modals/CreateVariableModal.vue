@@ -49,7 +49,7 @@
 
 <script>
 import { ref, reactive } from 'vue'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useChatStore } from '../../stores/chat.js'
 import { useCommandRegistry } from '../../composables/useCommandRegistry.js'
 

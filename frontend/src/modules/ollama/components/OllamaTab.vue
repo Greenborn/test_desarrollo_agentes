@@ -80,10 +80,10 @@
 <script>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Modal } from 'bootstrap'
-import { TableEditor, BtnConfig } from 'vue-table-editor'
+import { TableEditor, BtnConfig } from '@greenborn/vue-table-editor'
 import { createPiniaPrefsAdapter } from '../../../components/TableEditor/preferenciasAdapter.js'
 import OllamaConfigModal from './OllamaConfigModal.vue'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 
 export default {
   components: { TableEditor },

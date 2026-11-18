@@ -39,7 +39,7 @@
 
 <script>
 import { ref, onMounted } from 'vue'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import DescripcionMejorarModal from './DescripcionMejorarModal.vue'
 
 export default {

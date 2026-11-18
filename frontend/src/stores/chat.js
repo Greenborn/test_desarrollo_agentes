@@ -6,7 +6,7 @@ import { useSettingsStore } from './settings.js'
 import { useOpencodeStore } from './opencode.js'
 import wsClient from '../services/wsClient.js'
 import { playAlertBeep } from '../utils/audio.js'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 
 const API = '/api'
 const SESSION_KEY = 'oc_active_session_id'

@@ -117,7 +117,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../../stores/chat.js'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import { useWorkspaceStore } from '../../../stores/workspace.js'
 import { settingSet, settingGet } from '../../../services/settingService.js'
 import ChatFormatter from '../../../components/chat/ChatFormatter.vue'

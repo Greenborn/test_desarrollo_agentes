@@ -46,7 +46,7 @@
 
 <script>
 import { ref, computed, watch } from 'vue'
-import { useModal } from 'vue-greenborn-modal-manager'
+import { useModal } from '@greenborn/vue-greenborn-modal-manager'
 import ChatCdSelector from './ChatCdSelector.vue'
 
 export default {
