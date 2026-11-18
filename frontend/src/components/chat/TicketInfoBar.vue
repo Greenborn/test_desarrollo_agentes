@@ -17,7 +17,7 @@
       <button v-else class="btn btn-sm btn-outline-danger px-2" @click="detenerInstanciaDev" title="Detener instancia desarrollo">⏹️</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="configurarDespliegue" title="Configurar despliegue (deploy.json)">📋</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="generarCommit" title="Generar commit">💾</button>
-      <button class="btn btn-sm btn-outline-argentina px-2" @click="iniciarOpencode" title="Iniciar OpenCode">🚀</button>
+      <button class="btn btn-sm btn-outline-argentina px-2" @click="iniciarAgentePorDefecto" @contextmenu.prevent="abrirMenuAgente" :title="tituloBotonAgente">🚀</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="syncSkills" title="Sincronizar configuración de skills del proyecto">⚙️</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="iniciarTerminal" title="Abrir terminal">💻</button>
       <button class="btn btn-sm btn-outline-argentina px-2" @click="abrirNavegador" title="Abrir navegador Playwright">🌐</button>
@@ -28,11 +28,26 @@
         <button class="btn btn-sm btn-outline-secondary px-1 zoom-btn" @click="zoomIn" :disabled="gitStore.chatZoom >= 200" title="Acercar">+</button>
       </div>
     </div>
+    <template v-if="menuAgente.show">
+      <div class="ticket-agent-menu-backdrop" @mousedown="cerrarMenuAgente" @contextmenu.prevent></div>
+      <div ref="menuAgenteRef" class="ticket-agent-menu" :style="{ top: menuAgente.y + 'px', left: menuAgente.x + 'px' }" @click.stop>
+        <div class="ticket-agent-menu-title">Agente por defecto</div>
+        <div
+          v-for="(etiqueta, clave) in AGENTES"
+          :key="clave"
+          class="ticket-agent-menu-item"
+          @click="seleccionarAgentePorDefecto(clave)"
+        >
+          <span class="ticket-agent-check">{{ agentePorDefecto === clave ? '✓' : '' }}</span>{{ etiqueta }}
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
+import { adjustContextMenuPosition } from '../../utils/contextMenu.js'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../stores/chat.js'
 import { useGitStore } from '../../stores/git.js'
@@ -52,6 +67,51 @@ export default {
 
     const ticketInfo = ref(null)
     const devInstanceRunning = computed(() => devInstanceStore.hasProcesses)
+
+    // Agentes que lanza el botón 🚀. La elección se guarda en prefs de la sesión (clave `agentePorDefecto`).
+    const AGENTES = { opencode: 'OpenCode', claude: 'Claude' }
+    // Valor usado solo cuando la sesión todavía no tiene preferencia guardada.
+    const AGENTE_INICIAL = 'opencode'
+
+    const agentePorDefecto = computed(() => {
+      if (!activeSessionId.value) return AGENTE_INICIAL
+      const valor = chatStore.getSessionPrefs(activeSessionId.value).agentePorDefecto
+      if (valor === undefined) return AGENTE_INICIAL
+      return valor
+    })
+
+    const tituloBotonAgente = computed(() =>
+      `Iniciar agente ${AGENTES[agentePorDefecto.value]} (clic derecho: elegir agente por defecto)`
+    )
+
+    const menuAgente = ref({ show: false, x: 0, y: 0 })
+    const menuAgenteRef = ref(null)
+
+    function abrirMenuAgente(e) {
+      if (!activeSessionId.value) return
+      menuAgente.value = { show: true, x: e.clientX, y: e.clientY }
+      nextTick(() => {
+        if (!menuAgenteRef.value) return
+        const ajustado = adjustContextMenuPosition(menuAgenteRef.value, menuAgente.value.x, menuAgente.value.y)
+        menuAgente.value.x = ajustado.x
+        menuAgente.value.y = ajustado.y
+      })
+    }
+
+    function cerrarMenuAgente() {
+      menuAgente.value = { ...menuAgente.value, show: false }
+    }
+
+    async function seleccionarAgentePorDefecto(clave) {
+      cerrarMenuAgente()
+      if (!activeSessionId.value) return
+      await chatStore.saveSessionPref(activeSessionId.value, 'agentePorDefecto', clave)
+    }
+
+    function iniciarAgentePorDefecto() {
+      if (agentePorDefecto.value === 'claude') return iniciarClaude()
+      return iniciarOpencode()
+    }
 
     async function loadTicketInfo() {
       ticketInfo.value = null
@@ -185,6 +245,26 @@ export default {
       await executeCommand('/dev_opencode_iniciar')
     }
 
+    function iniciarClaude() {
+      const sid = activeSessionId.value
+      if (!sid) return
+      const session = sessions.value.find(s => Number(s.id) === Number(sid))
+      const cwd = session?.cwd || ''
+      if (!cwd) {
+        chatStore.pushMessage({
+          role: 'opencode_control',
+          controlData: {
+            controlType: 'cd_selector',
+            controlId: 'cd-' + Date.now(),
+            currentDir: '/',
+          },
+          _key: 'ctrl-' + Date.now(),
+        }, sid)
+        return
+      }
+      chatStore.openTerminal({ cwd, initCommand: 'claude', label: 'Claude', sessionId: sid })
+    }
+
     async function iniciarTerminal() {
       if (!activeSessionId.value) return
       await executeCommand('/terminal')
@@ -224,6 +304,8 @@ export default {
       zoomIn, zoomOut,
       generarCommit, configurarDespliegue, iniciarInstanciaDev, detenerInstanciaDev,
       modificarTicket, seleccionarTicket, crearTicket, crearProyecto, iniciarOpencode, syncSkills, iniciarTerminal, clearChat, abrirNavegador,
+      AGENTES, agentePorDefecto, tituloBotonAgente, menuAgente, menuAgenteRef,
+      abrirMenuAgente, cerrarMenuAgente, seleccionarAgentePorDefecto, iniciarAgentePorDefecto,
     }
   },
 }
@@ -306,6 +388,46 @@ export default {
 .priority-dot.priority-immediate {
   background: var(--priority-immediate-color, #ef4444);
   box-shadow: 0 0 4px var(--priority-immediate-color, #ef4444);
+}
+.ticket-agent-menu-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9998;
+}
+.ticket-agent-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #1a2744;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 170px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.ticket-agent-menu-title {
+  padding: 4px 14px;
+  font-size: 0.7rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ticket-agent-menu-item {
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  color: #e6edf3;
+  cursor: pointer;
+}
+.ticket-agent-menu-item:hover {
+  background: rgba(117, 170, 219, 0.15);
+  color: #75AADB;
+}
+.ticket-agent-check {
+  display: inline-block;
+  width: 16px;
+  color: #3fb950;
 }
 .zoom-controls {
   flex-shrink: 0;
