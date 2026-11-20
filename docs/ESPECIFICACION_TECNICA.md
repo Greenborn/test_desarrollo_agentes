@@ -265,6 +265,13 @@ El botón **Confirmar** se habilita solo cuando workspace, proyecto y directorio
 - Guard de navegación: verifica `auth.user` antes de rutas protegidas
 - Redirección automática a login si no hay sesión
 
+### Reporte contextual (notas de desarrollo)
+
+- Paquete `@greenborn/vue-greenborn-reporte-contextual` montado en `App.vue` (solo si `VITE_SGI_API_URL` y `VITE_SGI_PROYECTO_SLUG` están definidas).
+- Disparo: **Alt + clic derecho** (menú "Reportar este elemento") o **tecla `d` mantenida + clic izquierdo**. El clic derecho sin Alt conserva el menú contextual de componentes (`useComponentContextMenu.js`), que ignora los eventos con Alt.
+- Envío: el paquete consulta la apikey pública diaria en `GET {SGI}/api/public/notas-desarrollo/api-key` y luego hace `POST {SGI}/api/public/notas-desarrollo` con header `X-Api-Key`. Payload: `slug_proyecto`, `notas`, `localizacion_componente`, `url`, `version`, `navegador`, `ancho_viewport`, `alto_viewport`, `es_movil` y `captura_pantalla` (webp base64, opcional).
+- El `slug_proyecto` debe existir en la tabla `proyectos` del SGI; si no, el SGI responde `El proyecto no existe`.
+
 ## 8. Configuración de entorno
 
 ### `backend/.env`
@@ -290,7 +297,12 @@ PROCESOS_CONSOLA_API_KEY=sk-procesos-...
 
 ```
 VITE_BACKEND_URL=http://localhost:4000
+VITE_SGI_API_URL=
+VITE_SGI_PROYECTO_SLUG=
+VITE_REPORTE_VERSION=
 ```
+
+Ver `frontend/.env.example`. `VITE_SGI_*` apuntan al SGI (reporte contextual).
 
 ## 9. Comandos de desarrollo
 

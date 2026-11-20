@@ -9,8 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@greenborn/vue-greenborn-modal-manager": "^1.5.1",
+    "@greenborn/vue-greenborn-modal-manager": "^1.7.1",
     "@greenborn/vue-greenborn-panels": "^1.0.0",
+    "@greenborn/vue-greenborn-reporte-contextual": "^0.1.9",
     "@greenborn/vue-table-editor": "^1.1.1",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-image": "^0.9.0",

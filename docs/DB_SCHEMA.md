@@ -182,10 +182,6 @@ Settings globales compartidas entre todos los workspaces (sin dependencia de wor
 | `archivos_tree_width_full` | `'260'` | Ancho del árbol de archivos cuando el panel derecho ocupa todo el ancho |
 | `capturas_list_width` | `'160'` | Ancho de la lista de capturas (modo normal) |
 | `capturas_list_width_full` | `'280'` | Ancho de la lista de capturas cuando el panel derecho ocupa todo el ancho |
-| `casos_prueba_list_width` | `'180'` | Ancho de la lista de casos de prueba (modo normal) |
-| `casos_prueba_list_width_full` | `'300'` | Ancho de la lista de casos de prueba cuando el panel derecho ocupa todo el ancho |
-| `casos_prueba_middle_width` | `'180'` | Ancho de la columna media de casos de prueba (modo normal) |
-| `casos_prueba_middle_width_full` | `'300'` | Ancho de la columna media de casos de prueba cuando el panel derecho ocupa todo el ancho |
 | `sidebar_chat_tab_order` | `'["chats","servicios","archived"]'` | Orden de pestañas del sidebar izquierdo (array JSON de IDs) |
 | `sidebar_right_tab_order` | `'["archivos","comentarios","terminales","variables","comandos","capturas","skills"]'` | Orden de pestañas del panel derecho (array JSON de IDs) |
 | `dev_panel_tab_order` | `'["instancias","repositorio","tickets","proyectos","console_logs","events","network_logs"]'` | Orden de pestañas del panel inferior (array JSON de IDs) |

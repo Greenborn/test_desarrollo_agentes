@@ -144,7 +144,7 @@ export default router
 
 | Panel | Clave en `tabs.` | Archivo del panel | ¿Tabs built-in? |
 |-------|-------------------|-------------------|-----------------|
-| Derecho | `sidebarRight` | `SidebarRight.vue` | comentarios, archivos, variables, comandos, capturas, casos_prueba, documentacion |
+| Derecho | `sidebarRight` | `SidebarRight.vue` | comentarios, archivos, variables, comandos, capturas, documentacion |
 | Izquierdo | `sidebarChat` | `SidebarChat.vue` | chats, servicios, archived |
 | Inferior | `devPanel` | `DevInstancePanel.vue` | instancias, repositorio, tickets, proyectos, console_logs, events, network_logs |
 

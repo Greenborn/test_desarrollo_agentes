@@ -12,7 +12,6 @@ Migrar las 6 pestañas built-in de `SidebarRight.vue` al sistema de módulos aut
 |---|--------|--------|-----------|
 | 1 | `comentarios` | `frontend/src/modules/comentarios/` | 10 |
 | 2 | `archivos` | `frontend/src/modules/archivos/` | 5 |
-| 3 | `casos_prueba` | `frontend/src/modules/casos_prueba/` | 8 |
 | 4 | `variables` | `frontend/src/modules/variables/` | 30 |
 | 5 | `comandos` | `frontend/src/modules/comandos/` | 40 |
 | 7 | `capturas` | `frontend/src/modules/capturas/` | 60 |

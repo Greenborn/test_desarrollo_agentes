@@ -11,6 +11,8 @@ export function useComponentContextMenu() {
     initialized = true
 
     document.addEventListener('contextmenu', (e) => {
+      // Alt + clic derecho lo usa el reporte contextual (@greenborn/vue-greenborn-reporte-contextual).
+      if (e.altKey) return
       e.preventDefault()
       setTimeout(() => {
         if (document.querySelector('.context-menu-backdrop')) return
